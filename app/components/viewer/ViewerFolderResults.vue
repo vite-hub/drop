@@ -48,7 +48,7 @@ const meta = (drop: DropSummary) =>
           <span class="min-w-0 flex-1">
             <span class="block truncate font-medium text-highlighted">{{ drop.title }}</span>
             <span class="mt-0.5 block truncate text-xs text-muted"
-              >{{ meta(drop) }} · <RelativeTime :style="'short'" :at="drop.updatedAt"
+              >{{ meta(drop) }} · <RelativeTime format="short" :at="drop.updatedAt"
             /></span>
             <span v-if="drop.snippet" class="mt-1 line-clamp-2 block text-sm text-muted">{{ drop.snippet }}</span>
           </span>

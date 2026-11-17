@@ -56,7 +56,7 @@ const about = computed(() => {
         class="ml-auto flex shrink-0 items-center gap-3 text-muted group-focus-within:invisible group-hover:invisible"
       >
         <UIcon v-if="shared" :aria-label="status" class="size-3.5" :name="SHARE_ICONS[drop.share]" role="img" />
-        <RelativeTime :style="'short'" class="w-24 text-right tabular-nums" :at="drop.updatedAt" />
+        <RelativeTime format="short" class="w-24 text-right tabular-nums" :at="drop.updatedAt" />
       </span>
     </NuxtLink>
     <div

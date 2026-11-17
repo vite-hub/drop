@@ -121,7 +121,7 @@ function pageLabel(comment: DropComment) {
             <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="3xs" />
             <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
             <span class="shrink-0 font-mono text-xs text-muted"
-              >#{{ comment.n }} · <RelativeTime :style="'short'" :at="comment.createdAt"
+              >#{{ comment.n }} · <RelativeTime format="short" :at="comment.createdAt"
             /></span>
             <span
               v-if="comment.page"

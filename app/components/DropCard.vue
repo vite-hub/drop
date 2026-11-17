@@ -72,7 +72,7 @@ const address = computed(() =>
         <span class="truncate">
           <template v-if="where">in {{ where }} · </template>
           <template v-if="drop.version > 1">v{{ drop.version }} · </template>{{ drop.owner?.name ?? drop.actorName }} ·
-          <RelativeTime :style="'short'" :at="drop.updatedAt" />
+          <RelativeTime format="short" :at="drop.updatedAt" />
         </span>
         <UIcon
           v-if="shared"

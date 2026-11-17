@@ -116,14 +116,14 @@ index 88a7f1dc07e6728bbdf47b78eec1163810efff29..010f72a6ec156b77e99426f957132835
  import { computed, defineComponent, h, ref, watch } from "vue";
  //#region src/internal/image-preview.ts
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 74bc0cd6ac2c6064b9999580af24c99d034f1838..92b536d0279ab1c683b49c85fd5bd0c4a603cf7b 100644
+index 74bc0cd6ac2c6064b9999580af24c99d034f1838..ac6107ae593b16d996aa414b78f6a39322aea551 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -31,6 +31,7 @@ import { MessageParts } from "./parts/components/message-parts.js";
  import { Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "./parts/components/message.js";
  import "./parts/components/patch-parsers.js";
  import { PromptInput, PromptInputSubmit } from "./parts/components/prompt-input.js";
-+import { RelativeTime, RelativeTimeStyle, RelativeTimeValue, provideRelativeNow } from "./parts/components/relative-time.js";
++import { RelativeTime, RelativeTimeFormat, RelativeTimeValue, provideRelativeNow } from "./parts/components/relative-time.js";
  import { Status, StatusSize, StatusTone } from "./parts/components/status.js";
  import { SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue } from "./parts/components/sync-status.js";
  import { ToolList } from "./parts/components/tool-list.js";
@@ -133,7 +133,7 @@ index 74bc0cd6ac2c6064b9999580af24c99d034f1838..92b536d0279ab1c683b49c85fd5bd0c4
  //#endregion
 -export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
 \ No newline at end of file
-+export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, RelativeTime, RelativeTimeStyle, RelativeTimeValue, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
++export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, RelativeTime, RelativeTimeFormat, RelativeTimeValue, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
 \ No newline at end of file
 diff --git a/dist/index.js b/dist/index.js
 index 25c570d35e94ff703283f4578730d233ccdfeb3b..6f3ed66d916772b98aa79efbe635beffd8a06ac4 100644
@@ -449,7 +449,7 @@ index 54d2d51c58d2def59fca80e9884976047bf4712c..0b92d1a1e5e7e8f47517d5c2c359ab1e
  import { t as ImagePreview } from "../../image-preview-YCEZ5Enm.js";
 diff --git a/dist/parts/components/relative-time.d.ts b/dist/parts/components/relative-time.d.ts
 new file mode 100644
-index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f3238ecc93f1
+index 0000000000000000000000000000000000000000..587c8c78fd7b6a0c8bfc06baefe44ebcf6279ac2
 --- /dev/null
 +++ b/dist/parts/components/relative-time.d.ts
 @@ -0,0 +1,73 @@
@@ -458,7 +458,7 @@ index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f323
 +/** A moment: milliseconds, a `Date`, or an ISO string. A date alone, such as `2026-10-12`, is a calendar day. */
 +export type RelativeTimeValue = number | string | Date;
 +/** How long the words are: `long` ("3 weeks ago"), `short` ("3 wk. ago"), or `narrow` ("3w ago"). */
-+export type RelativeTimeStyle = "long" | "short" | "narrow";
++export type RelativeTimeFormat = "long" | "short" | "narrow";
 +/**
 + * Gives every `RelativeTime` below the clock that it counts from, in milliseconds. The server and the browser must
 + * start from the same value, so the first render in the browser matches the HTML. The `vite-hub/ui/nuxt` module gives
@@ -481,9 +481,9 @@ index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f323
 +    default: string;
 +    type: StringConstructor;
 +  };
-+  style: {
++  format: {
 +    default: string;
-+    type: PropType<RelativeTimeStyle>;
++    type: PropType<RelativeTimeFormat>;
 +  };
 +  /** A BCP 47 tag for the words and the date. */
 +  locale: {
@@ -506,9 +506,9 @@ index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f323
 +    default: string;
 +    type: StringConstructor;
 +  };
-+  style: {
++  format: {
 +    default: string;
-+    type: PropType<RelativeTimeStyle>;
++    type: PropType<RelativeTimeFormat>;
 +  };
 +  /** A BCP 47 tag for the words and the date. */
 +  locale: {
@@ -520,7 +520,7 @@ index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f323
 +    type: BooleanConstructor;
 +  };
 +}>> & Readonly<{}>, {
-+  style: RelativeTimeStyle;
++  format: RelativeTimeFormat;
 +  threshold: string;
 +  locale: string;
 +  tooltip: boolean;
@@ -586,7 +586,7 @@ index 1104879c71a270ea434a50f4e4bc1ffb6b0cea50..dd63bbc507a77692d77aca0b9fa820c1
  //#region src/workspace/workspace-shell.ts
  const defaultSplits = {
 diff --git a/dist/relative-time-BlPV9x_y.js b/dist/relative-time-BlPV9x_y.js
-index da8310634426d6b9ae0cf1d9edab4788925ccde0..17f078bd5d731668c22a0642b400eb6d79313b31 100644
+index da8310634426d6b9ae0cf1d9edab4788925ccde0..8864674102dd1e542c6295ed16dd326d31866dd6 100644
 --- a/dist/relative-time-BlPV9x_y.js
 +++ b/dist/relative-time-BlPV9x_y.js
 @@ -1,26 +1,309 @@
@@ -825,7 +825,7 @@ index da8310634426d6b9ae0cf1d9edab4788925ccde0..17f078bd5d731668c22a0642b400eb6d
 +			default: "3w",
 +			type: String
 +		},
-+		style: {
++		format: {
 +			default: "long",
 +			type: String
 +		},
@@ -857,7 +857,7 @@ index da8310634426d6b9ae0cf1d9edab4788925ccde0..17f078bd5d731668c22a0642b400eb6d
 +			if (at === void 0) return void 0;
 +			const options = {
 +				locale: props.locale,
-+				style: props.style,
++				style: props.format,
 +				threshold: props.threshold,
 +				timeZone
 +			};

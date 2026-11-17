@@ -115,7 +115,7 @@ const about = computed(() =>
         <AgentIcon class="size-3.5" :kind="child.actorKind" :name="child.actorName" />
         <span class="min-w-0 truncate"
           ><span class="text-default">{{ child.actorName }}</span> {{ child.version > 1 ? "updated it" : "added it" }}
-          <RelativeTime :style="'short'" :at="child.updatedAt"
+          <RelativeTime format="short" :at="child.updatedAt"
         /></span>
       </p>
       <div class="flex gap-2">

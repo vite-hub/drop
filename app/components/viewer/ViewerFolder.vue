@@ -279,7 +279,7 @@ async function newBoard() {
     <template v-else>
       <span class="hidden w-40 truncate text-xs text-muted sm:block">{{ meta(child) }}</span>
       <RelativeTime
-        :style="'short'"
+        format="short"
         class="w-24 shrink-0 text-right text-xs text-muted tabular-nums"
         :at="child.updatedAt"
       />

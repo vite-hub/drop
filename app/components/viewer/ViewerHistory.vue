@@ -51,7 +51,7 @@ function talk(version: DropVersion) {
             version.note ?? "First version"
           }}</span>
           <span class="block text-xs text-muted"
-            >{{ version.actorName }} · <RelativeTime :style="'short'" :at="version.createdAt" /><template
+            >{{ version.actorName }} · <RelativeTime format="short" :at="version.createdAt" /><template
               v-if="talk(version)"
             >
               · {{ talk(version) }}</template

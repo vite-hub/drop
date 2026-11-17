@@ -69,15 +69,15 @@ const detail = computed(() => {
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <template v-if="folder"
-          >{{ detail }}<span class="md:hidden"> · <RelativeTime :style="'short'" :at="drop.updatedAt" /></span
+          >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
         <!-- A site review or a link holds no file: its address says more than "0 B". -->
         <template v-else-if="drop.kind === 'site' || drop.kind === 'link'"
-          >{{ detail }}<span class="md:hidden"> · <RelativeTime :style="'short'" :at="drop.updatedAt" /></span
+          >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
         <template v-else
           ><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size)
-          }}<span class="md:hidden"> · <RelativeTime :style="'short'" :at="drop.updatedAt" /></span
+          }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
       </p>
       <!-- A search that matched the doc's text, not its name: the words around the match. -->
@@ -97,7 +97,7 @@ const detail = computed(() => {
         <span class="truncate">{{ drop.actorName }}</span>
       </span>
       <span class="mt-0.5 block text-xs text-muted tabular-nums"
-        ><RelativeTime :style="'short'" :at="drop.updatedAt"
+        ><RelativeTime format="short" :at="drop.updatedAt"
       /></span>
     </div>
     <div v-if="trashed" class="hidden min-w-0 md:block">
