@@ -1,0 +1,1252 @@
+diff --git a/dist/comment-marks.css b/dist/comment-marks.css
+index 1d2ddba4768354c315d094f65152ca2b910fd134..44be72ac4ef9f98b557c2f765c5d7c9c6bd2da00 100644
+--- a/dist/comment-marks.css
++++ b/dist/comment-marks.css
+@@ -11,7 +11,7 @@
+  *   firmer (45%), `data-status="resolved"` makes it dashed and grey, and `data-draft="true"` is the area being drawn or
+  *   written on: 2px comment blue with a fill. Its `comment-mark-handle` children, with `data-corner="top-left"` and the
+  *   other three corners, are round handles.
+- * - `data-leaving="true"` on a pin or an area: it shrinks and fades out in 180ms, then the page removes it.
++ * - `data-leaving="true"` on a pin or an area: it shrinks and fades out in 130ms (`commentLeaveMs` of `vite-hub/ui/headless`), then the page removes it.
+  * The page places a pin with `left` and `top`, and an area with `left`, `top`, `width`, and `height`.
+  * Commented text uses the CSS Custom Highlight API with the names `vh-comment`, `vh-comment-resolved`,
+  * `vh-comment-active`, and `vh-comment-draft`.
+@@ -191,7 +191,7 @@
+ /* A mark that goes, such as the others when one comment shows on its own: it shrinks and fades. */
+ :is([data-slot="comment-mark-pin"], [data-slot="comment-mark-area"])[data-leaving="true"],
+ [data-slot="comment-layer-item"][data-leaving="true"] > * {
+-  animation: vh-comment-mark-leave 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
++  animation: vh-comment-mark-leave 130ms cubic-bezier(0.4, 0, 1, 1) forwards;
+   pointer-events: none;
+ }
+ 
+@@ -200,17 +200,13 @@
+ }
+ 
+ @keyframes vh-comment-mark-leave {
+-  to { opacity: 0; scale: calc(var(--vh-comment-zoom, 1) * 0.6); }
++  to { opacity: 0; scale: calc(var(--vh-comment-zoom, 1) * 0.8); }
+ }
+ 
+ @keyframes vh-comment-mark-leave-area {
+   to { opacity: 0; scale: 0.97; }
+ }
+ 
+-@keyframes vh-comment-mark-fade {
+-  to { opacity: 0; }
+-}
+-
+ @media (prefers-reduced-motion: reduce) {
+   :is([data-slot="comment-mark-pin"], [data-slot="comment-pin"], [data-slot="comment-mark-area"], [data-slot="comment-layer-area"]) {
+     transition: none;
+@@ -218,7 +214,8 @@
+ 
+   :is([data-slot="comment-mark-pin"], [data-slot="comment-mark-area"])[data-leaving="true"],
+   [data-slot="comment-layer-item"][data-leaving="true"] > * {
+-    animation-name: vh-comment-mark-fade;
++    animation: none;
++    opacity: 0;
+   }
+ }
+ 
+diff --git a/dist/comment-row-DuiRCsHV.js b/dist/comment-row-DuiRCsHV.js
+index 37b29547a16a752251ce44685965a75f63ca698b..6792da478c216cb76d898a3bf0c888521ad5d44c 100644
+--- a/dist/comment-row-DuiRCsHV.js
++++ b/dist/comment-row-DuiRCsHV.js
+@@ -1,5 +1,6 @@
+ import { AvatarStack } from "./parts/components/avatar-stack.js";
+ import { a as writerName, o as writerPerson, r as plainText } from "./comment-person-CLPlW_SS.js";
++import { t as RelativeTime } from "./relative-time-BlPV9x_y.js";
+ import { h } from "vue";
+ //#region src/internal/comment-row.ts
+ /** The start of a thread as plain text: its first message, else the text that it is about. */
+@@ -15,7 +16,7 @@ function rowSlotScope(thread) {
+ 	};
+ }
+ /** The inside of one row of a thread list: its number, author, start, and facts. `CommentList` and `CommentPanel` use it. */
+-function threadRow(thread, time, options = {}) {
++function threadRow(thread, options = {}) {
+ 	const replies = thread.messages.length - 1;
+ 	return [
+ 		h("span", { "data-slot": "comment-list-number" }, String(thread.n)),
+@@ -26,7 +27,7 @@ function threadRow(thread, time, options = {}) {
+ 		}),
+ 		h("span", { "data-slot": "comment-list-body" }, [h("span", { "data-slot": "comment-list-text" }, options.preview ?? threadPreview(thread)), h("span", { "data-slot": "comment-list-meta" }, [
+ 			h("span", writerName(thread)),
+-			h("span", time(thread.updatedAt).text),
++			h(RelativeTime, { at: thread.updatedAt }),
+ 			replies > 0 ? h("span", `${replies} ${replies === 1 ? "reply" : "replies"}`) : null,
+ 			thread.status === "resolved" ? h("span", "Resolved") : null,
+ 			options.detached ? h("span", { "data-slot": "comment-list-detached" }, "Detached") : null,
+diff --git a/dist/comment-visibility-BT7mWt93.d.ts b/dist/comment-visibility-BT7mWt93.d.ts
+index 590e85fc2114d9c3a164750c9cd3a2b8e1c6015d..39b5e3ade3ac9dc0497bdc290931b4df0edf72c1 100644
+--- a/dist/comment-visibility-BT7mWt93.d.ts
++++ b/dist/comment-visibility-BT7mWt93.d.ts
+@@ -4,7 +4,7 @@ type CommentVisibility = "all" | "hidden";
+ interface CommentVisibilityOptions {
+   /** The first value, such as one the reader saved. Default `"all"`. */
+   visibility?: CommentVisibility;
+-  /** How long a comment or reply that was just sent shows while comments are hidden. Default `2500`. */
++  /** How long a comment or reply that was just sent shows while comments are hidden. The time waits while the reader is on it. Default `2500`. */
+   flashMs?: number;
+ }
+ /**
+@@ -15,13 +15,18 @@ interface CommentVisibilityModel {
+   readonly visibility: CommentVisibility;
+   /** The ids that still show while comments are hidden: the open thread, then each one that was just sent. Empty while all show. */
+   readonly only: readonly string[];
+-  /** The ids that stopped showing while comments are hidden, for 180 ms. Their marks play the pop-out in that time. */
++  /** The ids that stopped showing while comments are hidden, for `commentLeaveMs`. Their marks play the pop-out in that time. */
+   readonly leaving: readonly string[];
+   set: (visibility: CommentVisibility) => void;
+   /** The thread that is open. It shows while comments are hidden. */
+   open: (id: string | null) => void;
+   /** Shows the thread for `flashMs` while comments are hidden. It does nothing while all show. */
+   flash: (id: string) => void;
++  /**
++   * The thread the reader points at or focuses, such as its pin. `hover(null)` when the reader leaves. Like a toast, its
++   * flash time stops while the reader is on it, and the rest of the time runs after.
++   */
++  hover: (id: string | null) => void;
+   isShown: (id: string) => boolean;
+   /** Calls `listener` after each change. Returns a function that stops it. */
+   subscribe: (listener: () => void) => () => void;
+@@ -29,7 +34,7 @@ interface CommentVisibilityModel {
+   stop: () => void;
+ }
+ /** How long a mark that stops showing stays, for its pop-out. The styles of the parts use the same time. */
+-declare const commentLeaveMs = 180;
++declare const commentLeaveMs = 130;
+ declare function createCommentVisibility(options?: CommentVisibilityOptions): CommentVisibilityModel;
+ //#endregion
+ export { createCommentVisibility as a, commentLeaveMs as i, CommentVisibilityModel as n, CommentVisibilityOptions as r, CommentVisibility as t };
+\ No newline at end of file
+diff --git a/dist/comments-BPd7mX8v.js b/dist/comments-BPd7mX8v.js
+index 4d0f59efd9cbde84ee28f4215d1556f7fbeb5ab9..df1e6b5883091ce649758ffbfe7495951855d277 100644
+--- a/dist/comments-BPd7mX8v.js
++++ b/dist/comments-BPd7mX8v.js
+@@ -119,6 +119,7 @@ function useComments(options) {
+ 	seen.subscribe(() => seenChanges.value++);
+ 	watch(visibility, (value) => seen.set(value), { flush: "sync" });
+ 	watch(openId, (id) => seen.open(id), { flush: "sync" });
++	watch(hoverId, (id) => seen.hover(id), { flush: "sync" });
+ 	const marked = computed(() => {
+ 		seenChanges.value;
+ 		const ids = new Set(pageThreads.value.map((thread) => thread.id));
+diff --git a/dist/config-C_zVe6Oc.d.ts b/dist/config-C_zVe6Oc.d.ts
+index fef76254305f58853422a4ee4add86ceb60bb1e6..9b7997dcaa33a548765cf994451f805a82b3d32c 100644
+--- a/dist/config-C_zVe6Oc.d.ts
++++ b/dist/config-C_zVe6Oc.d.ts
+@@ -1,7 +1,7 @@
+ import { Component, ComputedRef, InjectionKey, MaybeRefOrGetter, Plugin } from "vue";
+ //#region src/internal/nuxt-ui.d.ts
+ /** The Nuxt UI components that the styled parts render. */
+-type ViteHubUIComponentName = "UBadge" | "UButton" | "UChatReasoning" | "UChatTool" | "UCollapsible" | "UDropdownMenu" | "UEditorDragHandle" | "UEditorSuggestionMenu" | "UEditorToolbar" | "UIcon" | "UInput" | "UModal" | "UTabs";
++type ViteHubUIComponentName = "UBadge" | "UButton" | "UChatReasoning" | "UChatTool" | "UCollapsible" | "UDropdownMenu" | "UEditorDragHandle" | "UEditorSuggestionMenu" | "UEditorToolbar" | "UIcon" | "UInput" | "UModal" | "UTabs" | "UTooltip";
+ /** Components that replace the Nuxt UI ones in the parts, by name. Give them to `createViteHubUI({ components })`. */
+ type ViteHubUIComponents = Partial<Record<ViteHubUIComponentName, Component>>;
+ //#endregion
+diff --git a/dist/copy-button-B_BQp2vV.js b/dist/copy-button-B_BQp2vV.js
+index 5698ad6e6185a659c9b9ea7910a777db1861998a..aa67a995b566254e07651585bd87a155f246fc7b 100644
+--- a/dist/copy-button-B_BQp2vV.js
++++ b/dist/copy-button-B_BQp2vV.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "./config-CprOILxQ.js";
+ import { defineComponent, getCurrentInstance, getCurrentScope, h, onMounted, onScopeDispose, readonly, ref, toValue, watch } from "vue";
+ //#region src/internal/announce.ts
+diff --git a/dist/format-BCg0Ab9Q.js b/dist/format-BCg0Ab9Q.js
+index bd8d78100f06c7589b994ac7b8c3ba7f5200b2e6..1ee0a86c45f06882dbc2a1e0793bd501b239c5c4 100644
+--- a/dist/format-BCg0Ab9Q.js
++++ b/dist/format-BCg0Ab9Q.js
+@@ -1,15 +1,4 @@
+ //#region src/internal/format.ts
+-const relativeUnits = [
+-	["day", 864e5],
+-	["hour", 36e5],
+-	["minute", 6e4]
+-];
+-/** "5 minutes ago", "yesterday", or "now" for under a minute. */
+-function timeAgo(at, now = Date.now()) {
+-	const difference = at - now;
+-	for (const [unit, size] of relativeUnits) if (Math.abs(difference) >= size) return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(Math.round(difference / size), unit);
+-	return "now";
+-}
+ /** "320 ms", "1.2 s", "30 s", or "1 min 35 s". Seconds round down, so a running counter never shows "60 s". */
+ function formatDuration(ms) {
+ 	if (ms < 1e3) return `${Math.round(ms)} ms`;
+@@ -26,4 +15,4 @@ function initials(name) {
+ 	return (first.slice(0, 1) + second.slice(0, 1)).toUpperCase() || "?";
+ }
+ //#endregion
+-export { initials as n, timeAgo as r, formatDuration as t };
++export { initials as n, formatDuration as t };
+diff --git a/dist/image-preview-YCEZ5Enm.js b/dist/image-preview-YCEZ5Enm.js
+index 88a7f1dc07e6728bbdf47b78eec1163810efff29..010f72a6ec156b77e99426f9571328357f074121 100644
+--- a/dist/image-preview-YCEZ5Enm.js
++++ b/dist/image-preview-YCEZ5Enm.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "./config-CprOILxQ.js";
+ import { computed, defineComponent, h, ref, watch } from "vue";
+ //#region src/internal/image-preview.ts
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 175d0d721f6e36f7d3b2493ec6a95aca7db50858..8df17c59b91bd1357d6452e7683a8a5c3341c46f 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -31,6 +31,7 @@ import { MessageParts } from "./parts/components/message-parts.js";
+ import { Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from "./parts/components/message.js";
+ import "./parts/components/patch-parsers.js";
+ import { PromptInput, PromptInputSubmit } from "./parts/components/prompt-input.js";
++import { RelativeTime, RelativeTimeStyle, RelativeTimeValue, provideRelativeNow } from "./parts/components/relative-time.js";
+ import { Status, StatusSize, StatusTone } from "./parts/components/status.js";
+ import { SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue } from "./parts/components/sync-status.js";
+ import { ToolList } from "./parts/components/tool-list.js";
+@@ -51,4 +52,4 @@ import { a as ViteHubUIOptions, c as useViteHubUI, d as ViteHubUIComponents, i a
+  */
+ export declare const uiSdkComponents: ViteHubUIComponents;
+ //#endregion
+-export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
+\ No newline at end of file
++export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, RelativeTime, RelativeTimeStyle, RelativeTimeValue, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
+\ No newline at end of file
+diff --git a/dist/index.js b/dist/index.js
+index 188e644e160b5d83a4ac36cffdaa6f689417f004..1b28976ccd1554e65bf5105a77d335eb0af1ca3b 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons, i as useViteHubUI, n as createViteHubUI, r as resolveViteHubUIDefaults, t as ViteHubUIInjectionKey } from "./config-CprOILxQ.js";
+ import { Markdown } from "./parts/components/markdown.js";
+ import { AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionTimeline, AgentSessionWorkGroup } from "./parts/components/agent-session.js";
+@@ -19,6 +19,7 @@ import { n as fileToUIPart, r as useAgentAttachments, t as fileToDataUrl } from
+ import { PromptInput } from "./parts/components/prompt-input.js";
+ import { commentLeaveMs, createCommentVisibility } from "./parts/headless/comment-visibility.js";
+ import { a as useCommentsContext, i as useComments, n as draftPositionKey, o as messagesSinceResolved, r as provideComments, s as repliedSinceResolved, t as defaultCommentCan } from "./comments-BPd7mX8v.js";
++import { n as provideRelativeNow, t as RelativeTime } from "./relative-time-BlPV9x_y.js";
+ import { CommentFilters, CommentList, CommentToolbar } from "./parts/components/comment-list.js";
+ import { CommentPin } from "./parts/components/comment-pin.js";
+ import { Marker, MarkerContent, MarkerIcon } from "./parts/components/marker.js";
+@@ -671,4 +672,4 @@ const uiSdkComponents = {
+ 	UTabs
+ };
+ //#endregion
+-export { AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionTimeline, AgentSessionWorkGroup, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger, AvatarStack, Bubble, BubbleContent, BubbleGroup, BubbleReactions, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockTitle, CodeView, CommentComposer, CommentFilters, CommentLayer, CommentList, CommentPanel, CommentPin, CommentReply, CommentThread, CommentToolbar, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, CopyButton, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, FileDiff, FileTree, FileView, FilterSearch, Markdown, Marker, MarkerContent, MarkerIcon, Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PlaygroundRender, PromptInput, Status, SyncStatus, SyncStatusIndicator, SyncStatusLabel, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceRun, TraceTitle, UnresolvedFile, ViteHubUIInjectionKey, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, repliedSinceResolved, resolveViteHubUIDefaults, uiSdkComponents, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
++export { AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionTimeline, AgentSessionWorkGroup, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger, AvatarStack, Bubble, BubbleContent, BubbleGroup, BubbleReactions, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockTitle, CodeView, CommentComposer, CommentFilters, CommentLayer, CommentList, CommentPanel, CommentPin, CommentReply, CommentThread, CommentToolbar, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, CopyButton, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, FileDiff, FileTree, FileView, FilterSearch, Markdown, Marker, MarkerContent, MarkerIcon, Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PlaygroundRender, PromptInput, RelativeTime, Status, SyncStatus, SyncStatusIndicator, SyncStatusLabel, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceRun, TraceTitle, UnresolvedFile, ViteHubUIInjectionKey, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, uiSdkComponents, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
+diff --git a/dist/markdown-editor-Cx2HR2y-.js b/dist/markdown-editor-Cx2HR2y-.js
+index 8bdf36a7f78e4883e2e9c002976efcc6129c9f9e..5545d36eb9f12644f31c6a0474979248a03472a2 100644
+--- a/dist/markdown-editor-Cx2HR2y-.js
++++ b/dist/markdown-editor-Cx2HR2y-.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
+ import { a as addStyles, c as src_default, d as src_default$1, f as src_default$3, i as rowsOf, l as src_default$2, m as isElement$2, o as typesetCss, p as childrenOf$1, s as theme, t as Properties } from "./vue-DGstVdGn.js";
+ import { Comment, Fragment, computed, defineComponent, h, isVNode, onBeforeUnmount, onMounted, onScopeDispose, provide, ref, shallowRef, watch, watchEffect } from "vue";
+ import { defineDiagnostics } from "nostics";
+@@ -19,13 +19,13 @@ import taskList from "comark/plugins/task-list";
+ import { parseFrontmatter } from "comark/parse";
+ import { Plugin as Plugin$1, PluginKey } from "@tiptap/pm/state";
+ import { Decoration, DecorationSet } from "@tiptap/pm/view";
+-//#region ../blob/dist/object-D8pRdprI.js
++//#region ../../../vitehub-v3-popout/packages/blob/dist/object-D8pRdprI.js
+ /** A non-null object that is not an array. Functions do not pass. */
+ function isRecord(value) {
+ 	return typeof value === "object" && value !== null && !Array.isArray(value);
+ }
+ //#endregion
+-//#region ../blob/dist/browser-diagnostics-LWw4MIqX.js
++//#region ../../../vitehub-v3-popout/packages/blob/dist/browser-diagnostics-LWw4MIqX.js
+ const blobBrowserDiagnostics = /*#__PURE__*/ defineDiagnostics({
+ 	docsBase: "https://vitehub.dev/docs/blob/diagnostics",
+ 	codes: {
+@@ -60,7 +60,7 @@ const blobBrowserDiagnostics = /*#__PURE__*/ defineDiagnostics({
+ 	}
+ });
+ //#endregion
+-//#region ../blob/dist/client.js
++//#region ../../../vitehub-v3-popout/packages/blob/dist/client.js
+ function isFile(value) {
+ 	return "name" in value && typeof value.name === "string" && "arrayBuffer" in value && typeof value.arrayBuffer === "function";
+ }
+diff --git a/dist/nuxt-ui-y7xXf6ys.js b/dist/nuxt-ui-y7xXf6ys.js
+index 1eb21084282282915a73f483f2ce87628e1919bf..42c4fe8e132c95ba165ad33f87bfd4f150b06b2c 100644
+--- a/dist/nuxt-ui-y7xXf6ys.js
++++ b/dist/nuxt-ui-y7xXf6ys.js
+@@ -14,7 +14,8 @@ const bundled = {
+ 	UIcon: defineAsyncComponent(() => import("@nuxt/ui/runtime/vue/components/Icon.vue")),
+ 	UInput: defineAsyncComponent(() => import("@nuxt/ui/components/Input.vue")),
+ 	UModal: defineAsyncComponent(() => import("@nuxt/ui/components/Modal.vue")),
+-	UTabs: defineAsyncComponent(() => import("@nuxt/ui/components/Tabs.vue"))
++	UTabs: defineAsyncComponent(() => import("@nuxt/ui/components/Tabs.vue")),
++	UTooltip: defineAsyncComponent(() => import("@nuxt/ui/components/Tooltip.vue"))
+ };
+ /**
+ * The component that a part renders for `name`: the one given to `createViteHubUI({ components })`, else one that the
+@@ -24,5 +25,14 @@ const bundled = {
+ function useUIComponent(name) {
+ 	return inject(uiComponentsKey, void 0)?.[name] ?? getCurrentInstance()?.appContext.components[name] ?? bundled[name];
+ }
++const nuxtUILocaleKey = Symbol.for("nuxt-ui.locale-context");
++/**
++* The tooltip that a part renders: the one given to `createViteHubUI({ components })` or registered globally, else
++* Nuxt UI's own inside `UApp`, which provides what it needs and lets the tooltips of a list share their open delay.
++* Outside `UApp` there is none, and the part uses the `title` attribute. Call it in `setup()`.
++*/
++function useTooltipComponent() {
++	return inject(uiComponentsKey, void 0)?.UTooltip ?? getCurrentInstance()?.appContext.components.UTooltip ?? (inject(nuxtUILocaleKey, void 0) === void 0 ? void 0 : bundled.UTooltip);
++}
+ //#endregion
+-export { useUIComponent as n, uiComponentsKey as t };
++export { useTooltipComponent as n, useUIComponent as r, uiComponentsKey as t };
+diff --git a/dist/nuxt.d.ts b/dist/nuxt.d.ts
+index 15d316551c5daef3492d1442e4f7cce89100296d..20b795dc942306228a9a9793b78abb98c362e571 100644
+--- a/dist/nuxt.d.ts
++++ b/dist/nuxt.d.ts
+@@ -1,5 +1,5 @@
+ import { a as ViteHubUIOptions, r as ViteHubUIIconOptions } from "./config-C_zVe6Oc.js";
+-//#region ../icons/dist/index.d.ts
++//#region ../../../vitehub-v3-popout/packages/icons/dist/index.d.ts
+ /** Name of an icon in the ViteHub set, such as `kv` for `i-vitehub-kv`. */
+ type ViteHubIconName = "agent" | "auth" | "blob" | "browser" | "bundle" | "cache" | "channels" | "cms" | "codemods" | "comments" | "compare" | "connections" | "content" | "database" | "decisions" | "development" | "docs" | "email" | "env" | "forge" | "forms" | "gateways" | "guides" | "hosts" | "i18n" | "kv" | "logs" | "mcp" | "queue" | "rate-limit" | "realtime" | "reference" | "sandbox" | "schedule" | "shell" | "skills" | "source" | "start" | "ui" | "usage" | "web-container" | "workflow" | "workspace";
+ /** The ViteHub icon set in the Iconify JSON format, as `@iconify-json/*` packages export it. */
+diff --git a/dist/nuxt.js b/dist/nuxt.js
+index 8d62fbb4f6e48ef203d7811e8935de76a1b92b92..8f49b8bf1bfbbd1b5b2308ee43aea872ddb6f60c 100644
+--- a/dist/nuxt.js
++++ b/dist/nuxt.js
+@@ -1,6 +1,6 @@
+ import { createRequire } from "node:module";
+ import { addComponent, createResolver, defineNuxtModule, runWithNuxtContext } from "@nuxt/kit";
+-//#region ../icons/dist/index.js
++//#region ../../../vitehub-v3-popout/packages/icons/dist/index.js
+ const icons = {
+ 	"prefix": "vitehub",
+ 	"info": {
+@@ -168,6 +168,7 @@ const componentNames = [
+ 	"TraceRun",
+ 	"UnresolvedFile",
+ 	"CopyButton",
++	"RelativeTime",
+ 	"Status",
+ 	...partFamilies.attachment,
+ 	...partFamilies["avatar-stack"],
+diff --git a/dist/parts/components/agent-session.d.ts b/dist/parts/components/agent-session.d.ts
+index dcad89b30534621ed03a9c6ca27cdfcac89878bc..aec6c422c28774578dd000dceade0b493e42bc22 100644
+--- a/dist/parts/components/agent-session.d.ts
++++ b/dist/parts/components/agent-session.d.ts
+@@ -170,7 +170,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
+     type: StringConstructor;
+   };
+   value: {
+-    type: (NumberConstructor | StringConstructor)[];
++    type: (StringConstructor | NumberConstructor)[];
+   };
+   href: {
+     type: StringConstructor;
+@@ -192,7 +192,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
+     type: StringConstructor;
+   };
+   value: {
+-    type: (NumberConstructor | StringConstructor)[];
++    type: (StringConstructor | NumberConstructor)[];
+   };
+   href: {
+     type: StringConstructor;
+@@ -205,7 +205,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
+     type: StringConstructor;
+   };
+ }>> & Readonly<{}>, {
+-  tone: "error" | "default" | "muted" | "success" | "info";
++  tone: "default" | "error" | "muted" | "success" | "info";
+ }, {}, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
+ /** A group of tool calls, folded behind one line such as "Worked for 3m 12s". */
+ export declare const AgentSessionWorkGroup: import("vue").DefineComponent<import("vue").ExtractPropTypes<{
+diff --git a/dist/parts/components/agent-session.js b/dist/parts/components/agent-session.js
+index d1bd91436ee43df0c002340b039c34159dc506bf..7356c5f2d3faa27b9a2d82fa6b6a485fda6d8707 100644
+--- a/dist/parts/components/agent-session.js
++++ b/dist/parts/components/agent-session.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { n as kitSlot } from "../../slot-part-Doic71uh.js";
+ import { Markdown } from "./markdown.js";
+ import { Tabs, TabsList, TabsPanel, TabsTab } from "@ui-sdk/vue/tabs";
+diff --git a/dist/parts/components/attachment.js b/dist/parts/components/attachment.js
+index 95c7814bd4f0f220e91dc32d3d04fc40cca68b1c..06c97d2b0430887f527d4190b55487e97528ffbd 100644
+--- a/dist/parts/components/attachment.js
++++ b/dist/parts/components/attachment.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { r as slotPart, t as asProp } from "../../slot-part-Doic71uh.js";
+ import { defineComponent, h } from "vue";
+ //#region src/components/attachment.ts
+diff --git a/dist/parts/components/bubble.d.ts b/dist/parts/components/bubble.d.ts
+index 40cb0b9c86d1d9380a70193cfc2d0a7a8025d284..ab33876daa709358779185e0ae5aa50c272538a1 100644
+--- a/dist/parts/components/bubble.d.ts
++++ b/dist/parts/components/bubble.d.ts
+@@ -66,6 +66,6 @@ export declare const BubbleReactions: import("vue").DefineComponent<import("vue"
+   };
+ }>> & Readonly<{}>, {
+   align: BubbleAlign;
+-  side: "bottom" | "top";
++  side: "top" | "bottom";
+ }, {}, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
+ //#endregion
+\ No newline at end of file
+diff --git a/dist/parts/components/chat.js b/dist/parts/components/chat.js
+index 4021e7503de21a568fbc51f9720e8904a1dc009a..8b1837342b3ffe752ad507d09b20ada702f10f2a 100644
+--- a/dist/parts/components/chat.js
++++ b/dist/parts/components/chat.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { i as useViteHubUI } from "../../config-CprOILxQ.js";
+ import { ChatMessage } from "./chat-message.js";
+ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "../headless/message-scroller.js";
+diff --git a/dist/parts/components/comment-layer.js b/dist/parts/components/comment-layer.js
+index 0dffd7fdf5fe2ab40de86102c97316fb64959e34..327daece9ae4c2a81ad898b2e943eea2582bc349 100644
+--- a/dist/parts/components/comment-layer.js
++++ b/dist/parts/components/comment-layer.js
+@@ -4,7 +4,6 @@ import { n as excerpt } from "../../comment-person-CLPlW_SS.js";
+ import { t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
+ import { i as useComments, n as draftPositionKey, r as provideComments } from "../../comments-BPd7mX8v.js";
+ import { n as threadRow } from "../../comment-row-DuiRCsHV.js";
+-import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
+ import { CommentList, CommentToolbar } from "./comment-list.js";
+ import { CommentPin } from "./comment-pin.js";
+ import { CommentThread } from "./comment-thread.js";
+@@ -102,7 +101,6 @@ const CommentLayer = defineComponent({
+ 		const { client, subject } = props;
+ 		if (!props.comments && (!client || !subject)) throw uiErrorDiagnostics.UI_R0002({ message: "CommentLayer needs a `client` and a `subject`, or the `comments` state from useComments()." });
+ 		const layer = ref(null);
+-		const time = useRelativeTime();
+ 		const uiRoot = () => {
+ 			const node = layer.value?.getRootNode();
+ 			return node instanceof ShadowRoot ? node : document;
+@@ -384,7 +382,7 @@ const CommentLayer = defineComponent({
+ 					ref: measured(entry.key),
+ 					style: { top: `${tops[index]}px` },
+ 					type: "button"
+-				}, threadRow(thread, time))];
++				}, threadRow(thread))];
+ 			});
+ 			return {
+ 				at,
+diff --git a/dist/parts/components/comment-list.js b/dist/parts/components/comment-list.js
+index ebc8462e72f998dfd03b144be923ce8c332653b5..c014ccd4698cb99f368167c578e661e1bf6ca917 100644
+--- a/dist/parts/components/comment-list.js
++++ b/dist/parts/components/comment-list.js
+@@ -1,9 +1,8 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "../../config-CprOILxQ.js";
+ import { AvatarStack } from "./avatar-stack.js";
+ import { a as useCommentsContext } from "../../comments-BPd7mX8v.js";
+ import { n as threadRow, t as rowSlotScope } from "../../comment-row-DuiRCsHV.js";
+-import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
+ import { defineComponent, h } from "vue";
+ //#region src/components/comment-list.ts
+ const commentsProp = { type: Object };
+@@ -49,7 +48,6 @@ const CommentList = defineComponent({
+ 	setup(props, { emit, slots }) {
+ 		const UButton = useUIComponent("UButton");
+ 		const comments = useCommentsContext(props.comments);
+-		const time = useRelativeTime();
+ 		function select(thread, event) {
+ 			emit("select", thread);
+ 			if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0)) return;
+@@ -89,7 +87,7 @@ const CommentList = defineComponent({
+ 					"data-status": thread.status,
+ 					href: comments.link(thread),
+ 					onClick: (event) => select(thread, event)
+-				}, slots.row?.(rowSlotScope(thread)) ?? threadRow(thread, time, {
++				}, slots.row?.(rowSlotScope(thread)) ?? threadRow(thread, {
+ 					detached,
+ 					preview: slots.preview?.(rowSlotScope(thread)),
+ 					site: comments.scope.value === "site"
+diff --git a/dist/parts/components/comment-panel.js b/dist/parts/components/comment-panel.js
+index 3d544b39c5c791b41cdc147cac7d6f9361906117..a51067d20780feba414fb0a2d40f83ab5c331057 100644
+--- a/dist/parts/components/comment-panel.js
++++ b/dist/parts/components/comment-panel.js
+@@ -1,10 +1,9 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { t as uiErrorDiagnostics } from "../../error-diagnostics-gyDj1QSg.js";
+ import { n as injectComments } from "../../comments-context-C2lOZyQ5.js";
+ import { t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
+ import { a as useCommentsContext, i as useComments, r as provideComments, s as repliedSinceResolved } from "../../comments-BPd7mX8v.js";
+ import { n as threadRow, t as rowSlotScope } from "../../comment-row-DuiRCsHV.js";
+-import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
+ import { CommentThread } from "./comment-thread.js";
+ import { computed, defineComponent, h, nextTick, ref, watch } from "vue";
+ //#region src/components/comment-panel.ts
+@@ -83,7 +82,6 @@ const CommentPanel = defineComponent({
+ 	slots: Object,
+ 	setup(props, { emit, slots }) {
+ 		const UButton = useUIComponent("UButton");
+-		const time = useRelativeTime();
+ 		const inherited = props.comments ?? injectComments();
+ 		if (!inherited && (!props.client || !props.subject)) throw uiErrorDiagnostics.UI_R0002({ message: "CommentPanel needs a comments state: put it inside CommentLayer, pass `comments`, or pass a `client` and a `subject`." });
+ 		const state = useCommentsContext(inherited ?? useComments({
+@@ -194,7 +192,7 @@ const CommentPanel = defineComponent({
+ 			"data-thread-id": thread.id,
+ 			onClick: () => select(thread),
+ 			type: "button"
+-		}, slots.row?.(rowSlotScope(thread)) ?? threadRow(thread, time, {
++		}, slots.row?.(rowSlotScope(thread)) ?? threadRow(thread, {
+ 			detached: state.positions.value.get(thread.id)?.detached === true,
+ 			preview: slots.preview?.(rowSlotScope(thread)),
+ 			site: state.scope.value === "site"
+diff --git a/dist/parts/components/comment-pin.js b/dist/parts/components/comment-pin.js
+index c5a28673779d54bfff90bbc980e80448662b5fc1..3a99a9e2d984f2045fd78e85775d8e4e811e7672 100644
+--- a/dist/parts/components/comment-pin.js
++++ b/dist/parts/components/comment-pin.js
+@@ -37,6 +37,8 @@ const CommentPin = defineComponent({
+ 			const text = props.excerpt ? `: ${props.excerpt}` : "";
+ 			return `Comment ${props.n}${by}${text}${props.status === "resolved" ? ", resolved" : ""}`;
+ 		};
++		let pointed = false;
++		let focused = false;
+ 		return () => h("button", {
+ 			"aria-expanded": props.draft ? void 0 : String(props.active),
+ 			"aria-label": label(),
+@@ -44,11 +46,23 @@ const CommentPin = defineComponent({
+ 			"data-draft": props.draft ? "true" : void 0,
+ 			"data-slot": "comment-pin",
+ 			"data-status": props.status,
+-			onBlur: () => emit("leave"),
++			onBlur: () => {
++				focused = false;
++				if (!pointed) emit("leave");
++			},
+ 			onClick: () => emit("select"),
+-			onFocus: () => emit("hover"),
+-			onPointerenter: () => emit("hover"),
+-			onPointerleave: () => emit("leave"),
++			onFocus: () => {
++				focused = true;
++				emit("hover");
++			},
++			onPointerenter: () => {
++				pointed = true;
++				emit("hover");
++			},
++			onPointerleave: () => {
++				pointed = false;
++				if (!focused) emit("leave");
++			},
+ 			type: "button"
+ 		}, [props.author ? h(AvatarStack, {
+ 			"aria-hidden": "true",
+diff --git a/dist/parts/components/comment-thread.js b/dist/parts/components/comment-thread.js
+index 3cdbae8e7356ffe605a3e4410dd28f9a22687aff..3c9fa68cbc02fa5398235d80d892541d5afccef1 100644
+--- a/dist/parts/components/comment-thread.js
++++ b/dist/parts/components/comment-thread.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "../../config-CprOILxQ.js";
+ import { Markdown } from "./markdown.js";
+ import { Attachment, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "./attachment.js";
+@@ -8,7 +8,7 @@ import { a as pathOf, c as swallowNextClick, l as useDocumentPointerDown, n as i
+ import { a as writerName, o as writerPerson, t as displayName } from "../../comment-person-CLPlW_SS.js";
+ import { n as mentionPlugin, r as mentionTag, t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
+ import { o as messagesSinceResolved, s as repliedSinceResolved, t as defaultCommentCan } from "../../comments-BPd7mX8v.js";
+-import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
++import { t as RelativeTime } from "../../relative-time-BlPV9x_y.js";
+ import { Marker, MarkerContent } from "./marker.js";
+ import { computed, defineComponent, h, nextTick, ref } from "vue";
+ //#region src/components/comment-thread.ts
+@@ -195,10 +195,8 @@ const CommentReply = defineComponent({
+ 			if (!props.onDelete) return;
+ 			if (await run(() => props.onDelete?.(props.message.id))) confirming.value = false;
+ 		}
+-		const relativeTime = useRelativeTime();
+ 		return () => {
+ 			const { message } = props;
+-			const time = relativeTime(message.createdAt);
+ 			return h("div", {
+ 				"data-compact": props.compact ? "true" : void 0,
+ 				"data-editing": editing.value ? "true" : void 0,
+@@ -215,11 +213,10 @@ const CommentReply = defineComponent({
+ 						"data-agent": message.actor ? "true" : void 0,
+ 						"data-slot": "comment-reply-author"
+ 					}, writerName(message)),
+-					h("time", {
+-						"data-slot": "comment-reply-time",
+-						datetime: new Date(message.createdAt).toISOString(),
+-						title: time.title
+-					}, time.text),
++					h(RelativeTime, {
++						at: message.createdAt,
++						"data-slot": "comment-reply-time"
++					}),
+ 					message.editedAt ? h("span", { "data-slot": "comment-reply-edited" }, "edited") : null
+ 				]),
+ 				editing.value ? h(CommentComposer, {
+diff --git a/dist/parts/components/filter-search.js b/dist/parts/components/filter-search.js
+index a1e54fc9dd0229e3ef8bc5237515c718a7ab7733..7f24e05278c0de9ba0fd091e371fdfaf208833fd 100644
+--- a/dist/parts/components/filter-search.js
++++ b/dist/parts/components/filter-search.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputStatus } from "../headless/choices-input.js";
+ import { defineComponent, h } from "vue";
+ //#region src/components/filter-search.ts
+diff --git a/dist/parts/components/prompt-input.d.ts b/dist/parts/components/prompt-input.d.ts
+index 908a79c000777aa1b931309b298ee1366f1d1a55..6035554c1ef5c1978ff889d41de6f149de3c2883 100644
+--- a/dist/parts/components/prompt-input.d.ts
++++ b/dist/parts/components/prompt-input.d.ts
+@@ -127,7 +127,7 @@ export declare const PromptInput: import("vue").DefineComponent<import("vue").Ex
+   modelValue: string;
+   files: readonly FileUIPart[];
+   attachments: boolean;
+-  attachVariant: "outline" | "ghost";
++  attachVariant: "ghost" | "outline";
+   disabled: boolean;
+   filesDisabled: boolean;
+   readonly: boolean;
+diff --git a/dist/parts/components/prompt-input.js b/dist/parts/components/prompt-input.js
+index 54d2d51c58d2def59fca80e9884976047bf4712c..0b92d1a1e5e7e8f47517d5c2c359ab1ec763de04 100644
+--- a/dist/parts/components/prompt-input.js
++++ b/dist/parts/components/prompt-input.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "../../config-CprOILxQ.js";
+ import { Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentGroup, AttachmentMedia, AttachmentTitle } from "./attachment.js";
+ import { t as ImagePreview } from "../../image-preview-YCEZ5Enm.js";
+diff --git a/dist/parts/components/relative-time.d.ts b/dist/parts/components/relative-time.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..65065239b96a71afaba0fc7414f9f3238ecc93f1
+--- /dev/null
++++ b/dist/parts/components/relative-time.d.ts
+@@ -0,0 +1,73 @@
++import { App, PropType, Ref } from "vue";
++//#region src/components/relative-time.d.ts
++/** A moment: milliseconds, a `Date`, or an ISO string. A date alone, such as `2026-10-12`, is a calendar day. */
++export type RelativeTimeValue = number | string | Date;
++/** How long the words are: `long` ("3 weeks ago"), `short` ("3 wk. ago"), or `narrow` ("3w ago"). */
++export type RelativeTimeStyle = "long" | "short" | "narrow";
++/**
++ * Gives every `RelativeTime` below the clock that it counts from, in milliseconds. The server and the browser must
++ * start from the same value, so the first render in the browser matches the HTML. The `vite-hub/ui/nuxt` module gives
++ * one: the request time from the payload, then the browser clock every 30 s while the tab is visible. Call it in
++ * `setup()`, or pass the `app` to call it from a plugin.
++ */
++export declare function provideRelativeNow(now: Readonly<Ref<number>>, app?: App): void;
++/**
++ * A moment as words that stay current: "5 minutes ago" while it is less than `threshold` away, then "Oct 12", or
++ * "Oct 12, 2025" in another year. Its tooltip shows the full date and time in the reader's zone, or the words when the
++ * label is a date. It follows comark-time's `:time`, so a page and its Markdown agree.
++ */
++export declare const RelativeTime: import("vue").DefineComponent<import("vue").ExtractPropTypes<{
++  at: {
++    required: true;
++    type: PropType<RelativeTimeValue>;
++  };
++  /** How far from now the label becomes a date, as a number and a unit (`s`, `m`, `h`, `d`, `w`, `mo`, `y`), or `none`. */
++  threshold: {
++    default: string;
++    type: StringConstructor;
++  };
++  style: {
++    default: string;
++    type: PropType<RelativeTimeStyle>;
++  };
++  /** A BCP 47 tag for the words and the date. */
++  locale: {
++    default: string;
++    type: StringConstructor;
++  };
++  tooltip: {
++    default: boolean;
++    type: BooleanConstructor;
++  };
++}>, () => import("vue").VNode<import("vue").RendererNode, import("vue").RendererElement, {
++  [key: string]: any;
++}>, {}, {}, {}, import("vue").ComponentOptionsMixin, import("vue").ComponentOptionsMixin, {}, string, import("vue").PublicProps, Readonly<import("vue").ExtractPropTypes<{
++  at: {
++    required: true;
++    type: PropType<RelativeTimeValue>;
++  };
++  /** How far from now the label becomes a date, as a number and a unit (`s`, `m`, `h`, `d`, `w`, `mo`, `y`), or `none`. */
++  threshold: {
++    default: string;
++    type: StringConstructor;
++  };
++  style: {
++    default: string;
++    type: PropType<RelativeTimeStyle>;
++  };
++  /** A BCP 47 tag for the words and the date. */
++  locale: {
++    default: string;
++    type: StringConstructor;
++  };
++  tooltip: {
++    default: boolean;
++    type: BooleanConstructor;
++  };
++}>> & Readonly<{}>, {
++  style: RelativeTimeStyle;
++  threshold: string;
++  locale: string;
++  tooltip: boolean;
++}, {}, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
++//#endregion
+\ No newline at end of file
+diff --git a/dist/parts/components/relative-time.js b/dist/parts/components/relative-time.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..58eb3fbf0839e96385df3f2965d8c5f7354ed66d
+--- /dev/null
++++ b/dist/parts/components/relative-time.js
+@@ -0,0 +1,2 @@
++import { n as provideRelativeNow, t as RelativeTime } from "../../relative-time-BlPV9x_y.js";
++export { RelativeTime, provideRelativeNow };
+diff --git a/dist/parts/components/trace-run.js b/dist/parts/components/trace-run.js
+index 873c52e1a21981b01f87c401279cc5bdd4173a79..3005ebb6df3be6cf82240b5c2760761c15df4b61 100644
+--- a/dist/parts/components/trace-run.js
++++ b/dist/parts/components/trace-run.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { t as formatDuration } from "../../format-BCg0Ab9Q.js";
+ import { CodeBlock, CodeBlockContent } from "./code-block.js";
+ import { t as payloadText } from "../../payload-text-sjkYAwvw.js";
+diff --git a/dist/parts/headless/comment-visibility.js b/dist/parts/headless/comment-visibility.js
+index 432e998b46a71112660db55f6769bf62e5d00dfe..195c2c8febc2ac144c4b286dc4c20d845906cb9a 100644
+--- a/dist/parts/headless/comment-visibility.js
++++ b/dist/parts/headless/comment-visibility.js
+@@ -1,15 +1,18 @@
+ //#region src/headless/comment-visibility.ts
+ /** How long a mark that stops showing stays, for its pop-out. The styles of the parts use the same time. */
+-const commentLeaveMs = 180;
++const commentLeaveMs = 130;
+ function createCommentVisibility(options = {}) {
+ 	const flashMs = options.flashMs ?? 2500;
+ 	let visibility = options.visibility ?? "all";
+ 	let opened = null;
++	let hovered = null;
+ 	let flashed = [];
+ 	let only = [];
+ 	let leaving = [];
+ 	const timers = /* @__PURE__ */ new Set();
+ 	const flashTimers = /* @__PURE__ */ new Map();
++	const flashEnds = /* @__PURE__ */ new Map();
++	const flashPaused = /* @__PURE__ */ new Map();
+ 	const leaveTimers = /* @__PURE__ */ new Map();
+ 	const listeners = /* @__PURE__ */ new Set();
+ 	const later = (run, ms) => {
+@@ -31,10 +34,32 @@ function createCommentVisibility(options = {}) {
+ 				leaveTimers.delete(id);
+ 				leaving = leaving.filter((entry) => entry !== id);
+ 				for (const listener of listeners) listener();
+-			}, 180));
++			}, 130));
+ 		}
+ 		for (const listener of listeners) listener();
+ 	}
++	function stopFlashTimer(id) {
++		const timer = flashTimers.get(id);
++		if (!timer) return;
++		clearTimeout(timer);
++		timers.delete(timer);
++		flashTimers.delete(id);
++	}
++	function runFlash(id, ms) {
++		stopFlashTimer(id);
++		flashPaused.delete(id);
++		if (id === hovered) {
++			flashPaused.set(id, ms);
++			return;
++		}
++		flashEnds.set(id, Date.now() + ms);
++		flashTimers.set(id, later(() => {
++			flashTimers.delete(id);
++			flashEnds.delete(id);
++			flashed = flashed.filter((entry) => entry !== id);
++			update();
++		}, ms));
++	}
+ 	return {
+ 		get visibility() {
+ 			return visibility;
+@@ -49,11 +74,9 @@ function createCommentVisibility(options = {}) {
+ 			if (next === visibility) return;
+ 			visibility = next;
+ 			if (next === "all") {
+-				for (const timer of flashTimers.values()) {
+-					clearTimeout(timer);
+-					timers.delete(timer);
+-				}
+-				flashTimers.clear();
++				for (const id of [...flashTimers.keys()]) stopFlashTimer(id);
++				flashEnds.clear();
++				flashPaused.clear();
+ 				flashed = [];
+ 			}
+ 			update();
+@@ -65,21 +88,27 @@ function createCommentVisibility(options = {}) {
+ 		},
+ 		flash(id) {
+ 			if (visibility !== "hidden") return;
+-			const before = flashTimers.get(id);
+-			if (before) {
+-				clearTimeout(before);
+-				timers.delete(before);
+-			}
+-			flashTimers.set(id, later(() => {
+-				flashTimers.delete(id);
+-				flashed = flashed.filter((entry) => entry !== id);
+-				update();
+-			}, flashMs));
++			runFlash(id, flashMs);
+ 			if (!flashed.includes(id)) {
+ 				flashed = [...flashed, id];
+ 				update();
+ 			}
+ 		},
++		hover(id) {
++			if (id === hovered) return;
++			const left = hovered;
++			hovered = id;
++			if (left !== null) {
++				const rest = flashPaused.get(left);
++				if (rest !== void 0) runFlash(left, rest);
++			}
++			if (id !== null && flashTimers.has(id)) {
++				const rest = Math.max(0, (flashEnds.get(id) ?? 0) - Date.now());
++				stopFlashTimer(id);
++				flashEnds.delete(id);
++				flashPaused.set(id, rest);
++			}
++		},
+ 		isShown: (id) => visibility === "all" || only.includes(id),
+ 		subscribe(listener) {
+ 			listeners.add(listener);
+@@ -89,6 +118,8 @@ function createCommentVisibility(options = {}) {
+ 			for (const timer of timers) clearTimeout(timer);
+ 			timers.clear();
+ 			flashTimers.clear();
++			flashEnds.clear();
++			flashPaused.clear();
+ 			leaveTimers.clear();
+ 		}
+ 	};
+diff --git a/dist/parts/workspace/connect-panel.js b/dist/parts/workspace/connect-panel.js
+index 3c1d2b2a5e22b880e11434f560f3fda79d82950c..a7d35d42534df080e77824b82cdc766cca617f02 100644
+--- a/dist/parts/workspace/connect-panel.js
++++ b/dist/parts/workspace/connect-panel.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { icon, providerLogo } from "./icons.js";
+ import { computed, defineComponent, h, ref, useId } from "vue";
+ //#region src/workspace/connect-panel.ts
+diff --git a/dist/parts/workspace/playground-container.js b/dist/parts/workspace/playground-container.js
+index 998d88adae0209033007ca6c005ec16ffebb257a..b06c8bee101383e06dd28ee8ffaff84e6bed938f 100644
+--- a/dist/parts/workspace/playground-container.js
++++ b/dist/parts/workspace/playground-container.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { n as useCopy } from "../../copy-button-B_BQp2vV.js";
+ import { Status } from "../components/status.js";
+ import { decodePlaygroundLink, encodePlaygroundLink, playgroundLinkLimit, playgroundUrl, readPlaygroundHash } from "../playground/share.js";
+diff --git a/dist/parts/workspace/workspace-preview.js b/dist/parts/workspace/workspace-preview.js
+index a7134dcac7c67c441f974884dc89970dccca4406..9410b697f9ae36659ea34d1fc58e6d98cf3932c1 100644
+--- a/dist/parts/workspace/workspace-preview.js
++++ b/dist/parts/workspace/workspace-preview.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { DeviceFrame } from "../components/device-frame.js";
+ import { icon } from "./icons.js";
+ import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch } from "vue";
+diff --git a/dist/parts/workspace/workspace-shell.js b/dist/parts/workspace/workspace-shell.js
+index 1104879c71a270ea434a50f4e4bc1ffb6b0cea50..dd63bbc507a77692d77aca0b9fa820c164226f39 100644
+--- a/dist/parts/workspace/workspace-shell.js
++++ b/dist/parts/workspace/workspace-shell.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
+ import { computed, defineComponent, h, onMounted, ref, watch } from "vue";
+ //#region src/workspace/workspace-shell.ts
+ const defaultSplits = {
+diff --git a/dist/relative-time-BlPV9x_y.js b/dist/relative-time-BlPV9x_y.js
+index da8310634426d6b9ae0cf1d9edab4788925ccde0..da86fdcd60f955029e54daad742de8c379ea9aba 100644
+--- a/dist/relative-time-BlPV9x_y.js
++++ b/dist/relative-time-BlPV9x_y.js
+@@ -1,26 +1,308 @@
+-import { r as timeAgo } from "./format-BCg0Ab9Q.js";
+-import { onBeforeUnmount, onMounted, ref } from "vue";
+-//#region src/internal/relative-time.ts
+-const serverDate = new Intl.DateTimeFormat("en", {
+-	dateStyle: "medium",
+-	timeZone: "UTC"
+-});
++import { n as useTooltipComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { computed, defineComponent, h, inject, onBeforeUnmount, onMounted, provide, ref, shallowRef } from "vue";
++//#region src/internal/describe-time.ts
+ /**
+-* Formats past times such as "5 minutes ago" from `setup()`. Until the component mounts, it gives the UTC date, so the
+-* server and the first client render match. After that it counts from the browser clock each minute.
++* Describes a date or an instant against `now`: "3 days ago" with the full date as its tip while it's closer than
++* `threshold`, and from there on "Oct 12" ("Oct 12, 2025" in another year) with the relative words as its tip. A date
++* alone (`2026-10-12`) counts whole calendar days in `timeZone`, and a time with no offset is read in that zone.
++* Returns `undefined` for a value it can't read, and throws a `RangeError` for a `threshold`, `now`, `locale`, or
++* `timeZone` it can't read.
+ */
+-function useRelativeTime() {
+-	const now = ref();
+-	let timer;
+-	onMounted(() => {
+-		now.value = Date.now();
+-		timer = setInterval(() => now.value = Date.now(), 6e4);
++function describeTime(at, options = {}) {
++	const [SECOND, MINUTE, HOUR, DAY] = [
++		1e3,
++		6e4,
++		36e5,
++		864e5
++	];
++	const [WEEK, MONTH, YEAR] = [
++		7 * DAY,
++		30 * DAY,
++		365 * DAY
++	];
++	const units = {
++		s: SECOND,
++		m: MINUTE,
++		h: HOUR,
++		d: DAY,
++		w: WEEK,
++		mo: MONTH,
++		y: YEAR
++	};
++	const { threshold = "3w", locale = "en-US", style = "long" } = options;
++	const [, amount, unit] = /^(\d+(?:\.\d+)?)\s*(s|m|h|d|w|mo|y)$/i.exec(threshold) ?? [];
++	const limit = /^(none|never)$/i.test(threshold) ? Number.POSITIVE_INFINITY : amount && unit ? Number(amount) * (units[unit.toLowerCase()] ?? NaN) : NaN;
++	if (Number.isNaN(limit)) throw new RangeError(`RelativeTime: threshold "${threshold}" isn't a duration. Write a number and a unit, such as "3w", or "none".`);
++	const now = options.now === void 0 ? Date.now() : new Date(options.now).getTime();
++	if (!Number.isFinite(now)) throw new RangeError("RelativeTime: now isn't a valid date. Use a date, an ISO string, or milliseconds.");
++	const zone = options.timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone;
++	const relative = new Intl.RelativeTimeFormat(locale, {
++		numeric: "auto",
++		style
+ 	});
+-	onBeforeUnmount(() => clearInterval(timer));
+-	return (at) => now.value === void 0 ? { text: serverDate.format(at) } : {
+-		text: timeAgo(at, now.value),
+-		title: new Date(at).toLocaleString()
++	const parts = (moment) => {
++		return Object.fromEntries(new Intl.DateTimeFormat("en-US", {
++			timeZone: zone,
++			hourCycle: "h23",
++			year: "numeric",
++			month: "numeric",
++			day: "numeric",
++			hour: "numeric",
++			minute: "numeric",
++			second: "numeric"
++		}).formatToParts(moment).map((part) => [part.type, Number(part.value)]));
++	};
++	const offsetAt = (moment) => {
++		const p = parts(moment);
++		return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(moment / 1e3) * 1e3;
++	};
++	const read = (value) => {
++		const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?\s*(Z|[+-]\d{2}:?\d{2})?)?$/i.exec(value);
++		if (!match) return void 0;
++		const [year, month, day, hour, minute, second] = [
++			1,
++			2,
++			3,
++			4,
++			5,
++			6
++		].map((index) => Number(match[index] ?? 0));
++		const stamp = Date.UTC(year, month - 1, day, hour, minute, second, Number((match[7] ?? "").padEnd(3, "0")));
++		const check = new Date(stamp);
++		if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return void 0;
++		if (match[4] === void 0) return {
++			at: Math.floor(stamp / DAY) * DAY,
++			wall: true
++		};
++		const offset = match[8];
++		if (offset?.toUpperCase() === "Z") return {
++			at: stamp,
++			wall: false
++		};
++		if (offset) {
++			const digits = offset.replace(/\D/g, "");
++			const hours = Number(digits.slice(0, 2));
++			const rest = Number(digits.slice(2));
++			if (hours > 23 || rest > 59) return void 0;
++			return {
++				at: stamp - (offset.startsWith("-") ? -1 : 1) * (hours * 60 + rest) * 6e4,
++				wall: false
++			};
++		}
++		const found = [...new Set([
++			stamp - DAY,
++			stamp,
++			stamp + DAY
++		].map((moment) => stamp - offsetAt(moment)))].filter((moment) => moment + offsetAt(moment) === stamp).sort((a, b) => a - b)[0];
++		return found === void 0 ? void 0 : {
++			at: found,
++			wall: false
++		};
++	};
++	const today = Math.floor((now + offsetAt(now)) / DAY);
++	const instant = typeof at === "string" ? NaN : new Date(at).getTime();
++	const when = typeof at === "string" ? read(at.trim()) : Number.isFinite(instant) ? {
++		at: instant,
++		wall: false
++	} : void 0;
++	if (!when) return void 0;
++	const distance = when.wall ? (when.at / DAY - today) * DAY : when.at - now;
++	const size = when.wall ? Math.max(Math.abs(distance), DAY) : Math.abs(distance);
++	const [name, per] = size < MINUTE ? ["second", SECOND] : size < HOUR ? ["minute", MINUTE] : size < DAY ? ["hour", HOUR] : size < WEEK ? ["day", DAY] : size < MONTH ? ["week", WEEK] : size < YEAR ? ["month", MONTH] : ["year", YEAR];
++	const words = relative.format(Math.trunc(distance / per) || 0, name);
++	const format = (extra) => new Intl.DateTimeFormat(locale, {
++		timeZone: when.wall ? "UTC" : zone,
++		...extra
++	}).format(when.at);
++	const short = {
++		day: "numeric",
++		month: "short"
++	};
++	const clock = {
++		hour: "numeric",
++		minute: "2-digit",
++		timeZoneName: "short"
++	};
++	const absolute = Math.abs(distance) >= limit;
++	const year = when.wall ? new Date(when.at).getUTCFullYear() : parts(when.at).year;
++	return {
++		datetime: when.wall ? new Date(when.at).toISOString().slice(0, 10) : new Date(when.at).toISOString().replace(/\.000Z$/, "Z"),
++		mode: absolute ? "absolute" : "relative",
++		label: absolute ? format(year === parts(now).year ? short : {
++			...short,
++			year: "numeric"
++		}) : words,
++		tip: !absolute ? format({
++			weekday: "short",
++			...short,
++			year: "numeric",
++			...when.wall ? {} : clock
++		}) : when.wall ? words : `${words} · ${format(clock)}`
++	};
++}
++//#endregion
++//#region src/internal/relative-now.ts
++/** The clock that `RelativeTime` counts from, given by `provideRelativeNow()`. */
++const relativeNowKey = Symbol("ViteHubRelativeNow");
++/** How often the clock moves. The words change by the minute at most, so twice a minute is enough. */
++const relativeNowInterval = 3e4;
++/**
++* Sets `now` to the browser clock, then again every 30 s while the page is visible. A hidden page stops the timer, and
++* the page showing again moves the clock at once. Returns the function that stops it.
++*/
++function startRelativeClock(now) {
++	let timer;
++	const tick = () => now.value = Date.now();
++	const pause = () => clearInterval(timer);
++	const resume = () => {
++		pause();
++		tick();
++		timer = setInterval(tick, relativeNowInterval);
++	};
++	const onVisibility = () => document.visibilityState === "hidden" ? pause() : resume();
++	document.addEventListener("visibilitychange", onVisibility);
++	onVisibility();
++	return () => {
++		pause();
++		document.removeEventListener("visibilitychange", onVisibility);
+ 	};
+ }
++const shared = ref(0);
++let holders = 0;
++let stopShared;
++/** Starts the shared clock for a mounted `RelativeTime`. Call `releaseSharedNow()` when it unmounts. */
++function holdSharedNow() {
++	if (holders++ === 0) stopShared = startRelativeClock(shared);
++	return shared;
++}
++function releaseSharedNow() {
++	if (--holders === 0) stopShared?.();
++}
++//#endregion
++//#region src/components/relative-time.ts
++/**
++* Gives every `RelativeTime` below the clock that it counts from, in milliseconds. The server and the browser must
++* start from the same value, so the first render in the browser matches the HTML. The `vite-hub/ui/nuxt` module gives
++* one: the request time from the payload, then the browser clock every 30 s while the tab is visible. Call it in
++* `setup()`, or pass the `app` to call it from a plugin.
++*/
++function provideRelativeNow(now, app) {
++	if (app) app.provide(relativeNowKey, now);
++	else provide(relativeNowKey, now);
++}
++const NOW_WINDOW = 6e4;
++/**
++* A moment as words that stay current: "5 minutes ago" while it is less than `threshold` away, then "Oct 12", or
++* "Oct 12, 2025" in another year. Its tooltip shows the full date and time in the reader's zone, or the words when the
++* label is a date. It follows comark-time's `:time`, so a page and its Markdown agree.
++*/
++const RelativeTime = defineComponent({
++	name: "RelativeTime",
++	inheritAttrs: false,
++	props: {
++		at: {
++			required: true,
++			type: [
++				Number,
++				String,
++				Date
++			]
++		},
++		/** How far from now the label becomes a date, as a number and a unit (`s`, `m`, `h`, `d`, `w`, `mo`, `y`), or `none`. */
++		threshold: {
++			default: "3w",
++			type: String
++		},
++		style: {
++			default: "long",
++			type: String
++		},
++		/** A BCP 47 tag for the words and the date. */
++		locale: {
++			default: "en",
++			type: String
++		},
++		tooltip: {
++			default: true,
++			type: Boolean
++		}
++	},
++	setup(props, { attrs }) {
++		const UTooltip = useTooltipComponent();
++		const provided = inject(relativeNowKey, void 0);
++		const fallback = shallowRef();
++		const mounted = ref(false);
++		onMounted(() => {
++			if (!provided) fallback.value = holdSharedNow();
++			mounted.value = true;
++		});
++		onBeforeUnmount(() => {
++			if (fallback.value) releaseSharedNow();
++		});
++		const now = computed(() => provided?.value ?? fallback.value?.value);
++		const describe = (timeZone) => {
++			const at = now.value;
++			if (at === void 0) return void 0;
++			const options = {
++				locale: props.locale,
++				style: props.style,
++				threshold: props.threshold,
++				timeZone
++			};
++			const time = describeTime(props.at, {
++				...options,
++				now: at
++			});
++			if (!time?.datetime.includes("T")) return time;
++			const instant = Date.parse(time.datetime);
++			return Math.abs(instant - at) < NOW_WINDOW ? describeTime(props.at, {
++				...options,
++				now: instant
++			}) : time;
++		};
++		const description = computed(() => describe(mounted.value ? void 0 : "UTC"));
++		const date = computed(() => {
++			const time = describeTime(props.at, {
++				locale: props.locale,
++				now: props.at,
++				threshold: "none",
++				timeZone: "UTC"
++			});
++			if (!time) return void 0;
++			const label = new Intl.DateTimeFormat(props.locale, {
++				day: "numeric",
++				month: "short",
++				timeZone: "UTC",
++				year: "numeric"
++			}).format(Date.parse(time.datetime));
++			return {
++				...time,
++				label,
++				mode: "absolute"
++			};
++		});
++		const tip = () => mounted.value ? describe()?.tip : void 0;
++		return () => {
++			const time = description.value ?? date.value;
++			if (!time) return h("time", {
++				...attrs,
++				"data-slot": attrs["data-slot"] ?? "relative-time"
++			}, String(props.at));
++			const element = (title) => h("time", {
++				...attrs,
++				"data-mode": time.mode,
++				"data-slot": attrs["data-slot"] ?? "relative-time",
++				datetime: time.datetime,
++				title
++			}, time.label);
++			if (!props.tooltip) return element();
++			if (UTooltip) return h(UTooltip, null, {
++				content: tip,
++				default: () => element()
++			});
++			return element(tip());
++		};
++	}
++});
+ //#endregion
+-export { useRelativeTime as t };
++export { provideRelativeNow as n, startRelativeClock as r, RelativeTime as t };
+diff --git a/dist/runtime/nuxt-plugin.js b/dist/runtime/nuxt-plugin.js
+index a73c4ac64acfe10ee9c662230357a2408433a266..2063faa1369dde5be62d21360bd64b7a99cd190e 100644
+--- a/dist/runtime/nuxt-plugin.js
++++ b/dist/runtime/nuxt-plugin.js
+@@ -1,6 +1,7 @@
+ import { n as createViteHubUI } from "../config-CprOILxQ.js";
++import { n as provideRelativeNow, r as startRelativeClock } from "../relative-time-BlPV9x_y.js";
+ import { defineAsyncComponent } from "vue";
+-import { defineNuxtPlugin, useAppConfig, useRuntimeConfig } from "#app";
++import { defineNuxtPlugin, useAppConfig, useRuntimeConfig, useState } from "#app";
+ //#region src/runtime/nuxt-plugin.ts
+ const viteHubUIPlugin = defineNuxtPlugin((nuxtApp) => {
+ 	const options = useRuntimeConfig().public.viteHubUI;
+@@ -15,6 +16,9 @@ const viteHubUIPlugin = defineNuxtPlugin((nuxtApp) => {
+ 		components: { UIcon },
+ 		icons
+ 	}));
++	const now = useState("vite-hub-ui:now", () => Date.now());
++	provideRelativeNow(now, nuxtApp.vueApp);
++	if (import.meta.client) nuxtApp.hooks.hookOnce("app:suspense:resolve", () => void startRelativeClock(now));
+ });
+ function iconsIn(appConfig, key) {
+ 	const config = Reflect.get(appConfig, key);
+diff --git a/dist/styles.css b/dist/styles.css
+index 12669dd174ade55512c8bde73d15608428fc6b56..64c1b2de680d036242b473fe68a3609e5f2a0442 100644
+--- a/dist/styles.css
++++ b/dist/styles.css
+@@ -1859,6 +1859,11 @@
+     }
+   }
+ 
++  /* RelativeTime, and the time of a comment reply that renders it. Digits keep one width, so the label does not jump when the clock moves. */
++  :is([data-slot="relative-time"], [data-slot="comment-reply-time"]) {
++    font-variant-numeric: tabular-nums;
++  }
++
+   /* Status: a 6px dot in the brighter status color and a label. A colored label uses the darker text shade of theme.css. */
+   [data-slot="status"] {
+     align-items: center;

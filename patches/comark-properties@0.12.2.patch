@@ -1,0 +1,422 @@
+diff --git a/dist/client-BeNPxCfR.mjs b/dist/client-BeNPxCfR.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b7aba7106e161b4631b4b491081840108bb33b80
+--- /dev/null
++++ b/dist/client-BeNPxCfR.mjs
+@@ -0,0 +1,35 @@
++import { t as css$1 } from "./styles-D2Ehi-z5.mjs";
++import { css, relativize as relativize$1, start } from "comark-time/client";
++//#region ../../shared/styles.ts
++/**
++* Adds a package's styles to the page once, unless the page already carries them as a `style` or a `link` with
++* `data-comark-<name>`, which is how the HTML renderer inlines them and how an app that imports `style.css` marks them.
++*/
++function addStyles$1(name, css) {
++	const attribute = `data-comark-${name}`;
++	if (document.querySelector(`style[${attribute}],link[${attribute}]`)) return;
++	const style = document.createElement("style");
++	style.setAttribute(attribute, "");
++	style.textContent = css;
++	document.head.append(style);
++}
++//#endregion
++//#region src/client.ts
++/** Adds the properties styles to the page once. */
++const addStyles = () => addStyles$1("properties", css$1);
++/**
++* What the Vue, React, and Svelte boxes run once mounted: adds the box's styles and comark-time's, lets Escape close a
++* date's tooltip, and keeps each date under `box` relative to the reader's clock, as comark-time's `relativize` does.
++* Returns a function that stops it.
++*/
++function start$1(box) {
++	addStyles();
++	const stopTime = start(css);
++	const stopDates = relativize$1(box);
++	return () => {
++		stopDates();
++		stopTime();
++	};
++}
++//#endregion
++export { relativize$1 as n, start$1 as r, addStyles as t };
+diff --git a/dist/client.d.mts b/dist/client.d.mts
+index de1db32fa7d34afb6082d28400bc4ba0b4b1ecf6..410d07d131dce0e483569a5fb96bea42ac6b5930 100644
+--- a/dist/client.d.mts
++++ b/dist/client.d.mts
+@@ -1,3 +1,4 @@
++import { relativize } from "comark-time/client";
+ //#region src/styles.d.ts
+ /**
+  * The properties as rows, like the property rows of a Notion page: an icon and a muted label, then the value. On a
+@@ -7,11 +8,13 @@
+ export declare const css: string;
+ //#endregion
+ //#region src/client.d.ts
+-/** Adds the properties styles to the page once. The Vue, React, and Svelte components call it when they mount. */
++/** Adds the properties styles to the page once. */
+ export declare const addStyles: () => void;
+ /**
+- * Rewrites each date in the properties boxes under `root` in the reader's locale. A date the `locale` option fixed
+- * keeps its `lang` and stays as written. The HTML renderer inlines this function, so it uses nothing from outside it.
++ * What the Vue, React, and Svelte boxes run once mounted: adds the box's styles and comark-time's, lets Escape close a
++ * date's tooltip, and keeps each date under `box` relative to the reader's clock, as comark-time's `relativize` does.
++ * Returns a function that stops it.
+  */
+-export declare function localizeDates(root: ParentNode): void;
++export declare function start(box: ParentNode & Node): () => void;
+ //#endregion
++export { relativize };
+\ No newline at end of file
+diff --git a/dist/client.mjs b/dist/client.mjs
+index 5e04b97b0e03a25afdfc28a0c85406faebc4b59c..2b7c4df46fcea85f04ef6b04a9df0054860578a6 100644
+--- a/dist/client.mjs
++++ b/dist/client.mjs
+@@ -1 +1,3 @@
+-export { t as addStyles, r as css, n as localizeDates } from "./client-BPkb2vp9.mjs";
++import { t as css } from "./styles-D2Ehi-z5.mjs";
++import { n as relativize, r as start, t as addStyles } from "./client-BeNPxCfR.mjs";
++export { addStyles, css, relativize, start };
+diff --git a/dist/html.d.mts b/dist/html.d.mts
+index 579e4cda1821c496c54d41502bba593085343365..b03f304afa3982fbd608ca5bdb4fe0ae8479ad1a 100644
+--- a/dist/html.d.mts
++++ b/dist/html.d.mts
+@@ -3,7 +3,8 @@ import { NodeHandler } from "comark";
+ //#region src/html.d.ts
+ /**
+  * The inline scripts this renderer writes, each exactly as it goes in its `<script>`: the one after every box with a
+- * date. It's the same on every render, so a page with a strict Content Security Policy can allow it by hash or add its
++ * date, which writes its dates relative to the reader's clock, and comark-time's, which lets Escape close a tooltip.
++ * They're the same on every render, so a page with a strict Content Security Policy can allow them by hash or add its
+  * nonce.
+  */
+ export declare const scripts: string[];
+diff --git a/dist/html.mjs b/dist/html.mjs
+index c6b377953b9b815573de1635d514fe1b94c2ebd1..b8965812ab7ebbdea09512df21d8e90028b303aa 100644
+--- a/dist/html.mjs
++++ b/dist/html.mjs
+@@ -1,6 +1,8 @@
+-import { n as src_default } from "./src-BRb5cKfk.mjs";
+-import { n as localizeDates, r as css } from "./client-BPkb2vp9.mjs";
++import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { t as css$1 } from "./styles-D2Ehi-z5.mjs";
+ import "comark/utils";
++import { describeTime, relativize } from "comark-time/client";
++import { scripts as scripts$1, timeRuntime } from "comark-time/html";
+ //#region ../../shared/html.ts
+ /** Keep script bodies invariant when Comark indents their native HTML ancestors.
+ * U+2028 is a JavaScript line terminator, but HTML formatting only indents LF lines.
+@@ -9,20 +11,22 @@ import "comark/utils";
+ const inlineScript = (source) => source.replace(/\r\n?|\n/g, "\u2028");
+ //#endregion
+ //#region src/html.ts
+-const inline = inlineScript(`(${localizeDates.toString()})(document.currentScript.previousElementSibling)`);
++const inline = inlineScript(`(${relativize.toString()})(document.currentScript.previousElementSibling,${describeTime.toString()})`);
+ /**
+ * The inline scripts this renderer writes, each exactly as it goes in its `<script>`: the one after every box with a
+-* date. It's the same on every render, so a page with a strict Content Security Policy can allow it by hash or add its
++* date, which writes its dates relative to the reader's clock, and comark-time's, which lets Escape close a tooltip.
++* They're the same on every render, so a page with a strict Content Security Policy can allow them by hash or add its
+ * nonce.
+ */
+-const scripts = [inline];
++const scripts = [inline, ...scripts$1];
+ const styled = /* @__PURE__ */ new WeakSet();
+ const properties = async ([, , ...children], state) => {
+ 	if (!children.length) return "";
+-	const styles = styled.has(state.context) ? "" : `<style data-comark-properties>${css}</style>`;
++	const styles = styled.has(state.context) ? "" : `<style data-comark-properties>${css$1}</style>`;
+ 	styled.add(state.context);
+ 	const rows = (await Promise.all(children.map((child) => state.one(child, state)))).join("");
+-	return `${styles}<dl class="cfm" data-comark-frame>${rows}</dl>${rows.includes("<time") ? `<script>${inline}<\/script>` : ""}`;
++	if (!rows.includes("<time")) return `${styles}<dl class="cfm" data-comark-frame>${rows}</dl>`;
++	return `${styles}${timeRuntime(state)}<dl class="cfm" data-comark-frame>${rows}</dl><script>${inline}<\/script>`;
+ };
+ /** The HTML renderer for the properties box. Pass it as `components`; it inlines the styles once per document. */
+ const components = { properties };
+diff --git a/dist/index.d.mts b/dist/index.d.mts
+index 0c2a868ec77a5b3f84aca2a14fb151d262185292..a99e970ee3333f53bab2a9360be2b11c926cd141 100644
+--- a/dist/index.d.mts
++++ b/dist/index.d.mts
+@@ -7,10 +7,7 @@ export interface PropertiesOptions {
+   labels?: Record<string, string>;
+   /** Puts the box at the top of a document that has no `::properties`. Default true. */
+   top?: boolean;
+-  /**
+-   * The locale dates show in, such as `"de-DE"`. Without it, dates render in English and the reader's browser rewrites
+-   * them in its own locale.
+-   */
++  /** The language of the dates' words and format, such as `"de-DE"`. Default English. */
+   locale?: string;
+ }
+ export type PropertiesMeta = {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index df7983a21ad0473ff969cc993b4feb8174141993..f95e316b979bfc1a63c2b327325ca6412295e929 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1 +1 @@
+-export { n as default, t as rowsOf } from "./src-BRb5cKfk.mjs";
++export { n as default, t as rowsOf } from "./src-CIPFb6M0.mjs";
+diff --git a/dist/react.mjs b/dist/react.mjs
+index eb50e464e22e9b6e6a08e63a0c3f92677a2a582a..7d638f657e8d246e9f28f302e0133e5f2b1f1ef0 100644
+--- a/dist/react.mjs
++++ b/dist/react.mjs
+@@ -1,14 +1,11 @@
+-import { n as src_default } from "./src-BRb5cKfk.mjs";
+-import { n as localizeDates, t as addStyles } from "./client-BPkb2vp9.mjs";
++import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { r as start } from "./client-BeNPxCfR.mjs";
+ import { Children, createElement, useEffect, useRef } from "react";
+ //#region src/react.ts
+ /** The properties box for `@comark/react`. */
+ function Properties({ children }) {
+ 	const box = useRef(null);
+-	useEffect(addStyles, []);
+-	useEffect(() => {
+-		if (box.current) localizeDates(box.current);
+-	});
++	useEffect(() => box.current ? start(box.current) : void 0);
+ 	return Children.count(children) ? createElement("dl", {
+ 		className: "cfm",
+ 		"data-comark-frame": "",
+diff --git a/dist/src-BRb5cKfk.mjs b/dist/src-CIPFb6M0.mjs
+similarity index 81%
+rename from dist/src-BRb5cKfk.mjs
+rename to dist/src-CIPFb6M0.mjs
+index ce1d9dc002565990e945ec37b6c1022e172d6576..5ab83d3562de21e119d3dd02a3e2e4201e9fe7d1 100644
+--- a/dist/src-BRb5cKfk.mjs
++++ b/dist/src-CIPFb6M0.mjs
+@@ -1,4 +1,5 @@
+ import { defineComarkPlugin } from "comark";
++import { describeTime } from "comark-time";
+ //#region ../../shared/nodes.ts
+ const isElement = (node) => Array.isArray(node) && node[0] !== null;
+ const childrenOf = ([, , ...rest]) => rest;
+@@ -25,7 +26,7 @@ function link(href) {
+ 		text
+ 	];
+ }
+-const DAY = /^\d{4}-\d{2}-\d{2}$/;
++const DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?)?$/i;
+ const KINDS = /* @__PURE__ */ new Map([
+ 	["status", "status"],
+ 	["pr", "pr"],
+@@ -41,30 +42,57 @@ function kindOf(key, value) {
+ 	if (Number(value) === value) return "number";
+ 	if (value === true || value === false) return "boolean";
+ 	const text = String(value);
+-	if (DAY.test(text)) return "date";
++	if (DATE.test(text)) return "date";
+ 	return /^https?:\/\//.test(text) ? "link" : "text";
+ }
+-/** `2026-10-23` as `Oct 23, 2026`, in a `time` that keeps the date for machines. */
+-function day(text, locale) {
+-	const date = /* @__PURE__ */ new Date(`${text}T00:00:00Z`);
+-	if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) return [
++/**
++* A date or an instant in comark-time's markup: a `time` that keeps the value for machines, with a tooltip. The words
++* depend on when and where it's read, so the server writes the date with its year, which reads right in any cached
++* copy, and the script after the box (or the component, once mounted) turns it into "2 days ago" in the reader's
++* browser. A time without an offset is UTC.
++*/
++function dateNode(text, locale) {
++	const time = describeTime(text, {
++		locale,
++		timeZone: "UTC",
++		threshold: "none"
++	});
++	if (!time) return [
+ 		"span",
+ 		{},
+ 		text
+ 	];
+-	const shown = date.toLocaleDateString(locale ?? "en-US", {
++	const label = new Intl.DateTimeFormat(locale ?? "en-US", {
+ 		month: "short",
+ 		day: "numeric",
+ 		year: "numeric",
+ 		timeZone: "UTC"
+-	});
++	}).format(new Date(time.datetime));
++	const id = `cfm-${crypto.randomUUID()}`;
+ 	return [
+ 		"time",
+-		locale ? {
+-			datetime: text,
+-			lang: locale
+-		} : { datetime: text },
+-		shown
++		{
++			class: "ctm",
++			datetime: time.datetime,
++			"data-mode": "absolute",
++			tabindex: "0",
++			"aria-describedby": id,
++			...locale ? { lang: locale } : {}
++		},
++		label,
++		[
++			"span",
++			{
++				class: "ctm-tip",
++				role: "tooltip",
++				id
++			},
++			[
++				"span",
++				{ class: "ctm-pill" },
++				time.tip
++			]
++		]
+ 	];
+ }
+ /** A frontmatter value as nodes: text, a link for an http(s) URL, or one tag per item of a list of those. */
+@@ -99,7 +127,7 @@ function rowsOf(frontmatter, options = {}) {
+ 		locale = void 0;
+ 		issues.push({
+ 			rule: "comark/properties/invalid-locale",
+-			message: "properties: `locale` is not a valid language tag, so dates use the reader's locale. Use a tag such as `de-DE`, or leave `locale` unset."
++			message: "properties: `locale` is not a valid language tag, so dates are in English. Use a tag such as `de-DE`, or leave `locale` unset."
+ 		});
+ 	}
+ 	for (const key of keys) {
+@@ -119,7 +147,7 @@ function rowsOf(frontmatter, options = {}) {
+ 			"span",
+ 			{ class: "cfm-status" },
+ 			...nodes
+-		]] : kind === "date" && text !== void 0 && DAY.test(text) ? [day(text, locale)] : nodes;
++		]] : kind === "date" && text !== void 0 && DATE.test(text) ? [dateNode(text, locale)] : nodes;
+ 		rows.push([
+ 			"div",
+ 			{
+@@ -181,7 +209,7 @@ var src_default = defineComarkPlugin((options = {}) => ({
+ 				nodes[index] = [
+ 					"properties",
+ 					{},
+-					...rows
++					...rowsOf(tree.frontmatter, options).rows
+ 				];
+ 			}
+ 		};
+diff --git a/dist/client-BPkb2vp9.mjs b/dist/styles-D2Ehi-z5.mjs
+similarity index 84%
+rename from dist/client-BPkb2vp9.mjs
+rename to dist/styles-D2Ehi-z5.mjs
+index 78b16d4dc94303337a59150b793c0306832c18ac..273c403cf5576afbb0666b470c4efb6c6a9ccaac 100644
+--- a/dist/client-BPkb2vp9.mjs
++++ b/dist/styles-D2Ehi-z5.mjs
+@@ -1,4 +1,4 @@
+-//#region ../zoom/dist/theme.mjs
++//#region ../../../comark-ui-relative-dates/packages/zoom/dist/theme.mjs
+ const tokens = [
+ 	[
+ 		"background",
+@@ -178,34 +178,4 @@ const css = `@layer comark{${[
+ 	"@media print{.cfm{break-inside:avoid}}"
+ ].join("")}}`;
+ //#endregion
+-//#region ../../shared/styles.ts
+-/**
+-* Adds a package's styles to the page once, unless the page already carries them as a `style` or a `link` with
+-* `data-comark-<name>`, which is how the HTML renderer inlines them and how an app that imports `style.css` marks them.
+-*/
+-function addStyles$1(name, css) {
+-	const attribute = `data-comark-${name}`;
+-	if (document.querySelector(`style[${attribute}],link[${attribute}]`)) return;
+-	const style = document.createElement("style");
+-	style.setAttribute(attribute, "");
+-	style.textContent = css;
+-	document.head.append(style);
+-}
+-//#endregion
+-//#region src/client.ts
+-/** Adds the properties styles to the page once. The Vue, React, and Svelte components call it when they mount. */
+-const addStyles = () => addStyles$1("properties", css);
+-/**
+-* Rewrites each date in the properties boxes under `root` in the reader's locale. A date the `locale` option fixed
+-* keeps its `lang` and stays as written. The HTML renderer inlines this function, so it uses nothing from outside it.
+-*/
+-function localizeDates(root) {
+-	for (const time of root.querySelectorAll(".cfm time[datetime]:not([lang])")) time.textContent = (/* @__PURE__ */ new Date(`${time.dateTime}T00:00:00Z`)).toLocaleDateString(void 0, {
+-		month: "short",
+-		day: "numeric",
+-		year: "numeric",
+-		timeZone: "UTC"
+-	});
+-}
+-//#endregion
+-export { localizeDates as n, css as r, addStyles as t };
++export { css as t };
+diff --git a/dist/svelte/Properties.svelte b/dist/svelte/Properties.svelte
+index 0abd0a7d146541dd8c658af6653fea2672b0185a..2af4271f2337390af910fcc946b7acb5294f68c1 100644
+--- a/dist/svelte/Properties.svelte
++++ b/dist/svelte/Properties.svelte
+@@ -1,14 +1,13 @@
+ <!-- The properties box for `@comark/svelte`. -->
+ <script>
+-  import { onMount } from "svelte";
+-  import { addStyles, localizeDates } from "comark-properties/client";
++  import { relativize, start } from "comark-properties/client";
+ 
+   let { children } = $props();
+   let box = $state();
+-  onMount(addStyles);
+   $effect(() => {
+     const root = box;
+     if (!root) return;
++    const stop = start(root);
+     // A snippet can update its rows without changing its identity or the box binding.
+     const options = {
+       subtree: true,
+@@ -18,12 +17,14 @@
+     };
+     const observer = new MutationObserver(() => {
+       observer.disconnect();
+-      localizeDates(root);
++      relativize(root)();
+       observer.observe(root, options);
+     });
+-    localizeDates(root);
+     observer.observe(root, options);
+-    return () => observer.disconnect();
++    return () => {
++      observer.disconnect();
++      stop();
++    };
+   });
+ </script>
+ 
+diff --git a/dist/vue.mjs b/dist/vue.mjs
+index 46e73e86eb84899f022f6d3688ce4d443a62ce7c..163afd852235f2dc3b1ed4184e3bac6b81db3b7c 100644
+--- a/dist/vue.mjs
++++ b/dist/vue.mjs
+@@ -1,6 +1,6 @@
+-import { n as src_default } from "./src-BRb5cKfk.mjs";
+-import { n as localizeDates, t as addStyles } from "./client-BPkb2vp9.mjs";
+-import { defineComponent, h, onMounted, onUpdated, shallowRef } from "vue";
++import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { r as start } from "./client-BeNPxCfR.mjs";
++import { defineComponent, h, onBeforeUnmount, onMounted, onUpdated, shallowRef } from "vue";
+ //#region src/vue.ts
+ /** The properties box for `@comark/vue`. */
+ const Properties = defineComponent({
+@@ -8,12 +8,14 @@ const Properties = defineComponent({
+ 	inheritAttrs: false,
+ 	setup(_, { slots }) {
+ 		const box = shallowRef();
+-		const localize = () => box.value && localizeDates(box.value);
+-		onMounted(() => {
+-			addStyles();
+-			localize();
+-		});
+-		onUpdated(localize);
++		let stop;
++		const refresh = () => {
++			stop?.();
++			stop = box.value ? start(box.value) : void 0;
++		};
++		onMounted(refresh);
++		onUpdated(refresh);
++		onBeforeUnmount(() => stop?.());
+ 		return () => {
+ 			const rows = slots.default?.();
+ 			return rows?.length ? h("dl", {
