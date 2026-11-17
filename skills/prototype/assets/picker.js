@@ -2,8 +2,9 @@
 // Paste it into a <script> at the end of <body> only for a page opened outside Drop.
 // Every top-level <section id="v-…" data-variant="Thing · variation" data-note="One line"> is one item. Two modes:
 // - Canvas, the default with two or more items: every item side by side at its real size, `data-width` (px, default
-//   1280) by `data-height` (px, default its content). Drag empty space, Space + drag, or middle-drag to pan; Ctrl/⌘ +
-//   wheel or pinch to zoom; + and − zoom, Shift+1 fits all, 0 resets the camera. Click a name to copy it; double-click
+//   1280) by `data-height` (px, default its content). Drag empty space, hold Space and drag, or middle-drag to pan;
+//   the Hand tool (H, V for Move again) pans from anywhere, over the items too, as in Figma. Ctrl/⌘ + wheel or pinch
+//   to zoom; + and − zoom, Shift+1 fits all, 0 resets the camera. Click a name to copy it; double-click
 //   it, press Enter on it, or press 1–9 to open that item in focus. Drag the handle beside a name, or focus it and press
 //   the arrow keys, to move the item. The camera stops where an item would leave the screen (a fence), and a minimap in
 //   the bottom-right corner shows the items and the screen: click it to jump, drag the screen's box to move.
@@ -14,7 +15,7 @@
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
 // on document each frame the camera or an item moves.
-// Inside Drop the page draws no bar: Drop's own bottom bar shows the mode and the camera. The page posts its state up
+// Inside Drop the page draws no bar: Drop's own bottom bar shows the mode, the tool, and the camera. The page posts its state up
 // and takes Drop's commands over postMessage; everything else (keys, hash, memory, the canvas) stays here.
 (() => {
   // Drop marks the page before any of its scripts run and injects its own copy; any other copy steps aside.
@@ -53,7 +54,9 @@
     body > [data-variant][data-src] { padding: 0; }
     html[data-prototype-layout="canvas"], html[data-prototype-layout="canvas"] body { overflow: hidden !important; overscroll-behavior: none !important; height: 100% !important; }
     html[data-prototype-layout="canvas"] body { margin: 0 !important; cursor: default; }
-    html[data-prototype-layout="canvas"] body > [data-variant] { cursor: auto; }`;
+    html[data-prototype-layout="canvas"] body > [data-variant] { cursor: auto; }
+    html[data-prototype-hand], html[data-prototype-hand] body { cursor: grab !important; }
+    html[data-prototype-hand="grabbing"], html[data-prototype-hand="grabbing"] body { cursor: grabbing !important; }`;
   document.head.append(css);
 
   const host = document.createElement("prototype-picker");
@@ -66,6 +69,7 @@
       font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: blur(8px); }
     button { all: unset; box-sizing: border-box; height: 28px; padding: 0 10px; border-radius: 8px; color: #a3a3a3; cursor: pointer; white-space: nowrap; }
     button:hover { color: #fafafa; background: rgb(255 255 255 / .08); }
+    button[aria-pressed="true"] { color: #171717; background: #fafafa; }
     button:focus-visible { outline: 2px solid #fafafa; outline-offset: 1px; }
     .bar > span { padding: 0 8px; color: #a3a3a3; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .bar .current { color: #fafafa; max-width: 44ch; overflow: hidden; text-overflow: ellipsis; }
@@ -75,6 +79,10 @@
     .bar:not(.canvas) .cam, .bar.canvas .one { display: none; }
     .tags { display: none; position: fixed; inset: 0 var(--drop-inset, 0px) 0 0; z-index: 2147482000; overflow: hidden; pointer-events: none; }
     .tags.on { display: block; }
+    .shield { position: absolute; inset: 0; display: none; cursor: grab; touch-action: none; }
+    .tags.hand .shield { display: block; pointer-events: auto; }
+    .tags.hand .tag { pointer-events: none; }
+    .tags.grabbing .shield { cursor: grabbing; }
     .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: auto;
       color: #171717; font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
@@ -110,6 +118,9 @@
     <button class="cam in" aria-label="Zoom in" title="Zoom in (+)">+</button>
     <button class="cam fit" title="Fit all (Shift+1)">Fit</button>
     <button class="cam reset" title="Reset camera (0)">Reset</button>
+    <i class="cam sep"></i>
+    <button class="cam move" aria-pressed="true" title="Move (V)">Move</button>
+    <button class="cam hand" aria-pressed="false" title="Hand: drag anywhere to pan (H, or hold Space)">Hand</button>
     <button class="one prev" aria-label="Previous item" title="Previous (←)">‹</button>
     <span class="one current" aria-live="polite"></span>
     <button class="one next" aria-label="Next item" title="Next (→)">›</button>
@@ -117,10 +128,10 @@
     <i class="one sep"></i>
     <button class="one back" title="Every item side by side (Esc)">Canvas</button>
   </nav>
-  <div class="tags"><i class="edge l"></i><i class="edge r"></i><i class="edge t"></i><i class="edge b"></i><div class="map" role="img" aria-label="Minimap: click to move the camera there"><canvas></canvas></div></div>
+  <div class="tags"><i class="shield"></i><i class="edge l"></i><i class="edge r"></i><i class="edge t"></i><i class="edge b"></i><div class="map" role="img" aria-label="Minimap: click to move the camera there"><canvas></canvas></div></div>
   <p class="sr" id="move-help">Arrow keys move the item, Shift moves it further.</p>`;
   const $ = (s) => shadow.querySelector(s);
-  const bar = $(".bar"), tags = $(".tags"), map = $(".map"), mapCanvas = $(".map canvas"), zoomText = $(".zoom"), currentText = $(".current"), noteText = $(".note");
+  const bar = $(".bar"), tags = $(".tags"), shield = $(".shield"), moveButton = $(".move"), handButton = $(".hand"), map = $(".map"), mapCanvas = $(".map canvas"), zoomText = $(".zoom"), currentText = $(".current"), noteText = $(".note");
   $(".count").textContent = variants.length + " items";
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
@@ -205,7 +216,7 @@
   }
   const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); schedule(); };
 
-  let mode = "", current = -1, gesture = null, space = false, frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
+  let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
@@ -396,6 +407,7 @@
     scrollTo(0, 0);
     tags.classList.add("on");
     bar.classList.add("canvas");
+    hand();
     schedule();
     // Coming back from focus centres that item; the first visit fits everything, unless a camera is saved.
     const go = () => requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -422,6 +434,7 @@
       bar.classList.remove("canvas");
     }
     mode = "focus";
+    hand();
     current = i;
     for (const it of items) {
       restore(it);
@@ -465,7 +478,7 @@
     if (!hosted || !synced || !several) return;
     reportedZoom = Math.round(cam.z * 100);
     const list = variants.map((el) => ({ id: el.id, label: nameOf(el), note: el.dataset.note || "" }));
-    parent.postMessage({ __drop: true, type: "variants", variants: list, current: Math.max(current, 0), canvas: mode === "canvas", zoom: reportedZoom }, "*");
+    parent.postMessage({ __drop: true, type: "variants", variants: list, current: Math.max(current, 0), canvas: mode === "canvas", zoom: reportedZoom, tool }, "*");
   }
   const commands = {
     sync: () => { synced = true; report(); },
@@ -477,6 +490,11 @@
     "zoom-out": () => mode === "canvas" && zoomCenter(1 / 1.25),
     fit: () => mode === "canvas" && fit(),
     reset: () => mode === "canvas" && reset(),
+    move: () => pick("move"),
+    hand: () => pick("hand"),
+    // Space held while Drop's window has focus.
+    hold: () => hold(true),
+    release: () => hold(false),
   };
   if (hosted) window.addEventListener("message", (e) => {
     const m = e.data;
@@ -491,6 +509,8 @@
   $(".in").onclick = () => zoomCenter(1.25);
   $(".fit").onclick = () => fit();
   $(".reset").onclick = reset;
+  moveButton.onclick = () => pick("move");
+  handButton.onclick = () => pick("hand");
   window.addEventListener("hashchange", () => { const i = find(location.hash.slice(1)); if (i >= 0) toFocus(i); });
 
   const typing = (t) => t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
@@ -504,7 +524,9 @@
     if (mode === "canvas") {
       // Shadow controls (handles, names, the bar) keep their own keys; the plane takes the rest.
       if (t === host) return;
-      if (e.key === " ") { if (interactive(t)) return; space = true; e.preventDefault(); return; }
+      if (e.key === " ") { if (interactive(t)) return; hold(true); e.preventDefault(); return; }
+      if (e.key === "h" || e.key === "H") { pick("hand"); e.preventDefault(); return; }
+      if (e.key === "v" || e.key === "V") { pick("move"); return; }
       if (interactive(t) && t !== document.body) return;
       const step = { ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] }[e.key];
       if (step) { pan(step[0], step[1]); settle(); }
@@ -524,24 +546,45 @@
     else return;
     e.preventDefault();
   });
-  window.addEventListener("keyup", (e) => { if (e.key === " ") space = false; });
+  window.addEventListener("keyup", (e) => { if (e.key === " ") hold(false); });
 
-  // Gestures. Space + drag and middle-drag pan anywhere and win over everything else; a plain drag pans only from
-  // empty space, so previews keep their clicks, selection, and inputs.
+  // The Hand tool, or Space held: a shield over the items takes the pointer, so a drag pans from anywhere, live pages
+  // included, and the items get no clicks or hovers until it's put down. The cursor says which: grab, then grabbing.
+  function hold(on) { if (space !== on) { space = on; hand(); } }
+  function pick(next) {
+    if (tool === next) return;
+    tool = next;
+    hand();
+    report();
+  }
+  function hand() {
+    const on = mode === "canvas" && (tool === "hand" || space), grabbing = on && gesture && gesture.kind === "pan";
+    tags.classList.toggle("hand", on);
+    tags.classList.toggle("grabbing", Boolean(grabbing));
+    if (on) root.dataset.prototypeHand = grabbing ? "grabbing" : "";
+    else delete root.dataset.prototypeHand;
+    moveButton.setAttribute("aria-pressed", String(tool === "move"));
+    handButton.setAttribute("aria-pressed", String(tool === "hand"));
+  }
+
+  // Gestures. The Hand tool, Space + drag, and middle-drag pan anywhere and win over everything else; a plain drag pans
+  // only from empty space, so previews keep their clicks, selection, and inputs.
   function endGesture() {
     if (!gesture) return;
     if (gesture.moved) suppressUntil = performance.now() + 400;
     gesture = null;
+    hand();
     settle();
   }
   window.addEventListener("pointerdown", (e) => {
     if (mode !== "canvas" || gesture) return;
-    const empty = e.target === root || e.target === document.body;
-    if (!(e.button === 1 || (e.button === 0 && (space || (empty && e.pointerType === "mouse"))))) return;
+    const empty = e.target === root || e.target === document.body, shielded = e.composedPath()[0] === shield;
+    if (!(e.button === 1 || (e.button === 0 && (space || shielded || (empty && e.pointerType === "mouse"))))) return;
     e.preventDefault();
     e.stopPropagation();
     try { root.setPointerCapture(e.pointerId); } catch {}
     gesture = { kind: "pan", id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+    hand();
   }, true);
   window.addEventListener("pointermove", (e) => {
     if (!gesture || e.pointerId !== gesture.id) return;
@@ -556,7 +599,7 @@
   for (const type of ["click", "auxclick"]) window.addEventListener(type, (e) => {
     if (performance.now() < suppressUntil) { suppressUntil = 0; e.preventDefault(); e.stopPropagation(); }
   }, true);
-  const drop = () => { space = false; endGesture(); };
+  const drop = () => { hold(false); endGesture(); };
   window.addEventListener("blur", drop);
   document.addEventListener("visibilitychange", () => { if (document.hidden) drop(); });
 
