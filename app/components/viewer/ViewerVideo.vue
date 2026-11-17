@@ -147,7 +147,7 @@ function copyFrame() {
       return notify.done(`Frame at ${clock(element.currentTime)} copied`)
     },
     (error) => {
-      reportError(error)
+      reportClientError("copy", error)
       notify.alert("Couldn't copy the frame")
     },
   )
@@ -161,7 +161,7 @@ async function commentOnFrame() {
     const frame = await frameAt()
     if (frame) emit("frame", frame)
   } catch (error) {
-    reportError(error)
+    reportClientError("video-frame", error)
     notify.alert("Couldn't take the frame")
   } finally {
     commenting.value = false

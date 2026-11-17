@@ -177,8 +177,9 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
-    // Uncaught browser errors, and the ones the app catches and passes to reportError(), land in the wide event of
-    // POST /api/_vitehub/browser-errors, so a toast like "Couldn't copy" leaves a trace in the logs.
+    // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
+    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
     observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.

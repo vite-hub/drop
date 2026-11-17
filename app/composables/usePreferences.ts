@@ -114,7 +114,7 @@ export function useCopy() {
     if (announce) notify.done(announce)
   }
   function failed(error: unknown) {
-    reportError(error)
+    reportClientError("copy", error)
     notify.alert("Couldn't copy")
   }
   return {
