@@ -100,6 +100,8 @@ export const CommentSchema = v.pipe(
     suggestion: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     /** A comment on a video's frame: the second it's at. The spot or area is on that frame. */
     at: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(86_400))),
+    /** A comment on a PDF's page: its number, from 1. The spot or area is on that page. */
+    pdfPage: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100_000))),
     // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
     mentions: MentionsSchema,
@@ -123,6 +125,11 @@ export const CommentSchema = v.pipe(
     "A suggestion replaces selected text.",
   ),
   v.check((input) => input.at === undefined || input.kind === "image", "A video's frame takes a spot or an area."),
+  v.check((input) => input.pdfPage === undefined || input.kind === "image", "A PDF's page takes a spot or an area."),
+  v.check(
+    (input) => input.at === undefined || input.pdfPage === undefined,
+    "A comment is on a frame or a page, not both.",
+  ),
 )
 
 /**

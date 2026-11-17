@@ -18,6 +18,12 @@ $$
 so it settles where saving covers depreciation.
 
 The capital stock is $k$, with input $x\\phantom{ABC}+y$.
+
+The 10 µm width is $k$.
+
+The area in m² is $x+y$.
+
+Office ﬁles have  two spaces.
 `
 const { html } = await renderMarkdownCached("math-comments", async () => markdown)
 // Vitest reads CSS `?raw` imports as empty strings, so the frame gets the real stylesheets the way the app builds them.
@@ -88,7 +94,9 @@ test("comments quote, anchor, and mark text around and inside math, and leave th
       const display = document.createRange()
       display.selectNodeContents(document.querySelector("math[display=block]"))
       // A letter in a formula, with the same letter in the prose before it, and a formula with invisible space.
-      const [stock, phantom] = document.querySelectorAll("main p:last-of-type math")
+      const [stock, phantom] = [...document.querySelectorAll("main p")]
+        .find((p) => p.textContent.includes("capital stock"))
+        .querySelectorAll("math")
       const letter = document.createRange()
       letter.selectNodeContents(stock)
       const spaced = document.createRange()
@@ -130,6 +138,42 @@ test("comments quote, anchor, and mark text around and inside math, and leave th
     assert.ok(drawn.display.beside, JSON.stringify(drawn.display))
     assert.ok(drawn.display.height < drawn.display.mathHeight, JSON.stringify(drawn.display))
     await context.close()
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("runtime selections preserve compatibility characters in prose across math", async () => {
+  const browser = await chromium.launch()
+  try {
+    for (const prose of ["The 10 µm", "The area in m²", "Office ﬁles"]) {
+      const probe = await open(browser, [])
+      await probe.frame.evaluate((prose) => {
+        const p = [...document.querySelectorAll("main p")].find((p) => p.textContent.includes(prose))
+        const range = document.createRange()
+        range.selectNodeContents(p)
+        getSelection().removeAllRanges()
+        getSelection().addRange(range)
+        document.dispatchEvent(new Event("mouseup"))
+      }, prose)
+      await probe.page.waitForFunction(() => window.posts.some((m) => m.type === "selection" && m.quote))
+      const saved = await probe.page.evaluate(() => window.posts.findLast((m) => m.type === "selection" && m.quote))
+      await probe.context.close()
+      const restored = await open(browser, [{ ...comment("c1", saved.quote), selector: saved.selector }])
+      await restored.frame.waitForFunction(() => document.querySelector("drop-bubble"))
+      const range = await restored.frame.evaluate(() => {
+        const range = [...CSS.highlights.get("drop-margin")][0]
+        return {
+          text: range.toString(),
+          start: range.startContainer.parentElement.closest("p").textContent,
+          end: range.endContainer.parentElement.closest("p").textContent,
+        }
+      })
+      assert.ok(range.text.startsWith(prose), JSON.stringify(range))
+      assert.ok(range.start.includes(prose), JSON.stringify(range))
+      assert.ok(range.end.includes(prose), JSON.stringify(range))
+      await restored.context.close()
+    }
   } finally {
     await browser.close()
   }

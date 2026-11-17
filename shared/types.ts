@@ -252,6 +252,8 @@ export interface DropComment {
   suggestion: string | null
   /** On a video's frame: the second it's at. `ox`/`oy`/`ow`/`oh` are then thousandths of the frame. */
   at: number | null
+  /** On a PDF's page: its number, from 1. `ox`/`oy`/`ow`/`oh` are then thousandths of the page. */
+  pdfPage: number | null
   label: string | null
   page: string | null
   body: string

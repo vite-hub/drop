@@ -229,10 +229,12 @@ const variables = {
           class="@container block min-h-0 w-full overflow-hidden rounded-lg border border-default shadow-lg [--media-background-color:var(--background)] [&[mediaisfullscreen]]:rounded-none [&[mediaisfullscreen]]:border-0 [&[mediaisfullscreen]]:[--media-background-color:#000]"
           :style="variables"
         >
+          <!-- Until its metadata arrives a video is 150px tall, and the player grew under the reader when it came: hold
+               16:9 until then. -->
           <video
             ref="video"
             slot="media"
-            class="block w-full in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none!"
+            class="block w-full [aspect-ratio:auto_16/9] in-[[mediaisfullscreen]]:h-full in-[[mediaisfullscreen]]:max-h-none!"
             :class="markers.length ? 'max-h-[calc(100cqh-2.25rem)]' : 'max-h-[100cqh]'"
             :aria-label="title"
             playsinline

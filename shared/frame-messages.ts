@@ -158,6 +158,8 @@ export const FrameMessage = v.variant("type", [
       current: v.pipe(v.number(), v.integer(), v.minValue(0)),
       canvas: v.boolean(),
       zoom: v.pipe(v.number(), v.minValue(0), v.maxValue(1000)),
+      /** The canvas tool: Move gives the items their clicks, Hand pans from anywhere. */
+      tool: v.optional(v.picklist(["move", "hand"])),
     }),
     v.check((message) => message.current < message.variants.length),
   ),

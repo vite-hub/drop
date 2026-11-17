@@ -542,21 +542,22 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         // A selection quotes a formula as it's drawn: a line between its symbols, and a letter such as k as the italic
         // 𝑘. The quote is matched again without whitespace and with each character in its plain form (NFKC), which
         // keeps where each one came from in the page's text. A character only a formula draws that way, such as 𝑘,
-        // must land in a formula, so the k of "stock" doesn't take the comment of the 𝑘 after it.
+        // must land in a formula or match the original prose character exactly, so the k of "stock" doesn't take the
+        // comment of the 𝑘 after it.
         const plain = (chars) => chars.normalize("NFKC").replace(/\s+/g, "");
         let bare = ""; const mathOnly = [];
-        for (const char of quote) { const folded = plain(char); bare += folded; for (let k = 0; k < folded.length; k++) mathOnly.push(folded !== char); }
-        const starts = [], ends = [], inMath = []; let squeezed = "";
+        for (const char of quote) { const folded = plain(char); bare += folded; for (let k = 0; k < folded.length; k++) mathOnly.push(folded !== char ? char : null); }
+        const starts = [], ends = [], inMath = [], originals = []; let squeezed = "";
         for (let n = 0; n < nodes.length; n++) {
           const [node, offset] = nodes[n], math = !!node.parentElement.closest("math");
           for (let i = 0; i < node.data.length; ) {
             const char = String.fromCodePoint(node.data.codePointAt(i)), folded = plain(char);
-            for (let k = 0; k < folded.length; k++) { starts.push(offset + i); ends.push(offset + i + char.length); inMath.push(math); }
+            for (let k = 0; k < folded.length; k++) { starts.push(offset + i); ends.push(offset + i + char.length); inMath.push(math); originals.push(char); }
             squeezed += folded; i += char.length;
           }
         }
         let from = bare ? squeezed.indexOf(bare) : -1;
-        while (from >= 0 && mathOnly.some((only, k) => only && !inMath[from + k])) from = squeezed.indexOf(bare, from + 1);
+        while (from >= 0 && mathOnly.some((only, k) => only && !inMath[from + k] && originals[from + k] !== only)) from = squeezed.indexOf(bare, from + 1);
         if (from < 0) continue;
         at = starts[from]; stop = ends[from + bare.length - 1];
       }
