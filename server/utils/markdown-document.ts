@@ -328,7 +328,7 @@ async function renderMarkdownBody(
   markdown: string,
   blobKey: string,
   event?: H3Event,
-): Promise<{ title: string; html: string; retry?: true }> {
+): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
@@ -359,11 +359,11 @@ async function renderMarkdownBody(
     }
   } catch (error) {
     logError(event, error, { action: "markdown_render", blobKey })
-    // Not kept: the next read renders it again.
+    // Kept for minutes, not the month a render is: reads don't each fail again.
     return {
       title: "Untitled document",
       html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`,
-      retry: true,
+      failed: true,
     }
   }
 }

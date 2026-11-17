@@ -6,7 +6,7 @@ import { readXls, readXlsx } from "hucre/xlsx"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { defineCachedFunction } from "nitro/cache"
 import { logError } from "./logs"
-import { MARKDOWN_CACHE_TTL } from "./markdown-cache"
+import { FAILED_RENDER_TTL, MARKDOWN_CACHE_TTL } from "./markdown-cache"
 
 /** The spreadsheets Drop previews, read-only. Anything else stays a plain file with a download. */
 export const SPREADSHEET_EXTENSIONS = new Set([".csv", ".tsv", ".xlsx", ".xlsm", ".xls", ".ods"])
@@ -158,10 +158,10 @@ async function renderSheets(bytes: Uint8Array, extension: string): Promise<{ htm
   }
 }
 
-/** A render that failed (`retry`) isn't kept, so the next read tries again. */
+/** A render that failed is kept for FAILED_RENDER_TTL, not the month a render is. */
 interface SheetRender {
   html: string
-  retry?: true
+  failed?: true
 }
 
 /** Keyed by blob key like Markdown renders (blobs never change); deleteMarkdownCache clears both. */
@@ -175,14 +175,13 @@ const cached = defineCachedFunction(
     const { html, failed } = await renderSheets(await bytes(), extension)
     if (failed === undefined) return { html }
     logError(event, failed, { action: "spreadsheet_render", blobKey: key })
-    // Not kept: the next read renders it again.
-    return { html, retry: true }
+    return { html, failed: true }
   },
   {
     name: "spreadsheet",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
-    validate: (entry: { value?: SheetRender }) => entry.value !== undefined && !entry.value.retry,
+    getMaxAge: (entry: { value?: SheetRender }) => (entry.value?.failed ? FAILED_RENDER_TTL : MARKDOWN_CACHE_TTL),
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )
