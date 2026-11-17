@@ -89,7 +89,7 @@ onMounted(async () => {
   } catch (error) {
     if (lifecycle.signal.aborted) return
     failed.value = true
-    reportClientError("pdf", error)
+    reportError(error)
   }
 })
 onBeforeUnmount(() => {
@@ -172,7 +172,7 @@ async function commentOnPage() {
     const still = await pageAt()
     if (still) emit("page", still)
   } catch (error) {
-    reportClientError("pdf-page", error)
+    reportError(error)
     notify.alert("Couldn't take the page")
   } finally {
     taking.value = false
