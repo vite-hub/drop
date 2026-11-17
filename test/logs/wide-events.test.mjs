@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import { beforeEach, test, vi } from "vite-plus/test"
-import { initLogger } from "evlog"
 import { H3Event } from "h3"
 import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs"
 
@@ -43,21 +42,29 @@ const app = {
     },
   },
 }
-await evlogPlugin(app)
+/** evlog's plugin, as in production: each event is printed as one JSON line, the way a host's log shows it. */
+async function startEvlog(target) {
+  process.env.NODE_ENV = "production"
+  await evlogPlugin(target)
+  process.env.NODE_ENV = "test"
+}
+await startEvlog(app)
 await wideEvents(app)
 const events = []
 app.hooks.hook("evlog:drain", ({ event }) => {
   events.push(event)
 })
-// Events outside a request (the hourly schedule) go to evlog's own drain.
+// Events outside a request (the hourly schedule) have no drain here: what's printed is what the host's log gets.
 const background = []
-initLogger({
-  ...JSON.parse(process.env.__EVLOG_CONFIG),
-  silent: true,
-  drain: ({ event }) => {
-    background.push(event)
-  },
-})
+const warnings = []
+function printed(line) {
+  try {
+    const event = JSON.parse(line)
+    if (!("method" in event)) background.push(event)
+  } catch {
+    warnings.push(String(line))
+  }
+}
 
 /** One request through evlog's request, response, and error hooks: the wide event it emitted. */
 async function request(path, handler, { method = "GET", body, params, headers = {} } = {}) {
@@ -93,6 +100,8 @@ beforeEach(() => {
   state.mcpCaller = null
   state.authSecret = undefined
   background.length = 0
+  warnings.length = 0
+  for (const method of ["log", "info", "warn", "error"]) vi.spyOn(console, method).mockImplementation(printed)
 })
 
 test("every event names the release and the host it ran on", async () => {
@@ -143,6 +152,25 @@ test("an upload URL's ticket never reaches the log", async () => {
   assert.equal(failure.status, 403)
   assert.equal(event.path, "/api/uploads/[REDACTED]")
   assert.ok(!JSON.stringify(event).includes("sealed-ticket"), JSON.stringify(event))
+})
+
+test("an upload URL quoted in an error's text loses its ticket, and the event stays whole", async () => {
+  const { event } = await request("/api/me", () => {
+    throw new Error('Upload failed: "https://drop.example/api/uploads/Fe26.2**sealed-ticket**abc" answered 500')
+  })
+  assert.equal(event.error.message, 'Upload failed: "https://drop.example/api/uploads/[REDACTED]" answered 500')
+  assert.deepEqual(event.deployment, { host: "vps" })
+})
+
+test("an event outside a request is redacted too and names the host", async () => {
+  const { logError } = await import("../../server/utils/logs.ts")
+  logError(undefined, new Error('fetch "https://drop.example/api/uploads/sealed-ticket" from 2001:db8::7'), {
+    action: "test",
+  })
+  const [event] = background
+  assert.deepEqual(event.deployment, { host: "vps" })
+  assert.ok(!JSON.stringify(event).includes("sealed-ticket"), JSON.stringify(event))
+  assert.ok(!JSON.stringify(event).includes("2001:db8"))
 })
 
 test("an IPv6 address in an error never reaches the log", async () => {
@@ -198,17 +226,21 @@ test("the hourly cleanup emits one event a run, with each step's count, and name
   const [run] = runs
   assert.equal(run.level, "error")
   assert.equal(run.version, "1.2.3")
+  assert.deepEqual(run.deployment, { host: "vps" })
   assert.deepEqual(run.failed, ["codeImages"])
   assert.match(run.steps.codeImages.error, /injected blob delete failure/)
   assert.equal(run.steps.drops.purged, 1)
+  assert.deepEqual(run.steps.drops.deleted, [{ id: "old", owner: "owner", reason: "deleted" }])
   assert.equal(typeof run.steps.drops.ms, "number")
   assert.equal(run.steps.quotaReservations.released, 0)
 })
 
 test("an abuse report is an audit, kept when info events are sampled out", async () => {
   insertDrop("shared", { visibility: "shared" })
-  const config = JSON.parse(process.env.__EVLOG_CONFIG)
-  initLogger({ ...config, silent: true, sampling: { ...config.sampling, rates: { info: 0 } } })
+  const config = process.env.__EVLOG_CONFIG
+  const parsed = JSON.parse(config)
+  process.env.__EVLOG_CONFIG = JSON.stringify({ ...parsed, sampling: { ...parsed.sampling, rates: { info: 0 } } })
+  await startEvlog({ hooks: { hook() {} } })
   try {
     const before = events.length
     const plain = new H3Event(new Request("https://drop.example/api/me"))
@@ -227,7 +259,8 @@ test("an abuse report is an audit, kept when info events are sampled out", async
     assert.equal(event.audit.target.drop, "shared")
     assert.ok(!JSON.stringify(event).includes("reporter@example.com"))
   } finally {
-    initLogger({ ...config, silent: true, drain: ({ event }) => void background.push(event) })
+    process.env.__EVLOG_CONFIG = config
+    await startEvlog({ hooks: { hook() {} } })
   }
 })
 
@@ -265,5 +298,101 @@ test("each tool call in an MCP batch keeps its own entry and drop", async () => 
       ["read_drop", "first", false],
       ["read_drop", "second", false],
     ],
+  )
+})
+
+test("a purge that fails halfway still lists the drops the run deleted", async () => {
+  const now = Date.UTC(2026, 10, 17, 12)
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  for (const id of ["first", "second"])
+    insertDrop(id, { trashed_at: now - 16 * 86_400_000, trash_reason: "deleted", blob_key: null })
+  sql.exec(`CREATE TRIGGER fail_second BEFORE DELETE ON drops WHEN old.id = 'second'
+    BEGIN SELECT RAISE(ABORT, 'second is stuck'); END`)
+  try {
+    await assert.rejects(cleanup.handler({ scheduledAt: new Date(now) }), /second is stuck/)
+  } finally {
+    sql.exec("DROP TRIGGER fail_second")
+  }
+  const run = background.find((event) => event.schedule === "cleanup")
+  assert.deepEqual(run.failed, ["drops"])
+  assert.deepEqual(run.steps.drops.deleted, [{ id: "first", owner: "owner", reason: "deleted" }])
+})
+
+test("a spreadsheet that can't be read logs once, and is read again after five minutes", async () => {
+  const { renderSpreadsheetCached } = await import("../../server/utils/spreadsheet.ts")
+  const now = Date.UTC(2026, 10, 17, 12)
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  let reads = 0
+  const bytes = async () => {
+    reads++
+    return new TextEncoder().encode("not a workbook")
+  }
+  const open = () =>
+    request("/f/sheet.xlsx", async (event) => renderSpreadsheetCached("sheets/broken.xlsx", ".xlsx", bytes, event))
+  const first = await open()
+  assert.equal(first.event.level, "error")
+  assert.equal(first.event.blobKey, "sheets/broken.xlsx")
+  const second = await open()
+  assert.equal(reads, 1, "kept for now")
+  assert.notEqual(second.event.level, "error")
+  vi.advanceTimersByTime(6 * 60_000)
+  await open()
+  assert.equal(reads, 2, "read again once the five minutes are over")
+})
+
+test("an admin's Better Auth call is audited with its outcome; one that only reads is not", async () => {
+  const { default: adminApi } = await import("../../server/middleware/0.18.admin-api.ts")
+  state.who = { ...who, role: "admin" }
+  const call = (endpoint, status) =>
+    request(`/api/auth/admin/${endpoint}`, (event) => adminApi(event, async () => new Response(null, { status })), {
+      method: "POST",
+      body: { userId: "member" },
+    })
+  const missing = await call("ban-user", 404)
+  assert.equal(missing.event.audit.action, "auth-admin.ban-user")
+  assert.equal(missing.event.audit.outcome, "failure")
+  assert.deepEqual(missing.event.audit.target, { type: "user", id: "member" })
+  assert.equal((await call("ban-user", 200)).event.audit.outcome, "success")
+  assert.equal((await call("has-permission", 200)).event.audit, undefined)
+})
+
+test("a webhook that cancels and updates a subscription lists both, and audits the cancellation", async () => {
+  const { logSubscription } = await import("../../server/utils/teams.ts")
+  const { authRequest } = await import("../../server/utils/logs.ts")
+  const subscription = { id: "sub_1", referenceId: "team-1", plan: "team", status: "active", seats: 3 }
+  const { event } = await request("/api/auth/stripe/webhook", (event) =>
+    authRequest.run(event, async () => {
+      await logSubscription("canceling")({ subscription })
+      await logSubscription("updated")({ subscription })
+    }),
+  )
+  assert.deepEqual(event.stripe.subscription.changes, ["canceling", "updated"])
+  assert.equal(event.audit.action, "billing.canceling")
+  assert.deepEqual(event.audit.actor, { type: "system", id: "stripe" })
+})
+
+test("a realtime room says why it refused someone", async () => {
+  const { default: latest } = await import("../../server/realtime/latest.ts")
+  const { event } = await request("/api/_vitehub/realtime/latest/gone", (event) =>
+    latest.authorize({ event, documentId: "gone", mode: "read" }),
+  )
+  assert.deepEqual(event.realtime, { reason: "not-found" })
+})
+
+test("a missing drop's page adds nothing to its request's event, which is already out", async () => {
+  const { default: contentError } = await import("../../server/handlers/content-error.ts")
+  insertDrop("plan", { visibility: "private" })
+  const { HTTPError } = await import("h3")
+  const { failure } = await request("/d/plan/missing", () => {
+    throw new HTTPError({ status: 404 })
+  })
+  const event = new H3Event(new Request("https://drop.example/d/plan/missing"))
+  await app.hooks.callHook("request", event)
+  await app.hooks.callHook("error", failure, { event })
+  await new Promise((resolve) => setImmediate(resolve))
+  await contentError(failure, event)
+  assert.deepEqual(
+    warnings.filter((line) => line.includes("after the wide event was emitted")),
+    [],
   )
 })
