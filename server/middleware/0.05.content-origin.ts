@@ -16,7 +16,11 @@ export default defineHandler(async (event) => {
     })
   const destination = event.req.headers.get("sec-fetch-dest")
   const read = ["GET", "HEAD"].includes(event.req.method)
-  const page = read && (!destination || destination === "iframe" || destination === "document")
+  // The frame host reading a page's HTML for the viewer says so, for a browser that sends no Sec-Fetch-Dest.
+  const page =
+    read &&
+    !event.req.headers.has("x-drop-read") &&
+    (!destination || destination === "iframe" || destination === "document")
   // Anything else an app loads (scripts, styles, fonts, fetch) is one of its files, for a frame that holds its grant.
   if (read && !page && host === "content") {
     const { serveAppFile } = await import("../utils/app-files")

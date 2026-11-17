@@ -2,7 +2,7 @@ import { stripe } from "@better-auth/stripe"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin, organization as teamsPlugin } from "better-auth/plugins"
 import { eq } from "drizzle-orm"
-import { Stripe } from "stripe"
+import type { Stripe } from "stripe"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
 import { createDatabaseAuthEventStore, defineAuth } from "vite-hub/auth"
@@ -23,6 +23,7 @@ import {
   teamsEnabled,
 } from "./utils/teams"
 import { currentRoleAdapter } from "./utils/current-role-adapter"
+import { lazyClient } from "./utils/lazy-client"
 import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
@@ -60,7 +61,12 @@ export default defineAuth(({ env, requestOrigin }) => {
   const billing = billingConfig()
   const teamBilling = billing.enabled
     ? {
-        stripeClient: new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+        // Stripe's SDK loads on the first billing call, so a Drop without billing never loads it.
+        stripeClient: lazyClient<Stripe>(() =>
+          import("stripe").then(
+            ({ Stripe }) => new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
+          ),
+        ),
         plans: teamPlans(billing),
       }
     : undefined

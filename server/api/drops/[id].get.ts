@@ -40,7 +40,8 @@ export default defineHandler(async (event) => {
     : undefined
   // Named after the drop, so every version of an HTML doc keeps the browser storage the last one left.
   const frameOrigin = drop.kind === "app" || drop.kind === "html" ? await contentOrigin(event, drop.id) : null
-  // An app on its own origin loads its files from there, so the viewer needs only its pages, and a grant to the rest.
+  // An app on its own origin loads its files from there, pages too (the frame reads them), so the viewer needs only a
+  // grant to them.
   const served = drop.kind === "app" && !!frameOrigin && perDropOrigins(event)
   // A folder a stranger opens may be a skill hub, or one of its skills; any other drop reads nothing more.
   // Install metadata is optional: unavailable child content must not prevent browsing the folder itself.
@@ -49,7 +50,7 @@ export default defineHandler(async (event) => {
       ? import("../../utils/hub-skills").then(({ hubInstall }) => hubInstall(drop, event)).catch(() => undefined)
       : undefined
   const [detail, install] = await Promise.all([
-    dropDetail(drop, who, event.url.origin, event, served ? "pages" : "all"),
+    dropDetail(drop, who, event.url.origin, event, served ? "none" : "all"),
     hub,
     visited,
   ])

@@ -162,7 +162,7 @@ export interface DropDetail extends DropSummary {
   html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
-  /** An app's text files keyed by path: all of them, or only its pages when its origin serves the rest (contentGrant). */
+  /** An app's text files keyed by path, unless its origin serves them all (contentGrant): the frame reads pages there. */
   files?: Record<string, string>
   /** Apps: each file's size in bytes, keyed by path. */
   sizes?: Record<string, number>
@@ -252,6 +252,8 @@ export interface DropComment {
   suggestion: string | null
   /** On a video's frame: the second it's at. `ox`/`oy`/`ow`/`oh` are then thousandths of the frame. */
   at: number | null
+  /** On a PDF's page: its number, from 1. `ox`/`oy`/`ow`/`oh` are then thousandths of the page. */
+  pdfPage: number | null
   label: string | null
   page: string | null
   body: string

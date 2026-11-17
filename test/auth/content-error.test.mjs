@@ -23,6 +23,9 @@ test("signed-out content errors offer sign-in and preserve the original link", a
   assert.match(html, /<meta property="og:image" content="https:\/\/drop\.example\/og\.png">/)
   assert.equal(response.headers.get("cache-control"), "private, no-store")
   assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
+  // The tab keeps Drop's icon, and the policy lets the browser fetch it.
+  assert.match(html, /<link rel="icon" href="\/favicon\.svg"/)
+  assert.match(response.headers.get("content-security-policy"), /img-src 'self'/)
 })
 
 test("signed-in content errors show only the current account and offer account switching", async () => {

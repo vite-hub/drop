@@ -39,12 +39,14 @@ const dropPlayer = (url: URL) => {
  * off and cast, table, and tests read no files (the preset's defaults), chips take each site's icon from Drop's own
  * endpoint (server/utils/favicons.ts; the address is made absolute per read, absoluteFavicons) and leave avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments,
- * Mermaid draws at most 4 diagrams and 8,000 characters of source a doc, Shiki colors code in the languages Drop
- * loads (GitHub light, and GitHub dark for the viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't
- * eat the Worker's CPU, and Drop supplies the document's typography.
+ * PlantUML, Graphviz, D2, and the other Kroki fences draw through kroki.io, Mermaid draws at most 4 diagrams and 8,000
+ * characters of source a doc, Shiki colors code in the languages Drop loads (GitHub light, and GitHub dark for the
+ * viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't eat the Worker's CPU, and Drop supplies the
+ * document's typography. Math is typeset as MathML while parsing, so a doc without it loads nothing for it.
  */
 const preset = comarkUi({
   chips: { download: false, favicon: (host) => `${FAVICON_PATH}${host}` },
+  diagrams: true,
   embed: { player: dropPlayer },
   mermaid: { maxDiagrams: 4, maxSource: 8_000 },
   shiki: {

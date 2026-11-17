@@ -173,6 +173,8 @@ export default defineMcpTool({
           ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
           // The second of the video's frame it's on; its image is that frame.
           ...(comment.at === null ? {} : { at: comment.at }),
+          // The number of the PDF's page it's on, from 1; its image is that page.
+          ...(comment.pdfPage === null ? {} : { pdfPage: comment.pdfPage }),
           body: comment.body,
           author: writtenBy(comment),
           page: comment.page,
