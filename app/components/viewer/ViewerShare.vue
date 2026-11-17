@@ -42,12 +42,18 @@ async function pick(next: Share) {
   saving.value = false
   if (done && renew) notify.done("Public link renewed")
 }
+
+// Reka focuses the first button, the close X, and rings it. Focus the panel instead: Tab still walks in, Escape still closes.
+function focusPanel(event: Event) {
+  event.preventDefault()
+  ;(event.target as HTMLElement).focus({ preventScroll: true })
+}
 </script>
 
 <template>
   <UPopover
     v-model:open="open"
-    :content="{ align: 'end', side: 'top' }"
+    :content="{ align: 'end', side: 'top', onOpenAutoFocus: focusPanel }"
     :ui="{
       content:
         'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px]',
