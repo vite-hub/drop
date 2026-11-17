@@ -88,7 +88,7 @@ File reads use the same access checks as opening the drop. They require no brows
 
 ## Where agents publish {#folders}
 
-Before publishing something new, an agent calls `list_folders`. It lists every folder you can publish into, the team's first, each with its path and description. The agent passes the folder whose description fits to `publish` and follows what the description asks, such as how to name the doc. When none fits, it publishes at the top.
+Before publishing something new, an agent calls `list_folders`. It lists the folders you can publish into, the team's first, each with its path and the start of its description. With `query`, it lists only the folders whose name, path, or description has those words, each with its whole description. The agent passes the folder whose description fits to `publish` and follows what the description asks, such as how to name the doc. When none fits, it publishes at the top.
 
 So write a folder's description for the agent too: what goes in it, how to name it, and how to lay it out. Agents take descriptions as guidance about where things go, not as instructions for anything else. An agent can describe your own folders with `create_folder` or `update_drop` and `description`; admins describe the team's folders in the browser.
 

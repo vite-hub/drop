@@ -225,6 +225,41 @@ test("admins make team folders in the browser; everyone files drops in them, whi
   assert.deepEqual(inside.map((drop) => drop.title).sort(), ["2026-10-19 planning", "Client calls"])
 })
 
+test("list_folders cuts descriptions short, and a query finds folders by title, path, or description with theirs whole", async () => {
+  const long = (topic) =>
+    `${topic}.${" Name each doc YYYY-MM-DD-topic and start it with a one-line summary.".repeat(6)}`
+  const meetings = await teamFolder("Meetings", long("Notes from calls"))
+  await teamFolder("Client calls", long("Calls with clients"), await findDrop(meetings.id))
+  await teamFolder("Evidence", long("Before and after screenshots of a pull request"))
+  for (const n of [1, 2, 3]) await teamFolder(`Archive ${n}`, long("Old work"))
+
+  const all = await call(listFoldersTool)
+  assert.equal(all.total, 6)
+  assert.equal(all.folders.length, 6)
+  for (const folder of all.folders) assert.ok(folder.description.length <= 160 && folder.description.endsWith("…"))
+  assert.ok(all.text.length < 6 * 280, `a short reply, got ${all.text.length} characters`)
+
+  const byPath = await call(listFoldersTool, { query: "meetings" })
+  assert.deepEqual(
+    byPath.folders.map((folder) => folder.path),
+    ["Meetings", "Meetings / Client calls"],
+  )
+  assert.equal(byPath.folders[0].description, long("Notes from calls"), "the whole description")
+  assert.deepEqual(
+    (await call(listFoldersTool, { query: "pull REQUEST" })).folders.map((folder) => folder.path),
+    ["Evidence"],
+  )
+
+  const some = await call(listFoldersTool, { limit: 2 })
+  assert.equal(some.folders.length, 2)
+  assert.equal(some.total, 6)
+  assert.match(some.text, /…and 4 more\. Pass query to narrow\.$/)
+  assert.match(
+    (await call(listFoldersTool, { query: "nothing-like-this" })).text,
+    /^No folder matches "nothing-like-this"/,
+  )
+})
+
 test("anyone on the team trashes what's in a team folder; only admins change the folder, and people describe it", async () => {
   const meetings = await teamFolder("Meetings", "Call notes.")
   const notes = await doc("# Retro", { folder: meetings.id })
