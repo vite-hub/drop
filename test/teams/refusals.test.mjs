@@ -15,15 +15,6 @@ test("a team action Better Auth refuses keeps its status, so it isn't reported a
   assert.equal(error.message, "This invitation is for someone else.")
   assert.equal(error.status, 403)
   const sent = []
-  createClientErrorReporter((body) => sent.push(body))(
-    "notify",
-    error,
-    {},
-    {
-      path: "/teams/join/inv_1",
-      online: true,
-      leaving: false,
-    },
-  )
+  createClientErrorReporter((failure) => sent.push(failure))("notify", error, {}, { online: true, leaving: false })
   assert.deepEqual(sent, [])
 })

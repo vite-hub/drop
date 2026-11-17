@@ -264,18 +264,3 @@ export const RuntimeErrorSchema = v.object({
   source: v.optional(v.pipe(v.string(), v.maxLength(300))),
   page: v.optional(v.pipe(v.string(), v.maxLength(300))),
 })
-
-/** A failure in someone's browser, reported without who it was: what broke, where, and the browser's message. */
-export const ClientErrorSchema = v.object({
-  action: v.pipe(v.string(), v.maxLength(60)),
-  path: v.pipe(v.string(), v.maxLength(600)),
-  name: v.optional(v.pipe(v.string(), v.maxLength(120))),
-  message: v.pipe(v.string(), v.maxLength(1000)),
-  stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
-  // A failed request's answer, which finds it in the server's logs, and where in Drop it happened.
-  status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
-  requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
-  drop: v.optional(v.pipe(v.string(), v.maxLength(40))),
-  title: v.optional(v.pipe(v.string(), v.maxLength(200))),
-  source: v.optional(v.pipe(v.string(), v.maxLength(300))),
-})

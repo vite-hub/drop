@@ -182,6 +182,10 @@ export default defineNuxtConfig({
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
     auth: true,
+    // Uncaught errors in the browser, and the ones Drop catches (reportClientError), reach the server's logs through
+    // POST /api/_vitehub/browser-errors, as a `browserError` on that request's event. The evlog module below is
+    // Drop's own, which ViteHub reuses.
+    observability: { browserErrors: true },
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
       server: {
