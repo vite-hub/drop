@@ -45,7 +45,7 @@ test("an answer the server gave as a 4xx isn't reported", () => {
   assert.deepEqual(sent, [])
 })
 
-test("a 5xx from Drop's server isn't reported again; one from in front of it is, with its status and request id", () => {
+test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its status and request id, unless Drop wrote it", () => {
   const { sent, report } = reporter()
   report("notify", fetchError({ status: 500, data: { status: 500, message: "Server Error" } }))
   report("notify", fetchError({ status: 500, data: { statusCode: 500, statusMessage: "Server Error" } }))
@@ -55,13 +55,25 @@ test("a 5xx from Drop's server isn't reported again; one from in front of it is,
     fetchError({ status: 502, data: "<html>Bad gateway</html>", headers: { "cf-ray": "8f1e2d3c4b5a6978-AMS" } }),
   )
   report("upload", Object.assign(new Error("503"), { status: 503, requestId: "abc-123" }))
+  report("notify", fetchError({ status: 524, data: "<html>A timeout occurred</html>" }))
   assert.deepEqual(
     sent.map((body) => [body.status, body.requestId]),
     [
       [502, "8f1e2d3c4b5a6978-AMS"],
       [503, "abc-123"],
+      [524, undefined],
     ],
   )
+})
+
+test("any other 5xx is Drop's own answer, which its server logged, whatever the body", () => {
+  const { sent, report } = reporter()
+  // A file fetched as a blob, an HTML error page, Better Auth's answer.
+  report("image-load", fetchError({ status: 500, data: new Blob(["Server Error"]) }))
+  report("visit", fetchError({ status: 500, data: "<!doctype html><title>500</title>" }))
+  report("signin", { status: 500, statusText: "Internal Server Error", message: "Failed" })
+  report("notify", fetchError({ status: 501 }))
+  assert.deepEqual(sent, [])
 })
 
 test("aborted requests, offline browsers, and pages that are leaving aren't reported", () => {

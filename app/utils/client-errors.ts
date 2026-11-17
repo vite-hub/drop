@@ -27,13 +27,16 @@ const parse = (error: unknown) => {
 /** The HTTP status of the answer a failed request got: ofetch's, Better Auth's, or an upload's. None without an answer. */
 export const httpStatus = (error: unknown) => parse(error).status
 
+// What a gateway in front of Drop answers (a proxy, Cloudflare's 52x): the server may never have seen the request.
+const gateway = (status: number) => [502, 503, 504].includes(status) || (status >= 520 && status <= 530)
+
 /**
  * Whether the server already has this failure in its logs. A 4xx is an answer it gave on purpose (a refusal, a missing
- * drop, a limit); a 5xx with Drop's own error body is one it logged as an error. A 5xx without one came from in front
- * of Drop (a proxy, the edge, a Worker that ran out of time), which the server never saw.
+ * drop, a limit). Any other 5xx is its own error, which it logged, whatever the body (JSON, a blob, an HTML page). A
+ * gateway status is Drop's only when it carries Drop's error body, since Drop sends 502 and 503 itself too.
  */
 function serverLogged(failure: v.InferOutput<typeof Failure>, status: number) {
-  return status < 500 || failure.data?.status === status || failure.data?.statusCode === status
+  return !gateway(status) || failure.data?.status === status || failure.data?.statusCode === status
 }
 
 /**

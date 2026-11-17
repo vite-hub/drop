@@ -169,9 +169,13 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let imageTimer: ReturnType<typeof setTimeout> | undefined
   let busy: Promise<unknown> = Promise.resolve()
-  const schedule = () => {
+  // Failed saves in a row, for the wait before the next (saveRetryDelay). After stop(), nothing is scheduled again.
+  let failures = 0
+  let stopped = false
+  const schedule = (delay = 700) => {
+    if (stopped) return
     clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => (busy = busy.then(save)), 700)
+    saveTimer = setTimeout(() => (busy = busy.then(save)), delay)
   }
   // Excalidraw calls this on every change, the pointer's and the selection's too: only elements with a version the
   // server hasn't seen go out.
@@ -189,7 +193,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
         pending.set(element.id, element)
         any = true
       }
-    if (any) schedule()
+    if (any) {
+      failures = 0
+      schedule()
+    }
   }
 
   async function save() {
@@ -203,21 +210,22 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       await $fetch(`/api/drops/${id}/board`, { method: "POST", body: { elements } })
       for (const element of elements)
         if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
+      failures = 0
       unsaved.value = undefined
       clearTimeout(imageTimer)
-      imageTimer = setTimeout(() => void images(), 4000)
+      if (!stopped) imageTimer = setTimeout(() => void images(), 4000)
     } catch (error) {
       // Kept for the next save, unless something newer replaced them meanwhile.
       for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
       reportClientError("board-save", error, { drop: id })
-      // A refusal (no longer allowed to draw, too big) says why and waits for the next change; anything else tries again.
+      // A refusal (no longer allowed to draw, too big) says why and waits for the next change; anything else tries
+      // again, less often each time, until it gives up and waits for the next change too.
       const status = httpStatus(error)
       const refused = status !== undefined && status < 500
-      unsaved.value = refused ? `Not saved: ${errorText(error)}` : "Not saved. Trying again…"
-      if (!refused) {
-        clearTimeout(saveTimer)
-        saveTimer = setTimeout(() => (busy = busy.then(save)), 5000)
-      }
+      const delay = refused ? undefined : saveRetryDelay(++failures)
+      if (delay) schedule(delay)
+      if (refused) unsaved.value = `Not saved: ${errorText(error)}`
+      else unsaved.value = delay ? "Not saved. Trying again…" : "Not saved. Your next change tries again."
     } finally {
       saving.value = false
     }
@@ -348,6 +356,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   return {
     onChange,
     stop: () => {
+      stopped = true
       window.removeEventListener("pagehide", flush)
       clearInterval(poll)
       clearTimeout(imageTimer)
