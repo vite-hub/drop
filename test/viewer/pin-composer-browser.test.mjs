@@ -285,24 +285,29 @@ test(
   },
 )
 
-test("immediate guest lookups preserve native keyboard input in compact and dock composers", async () => {
-  const browser = await chromium.launch()
-  try {
-    for (const inDock of [false, true]) {
-      // Each presentation starts with an empty draft; remounting intentionally preserves existing text.
-      const page = await open(browser)
-      await page.evaluate(() => {
-        window.guest = true
-      })
-      await page.evaluate((inDock) => replaceComposer(inDock), inDock)
-      const field = page.locator("textarea")
-      await field.focus()
-      await field.pressSequentially("@An")
-      assert.equal(await field.inputValue(), "@An")
-      assert.equal(await page.evaluate(() => draft.body.value), "@An")
-      await page.close()
+// Two Vite servers and a browser start inside it, which takes more than the default 5 s on a busy CI runner.
+test(
+  "immediate guest lookups preserve native keyboard input in compact and dock composers",
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch()
+    try {
+      for (const inDock of [false, true]) {
+        // Each presentation starts with an empty draft; remounting intentionally preserves existing text.
+        const page = await open(browser)
+        await page.evaluate(() => {
+          window.guest = true
+        })
+        await page.evaluate((inDock) => replaceComposer(inDock), inDock)
+        const field = page.locator("textarea")
+        await field.focus()
+        await field.pressSequentially("@An")
+        assert.equal(await field.inputValue(), "@An")
+        assert.equal(await page.evaluate(() => draft.body.value), "@An")
+        await page.close()
+      }
+    } finally {
+      await browser.close()
     }
-  } finally {
-    await browser.close()
-  }
-})
+  },
+)
