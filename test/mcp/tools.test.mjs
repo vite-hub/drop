@@ -1694,6 +1694,77 @@ test("the comments on Drop's own pages are for admins only", async () => {
   assert.deepEqual(await comments.people({ query: "", user: null }), [undefined, []])
 })
 
+test("read_drop tells an admin's agent about the toolbar threads on the drop's page, and nobody else's", async () => {
+  const doc = (await call(publish, { markdown: "# Paper", title: "Paper ES", note: "v1", lifetime: "review" }))
+    .structuredContent
+  const author = { id: "owner", name: "Owner" }
+  // What the toolbar keeps: the pathname the comment was left on, any slug, open or resolved.
+  for (const page of [`/d/${doc.id}/paper-es`, `/d/${doc.id}/paper-es`, `/d/${doc.id}/old-slug`])
+    assert.equal((await comments.create({ page, body: "The bar overlaps the title", author }))[0], undefined)
+  const [, done] = await comments.create({ page: `/d/${doc.id}/paper-es`, body: "Fixed already", author })
+  await comments.resolve(done.id, { by: author })
+  // Another drop's page, and a longer id that starts with this one.
+  await comments.create({ page: "/d/other/paper", body: "Elsewhere", author })
+  await comments.create({ page: `/d/${doc.id}x/paper`, body: "Not this drop", author })
+
+  const member = await call(readDrop, { id: doc.id })
+  assert.doesNotMatch(member.content[0].text, /toolbar/i)
+  assert.equal(member.structuredContent.toolbarThreads, undefined)
+
+  state.who = { ...state.who, role: "admin" }
+  const admin = await call(readDrop, { id: doc.id })
+  assert.deepEqual(admin.structuredContent.toolbarThreads, [
+    { page: `/d/${doc.id}/paper-es`, open: 2 },
+    { page: `/d/${doc.id}/old-slug`, open: 1 },
+  ])
+  const text = admin.content[0].text
+  assert.match(text, /## Open comments\nNone\.\n\n## Toolbar comments on this drop's page\n3 open threads/)
+  assert.match(text, /about Drop's interface there, not about the drop's content/)
+  assert.match(text, new RegExp(`- comments_list_threads with page "/d/${doc.id}/paper-es" \\(2 open\\)`))
+  // The call it names returns them.
+  const [list] = siteCommentTools
+  const listed = await call(list, { page: `/d/${doc.id}/paper-es` })
+  assert.equal(listed.structuredContent.threads.length, 2)
+})
+
+test("read_drop leaves a doc's inline figure bytes out of its text and names each figure", async () => {
+  // Shaped like a converted paper: prose with 104 inline PNG and WebP figures, 2.4 MB of figures in all.
+  const sizes = Array.from({ length: 104 }, (_, i) => (i % 3 === 0 ? 4000 : i % 3 === 1 ? 40000 : 30000))
+  const prose = "Las empresas que adoptan IA producen más código revisado. ".repeat(20)
+  const figure = (n, bytes) =>
+    `![Figura ${n} del PDF](data:image/${n % 2 ? "png" : "webp"};base64,${Buffer.alloc(bytes, n).toString("base64")})`
+  const icon = `![dot](data:image/png;base64,${Buffer.alloc(30, 1).toString("base64")})`
+  const markdown = `# Paper\n\n${icon}\n\n${sizes.map((bytes, i) => `${prose}\n\n${figure(i + 1, bytes)}`).join("\n\n")}`
+  insertDrop("paper", { size: markdown.length })
+  objects.set("paper.md", { body: new Blob([markdown]), uploadedAt: new Date() })
+
+  const read = await call(readDrop, { id: "paper" })
+  const text = read.content[0].text
+  assert.ok(markdown.length > 2_500_000)
+  assert.ok(text.length < 200_000, `${text.length} characters`)
+  // Only the prose and a short placeholder per figure are left.
+  assert.ok(text.length < prose.length * 104 + 104 * 80 + 2000, `${text.length} characters`)
+  assert.doesNotMatch(text, /base64,[A-Za-z0-9+/]{1024}/)
+  assert.match(
+    text,
+    /## Content\n104 inline figures \(2\.4 MB\) left out of this text as \[inline figure N: …\]\..*read_file/,
+  )
+  assert.match(text, /!\[Figura 1 del PDF\]\(\[inline figure 1: image\/png, 4 KB, left out\]\)/)
+  assert.match(text, /!\[Figura 2 del PDF\]\(\[inline figure 2: image\/webp, 39 KB, left out\]\)/)
+  // A small icon costs less than its placeholder, so it stays.
+  assert.ok(text.includes(icon))
+  assert.equal(read.structuredContent.content.length, text.slice(text.indexOf("# Paper")).length)
+  assert.deepEqual(read.structuredContent.inlineFigures[1], {
+    n: 2,
+    alt: "Figura 2 del PDF",
+    mediaType: "image/webp",
+    bytes: 40000,
+  })
+  // The original keeps them.
+  const original = await call(readFile, { id: "paper" })
+  assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), markdown)
+})
+
 // An annotated screenshot whose first annotation starts past the image's right edge. The problem is the screenshot's, on
 // line 3.
 const OFF_IMAGE = `# Evidence

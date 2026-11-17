@@ -18,7 +18,7 @@ async function run(name: string, input: Record<string, unknown>, event: H3Event)
   if (who.role !== "admin")
     throw new HTTPError({
       status: 403,
-      message: `Only Drop admins read the comments on Drop's own pages. ${SITE_REVIEWS}`,
+      message: `Only Drop admins read the ViteHub toolbar comments on Drop's interface. ${SITE_REVIEWS}`,
     })
   const tool = tools.get(name)!
   const result = await tool.call(input, {
@@ -36,14 +36,23 @@ async function run(name: string, input: Record<string, unknown>, event: H3Event)
 const SITE_REVIEWS =
   "For comments people left on a site under review, such as a pull request's preview, call read_drop with the page's address, then reply with resolve: true once you've fixed each one."
 
-/** The ViteHub description, said to be about Drop's own pages, so agents fixing a reviewed site don't pick it. */
-const describe = (name: string) => `Drop's own pages, for Drop admins: ${tools.get(name)!.description} ${SITE_REVIEWS}`
+/**
+ * The ViteHub description, led by the words people use for these comments ("ViteHub comments", "the toolbar
+ * comments"), and said to be about Drop's interface, so agents asked about a drop's content or a reviewed site pick
+ * read_drop instead. The list tool says where they are; the others act on its threads.
+ */
+const describe = (name: string) =>
+  `${
+    name === "comments_list_threads"
+      ? "ViteHub toolbar comments: threads left with the ViteHub Comments toolbar on Drop's own interface, on any Drop page including a drop's page (/d/<id>/<slug>), about Drop's UI, not a drop's content. For Drop admins. Pass a drop link's path as page."
+      : "ViteHub toolbar comments on Drop's interface, for Drop admins:"
+  } ${tools.get(name)!.description} ${SITE_REVIEWS}`
 
 const thread = v.pipe(v.string(), v.minLength(1), v.description("The thread id, from comments_list_threads."))
 
 /**
- * Comments that admins left on Drop's own pages with the Comments toolbar: the agent reads where each one is (page,
- * element, Vue components and their files), fixes the code, then replies and resolves.
+ * Comments that admins left on Drop's own pages, a drop's page included, with the ViteHub Comments toolbar: the agent
+ * reads where each one is (page, element, Vue components and their files), fixes the code, then replies and resolves.
  */
 export const siteCommentTools = [
   defineMcpTool({
@@ -53,7 +62,12 @@ export const siteCommentTools = [
     annotations: { readOnlyHint: true },
     inputSchema: toStandardJsonSchema(
       v.object({
-        page: v.optional(v.pipe(v.string(), v.description("Only threads of this pathname, such as /pricing."))),
+        page: v.optional(
+          v.pipe(
+            v.string(),
+            v.description("Only threads on this Drop page: its path, such as /d/<id>/<slug> from a drop's link."),
+          ),
+        ),
         status: v.optional(v.pipe(v.picklist(["open", "resolved"]), v.description("Default: open."))),
         search: v.optional(v.pipe(v.string(), v.description("Only threads whose comments contain this text."))),
         limit: v.optional(

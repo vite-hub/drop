@@ -186,3 +186,43 @@ export function pagesSection(pages: { page: string; url: string }[]) {
     ...(pages.length > shown.length ? [`And ${pages.length - shown.length} more.`] : []),
   ].join("\n")
 }
+
+/** Base64 shorter than this stays in the text: an icon costs less than the placeholder that would replace it. */
+const KEEP_INLINE = 1024
+/** A base64 data URI, with the Markdown image around it when there is one, so its alt text names it. */
+const INLINE_DATA = /(!\[([^\]\n]*)\]\()?data:([\w.+-]+\/[\w.+-]+)?(?:;[\w.+-]+=[^;,)"'\s]*)*;base64,([A-Za-z0-9+/=]+)/g
+
+/** A figure whose bytes `withoutInlineData` left out of a doc's text. */
+export interface InlineFigure {
+  n: number
+  alt: string | null
+  mediaType: string
+  bytes: number
+}
+
+const sizeLabel = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
+
+/**
+ * A doc's text with each inline figure (a base64 `data:` URI) replaced by `[inline figure N: type, size, left out]`.
+ * A converted paper keeps its figures inline, and read_drop then sent 3 MB of base64 that no agent can read as text.
+ */
+export function withoutInlineData(text: string): { text: string; figures: InlineFigure[] } {
+  const figures: InlineFigure[] = []
+  const out = text.replace(
+    INLINE_DATA,
+    (match, image: string | undefined, alt: string | undefined, type, data: string) => {
+      if (data.length < KEEP_INLINE) return match
+      const mediaType = type ?? "text/plain"
+      const bytes = Math.floor((data.length * 3) / 4) - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0)
+      const figure = { n: figures.length + 1, alt: alt?.trim() || null, mediaType, bytes }
+      figures.push(figure)
+      return `${image ?? ""}[inline figure ${figure.n}: ${mediaType}, ${sizeLabel(bytes)}, left out]`
+    },
+  )
+  return { text: out, figures }
+}
+
+/** What read_drop says above a doc whose inline figures it left out, and where their bytes are. */
+export const inlineFiguresNote = (figures: InlineFigure[]) =>
+  `${figures.length} inline ${figures.length === 1 ? "figure" : "figures"} (${sizeLabel(figures.reduce((sum, figure) => sum + figure.bytes, 0))}) left out of this text as [inline figure N: …]. For their bytes, or to publish a next version that keeps them, read the source with read_file.`
