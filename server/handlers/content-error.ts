@@ -1,11 +1,11 @@
-import { log } from "evlog"
+import { useLogger } from "evlog/nitro/v3"
 import type { H3Event, HTTPError } from "h3"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { contentUnavailable, contentUnavailableIcon, missingInDrop } from "../../shared/content-unavailable.ts"
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
-import { requestLog } from "../utils/logs.ts"
+import { background } from "../utils/logs.ts"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
 const theme = `${THEME_CSS.replace(":root.dark {", "@media (prefers-color-scheme: dark) { :root {")}\n}`
@@ -16,11 +16,11 @@ const mark = DROP_MARK.replace("<svg ", '<svg class="content-unavailable-mark" a
  * thrown), so this is an event of its own, with the request's id.
  */
 function fellBack(event: H3Event, step: string, error: unknown) {
-  log.warn({
+  background.warn({
     action: "content-error",
     step,
     path: event.url.pathname,
-    requestId: requestLog(event)?.getContext().requestId,
+    requestId: event.req.context?.log ? useLogger(event).getContext().requestId : undefined,
     error: error instanceof Error ? error.message : String(error),
   })
 }
@@ -57,6 +57,8 @@ async function openableDrop(event: H3Event, path: string, identity: Awaited<Retu
 export default async function contentError(error: HTTPError<{ shareReview?: string }>, event: H3Event) {
   const path = event.url.pathname
   if (!path.startsWith("/f/") && !path.startsWith("/d/")) return
+  // evlog emitted this request's event as the error was thrown; the lookups below add nothing to it.
+  event.context.logClosed = true
   const status = error.status >= 400 && error.status <= 599 ? error.status : 500
   // Reuse the access gate's identity when it ran. For missing files, resolve it only on this error path.
   let identity: Awaited<ReturnType<typeof signedIn>> = null
