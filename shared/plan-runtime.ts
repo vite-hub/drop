@@ -1487,7 +1487,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (tool === "mark") leaveMark();
     tool = next;
     self.__dropHold(tool === "browse" ? null : held);
-    if (!wasHeld && tool !== "browse") { heldHover = Array.from(document.querySelectorAll(":hover")); pointer = null; }
+    if (!wasHeld && tool !== "browse") { heldHover = Array.from(document.querySelectorAll(":hover")); pointer = null; freeze(); }
     // The picture each comment keeps (shoot) starts sooner with its module loaded.
     if (tool === "comment") loadScreenshot().catch(() => { screenshotModule = null; });
     hovered = picked = null;
@@ -1496,7 +1496,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       layer.remove(); layer = null;
       if (root !== shadow && root.host) root.host.remove();
     }
-    if (wasHeld && tool === "browse") leaveHeld();
+    if (wasHeld && tool === "browse") { unfreeze(); leaveHeld(); }
     if (tool === "mark") {
       getSelection().removeAllRanges();
       if (lastQuote) post({ type: "selection", clear: true });
@@ -1551,10 +1551,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   /**
-   * The Marker: the reader marks up a still of the page and sends it as one comment. Picking it freezes the page as it
-   * is: the page hears no pointer while a tool is on (EVENT_HOLD), and what's under the pointer keeps its hover look
-   * too, since each :hover rule also matches [data-drop-hover], which those elements carry. So a tooltip, even one
-   * shown only by CSS, stays open. The viewport's screenshot starts then,
+   * The Marker: the reader marks up a still of the page and sends it as one comment. Like every tool, picking it freezes
+   * the page as it is (freeze). The viewport's screenshot starts then,
    * and a layer over the page takes the strokes (marker, pen, or arrow, in viewport pixels) and holds the scroll still.
    * Done anchors the comment to the smallest element under the strokes, reads the words under them, draws the strokes
    * on the screenshot, and posts the area, then the picture as its "area-shot", which Drop adds to the comment. The
@@ -1572,6 +1570,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (layer && tool === "mark") layer.style.cursor = penCursor(pen);
     restyleLabel(style);
   }
+  /**
+   * Any tool freezes the page as it is until Browse: the page hears no pointer while a tool is on (EVENT_HOLD), and
+   * what was under the pointer keeps its hover look too, since each :hover rule also matches [data-drop-hover], which
+   * those elements carry. So a tooltip, even one shown only by CSS, stays open under the Comment tool and the Marker.
+   */
   function freeze() {
     const roots = [document], hovering = [], styles = [];
     for (const root of roots) {
@@ -1601,7 +1604,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     frozen = null;
   }
   function markLayer() {
-    freeze();
     shot = captureViewport(host).catch(() => null);
     strokes = [];
     const el = document.createElement("div");
@@ -1623,7 +1625,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function leaveMark() {
     markSession++; finishing = false;
     forgetInk();
-    unfreeze();
     strokes = []; shot = null; ink = null;
     post({ type: "marks", count: 0 });
   }
