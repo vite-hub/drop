@@ -42,7 +42,7 @@ export type DocHeader = {
   links: { url: string; label: string; icon: string }[]
 }
 /** A row of the folder list ("doc-folder-items"); `at` is already words, such as "3 days ago", with `tip` the date. */
-export type DocHeaderFolderItem = {
+type DocHeaderFolderItem = {
   id: string
   title: string
   icon: DocHeaderKindIcon
