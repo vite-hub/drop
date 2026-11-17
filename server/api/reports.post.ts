@@ -7,6 +7,7 @@ import { ReportSchema } from "#shared/schemas"
 import { reportTarget } from "#shared/trust"
 import { abuseReports } from "../databases/default/index"
 import { findDrop, findDropByBlob } from "../utils/drops"
+import { logAudit } from "../utils/logs"
 
 export default defineValidatedHandler({
   validate: { body: ReportSchema },
@@ -47,12 +48,8 @@ export default defineValidatedHandler({
       email: body.email || null,
       createdAt: Date.now(),
     })
-    // Always retained in Workers Logs, even when the request itself succeeded.
-    useLogger(event).error("Abuse report received", {
-      severity: "high",
-      action: "abuse-report",
-      report: { id, target, reason: body.reason },
-    })
+    // An audit event: kept whatever the sampling rate.
+    logAudit(event, null, "report.create", { type: "report", id, target, reason: body.reason, drop: drop?.id })
     return { ok: true }
   },
 })
