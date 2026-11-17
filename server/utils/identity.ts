@@ -1,10 +1,10 @@
 import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import { useLogger } from "evlog/nitro/v3"
 import { verifyMcpRequest } from "vite-hub/auth/mcp"
 import { useAuth } from "vite-hub/auth/server"
 import { db } from "vite-hub/database"
 import { user as users } from "../databases/default/index"
+import { logActor, logDenied, logError, requestLog } from "./logs"
 import { isMember, rethrowMembershipOutage } from "./members"
 import { type TeamRole, teamsOf } from "./teams"
 import { useServerEnv } from "vite-hub/env"
@@ -77,11 +77,7 @@ export function identify(event: H3Event): Promise<Identity | null> {
     event.context.dropPage ? identify(event.context.dropPage) : verify(event)
   ).then((who) => {
     // Every request's wide event says who made it, never the credential itself.
-    if (who)
-      useLogger(event).set({
-        user: { id: who.userId, role: who.role },
-        actor: { kind: who.actorKind, name: who.actorName },
-      })
+    if (who) logActor(event, who)
     return who
   }))
 }
@@ -91,20 +87,30 @@ async function verify(event: H3Event): Promise<Identity | null> {
   if (!who) return null
   // Both are a round trip to the database, so they start together.
   const [member, teams] = await Promise.all([isMember(who.userId, event), teamsOf(who.userId, event)])
-  if (!member) return null
+  if (!member) {
+    logDenied(event, "not-member")
+    return null
+  }
   who.teams = teams
   return who
 }
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (bearerFrom(event.req.headers)) return fromAccessToken(event)
+  // A failed lookup answers as signed out, and the wide event keeps why.
   const session = await authFor(event)
     .api.getSession({ headers: event.req.headers })
     .catch((error: unknown) => {
+      // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
       rethrowMembershipOutage(error)
+      logError(event, error, { auth: { session: "failed" } })
       return null
     })
-  if (!session?.user || session.user.banned) return null
+  if (!session?.user) return null
+  if (session.user.banned) {
+    logDenied(event, "banned")
+    return null
+  }
   return {
     userId: session.user.id,
     name: session.user.name,
@@ -127,7 +133,7 @@ async function fromAccessToken(event: H3Event): Promise<Identity | null> {
   const [error, caller] = await verifyMcpRequest(request, { resource: `${event.url.origin}/mcp` })
   if (error) {
     // The client only sees a 401, so the wide event keeps which check failed.
-    useLogger(event).set({ token: { rejected: error.message } })
+    requestLog(event)?.set({ token: { rejected: error.message } })
     return null
   }
   const { user } = caller

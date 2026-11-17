@@ -11,6 +11,7 @@ import { db, schema } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
+import { authRequest, logAudit, requestLog } from "./utils/logs"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import {
@@ -29,6 +30,24 @@ import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
+
+interface BilledSubscription {
+  id: string
+  referenceId: string
+  plan: string
+  status?: string | null
+  seats?: number | null
+}
+
+/** A Stripe webhook's outcome for a team's subscription, on the webhook request's wide event. */
+const billed =
+  (change: string) =>
+  async ({ subscription }: { subscription: BilledSubscription }) => {
+    const event = authRequest.getStore()
+    const { id, referenceId: team, plan, status, seats } = subscription
+    requestLog(event)?.set({ stripe: { subscription: { id, team, plan, status, seats, change } } })
+    logAudit(event, "stripe", `billing.${change}`, { type: "team", id: team })
+  }
 
 /**
  * Who can sign in, and how.
@@ -144,7 +163,12 @@ export default defineAuth(({ env, requestOrigin }) => {
               signal: AbortSignal.timeout(3000),
             })
               .then(async (response) => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null))
-              .catch(() => null)
+              .catch((error: unknown) => {
+                requestLog(authRequest.getStore())?.warn("GitHub profile lookup failed", {
+                  github: { profile: error instanceof Error ? error.message : String(error) },
+                })
+                return null
+              })
             const createdAt = profile?.success ? profile.output.created_at : undefined
             const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
             if (Number.isFinite(githubCreatedAt))
@@ -155,7 +179,17 @@ export default defineAuth(({ env, requestOrigin }) => {
       user: {
         create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
-        delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },
+        delete: {
+          before: async (user, context) => {
+            // An admin may delete someone else's account.
+            const by = context?.context.session?.user.id ?? user.id
+            logAudit(authRequest.getStore(), { userId: by, actorKind: "browser" }, "account.delete", {
+              type: "user",
+              id: user.id,
+            })
+            await leaveTeams(user, context, teamBilling)
+          },
+        },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
@@ -176,12 +210,20 @@ export default defineAuth(({ env, requestOrigin }) => {
               stripeClient: teamBilling.stripeClient,
               stripeWebhookSecret: billing.webhookSecret,
               organization: { enabled: true },
+              onEvent: async (event) => {
+                requestLog(authRequest.getStore())?.set({ stripe: { event: { type: event.type, id: event.id } } })
+              },
               subscription: {
                 enabled: true,
                 plans: teamBilling.plans,
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
+                onSubscriptionCreated: billed("created"),
+                onSubscriptionComplete: billed("completed"),
+                onSubscriptionUpdate: billed("updated"),
+                onSubscriptionCancel: billed("canceling"),
+                onSubscriptionDeleted: billed("deleted"),
               },
             }),
           ]

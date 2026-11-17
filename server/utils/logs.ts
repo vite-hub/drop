@@ -37,7 +37,7 @@ export function logActor(event: H3Event, who: Pick<Identity, "userId" | "role" |
 }
 
 /** Why a request's identity was refused, while it still answers as signed out. */
-export type AuthDenial = "banned" | "not-member" | "not-listed"
+export type AuthDenial = "banned" | "not-member"
 
 export function logDenied(event: H3Event | undefined, denied: AuthDenial) {
   requestLog(event)?.set({ auth: { denied } })

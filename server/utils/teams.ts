@@ -10,6 +10,7 @@ import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
 import { drops, member, organization, subscription } from "../databases/default/index"
 import type { DropRow } from "./drops/types"
+import { authRequest, requestLog } from "./logs"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.
 // What a team shares lives in its team folders (`drops.team_id`), which reach the team's members only. A team folder on a
@@ -339,6 +340,10 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
       })
     throw error
   }
-  for (const { membership, team, others } of left)
+  const outcome: { left: string[]; deleted: string[] } = { left: [], deleted: [] }
+  for (const { membership, team, others } of left) {
     if (others.length) await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
+    outcome[others.length ? "left" : "deleted"].push(team.id)
+  }
+  requestLog(authRequest.getStore())?.set({ teams: outcome })
 }
