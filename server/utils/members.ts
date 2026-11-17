@@ -1,6 +1,7 @@
 import { type H3Event, HTTPError } from "h3"
 import { checkAuthMember } from "vite-hub/auth/server"
 import { useServerEnv } from "vite-hub/env"
+import * as v from "valibot"
 
 /** Whether `VITEHUB_MEMBERS` limits who may use this Drop. */
 export const membersOnly = () => Boolean(useServerEnv().drop.members.unseal().trim())
@@ -21,14 +22,14 @@ export async function isMember(userId: string, event?: H3Event | Request) {
   return !error
 }
 
+const MembershipOutage = v.object({ body: v.object({ code: v.literal("AUTH_GITHUB_UNAVAILABLE") }) })
+
 /** Session policy errors cross Better Auth's API boundary before the sessionless check can run. */
 export function rethrowMembershipOutage(error: unknown) {
-  if (!error || typeof error !== "object" || !("body" in error)) return
-  const body = error.body
-  if (body && typeof body === "object" && "code" in body && body.code === "AUTH_GITHUB_UNAVAILABLE")
-    throw new HTTPError({
-      status: 503,
-      statusText: "GitHub membership verification is unavailable. Try again shortly.",
-      data: { code: body.code },
-    })
+  if (!v.is(MembershipOutage, error)) return
+  throw new HTTPError({
+    status: 503,
+    statusText: "GitHub membership verification is unavailable. Try again shortly.",
+    data: { code: error.body.code },
+  })
 }

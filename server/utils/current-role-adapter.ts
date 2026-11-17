@@ -1,7 +1,11 @@
 import type { DBTransactionAdapter } from "better-auth/adapters"
 import type { drizzleAdapter } from "better-auth/adapters/drizzle"
+import * as v from "valibot"
 
 type Person = { email: string; emailVerified?: boolean | null }
+
+// Policy reads request the whole user; projections without an email stay as they are.
+const RoleSubject = v.object({ email: v.string(), emailVerified: v.nullish(v.boolean()) })
 
 /** Auth's membership policy runs before application hooks. Give it Drop's current role on every user read. */
 export function currentRoleAdapter(
@@ -11,16 +15,8 @@ export function currentRoleAdapter(
   function wrap(adapter: DBTransactionAdapter): DBTransactionAdapter {
     return {
       ...adapter,
-      async findOne<T>(input: Parameters<DBTransactionAdapter["findOne"]>[0]): Promise<T | null> {
-        const row = await adapter.findOne<T>(input)
-        if (input.model !== "user" || !row || typeof row !== "object") return row
-        // Policy reads request the whole user; leave projections without an email alone.
-        if ("email" in row && typeof row.email === "string") {
-          const emailVerified = "emailVerified" in row && row.emailVerified === true
-          return { ...row, role: role({ email: row.email, emailVerified }) }
-        }
-        return row
-      },
+      // The inner read gives the row's type, so the wrapper keeps the type Better Auth asked for.
+      findOne: (input) => (input.model === "user" ? withRole(adapter.findOne(input), role) : adapter.findOne(input)),
     }
   }
   return (options) => {
@@ -30,4 +26,11 @@ export function currentRoleAdapter(
       transaction: (callback) => adapter.transaction((transaction) => callback(wrap(transaction))),
     }
   }
+}
+
+async function withRole<Row>(read: Promise<Row>, role: (person: Person) => string): Promise<Row> {
+  const row = await read
+  const person = v.safeParse(RoleSubject, row)
+  if (!person.success) return row
+  return { ...row, role: role({ email: person.output.email, emailVerified: person.output.emailVerified === true }) }
 }
