@@ -32,9 +32,10 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
 }
 export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
+  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls. An
+  // access token is `dropTest.mcpCaller`'s.
   "vite-hub/auth/mcp":
-    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
+    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }; export const verifyMcpRequest = async () => globalThis.dropTest.mcpCaller ? [undefined, globalThis.dropTest.mcpCaller] : [new Error('invalid token')]",
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
   "vite-hub/env":
