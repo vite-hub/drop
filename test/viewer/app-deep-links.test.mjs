@@ -15,7 +15,7 @@ const page = (body) => `<!doctype html><html><head></head><body>${body}</body></
  * A viewer on an app drop opened at `query` (a drop link's own query) and `hash`, with the route the viewer writes
  * back to and the messages it sends its frame.
  */
-function openApp(query, { hash = "", files: given, router } = {}) {
+function openApp(query, { hash = "", files: given, router, served = false } = {}) {
   const files = given ?? {
     "index.html": page("Home"),
     "integrations/components.html": page("Components"),
@@ -79,7 +79,12 @@ function openApp(query, { hash = "", files: given, router } = {}) {
   }))
     vi.stubGlobal(name, value)
   const scope = effectScope()
-  const drop = ref({ id: "d1", kind: "app", files, contentOrigin: ORIGIN, contentGrant: "grant" })
+  // An app its origin serves comes with only its paths (server/api/drops/[id].get.ts); others with their text.
+  const drop = ref(
+    served
+      ? { id: "d1", kind: "app", paths: Object.keys(files).sort(), contentOrigin: ORIGIN, contentGrant: "grant" }
+      : { id: "d1", kind: "app", files, contentOrigin: ORIGIN },
+  )
   const app = scope.run(() => useAppFiles(drop))
   const viewer = scope.run(() =>
     useViewerFrame({
@@ -274,6 +279,69 @@ test("an older link's ?file= still opens its page, and leaves for ?path= once th
     receive({ type: "location", path: "/workflow/cli/extract" })
     await settle()
     assert.deepEqual({ ...route.query }, { path: "/workflow/cli/extract", v: "2" })
+  } finally {
+    stop()
+  }
+})
+
+test("an app its origin serves gets each page's HTML from its frame, then the document built from it", async () => {
+  const { app, viewer, sent, receive, settle, stop } = openApp({ path: "/integrations/components" }, { served: true })
+  try {
+    assert.deepEqual(app.pages.value, [
+      "index.html",
+      "404.html",
+      "integrations/components.html",
+      "workflow/cli/extract.html",
+    ])
+    assert.equal(app.page.value, "integrations/components.html")
+    receive({ type: "host", path: "/integrations/components" })
+    assert.deepEqual(sent.at(-1), { type: "read", page: "integrations/components.html", grant: "grant" })
+    const key = viewer.frameKey.value
+    receive({ type: "page", page: "integrations/components.html", html: page("Components") })
+    assert.equal(sent.at(-1).type, "document")
+    assert.ok(sent.at(-1).html.includes("Components"))
+    await settle()
+    assert.equal(viewer.frameKey.value, key, "the frame shows the page without loading again")
+
+    // A page read once isn't read again, and one that didn't load says so in the frame.
+    receive({ type: "host", path: "/integrations/components" })
+    assert.equal(sent.at(-1).type, "document")
+    receive({ type: "location", path: "/workflow/cli/extract" })
+    await settle()
+    receive({ type: "host", path: "/workflow/cli/extract" })
+    assert.deepEqual(sent.at(-1), { type: "read", page: "workflow/cli/extract.html", grant: "grant" })
+    receive({ type: "page", page: "workflow/cli/extract.html" })
+    assert.match(sent.at(-1).html, /workflow\/cli\/extract\.html isn't in this project/)
+    // Only pages of the app, and only ones the viewer is waiting for.
+    const count = sent.length
+    receive({ type: "page", page: "other.html", html: page("Other") })
+    receive({ type: "page", page: "integrations/components.html", html: page("Changed") })
+    assert.equal(sent.length, count)
+  } finally {
+    stop()
+  }
+})
+
+test("an app's own frame asking for a page it serves waits for the frame to read it", () => {
+  const { sent, receive, stop } = openApp({}, { served: true })
+  try {
+    receive({ type: "frame-request", id: "a", path: "/workflow/cli/extract" })
+    receive({ type: "frame-request", id: "b", path: "/workflow/cli/extract.html" })
+    assert.deepEqual(sent.slice(-2), [
+      { type: "read", page: "workflow/cli/extract.html" },
+      { type: "read", page: "workflow/cli/extract.html" },
+    ])
+    receive({ type: "page", page: "workflow/cli/extract.html", html: page("Extract") })
+    assert.deepEqual(
+      sent.slice(-2).map(({ type, id }) => [type, id]),
+      [
+        ["document", "a"],
+        ["document", "b"],
+      ],
+    )
+    assert.ok(sent.at(-1).html.includes("Extract"))
+    receive({ type: "frame-request", id: "c", path: "/workflow/cli/extract" })
+    assert.equal(sent.at(-1).id, "c", "read once")
   } finally {
     stop()
   }
