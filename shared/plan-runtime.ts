@@ -92,6 +92,27 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
   }`
 
 /**
+ * A scroll key Drop's window passed on, because its focus was there and not on the page: the page scrolls as it would
+ * for the key itself (app/utils/frame-scroll-key.ts). Quick presses add up while the smooth scroll runs. `still` says
+ * when a drawing tool holds the page. Shared by the frame's comment layer and the site review script.
+ */
+export const KEY_SCROLL = String.raw`function keyScroller(still) {
+  let target = 0, targetAt = -Infinity;
+  return (key, shift) => {
+    if (still()) return;
+    const page = Math.max(40, innerHeight * 0.875);
+    const step = { ArrowUp: -40, ArrowDown: 40, PageUp: -page, PageDown: page, " ": shift ? -page : page }[key];
+    if (step === undefined && key !== "Home" && key !== "End") return;
+    const end = (document.scrollingElement || document.documentElement).scrollHeight - innerHeight;
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const from = smooth && performance.now() - targetAt < 500 ? target : scrollY;
+    target = Math.max(0, Math.min(end, key === "Home" ? 0 : key === "End" ? end : from + step));
+    targetAt = performance.now();
+    scrollTo({ top: target, behavior: smooth ? "smooth" : "auto" });
+  };
+}`
+
+/**
  * What the frame's comment layer and the site review script share: the Marker's ink (the path of a stroke, a marker,
  * pen, or arrow in viewport pixels, or a text label, drawn on an SVG layer or a canvas, the pointer for a tip, and
  * drawing strokes and typing labels on a layer) and people's initials.
@@ -1928,21 +1949,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (printedDark) { document.documentElement.classList.add("dark"); document.documentElement.classList.remove("light"); }
   });
 
-  // A scroll key Drop's window passed on, because its focus was there and not on the page: the page scrolls as it would
-  // for the key itself. Quick presses add up while the smooth scroll runs. The Marker holds the page still.
-  let keyTarget = 0, keyTargetAt = -Infinity;
-  function keyScroll(key, shift) {
-    if (tool === "mark") return;
-    const page = Math.max(40, innerHeight * 0.875);
-    const step = { ArrowUp: -40, ArrowDown: 40, PageUp: -page, PageDown: page, " ": shift ? -page : page }[key];
-    if (step === undefined && key !== "Home" && key !== "End") return;
-    const end = (document.scrollingElement || document.documentElement).scrollHeight - innerHeight;
-    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const from = smooth && performance.now() - keyTargetAt < 500 ? keyTarget : scrollY;
-    keyTarget = Math.max(0, Math.min(end, key === "Home" ? 0 : key === "End" ? end : from + step));
-    keyTargetAt = performance.now();
-    scrollTo({ top: keyTarget, behavior: smooth ? "smooth" : "auto" });
-  }
+  // The Marker holds the page still.
+  ${KEY_SCROLL}
+  const keyScroll = keyScroller(() => tool === "mark");
 
   window.addEventListener("message", (e) => {
     const m = e.data;

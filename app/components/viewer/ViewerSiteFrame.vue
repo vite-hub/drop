@@ -32,6 +32,18 @@ function go() {
   if (valid.value) open.value = new URL(typed.value).href
 }
 
+// Under Comments the layer over the frame keeps focus in Drop's window, so a scroll key would scroll nothing. It goes to
+// the site instead, whose review script scrolls the page (frameScrollKey). Only to the open address's origin.
+const siteFrame = useTemplateRef<HTMLIFrameElement>("siteFrame")
+useEventListener("keydown", (event: KeyboardEvent) => {
+  const scroll = frameScrollKey(event)
+  if (scroll)
+    siteFrame.value?.contentWindow?.postMessage(
+      { __drop: true, type: "scroll-key", ...scroll },
+      new URL(open.value).origin,
+    )
+})
+
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
 const capturing = ref(false)
@@ -253,6 +265,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
           <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
                dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
           <iframe
+            ref="siteFrame"
             :key="open"
             class="absolute inset-0 size-full border-0 bg-white"
             referrerpolicy="strict-origin"

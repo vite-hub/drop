@@ -11,7 +11,7 @@
 // The bookmarklet has no tag, so it starts at the bottom middle.
 import PAGE_PILL from "vite-hub/page/pill.js?raw"
 import DROP_MARK from "./drop-mark.svg?raw"
-import { ELEMENT_NAMING, INK } from "./plan-runtime"
+import { ELEMENT_NAMING, INK, KEY_SCROLL } from "./plan-runtime"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
@@ -1512,6 +1512,16 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // Other reviewers' new threads and replies show up while someone looks.
   setInterval(() => { if (token && document.visibilityState === "visible" && !busy) void refresh(); }, 30000);
   addEventListener("focus", () => { if (token) void refresh(); });
+
+  // In Drop's site review frame, Drop's window keeps focus under Comments and passes the scroll keys on, as it does for
+  // a drop's own frame. Highlight holds the page still.
+  ${KEY_SCROLL}
+  const keyScroll = keyScroller(() => !paint.hidden);
+  addEventListener("message", (e) => {
+    const m = e.data;
+    if (e.source !== parent || e.origin !== drop || !m || m.__drop !== true) return;
+    if (m.type === "scroll-key") keyScroll(m.key, m.shift === true);
+  });
 
   // A page's menus and popovers close on a press or focus outside them, which they listen for on the document (Reka
   // UI, Radix). Stopped here, after the toolbar's own listeners, so commenting on an open menu keeps it open, and
