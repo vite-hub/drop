@@ -91,13 +91,13 @@ index 579e4cda1821c496c54d41502bba593085343365..b03f304afa3982fbd608ca5bdb4fe0ae
   */
  export declare const scripts: string[];
 diff --git a/dist/html.mjs b/dist/html.mjs
-index c6b377953b9b815573de1635d514fe1b94c2ebd1..b8965812ab7ebbdea09512df21d8e90028b303aa 100644
+index c6b377953b9b815573de1635d514fe1b94c2ebd1..499391091ad9f5abe698f4613cad69796b69cf72 100644
 --- a/dist/html.mjs
 +++ b/dist/html.mjs
 @@ -1,6 +1,8 @@
 -import { n as src_default } from "./src-BRb5cKfk.mjs";
 -import { n as localizeDates, r as css } from "./client-BPkb2vp9.mjs";
-+import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { n as src_default } from "./src-DQW6Z39k.mjs";
 +import { t as css$1 } from "./styles-D2Ehi-z5.mjs";
  import "comark/utils";
 +import { describeTime, relativize } from "comark-time/client";
@@ -150,20 +150,20 @@ index 0c2a868ec77a5b3f84aca2a14fb151d262185292..a99e970ee3333f53bab2a9360be2b11c
  }
  export type PropertiesMeta = {
 diff --git a/dist/index.mjs b/dist/index.mjs
-index df7983a21ad0473ff969cc993b4feb8174141993..f95e316b979bfc1a63c2b327325ca6412295e929 100644
+index df7983a21ad0473ff969cc993b4feb8174141993..e034a87557e4120eb46249aca9fb8a35336f9862 100644
 --- a/dist/index.mjs
 +++ b/dist/index.mjs
 @@ -1 +1 @@
 -export { n as default, t as rowsOf } from "./src-BRb5cKfk.mjs";
-+export { n as default, t as rowsOf } from "./src-CIPFb6M0.mjs";
++export { n as default, t as rowsOf } from "./src-DQW6Z39k.mjs";
 diff --git a/dist/react.mjs b/dist/react.mjs
-index eb50e464e22e9b6e6a08e63a0c3f92677a2a582a..7d638f657e8d246e9f28f302e0133e5f2b1f1ef0 100644
+index eb50e464e22e9b6e6a08e63a0c3f92677a2a582a..37fa9a532e7d59ca2693a0db1e05679e9414cb44 100644
 --- a/dist/react.mjs
 +++ b/dist/react.mjs
 @@ -1,14 +1,11 @@
 -import { n as src_default } from "./src-BRb5cKfk.mjs";
 -import { n as localizeDates, t as addStyles } from "./client-BPkb2vp9.mjs";
-+import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { n as src_default } from "./src-DQW6Z39k.mjs";
 +import { r as start } from "./client-BeNPxCfR.mjs";
  import { Children, createElement, useEffect, useRef } from "react";
  //#region src/react.ts
@@ -178,13 +178,13 @@ index eb50e464e22e9b6e6a08e63a0c3f92677a2a582a..7d638f657e8d246e9f28f302e0133e5f
  	return Children.count(children) ? createElement("dl", {
  		className: "cfm",
  		"data-comark-frame": "",
-diff --git a/dist/src-BRb5cKfk.mjs b/dist/src-CIPFb6M0.mjs
-similarity index 81%
+diff --git a/dist/src-BRb5cKfk.mjs b/dist/src-DQW6Z39k.mjs
+similarity index 79%
 rename from dist/src-BRb5cKfk.mjs
-rename to dist/src-CIPFb6M0.mjs
-index ce1d9dc002565990e945ec37b6c1022e172d6576..5ab83d3562de21e119d3dd02a3e2e4201e9fe7d1 100644
+rename to dist/src-DQW6Z39k.mjs
+index ce1d9dc002565990e945ec37b6c1022e172d6576..9c861c634bd50a0b2953761613ed399d61ce1785 100644
 --- a/dist/src-BRb5cKfk.mjs
-+++ b/dist/src-CIPFb6M0.mjs
++++ b/dist/src-DQW6Z39k.mjs
 @@ -1,4 +1,5 @@
  import { defineComarkPlugin } from "comark";
 +import { describeTime } from "comark-time";
@@ -237,7 +237,7 @@ index ce1d9dc002565990e945ec37b6c1022e172d6576..5ab83d3562de21e119d3dd02a3e2e420
  		timeZone: "UTC"
 -	});
 +	}).format(new Date(time.datetime));
-+	const id = `cfm-${crypto.randomUUID()}`;
++	const id = `cfm-${Array.from(crypto.getRandomValues(/* @__PURE__ */ new Uint32Array(4)), (word) => word.toString(16).padStart(8, "0")).join("")}`;
  	return [
  		"time",
 -		locale ? {
@@ -386,14 +386,14 @@ index 0abd0a7d146541dd8c658af6653fea2672b0185a..2af4271f2337390af910fcc946b7acb5
  </script>
  
 diff --git a/dist/vue.mjs b/dist/vue.mjs
-index 46e73e86eb84899f022f6d3688ce4d443a62ce7c..163afd852235f2dc3b1ed4184e3bac6b81db3b7c 100644
+index 46e73e86eb84899f022f6d3688ce4d443a62ce7c..5fb4c37f4483422839d375b1521127e36d8117e7 100644
 --- a/dist/vue.mjs
 +++ b/dist/vue.mjs
 @@ -1,6 +1,6 @@
 -import { n as src_default } from "./src-BRb5cKfk.mjs";
 -import { n as localizeDates, t as addStyles } from "./client-BPkb2vp9.mjs";
 -import { defineComponent, h, onMounted, onUpdated, shallowRef } from "vue";
-+import { n as src_default } from "./src-CIPFb6M0.mjs";
++import { n as src_default } from "./src-DQW6Z39k.mjs";
 +import { r as start } from "./client-BeNPxCfR.mjs";
 +import { defineComponent, h, onBeforeUnmount, onMounted, onUpdated, shallowRef } from "vue";
  //#region src/vue.ts

@@ -1,54 +1,3 @@
-diff --git a/dist/comment-marks.css b/dist/comment-marks.css
-index 1d2ddba4768354c315d094f65152ca2b910fd134..44be72ac4ef9f98b557c2f765c5d7c9c6bd2da00 100644
---- a/dist/comment-marks.css
-+++ b/dist/comment-marks.css
-@@ -11,7 +11,7 @@
-  *   firmer (45%), `data-status="resolved"` makes it dashed and grey, and `data-draft="true"` is the area being drawn or
-  *   written on: 2px comment blue with a fill. Its `comment-mark-handle` children, with `data-corner="top-left"` and the
-  *   other three corners, are round handles.
-- * - `data-leaving="true"` on a pin or an area: it shrinks and fades out in 180ms, then the page removes it.
-+ * - `data-leaving="true"` on a pin or an area: it shrinks and fades out in 130ms (`commentLeaveMs` of `vite-hub/ui/headless`), then the page removes it.
-  * The page places a pin with `left` and `top`, and an area with `left`, `top`, `width`, and `height`.
-  * Commented text uses the CSS Custom Highlight API with the names `vh-comment`, `vh-comment-resolved`,
-  * `vh-comment-active`, and `vh-comment-draft`.
-@@ -191,7 +191,7 @@
- /* A mark that goes, such as the others when one comment shows on its own: it shrinks and fades. */
- :is([data-slot="comment-mark-pin"], [data-slot="comment-mark-area"])[data-leaving="true"],
- [data-slot="comment-layer-item"][data-leaving="true"] > * {
--  animation: vh-comment-mark-leave 180ms cubic-bezier(0.4, 0, 1, 1) forwards;
-+  animation: vh-comment-mark-leave 130ms cubic-bezier(0.4, 0, 1, 1) forwards;
-   pointer-events: none;
- }
- 
-@@ -200,17 +200,13 @@
- }
- 
- @keyframes vh-comment-mark-leave {
--  to { opacity: 0; scale: calc(var(--vh-comment-zoom, 1) * 0.6); }
-+  to { opacity: 0; scale: calc(var(--vh-comment-zoom, 1) * 0.8); }
- }
- 
- @keyframes vh-comment-mark-leave-area {
-   to { opacity: 0; scale: 0.97; }
- }
- 
--@keyframes vh-comment-mark-fade {
--  to { opacity: 0; }
--}
--
- @media (prefers-reduced-motion: reduce) {
-   :is([data-slot="comment-mark-pin"], [data-slot="comment-pin"], [data-slot="comment-mark-area"], [data-slot="comment-layer-area"]) {
-     transition: none;
-@@ -218,7 +214,8 @@
- 
-   :is([data-slot="comment-mark-pin"], [data-slot="comment-mark-area"])[data-leaving="true"],
-   [data-slot="comment-layer-item"][data-leaving="true"] > * {
--    animation-name: vh-comment-mark-fade;
-+    animation: none;
-+    opacity: 0;
-   }
- }
- 
 diff --git a/dist/comment-row-DuiRCsHV.js b/dist/comment-row-DuiRCsHV.js
 index 37b29547a16a752251ce44685965a75f63ca698b..6792da478c216cb76d898a3bf0c888521ad5d44c 100644
 --- a/dist/comment-row-DuiRCsHV.js
@@ -78,61 +27,6 @@ index 37b29547a16a752251ce44685965a75f63ca698b..6792da478c216cb76d898a3bf0c88852
  			replies > 0 ? h("span", `${replies} ${replies === 1 ? "reply" : "replies"}`) : null,
  			thread.status === "resolved" ? h("span", "Resolved") : null,
  			options.detached ? h("span", { "data-slot": "comment-list-detached" }, "Detached") : null,
-diff --git a/dist/comment-visibility-BT7mWt93.d.ts b/dist/comment-visibility-BT7mWt93.d.ts
-index 590e85fc2114d9c3a164750c9cd3a2b8e1c6015d..39b5e3ade3ac9dc0497bdc290931b4df0edf72c1 100644
---- a/dist/comment-visibility-BT7mWt93.d.ts
-+++ b/dist/comment-visibility-BT7mWt93.d.ts
-@@ -4,7 +4,7 @@ type CommentVisibility = "all" | "hidden";
- interface CommentVisibilityOptions {
-   /** The first value, such as one the reader saved. Default `"all"`. */
-   visibility?: CommentVisibility;
--  /** How long a comment or reply that was just sent shows while comments are hidden. Default `2500`. */
-+  /** How long a comment or reply that was just sent shows while comments are hidden. The time waits while the reader is on it. Default `2500`. */
-   flashMs?: number;
- }
- /**
-@@ -15,13 +15,18 @@ interface CommentVisibilityModel {
-   readonly visibility: CommentVisibility;
-   /** The ids that still show while comments are hidden: the open thread, then each one that was just sent. Empty while all show. */
-   readonly only: readonly string[];
--  /** The ids that stopped showing while comments are hidden, for 180 ms. Their marks play the pop-out in that time. */
-+  /** The ids that stopped showing while comments are hidden, for `commentLeaveMs`. Their marks play the pop-out in that time. */
-   readonly leaving: readonly string[];
-   set: (visibility: CommentVisibility) => void;
-   /** The thread that is open. It shows while comments are hidden. */
-   open: (id: string | null) => void;
-   /** Shows the thread for `flashMs` while comments are hidden. It does nothing while all show. */
-   flash: (id: string) => void;
-+  /**
-+   * The thread the reader points at or focuses, such as its pin. `hover(null)` when the reader leaves. Like a toast, its
-+   * flash time stops while the reader is on it, and the rest of the time runs after.
-+   */
-+  hover: (id: string | null) => void;
-   isShown: (id: string) => boolean;
-   /** Calls `listener` after each change. Returns a function that stops it. */
-   subscribe: (listener: () => void) => () => void;
-@@ -29,7 +34,7 @@ interface CommentVisibilityModel {
-   stop: () => void;
- }
- /** How long a mark that stops showing stays, for its pop-out. The styles of the parts use the same time. */
--declare const commentLeaveMs = 180;
-+declare const commentLeaveMs = 130;
- declare function createCommentVisibility(options?: CommentVisibilityOptions): CommentVisibilityModel;
- //#endregion
- export { createCommentVisibility as a, commentLeaveMs as i, CommentVisibilityModel as n, CommentVisibilityOptions as r, CommentVisibility as t };
-\ No newline at end of file
-diff --git a/dist/comments-BPd7mX8v.js b/dist/comments-BPd7mX8v.js
-index 4d0f59efd9cbde84ee28f4215d1556f7fbeb5ab9..df1e6b5883091ce649758ffbfe7495951855d277 100644
---- a/dist/comments-BPd7mX8v.js
-+++ b/dist/comments-BPd7mX8v.js
-@@ -119,6 +119,7 @@ function useComments(options) {
- 	seen.subscribe(() => seenChanges.value++);
- 	watch(visibility, (value) => seen.set(value), { flush: "sync" });
- 	watch(openId, (id) => seen.open(id), { flush: "sync" });
-+	watch(hoverId, (id) => seen.hover(id), { flush: "sync" });
- 	const marked = computed(() => {
- 		seenChanges.value;
- 		const ids = new Set(pageThreads.value.map((thread) => thread.id));
 diff --git a/dist/config-C_zVe6Oc.d.ts b/dist/config-C_zVe6Oc.d.ts
 index fef76254305f58853422a4ee4add86ceb60bb1e6..9b7997dcaa33a548765cf994451f805a82b3d32c 100644
 --- a/dist/config-C_zVe6Oc.d.ts
@@ -156,6 +50,35 @@ index 5698ad6e6185a659c9b9ea7910a777db1861998a..aa67a995b566254e07651585bd87a155
  import { a as useViteHubUIIcons } from "./config-CprOILxQ.js";
  import { defineComponent, getCurrentInstance, getCurrentScope, h, onMounted, onScopeDispose, readonly, ref, toValue, watch } from "vue";
  //#region src/internal/announce.ts
+diff --git a/dist/editor-CHhoaZrB.js b/dist/editor-CHhoaZrB.js
+index af304e8318a33ec725cefcc84b8399357d0f0c75..9393c54d0ea09c0ce3bfe88726bd98f1907a27a2 100644
+--- a/dist/editor-CHhoaZrB.js
++++ b/dist/editor-CHhoaZrB.js
+@@ -1,4 +1,4 @@
+-import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
+ import { a as useViteHubUIIcons } from "./config-CprOILxQ.js";
+ import { n as editorHandlersKey, t as createEditorHandlers } from "./handlers-DMl-Na3x.js";
+ import { computed, defineComponent, h, inject, onMounted, ref, shallowRef } from "vue";
+diff --git a/dist/error-diagnostics-gyDj1QSg.js b/dist/error-diagnostics-gyDj1QSg.js
+index bd08e6a4c1d294990dc4e206b1adbc9499fa11ed..17cbed099c90262e9f769551abf6b17b0a7997b4 100644
+--- a/dist/error-diagnostics-gyDj1QSg.js
++++ b/dist/error-diagnostics-gyDj1QSg.js
+@@ -11,6 +11,14 @@ const uiErrorDiagnostics = /*#__PURE__*/ defineDiagnostics({
+ 		UI_R0002: {
+ 			...dynamicError,
+ 			fix: "Use the component that the message names as it says: inside its parent, such as `CommentLayer`, `ChoicesInput`, or `MessageScroller`, or with the props that the message names."
++		},
++		UI_RELATIVE_TIME_NOW_INVALID: {
++			why: "RelativeTime cannot read the supplied clock value.",
++			fix: "Pass a valid Date, an ISO date string, or milliseconds as now."
++		},
++		UI_RELATIVE_TIME_THRESHOLD_INVALID: {
++			why: ({ threshold }) => `RelativeTime threshold "${threshold}" is not a duration.`,
++			fix: "Pass a number and a unit, such as \"3w\", or \"none\" as threshold."
+ 		}
+ 	}
+ });
 diff --git a/dist/format-BCg0Ab9Q.js b/dist/format-BCg0Ab9Q.js
 index bd8d78100f06c7589b994ac7b8c3ba7f5200b2e6..1ee0a86c45f06882dbc2a1e0793bd501b239c5c4 100644
 --- a/dist/format-BCg0Ab9Q.js
@@ -193,7 +116,7 @@ index 88a7f1dc07e6728bbdf47b78eec1163810efff29..010f72a6ec156b77e99426f957132835
  import { computed, defineComponent, h, ref, watch } from "vue";
  //#region src/internal/image-preview.ts
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 175d0d721f6e36f7d3b2493ec6a95aca7db50858..8df17c59b91bd1357d6452e7683a8a5c3341c46f 100644
+index 74bc0cd6ac2c6064b9999580af24c99d034f1838..92b536d0279ab1c683b49c85fd5bd0c4a603cf7b 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -31,6 +31,7 @@ import { MessageParts } from "./parts/components/message-parts.js";
@@ -213,7 +136,7 @@ index 175d0d721f6e36f7d3b2493ec6a95aca7db50858..8df17c59b91bd1357d6452e7683a8a5c
 +export { AgentAttachments, type AgentInspectionValue, AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionItem, AgentSessionSurface, AgentSessionTimeline, AgentSessionWorkEntry, AgentSessionWorkGroup, AgentSessionWorkKind, type AgentToolInspection, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentOrientation, AttachmentSize, AttachmentState, AttachmentTitle, AttachmentTrigger, AvatarStack, AvatarStackPerson, AvatarStackSize, AvatarStackVariant, Bubble, BubbleAlign, BubbleContent, BubbleGroup, BubbleReactions, BubbleVariant, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputSource, ChoicesInputState, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockLineVariant, CodeBlockSize, CodeBlockTitle, CodeBlockVariant, CodeView, type CodeViewItem, type CodeViewLineSelection, type CodeViewOptions, CommentAttachmentLink, CommentAttachmentUrl, CommentCan, CommentComposer, CommentComposerFrame, CommentComposerSize, CommentComposerSlots, CommentComposerSubmit, CommentComposerVariant, CommentDraft, CommentFilterState, CommentFilters, CommentGroup, CommentGroupSlotScope, CommentLayer, CommentList, CommentMentionEmptyScope, CommentMentionItemScope, CommentPanel, CommentPanelSlots, CommentPanelVariant, CommentPin, CommentPlacement, CommentReply, CommentReplySlotScope, CommentReplySlots, CommentRowSlotScope, CommentRowSlots, CommentScope, CommentThread, CommentThreadAction, CommentThreadSlotScope, CommentThreadSlots, CommentToolbar, CommentUpload, CommentVisibility, CommentVisibilityModel, CommentVisibilityOptions, CommentsState, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, ConnectionStatusState, ConnectionStatusValue, CopyButton, CopyButtonSize, CopyButtonVariant, CopyValue, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, DeviceFrameBreakpoint, DeviceFramePreset, DeviceFrameSize, type DiffLineAnnotation, type FileContents, FileDiff, type FileDiffMetadata, type FileDiffOptions, type FileOptions, FileTree, FileTreeModel, FileTreeOptions, FileView, FilterSearch, FilterSearchSize, type LineAnnotation, Markdown, MarkdownValue, Marker, MarkerContent, MarkerIcon, MarkerVariant, Message, MessageAlign, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScrollBehavior, MessageScrollPosition, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerContext, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PendingAttachment, type PlaygroundFiles, type PlaygroundIssue, type PlaygroundPane, type PlaygroundPaneSlotProps, type PlaygroundPreset, PlaygroundRender, type PlaygroundRenderer, type PlaygroundResult, PromptInput, PromptInputSubmit, RelativeTime, RelativeTimeStyle, RelativeTimeValue, ResolvedViteHubUIDefaults, type SelectedLineRange, Status, StatusSize, StatusTone, SyncStatus, SyncStatusIndicator, SyncStatusLabel, SyncStatusValue, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, type TraceEventLogEntry, TraceIcon, TraceLine, TraceLineStatus, TraceRun, type TraceRunView, type TraceStepView, TraceTitle, UnresolvedFile, type UnresolvedFileOptions, UseAgentAttachmentsOptions, UseCommentsOptions, UseCopyOptions, UseCopyReturn, type ViteHubUIComponentName, type ViteHubUIComponents, ViteHubUIDefaults, ViteHubUIIconOptions, ViteHubUIInjectionKey, type ViteHubUIMessage, ViteHubUIOptions, type ViteHubUISession, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
 \ No newline at end of file
 diff --git a/dist/index.js b/dist/index.js
-index 188e644e160b5d83a4ac36cffdaa6f689417f004..1b28976ccd1554e65bf5105a77d335eb0af1ca3b 100644
+index 25c570d35e94ff703283f4578730d233ccdfeb3b..6f3ed66d916772b98aa79efbe635beffd8a06ac4 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,4 +1,4 @@
@@ -225,57 +148,38 @@ index 188e644e160b5d83a4ac36cffdaa6f689417f004..1b28976ccd1554e65bf5105a77d335eb
 @@ -19,6 +19,7 @@ import { n as fileToUIPart, r as useAgentAttachments, t as fileToDataUrl } from
  import { PromptInput } from "./parts/components/prompt-input.js";
  import { commentLeaveMs, createCommentVisibility } from "./parts/headless/comment-visibility.js";
- import { a as useCommentsContext, i as useComments, n as draftPositionKey, o as messagesSinceResolved, r as provideComments, s as repliedSinceResolved, t as defaultCommentCan } from "./comments-BPd7mX8v.js";
+ import { a as useCommentsContext, i as useComments, n as draftPositionKey, o as messagesSinceResolved, r as provideComments, s as repliedSinceResolved, t as defaultCommentCan } from "./comments-D3odN60W.js";
 +import { n as provideRelativeNow, t as RelativeTime } from "./relative-time-BlPV9x_y.js";
  import { CommentFilters, CommentList, CommentToolbar } from "./parts/components/comment-list.js";
  import { CommentPin } from "./parts/components/comment-pin.js";
  import { Marker, MarkerContent, MarkerIcon } from "./parts/components/marker.js";
-@@ -671,4 +672,4 @@ const uiSdkComponents = {
+@@ -675,4 +676,4 @@ const uiSdkComponents = {
  	UTabs
  };
  //#endregion
 -export { AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionTimeline, AgentSessionWorkGroup, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger, AvatarStack, Bubble, BubbleContent, BubbleGroup, BubbleReactions, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockTitle, CodeView, CommentComposer, CommentFilters, CommentLayer, CommentList, CommentPanel, CommentPin, CommentReply, CommentThread, CommentToolbar, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, CopyButton, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, FileDiff, FileTree, FileView, FilterSearch, Markdown, Marker, MarkerContent, MarkerIcon, Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PlaygroundRender, PromptInput, Status, SyncStatus, SyncStatusIndicator, SyncStatusLabel, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceRun, TraceTitle, UnresolvedFile, ViteHubUIInjectionKey, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, repliedSinceResolved, resolveViteHubUIDefaults, uiSdkComponents, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
 +export { AgentSession, AgentSessionDetailsRow, AgentSessionDetailsSection, AgentSessionTimeline, AgentSessionWorkGroup, Attachment, AttachmentAction, AttachmentActions, AttachmentContent, AttachmentDescription, AttachmentGroup, AttachmentMedia, AttachmentTitle, AttachmentTrigger, AvatarStack, Bubble, BubbleContent, BubbleGroup, BubbleReactions, Chat, ChatMessage, ChatSession, ChoicesInput, ChoicesInputClear, ChoicesInputError, ChoicesInputField, ChoicesInputStatus, CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton, CodeBlockFooter, CodeBlockHeader, CodeBlockLine, CodeBlockTitle, CodeView, CommentComposer, CommentFilters, CommentLayer, CommentList, CommentPanel, CommentPin, CommentReply, CommentThread, CommentToolbar, ConnectionStatus, ConnectionStatusIndicator, ConnectionStatusLabel, CopyButton, DEVICE_FRAME_BREAKPOINTS, DEVICE_FRAME_PRESETS, DeviceFrame, FileDiff, FileTree, FileView, FilterSearch, Markdown, Marker, MarkerContent, MarkerIcon, Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader, MessageParts, MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport, MultiFileDiff, PatchDiff, PlaygroundRender, PromptInput, RelativeTime, Status, SyncStatus, SyncStatusIndicator, SyncStatusLabel, ToolList, Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceDescription, TraceIcon, TraceLine, TraceRun, TraceTitle, UnresolvedFile, ViteHubUIInjectionKey, calculatePrependScrollTop, chatActivity, commentLeaveMs, createCommentVisibility, createViteHubUI, defaultCommentCan, draftPositionKey, fileToDataUrl, fileToUIPart, getSingularPatch, messagesSinceResolved, parseDiffFromFile, parsePatchFiles, provideComments, provideRelativeNow, repliedSinceResolved, resolveViteHubUIDefaults, uiSdkComponents, useAgentAttachments, useComments, useCommentsContext, useCopy, useFileTree, useFileTreeSelection, useHighlightedCode, useMessageScroller, useViteHubUI, useViteHubUIIcons };
-diff --git a/dist/markdown-editor-Cx2HR2y-.js b/dist/markdown-editor-Cx2HR2y-.js
-index 8bdf36a7f78e4883e2e9c002976efcc6129c9f9e..5545d36eb9f12644f31c6a0474979248a03472a2 100644
---- a/dist/markdown-editor-Cx2HR2y-.js
-+++ b/dist/markdown-editor-Cx2HR2y-.js
+diff --git a/dist/markdown-editor-BqBc8m1s.js b/dist/markdown-editor-BqBc8m1s.js
+index c036bbf6d9890a25df01e4884ee7f4508fce026a..db720cd3b3e11e8469c723922cb221963f70c50a 100644
+--- a/dist/markdown-editor-BqBc8m1s.js
++++ b/dist/markdown-editor-BqBc8m1s.js
 @@ -1,4 +1,4 @@
 -import { n as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
 +import { r as useUIComponent } from "./nuxt-ui-y7xXf6ys.js";
  import { a as addStyles, c as src_default, d as src_default$1, f as src_default$3, i as rowsOf, l as src_default$2, m as isElement$2, o as typesetCss, p as childrenOf$1, s as theme, t as Properties } from "./vue-DGstVdGn.js";
+ import { n as editorHandlersKey, t as createEditorHandlers } from "./handlers-DMl-Na3x.js";
  import { Comment, Fragment, computed, defineComponent, h, isVNode, onBeforeUnmount, onMounted, onScopeDispose, provide, ref, shallowRef, watch, watchEffect } from "vue";
- import { defineDiagnostics } from "nostics";
-@@ -19,13 +19,13 @@ import taskList from "comark/plugins/task-list";
- import { parseFrontmatter } from "comark/parse";
- import { Plugin as Plugin$1, PluginKey } from "@tiptap/pm/state";
- import { Decoration, DecorationSet } from "@tiptap/pm/view";
--//#region ../blob/dist/object-D8pRdprI.js
-+//#region ../../../vitehub-v3-popout/packages/blob/dist/object-D8pRdprI.js
- /** A non-null object that is not an array. Functions do not pass. */
- function isRecord(value) {
- 	return typeof value === "object" && value !== null && !Array.isArray(value);
- }
- //#endregion
--//#region ../blob/dist/browser-diagnostics-LWw4MIqX.js
-+//#region ../../../vitehub-v3-popout/packages/blob/dist/browser-diagnostics-LWw4MIqX.js
- const blobBrowserDiagnostics = /*#__PURE__*/ defineDiagnostics({
- 	docsBase: "https://vitehub.dev/docs/blob/diagnostics",
- 	codes: {
-@@ -60,7 +60,7 @@ const blobBrowserDiagnostics = /*#__PURE__*/ defineDiagnostics({
- 	}
- });
- //#endregion
--//#region ../blob/dist/client.js
-+//#region ../../../vitehub-v3-popout/packages/blob/dist/client.js
- function isFile(value) {
- 	return "name" in value && typeof value.name === "string" && "arrayBuffer" in value && typeof value.arrayBuffer === "function";
- }
 diff --git a/dist/nuxt-ui-y7xXf6ys.js b/dist/nuxt-ui-y7xXf6ys.js
-index 1eb21084282282915a73f483f2ce87628e1919bf..42c4fe8e132c95ba165ad33f87bfd4f150b06b2c 100644
+index 1eb21084282282915a73f483f2ce87628e1919bf..fee11d6d1702fca9555406408595613e58dfd52c 100644
 --- a/dist/nuxt-ui-y7xXf6ys.js
 +++ b/dist/nuxt-ui-y7xXf6ys.js
-@@ -14,7 +14,8 @@ const bundled = {
+@@ -1,4 +1,5 @@
+ import { defineAsyncComponent, getCurrentInstance, inject } from "vue";
++import { injectTooltipProviderContext } from "reka-ui";
+ //#region src/internal/nuxt-ui.ts
+ const uiComponentsKey = Symbol("ViteHubUIComponents");
+ const bundled = {
+@@ -14,7 +15,8 @@ const bundled = {
  	UIcon: defineAsyncComponent(() => import("@nuxt/ui/runtime/vue/components/Icon.vue")),
  	UInput: defineAsyncComponent(() => import("@nuxt/ui/components/Input.vue")),
  	UModal: defineAsyncComponent(() => import("@nuxt/ui/components/Modal.vue")),
@@ -285,45 +189,25 @@ index 1eb21084282282915a73f483f2ce87628e1919bf..42c4fe8e132c95ba165ad33f87bfd4f1
  };
  /**
  * The component that a part renders for `name`: the one given to `createViteHubUI({ components })`, else one that the
-@@ -24,5 +25,14 @@ const bundled = {
+@@ -24,5 +26,13 @@ const bundled = {
  function useUIComponent(name) {
  	return inject(uiComponentsKey, void 0)?.[name] ?? getCurrentInstance()?.appContext.components[name] ?? bundled[name];
  }
-+const nuxtUILocaleKey = Symbol.for("nuxt-ui.locale-context");
 +/**
 +* The tooltip that a part renders: the one given to `createViteHubUI({ components })` or registered globally, else
 +* Nuxt UI's own inside `UApp`, which provides what it needs and lets the tooltips of a list share their open delay.
 +* Outside `UApp` there is none, and the part uses the `title` attribute. Call it in `setup()`.
 +*/
 +function useTooltipComponent() {
-+	return inject(uiComponentsKey, void 0)?.UTooltip ?? getCurrentInstance()?.appContext.components.UTooltip ?? (inject(nuxtUILocaleKey, void 0) === void 0 ? void 0 : bundled.UTooltip);
++	return inject(uiComponentsKey, void 0)?.UTooltip ?? getCurrentInstance()?.appContext.components.UTooltip ?? (!injectTooltipProviderContext(null) ? void 0 : bundled.UTooltip);
 +}
  //#endregion
 -export { useUIComponent as n, uiComponentsKey as t };
 +export { useTooltipComponent as n, useUIComponent as r, uiComponentsKey as t };
-diff --git a/dist/nuxt.d.ts b/dist/nuxt.d.ts
-index 15d316551c5daef3492d1442e4f7cce89100296d..20b795dc942306228a9a9793b78abb98c362e571 100644
---- a/dist/nuxt.d.ts
-+++ b/dist/nuxt.d.ts
-@@ -1,5 +1,5 @@
- import { a as ViteHubUIOptions, r as ViteHubUIIconOptions } from "./config-C_zVe6Oc.js";
--//#region ../icons/dist/index.d.ts
-+//#region ../../../vitehub-v3-popout/packages/icons/dist/index.d.ts
- /** Name of an icon in the ViteHub set, such as `kv` for `i-vitehub-kv`. */
- type ViteHubIconName = "agent" | "auth" | "blob" | "browser" | "bundle" | "cache" | "channels" | "cms" | "codemods" | "comments" | "compare" | "connections" | "content" | "database" | "decisions" | "development" | "docs" | "email" | "env" | "forge" | "forms" | "gateways" | "guides" | "hosts" | "i18n" | "kv" | "logs" | "mcp" | "queue" | "rate-limit" | "realtime" | "reference" | "sandbox" | "schedule" | "shell" | "skills" | "source" | "start" | "ui" | "usage" | "web-container" | "workflow" | "workspace";
- /** The ViteHub icon set in the Iconify JSON format, as `@iconify-json/*` packages export it. */
 diff --git a/dist/nuxt.js b/dist/nuxt.js
-index 8d62fbb4f6e48ef203d7811e8935de76a1b92b92..8f49b8bf1bfbbd1b5b2308ee43aea872ddb6f60c 100644
+index 8d62fbb4f6e48ef203d7811e8935de76a1b92b92..7bac1d321dc96fe28afb5ef07bc02bb18cdb9900 100644
 --- a/dist/nuxt.js
 +++ b/dist/nuxt.js
-@@ -1,6 +1,6 @@
- import { createRequire } from "node:module";
- import { addComponent, createResolver, defineNuxtModule, runWithNuxtContext } from "@nuxt/kit";
--//#region ../icons/dist/index.js
-+//#region ../../../vitehub-v3-popout/packages/icons/dist/index.js
- const icons = {
- 	"prefix": "vitehub",
- 	"info": {
 @@ -168,6 +168,7 @@ const componentNames = [
  	"TraceRun",
  	"UnresolvedFile",
@@ -332,37 +216,6 @@ index 8d62fbb4f6e48ef203d7811e8935de76a1b92b92..8f49b8bf1bfbbd1b5b2308ee43aea872
  	"Status",
  	...partFamilies.attachment,
  	...partFamilies["avatar-stack"],
-diff --git a/dist/parts/components/agent-session.d.ts b/dist/parts/components/agent-session.d.ts
-index dcad89b30534621ed03a9c6ca27cdfcac89878bc..aec6c422c28774578dd000dceade0b493e42bc22 100644
---- a/dist/parts/components/agent-session.d.ts
-+++ b/dist/parts/components/agent-session.d.ts
-@@ -170,7 +170,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
-     type: StringConstructor;
-   };
-   value: {
--    type: (NumberConstructor | StringConstructor)[];
-+    type: (StringConstructor | NumberConstructor)[];
-   };
-   href: {
-     type: StringConstructor;
-@@ -192,7 +192,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
-     type: StringConstructor;
-   };
-   value: {
--    type: (NumberConstructor | StringConstructor)[];
-+    type: (StringConstructor | NumberConstructor)[];
-   };
-   href: {
-     type: StringConstructor;
-@@ -205,7 +205,7 @@ export declare const AgentSessionDetailsRow: import("vue").DefineComponent<impor
-     type: StringConstructor;
-   };
- }>> & Readonly<{}>, {
--  tone: "error" | "default" | "muted" | "success" | "info";
-+  tone: "default" | "error" | "muted" | "success" | "info";
- }, {}, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
- /** A group of tool calls, folded behind one line such as "Worked for 3m 12s". */
- export declare const AgentSessionWorkGroup: import("vue").DefineComponent<import("vue").ExtractPropTypes<{
 diff --git a/dist/parts/components/agent-session.js b/dist/parts/components/agent-session.js
 index d1bd91436ee43df0c002340b039c34159dc506bf..7356c5f2d3faa27b9a2d82fa6b6a485fda6d8707 100644
 --- a/dist/parts/components/agent-session.js
@@ -384,9 +237,19 @@ index 95c7814bd4f0f220e91dc32d3d04fc40cca68b1c..06c97d2b0430887f527d4190b55487e9
  import { defineComponent, h } from "vue";
  //#region src/components/attachment.ts
 diff --git a/dist/parts/components/bubble.d.ts b/dist/parts/components/bubble.d.ts
-index 40cb0b9c86d1d9380a70193cfc2d0a7a8025d284..ab33876daa709358779185e0ae5aa50c272538a1 100644
+index dbebfe5424405b19825f950234e350a66eca5631..ab33876daa709358779185e0ae5aa50c272538a1 100644
 --- a/dist/parts/components/bubble.d.ts
 +++ b/dist/parts/components/bubble.d.ts
+@@ -26,8 +26,8 @@ export declare const Bubble: import("vue").DefineComponent<import("vue").Extract
+     type: PropType<BubbleVariant>;
+   };
+ }>> & Readonly<{}>, {
+-  align: BubbleAlign;
+   variant: BubbleVariant;
++  align: BubbleAlign;
+ }, {}, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
+ export declare const BubbleContent: import("vue").DefineComponent<import("vue").ExtractPropTypes<{
+   as: {
 @@ -66,6 +66,6 @@ export declare const BubbleReactions: import("vue").DefineComponent<import("vue"
    };
  }>> & Readonly<{}>, {
@@ -407,12 +270,12 @@ index 4021e7503de21a568fbc51f9720e8904a1dc009a..8b1837342b3ffe752ad507d09b20ada7
  import { ChatMessage } from "./chat-message.js";
  import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerViewport } from "../headless/message-scroller.js";
 diff --git a/dist/parts/components/comment-layer.js b/dist/parts/components/comment-layer.js
-index 0dffd7fdf5fe2ab40de86102c97316fb64959e34..327daece9ae4c2a81ad898b2e943eea2582bc349 100644
+index 2abfb5e2d2434fbed4096b6f8d0d7fd52716d0ec..6190d44017ed811d6709eb4aed76b28212222f8f 100644
 --- a/dist/parts/components/comment-layer.js
 +++ b/dist/parts/components/comment-layer.js
 @@ -4,7 +4,6 @@ import { n as excerpt } from "../../comment-person-CLPlW_SS.js";
  import { t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
- import { i as useComments, n as draftPositionKey, r as provideComments } from "../../comments-BPd7mX8v.js";
+ import { i as useComments, n as draftPositionKey, r as provideComments } from "../../comments-D3odN60W.js";
  import { n as threadRow } from "../../comment-row-DuiRCsHV.js";
 -import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
  import { CommentList, CommentToolbar } from "./comment-list.js";
@@ -436,7 +299,7 @@ index 0dffd7fdf5fe2ab40de86102c97316fb64959e34..327daece9ae4c2a81ad898b2e943eea2
  			return {
  				at,
 diff --git a/dist/parts/components/comment-list.js b/dist/parts/components/comment-list.js
-index ebc8462e72f998dfd03b144be923ce8c332653b5..c014ccd4698cb99f368167c578e661e1bf6ca917 100644
+index 48d0e47bd798ec6c223f5f585216e57366401e92..18c0897fde21a86fd2a31f95ec6820f80f45b3d5 100644
 --- a/dist/parts/components/comment-list.js
 +++ b/dist/parts/components/comment-list.js
 @@ -1,9 +1,8 @@
@@ -444,7 +307,7 @@ index ebc8462e72f998dfd03b144be923ce8c332653b5..c014ccd4698cb99f368167c578e661e1
 +import { r as useUIComponent } from "../../nuxt-ui-y7xXf6ys.js";
  import { a as useViteHubUIIcons } from "../../config-CprOILxQ.js";
  import { AvatarStack } from "./avatar-stack.js";
- import { a as useCommentsContext } from "../../comments-BPd7mX8v.js";
+ import { a as useCommentsContext } from "../../comments-D3odN60W.js";
  import { n as threadRow, t as rowSlotScope } from "../../comment-row-DuiRCsHV.js";
 -import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
  import { defineComponent, h } from "vue";
@@ -468,7 +331,7 @@ index ebc8462e72f998dfd03b144be923ce8c332653b5..c014ccd4698cb99f368167c578e661e1
  					preview: slots.preview?.(rowSlotScope(thread)),
  					site: comments.scope.value === "site"
 diff --git a/dist/parts/components/comment-panel.js b/dist/parts/components/comment-panel.js
-index 3d544b39c5c791b41cdc147cac7d6f9361906117..a51067d20780feba414fb0a2d40f83ab5c331057 100644
+index 531e3014ad7b2c87a9a9820e84c5be09b84fd5a5..be0671648c469d19e95c0ba038a314acc9bbc215 100644
 --- a/dist/parts/components/comment-panel.js
 +++ b/dist/parts/components/comment-panel.js
 @@ -1,10 +1,9 @@
@@ -477,7 +340,7 @@ index 3d544b39c5c791b41cdc147cac7d6f9361906117..a51067d20780feba414fb0a2d40f83ab
  import { t as uiErrorDiagnostics } from "../../error-diagnostics-gyDj1QSg.js";
  import { n as injectComments } from "../../comments-context-C2lOZyQ5.js";
  import { t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
- import { a as useCommentsContext, i as useComments, r as provideComments, s as repliedSinceResolved } from "../../comments-BPd7mX8v.js";
+ import { a as useCommentsContext, i as useComments, r as provideComments, s as repliedSinceResolved } from "../../comments-D3odN60W.js";
  import { n as threadRow, t as rowSlotScope } from "../../comment-row-DuiRCsHV.js";
 -import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
  import { CommentThread } from "./comment-thread.js";
@@ -500,49 +363,8 @@ index 3d544b39c5c791b41cdc147cac7d6f9361906117..a51067d20780feba414fb0a2d40f83ab
  			detached: state.positions.value.get(thread.id)?.detached === true,
  			preview: slots.preview?.(rowSlotScope(thread)),
  			site: state.scope.value === "site"
-diff --git a/dist/parts/components/comment-pin.js b/dist/parts/components/comment-pin.js
-index c5a28673779d54bfff90bbc980e80448662b5fc1..3a99a9e2d984f2045fd78e85775d8e4e811e7672 100644
---- a/dist/parts/components/comment-pin.js
-+++ b/dist/parts/components/comment-pin.js
-@@ -37,6 +37,8 @@ const CommentPin = defineComponent({
- 			const text = props.excerpt ? `: ${props.excerpt}` : "";
- 			return `Comment ${props.n}${by}${text}${props.status === "resolved" ? ", resolved" : ""}`;
- 		};
-+		let pointed = false;
-+		let focused = false;
- 		return () => h("button", {
- 			"aria-expanded": props.draft ? void 0 : String(props.active),
- 			"aria-label": label(),
-@@ -44,11 +46,23 @@ const CommentPin = defineComponent({
- 			"data-draft": props.draft ? "true" : void 0,
- 			"data-slot": "comment-pin",
- 			"data-status": props.status,
--			onBlur: () => emit("leave"),
-+			onBlur: () => {
-+				focused = false;
-+				if (!pointed) emit("leave");
-+			},
- 			onClick: () => emit("select"),
--			onFocus: () => emit("hover"),
--			onPointerenter: () => emit("hover"),
--			onPointerleave: () => emit("leave"),
-+			onFocus: () => {
-+				focused = true;
-+				emit("hover");
-+			},
-+			onPointerenter: () => {
-+				pointed = true;
-+				emit("hover");
-+			},
-+			onPointerleave: () => {
-+				pointed = false;
-+				if (!focused) emit("leave");
-+			},
- 			type: "button"
- 		}, [props.author ? h(AvatarStack, {
- 			"aria-hidden": "true",
 diff --git a/dist/parts/components/comment-thread.js b/dist/parts/components/comment-thread.js
-index 3cdbae8e7356ffe605a3e4410dd28f9a22687aff..3c9fa68cbc02fa5398235d80d892541d5afccef1 100644
+index 7714519c1b875092a9a32ab4fc3b2b7a21dad1be..be8bfa58a1e7b4dbf1379ea82f5175ec7d508def 100644
 --- a/dist/parts/components/comment-thread.js
 +++ b/dist/parts/components/comment-thread.js
 @@ -1,4 +1,4 @@
@@ -554,7 +376,7 @@ index 3cdbae8e7356ffe605a3e4410dd28f9a22687aff..3c9fa68cbc02fa5398235d80d892541d
 @@ -8,7 +8,7 @@ import { a as pathOf, c as swallowNextClick, l as useDocumentPointerDown, n as i
  import { a as writerName, o as writerPerson, t as displayName } from "../../comment-person-CLPlW_SS.js";
  import { n as mentionPlugin, r as mentionTag, t as CommentComposer } from "../../comment-composer-BTGZN7DC.js";
- import { o as messagesSinceResolved, s as repliedSinceResolved, t as defaultCommentCan } from "../../comments-BPd7mX8v.js";
+ import { o as messagesSinceResolved, s as repliedSinceResolved, t as defaultCommentCan } from "../../comments-D3odN60W.js";
 -import { t as useRelativeTime } from "../../relative-time-BlPV9x_y.js";
 +import { t as RelativeTime } from "../../relative-time-BlPV9x_y.js";
  import { Marker, MarkerContent } from "./marker.js";
@@ -598,18 +420,23 @@ index a1e54fc9dd0229e3ef8bc5237515c718a7ab7733..7f24e05278c0de9ba0fd091e371fdfaf
  import { defineComponent, h } from "vue";
  //#region src/components/filter-search.ts
 diff --git a/dist/parts/components/prompt-input.d.ts b/dist/parts/components/prompt-input.d.ts
-index 908a79c000777aa1b931309b298ee1366f1d1a55..6035554c1ef5c1978ff889d41de6f149de3c2883 100644
+index 908a79c000777aa1b931309b298ee1366f1d1a55..817b8987306f110e3fba84de441603c9aaa975ed 100644
 --- a/dist/parts/components/prompt-input.d.ts
 +++ b/dist/parts/components/prompt-input.d.ts
-@@ -127,7 +127,7 @@ export declare const PromptInput: import("vue").DefineComponent<import("vue").Ex
+@@ -124,11 +124,11 @@ export declare const PromptInput: import("vue").DefineComponent<import("vue").Ex
+   onStop?: ((...args: any[]) => any) | undefined;
+ }>, {
+   status: ChatStatus;
++  disabled: boolean;
    modelValue: string;
    files: readonly FileUIPart[];
    attachments: boolean;
 -  attachVariant: "outline" | "ghost";
+-  disabled: boolean;
 +  attachVariant: "ghost" | "outline";
-   disabled: boolean;
    filesDisabled: boolean;
    readonly: boolean;
+   multiple: boolean;
 diff --git a/dist/parts/components/prompt-input.js b/dist/parts/components/prompt-input.js
 index 54d2d51c58d2def59fca80e9884976047bf4712c..0b92d1a1e5e7e8f47517d5c2c359ab1ec763de04 100644
 --- a/dist/parts/components/prompt-input.js
@@ -718,126 +545,6 @@ index 873c52e1a21981b01f87c401279cc5bdd4173a79..3005ebb6df3be6cf82240b5c2760761c
  import { t as formatDuration } from "../../format-BCg0Ab9Q.js";
  import { CodeBlock, CodeBlockContent } from "./code-block.js";
  import { t as payloadText } from "../../payload-text-sjkYAwvw.js";
-diff --git a/dist/parts/headless/comment-visibility.js b/dist/parts/headless/comment-visibility.js
-index 432e998b46a71112660db55f6769bf62e5d00dfe..195c2c8febc2ac144c4b286dc4c20d845906cb9a 100644
---- a/dist/parts/headless/comment-visibility.js
-+++ b/dist/parts/headless/comment-visibility.js
-@@ -1,15 +1,18 @@
- //#region src/headless/comment-visibility.ts
- /** How long a mark that stops showing stays, for its pop-out. The styles of the parts use the same time. */
--const commentLeaveMs = 180;
-+const commentLeaveMs = 130;
- function createCommentVisibility(options = {}) {
- 	const flashMs = options.flashMs ?? 2500;
- 	let visibility = options.visibility ?? "all";
- 	let opened = null;
-+	let hovered = null;
- 	let flashed = [];
- 	let only = [];
- 	let leaving = [];
- 	const timers = /* @__PURE__ */ new Set();
- 	const flashTimers = /* @__PURE__ */ new Map();
-+	const flashEnds = /* @__PURE__ */ new Map();
-+	const flashPaused = /* @__PURE__ */ new Map();
- 	const leaveTimers = /* @__PURE__ */ new Map();
- 	const listeners = /* @__PURE__ */ new Set();
- 	const later = (run, ms) => {
-@@ -31,10 +34,32 @@ function createCommentVisibility(options = {}) {
- 				leaveTimers.delete(id);
- 				leaving = leaving.filter((entry) => entry !== id);
- 				for (const listener of listeners) listener();
--			}, 180));
-+			}, 130));
- 		}
- 		for (const listener of listeners) listener();
- 	}
-+	function stopFlashTimer(id) {
-+		const timer = flashTimers.get(id);
-+		if (!timer) return;
-+		clearTimeout(timer);
-+		timers.delete(timer);
-+		flashTimers.delete(id);
-+	}
-+	function runFlash(id, ms) {
-+		stopFlashTimer(id);
-+		flashPaused.delete(id);
-+		if (id === hovered) {
-+			flashPaused.set(id, ms);
-+			return;
-+		}
-+		flashEnds.set(id, Date.now() + ms);
-+		flashTimers.set(id, later(() => {
-+			flashTimers.delete(id);
-+			flashEnds.delete(id);
-+			flashed = flashed.filter((entry) => entry !== id);
-+			update();
-+		}, ms));
-+	}
- 	return {
- 		get visibility() {
- 			return visibility;
-@@ -49,11 +74,9 @@ function createCommentVisibility(options = {}) {
- 			if (next === visibility) return;
- 			visibility = next;
- 			if (next === "all") {
--				for (const timer of flashTimers.values()) {
--					clearTimeout(timer);
--					timers.delete(timer);
--				}
--				flashTimers.clear();
-+				for (const id of [...flashTimers.keys()]) stopFlashTimer(id);
-+				flashEnds.clear();
-+				flashPaused.clear();
- 				flashed = [];
- 			}
- 			update();
-@@ -65,21 +88,27 @@ function createCommentVisibility(options = {}) {
- 		},
- 		flash(id) {
- 			if (visibility !== "hidden") return;
--			const before = flashTimers.get(id);
--			if (before) {
--				clearTimeout(before);
--				timers.delete(before);
--			}
--			flashTimers.set(id, later(() => {
--				flashTimers.delete(id);
--				flashed = flashed.filter((entry) => entry !== id);
--				update();
--			}, flashMs));
-+			runFlash(id, flashMs);
- 			if (!flashed.includes(id)) {
- 				flashed = [...flashed, id];
- 				update();
- 			}
- 		},
-+		hover(id) {
-+			if (id === hovered) return;
-+			const left = hovered;
-+			hovered = id;
-+			if (left !== null) {
-+				const rest = flashPaused.get(left);
-+				if (rest !== void 0) runFlash(left, rest);
-+			}
-+			if (id !== null && flashTimers.has(id)) {
-+				const rest = Math.max(0, (flashEnds.get(id) ?? 0) - Date.now());
-+				stopFlashTimer(id);
-+				flashEnds.delete(id);
-+				flashPaused.set(id, rest);
-+			}
-+		},
- 		isShown: (id) => visibility === "all" || only.includes(id),
- 		subscribe(listener) {
- 			listeners.add(listener);
-@@ -89,6 +118,8 @@ function createCommentVisibility(options = {}) {
- 			for (const timer of timers) clearTimeout(timer);
- 			timers.clear();
- 			flashTimers.clear();
-+			flashEnds.clear();
-+			flashPaused.clear();
- 			leaveTimers.clear();
- 		}
- 	};
 diff --git a/dist/parts/workspace/connect-panel.js b/dist/parts/workspace/connect-panel.js
 index 3c1d2b2a5e22b880e11434f560f3fda79d82950c..a7d35d42534df080e77824b82cdc766cca617f02 100644
 --- a/dist/parts/workspace/connect-panel.js
@@ -879,10 +586,10 @@ index 1104879c71a270ea434a50f4e4bc1ffb6b0cea50..dd63bbc507a77692d77aca0b9fa820c1
  //#region src/workspace/workspace-shell.ts
  const defaultSplits = {
 diff --git a/dist/relative-time-BlPV9x_y.js b/dist/relative-time-BlPV9x_y.js
-index da8310634426d6b9ae0cf1d9edab4788925ccde0..da86fdcd60f955029e54daad742de8c379ea9aba 100644
+index da8310634426d6b9ae0cf1d9edab4788925ccde0..17f078bd5d731668c22a0642b400eb6d79313b31 100644
 --- a/dist/relative-time-BlPV9x_y.js
 +++ b/dist/relative-time-BlPV9x_y.js
-@@ -1,26 +1,308 @@
+@@ -1,26 +1,309 @@
 -import { r as timeAgo } from "./format-BCg0Ab9Q.js";
 -import { onBeforeUnmount, onMounted, ref } from "vue";
 -//#region src/internal/relative-time.ts
@@ -891,6 +598,7 @@ index da8310634426d6b9ae0cf1d9edab4788925ccde0..da86fdcd60f955029e54daad742de8c3
 -	timeZone: "UTC"
 -});
 +import { n as useTooltipComponent } from "./nuxt-ui-y7xXf6ys.js";
++import { t as uiErrorDiagnostics } from "./error-diagnostics-gyDj1QSg.js";
 +import { computed, defineComponent, h, inject, onBeforeUnmount, onMounted, provide, ref, shallowRef } from "vue";
 +//#region src/internal/describe-time.ts
  /**
@@ -899,7 +607,7 @@ index da8310634426d6b9ae0cf1d9edab4788925ccde0..da86fdcd60f955029e54daad742de8c3
 +* Describes a date or an instant against `now`: "3 days ago" with the full date as its tip while it's closer than
 +* `threshold`, and from there on "Oct 12" ("Oct 12, 2025" in another year) with the relative words as its tip. A date
 +* alone (`2026-10-12`) counts whole calendar days in `timeZone`, and a time with no offset is read in that zone.
-+* Returns `undefined` for a value it can't read, and throws a `RangeError` for a `threshold`, `now`, `locale`, or
++* Returns `undefined` for a value it can't read, and throws an error for a `threshold`, `now`, `locale`, or
 +* `timeZone` it can't read.
  */
 -function useRelativeTime() {
@@ -932,9 +640,9 @@ index da8310634426d6b9ae0cf1d9edab4788925ccde0..da86fdcd60f955029e54daad742de8c3
 +	const { threshold = "3w", locale = "en-US", style = "long" } = options;
 +	const [, amount, unit] = /^(\d+(?:\.\d+)?)\s*(s|m|h|d|w|mo|y)$/i.exec(threshold) ?? [];
 +	const limit = /^(none|never)$/i.test(threshold) ? Number.POSITIVE_INFINITY : amount && unit ? Number(amount) * (units[unit.toLowerCase()] ?? NaN) : NaN;
-+	if (Number.isNaN(limit)) throw new RangeError(`RelativeTime: threshold "${threshold}" isn't a duration. Write a number and a unit, such as "3w", or "none".`);
++	if (Number.isNaN(limit)) throw uiErrorDiagnostics.UI_RELATIVE_TIME_THRESHOLD_INVALID({ threshold });
 +	const now = options.now === void 0 ? Date.now() : new Date(options.now).getTime();
-+	if (!Number.isFinite(now)) throw new RangeError("RelativeTime: now isn't a valid date. Use a date, an ISO string, or milliseconds.");
++	if (!Number.isFinite(now)) throw uiErrorDiagnostics.UI_RELATIVE_TIME_NOW_INVALID();
 +	const zone = options.timeZone ?? new Intl.DateTimeFormat().resolvedOptions().timeZone;
 +	const relative = new Intl.RelativeTimeFormat(locale, {
 +		numeric: "auto",
@@ -1235,7 +943,7 @@ index a73c4ac64acfe10ee9c662230357a2408433a266..2063faa1369dde5be62d21360bd64b7a
  function iconsIn(appConfig, key) {
  	const config = Reflect.get(appConfig, key);
 diff --git a/dist/styles.css b/dist/styles.css
-index 12669dd174ade55512c8bde73d15608428fc6b56..64c1b2de680d036242b473fe68a3609e5f2a0442 100644
+index d80374edc06070787005b26be8b95994b05f9dd2..5ce5d773787107957d830ba61dee8a84393d70da 100644
 --- a/dist/styles.css
 +++ b/dist/styles.css
 @@ -1859,6 +1859,11 @@
