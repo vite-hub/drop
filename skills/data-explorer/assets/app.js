@@ -1063,10 +1063,36 @@ const SPECS = {
   histogram: histogramSpec,
 };
 
+// A raw spec takes the page's colors by name, so it follows the theme and the filters' colors without copied hex
+// values: a theme color (`fg`, `muted`, `border`, `grid`, `bg`, `soft`), a tone (`good`, `fair`, `warn`, `bad`,
+// `accent`) or a palette index, wherever it sets `color`, `fill` or `stroke` or lists a scale's `range`. A color, fill
+// or stroke on a list filter's field without a range of its own gives each name its color across the report.
+const PAINT = ["color", "fill", "stroke"];
+function paintSpec(node, rows, c = vars()) {
+  const named = (v) =>
+    typeof v === "number" ? PALETTE[v % PALETTE.length] : typeof v === "string" ? (c[v] ?? TONES[v] ?? v) : v;
+  if (Array.isArray(node)) return node.forEach((n) => paintSpec(n, rows, c));
+  if (!node || typeof node !== "object") return;
+  for (const [key, v] of Object.entries(node)) {
+    if (PAINT.includes(key) && typeof v === "string") node[key] = named(v);
+    if (PAINT.includes(key) && v && typeof v === "object" && !Array.isArray(v)) {
+      for (const ref of [v, ...[v.condition ?? []].flat()]) if ("value" in ref) ref.value = named(ref.value);
+      if (Array.isArray(v.scale?.range)) v.scale.range = v.scale.range.map(named);
+      else if (COLORS[v.field] && !v.scale?.range && !v.scale?.scheme) {
+        const present = new Set(rows?.map((r) => r[v.field]));
+        const keys = [...COLORS[v.field].keys()].filter((k) => !rows || present.has(k));
+        if (keys.length) v.scale = { ...v.scale, domain: keys, range: keys.map((k) => COLORS[v.field].get(k)) };
+      }
+    }
+    if (key !== "data") paintSpec(v, rows, c);
+  }
+}
+
 function vegaSpec(block, width) {
   const spec = structuredClone(block.spec);
   const named = spec.data?.name;
   if (named) spec.data = { values: rowsOf(named) };
+  paintSpec(spec, named ? data[named] : spec.data?.values);
   return { ...spec, width: spec.width ?? width, height: spec.height ?? block.height ?? 240 };
 }
 
