@@ -343,10 +343,10 @@ test("a spreadsheet that can't be read logs once, and is read again after five m
 test("an admin's Better Auth call is audited with its outcome; one that only reads is not", async () => {
   const { default: adminApi } = await import("../../server/middleware/0.18.admin-api.ts")
   state.who = { ...who, role: "admin" }
-  const call = (endpoint, status) =>
-    request(`/api/auth/admin/${endpoint}`, (event) => adminApi(event, async () => new Response(null, { status })), {
+  const call = (endpoint, status, answer = null, body = { userId: "member" }) =>
+    request(`/api/auth/admin/${endpoint}`, (event) => adminApi(event, async () => new Response(answer, { status })), {
       method: "POST",
-      body: { userId: "member" },
+      body,
     })
   const missing = await call("ban-user", 404)
   assert.equal(missing.event.audit.action, "auth-admin.ban-user")
@@ -354,6 +354,14 @@ test("an admin's Better Auth call is audited with its outcome; one that only rea
   assert.deepEqual(missing.event.audit.target, { type: "user", id: "member" })
   assert.equal((await call("ban-user", 200)).event.audit.outcome, "success")
   assert.equal((await call("has-permission", 200)).event.audit, undefined)
+  assert.equal((await call("list-user-sessions", 200)).event.audit, undefined)
+  // An endpoint Drop doesn't know yet is audited rather than missed.
+  assert.equal((await call("some-new-endpoint", 200)).event.audit.action, "auth-admin.some-new-endpoint")
+  const created = await call("create-user", 200, JSON.stringify({ user: { id: "new-user" } }), {
+    email: "a@example.com",
+  })
+  assert.deepEqual(created.event.audit.target, { type: "user", id: "new-user" })
+  assert.equal((await call("ban-user", 200, "{}")).event.audit.outcome, "success")
 })
 
 test("a webhook that cancels and updates a subscription lists both, and audits the cancellation", async () => {
