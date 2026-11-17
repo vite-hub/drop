@@ -12,11 +12,13 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
-import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
+import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
+import { knownAgent } from "#shared/agents"
+import { describeTime } from "comark-time"
 import { faviconUrl, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
+import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import {
   AvatarStack,
   ConnectionStatus,
@@ -595,9 +597,14 @@ const {
     void copy(shared.href, { announce: "Link to the section copied" })
   },
   docAction: (action) => {
+    // A frame without the Clipboard API asks the viewer to copy.
     if (action === "markdown") void copyMarkdown()
     else if (action === "download") download()
     else if (printsPdf.value) exportPdf()
+  },
+  docIntent: (what) => (what === "markdown" ? sendMarkdown() : void sendFolder()),
+  docCopied: (ok, error) => {
+    if (!ok) reportClientError("copy", new Error(`The doc header's Copy: ${error ?? "refused"}`))
   },
   openDrop: (id) => void router.push(`/drops/${id}`),
 })
@@ -809,6 +816,77 @@ function viewsFact(views: { person: number; anonymous: number; agent: number }):
 }
 
 /**
+ * Who dropped the doc: its owner with the agent that published this version, "[avatar] Max · [logo] Claude Code", and
+ * on hover what it came through ("via Executor"), the model and the reasoning level. Without an owner (an anonymous
+ * drop), the name the version was published under.
+ */
+const droppedBy = computed<DocHeaderWho>(() => {
+  const d = drop.value
+  const agent = d.versions.find((version) => version.version === d.version)?.agent ?? null
+  const harness = agent?.harness ? knownAgent(agent.harness) : null
+  const client = d.actorKind === "agent" ? knownAgent(d.actorName) : null
+  const shown = harness ?? client
+  const origin = import.meta.client ? location.origin : ""
+  const label = agent?.harness ?? (client ? d.actorName : undefined)
+  const via = d.actorKind === "agent" && label !== d.actorName ? `via ${d.actorName}` : `via ${VIA_LABELS[d.actorKind]}`
+  const tip = [via, agent?.model, agent?.reasoningLevel && `${agent.reasoningLevel} reasoning`]
+    .filter(Boolean)
+    .join(" · ")
+  const person = d.owner ?? { name: d.actorName, image: null }
+  return {
+    name: person.name,
+    image: person.image,
+    ...(label ? { agent: { label, logo: `${origin}${shown?.logo ?? "/agents/executor.png"}` } } : {}),
+    tip,
+  }
+})
+
+// The doc's folder, for the list its header opens: the newest drops in it and this one, signed-in readers only.
+const FOLDER_ROWS = 8
+const KIND_ICON: Record<DropKind, DocHeaderKindIcon> = {
+  markdown: "doc",
+  html: "code",
+  app: "code",
+  image: "image",
+  file: "file",
+  board: "file",
+  folder: "folder",
+  site: "link",
+  link: "link",
+}
+const docFolder = computed(() => {
+  const crumb = drop.value.ancestors.at(-1)
+  return crumb?.kind === "folder" && me.value ? crumb : null
+})
+async function sendFolder() {
+  const folder = docFolder.value
+  if (!folder) return
+  const d = drop.value
+  const listed = await $fetch<DropSummary[]>("/api/drops", {
+    query: { folder: folder.id, limit: FOLDER_ROWS },
+  }).catch(() => null)
+  if (!listed) return send({ type: "doc-folder-items", folder: null })
+  const rows = listed.filter((item) => item.id !== d.id).slice(0, FOLDER_ROWS - 1)
+  const items = [...rows, d]
+    .toSorted((a, b) => b.updatedAt - a.updatedAt)
+    .map((item) => {
+      const time = describeTime(item.updatedAt, { now: now.value, locale: "en-US", style: "short" })
+      return {
+        id: item.id,
+        title: item.title,
+        icon: KIND_ICON[item.kind],
+        at: time?.label ?? "",
+        tip: time?.tip ?? "",
+        current: item.id === d.id,
+      }
+    })
+  send({
+    type: "doc-folder-items",
+    folder: { id: folder.id, title: folder.title, items } satisfies DocHeaderFolder,
+  })
+}
+
+/**
  * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
  * properties box, its related drops among its links, and under See more the facts the Details used to list.
  */
@@ -820,8 +898,8 @@ const docHeader = computed<DocHeader | null>(() => {
   const facts: DocHeaderFact[] = [
     ...(views ? [viewsFact(views)] : []),
     { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
-    { icon: "person", label: "Dropped by", value: d.actorName, detail: `via ${VIA_LABELS[d.actorKind]}` },
-    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder }] : []),
+    { icon: "person", label: "Dropped by", value: droppedBy.value.name, who: droppedBy.value },
+    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: Boolean(me.value) }] : []),
   ]
   const origin = import.meta.client ? location.origin : ""
   const listed = new Set((d.resources ?? []).map((resource) => resource.url))
@@ -831,7 +909,6 @@ const docHeader = computed<DocHeader | null>(() => {
       ...(d.url ? [{ id: "download" as const, label: "Download original", kbd: "D" }] : []),
       ...(printsPdf.value ? [{ id: "pdf" as const, label: "Export as PDF" }] : []),
     ],
-    copied: copied("markdown"),
     facts,
     related: related.value.map((item) => ({
       id: item.id,
@@ -903,11 +980,32 @@ const detailsActions = computed<DetailsAction[]>(() => [
     ? [{ id: "trash", label: "Move to Trash", icon: "i-mingcute-delete-2-line", destructive: true, press: deleteDrop }]
     : []),
 ])
-const copyMarkdown = (announce?: string) =>
-  copyLoading(
-    $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
-    { key: "markdown", announce },
+// The version's Markdown, loaded once: the header asks for it when the pointer or focus reaches Copy, so a click copies
+// at once, and the shortcut and menus copy the same text.
+let markdownLoad: { key: string; text: Promise<string> } | null = null
+function markdownText() {
+  const d = drop.value
+  const key = `${d.id}@${d.version}`
+  if (markdownLoad?.key !== key) {
+    const text = $fetch<string>(`${dropPath(d)}.md`, { query: { v: d.version }, responseType: "text" })
+    markdownLoad = { key, text }
+    text.catch(() => {
+      if (markdownLoad?.text === text) markdownLoad = null
+    })
+  }
+  return markdownLoad.text
+}
+const sendMarkdown = () =>
+  void markdownText().then(
+    (text) => send({ type: "doc-markdown", text }),
+    () => send({ type: "doc-markdown", text: null }),
   )
+const copyMarkdown = (announce?: string) => copyLoading(markdownText(), { key: "markdown", announce })
+// A copy by the shortcut or a menu shows on the header's Copy too.
+watch(
+  () => copied("markdown"),
+  (on) => on && docHeader.value && send({ type: "doc-copied" }),
+)
 const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).

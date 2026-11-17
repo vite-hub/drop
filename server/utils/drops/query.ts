@@ -67,6 +67,7 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
     {
       ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
       ownerBanned: !row.owner || Boolean(row.owner.banned),
+      ...(row.owner ? { ownerProfile: { name: row.owner.name, image: row.owner.image } } : {}),
     },
     row.owner,
     event,
@@ -239,7 +240,7 @@ export async function listTree(who: Identity, event?: H3Event, open?: string): P
 export async function listFolder(
   folder: DropRow,
   event?: H3Event,
-  options: { query?: string; kinds?: DropKind[]; who?: Identity | null } = {},
+  options: { query?: string; kinds?: DropKind[]; who?: Identity | null; limit?: number } = {},
 ): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
@@ -249,7 +250,7 @@ export async function listFolder(
   const found = await dropsMatching(
     and(owned, inside, ofKinds(options.kinds), isNull(drops.trashedAt)),
     words,
-    deep ? 200 : 500,
+    Math.min(options.limit ?? 500, deep ? 200 : 500),
   )
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
@@ -555,6 +556,11 @@ type AppText = "all" | "none" | "agent"
 const AGENT_FILE_BYTES = 64 * 1024
 const AGENT_FILES = 40
 
+async function ownerProfileOf(id: string) {
+  const [row] = await db.select({ name: user.name, image: user.image }).from(user).where(eq(user.id, id)).limit(1)
+  return row ?? null
+}
+
 export async function dropDetail(
   row: DropRow,
   who: Identity | null,
@@ -566,13 +572,14 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz, gallery] = await Promise.all([
+  const [versions, body, attachments, views, quiz, gallery, owner] = await Promise.all([
     versionsOf(row),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
     galleryOf(row, who, days),
+    row.ownerProfile ?? ownerProfileOf(row.ownerId),
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -597,6 +604,8 @@ export async function dropDetail(
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
   if (gallery) detail.gallery = gallery
+  // Who dropped it, for a doc's header: the person, beside the agent that published the version.
+  if (owner) detail.owner = owner
   return detail
 }
 
