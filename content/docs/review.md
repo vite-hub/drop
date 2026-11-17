@@ -23,6 +23,14 @@ A **video** you upload (MP4, WebM) plays in the viewer. Add `?t=` to its link to
 | **Copy link** | Copies the video's link at the second it's at. |
 | **Copy frame** | Copies the frame on screen as a PNG. |
 
+## PDFs {#pdfs}
+
+A **PDF** you upload opens in the viewer, page after page. Its text is selectable and its links work. The bar over the pages shows the page you're on (type a number to go there) and the zoom; the percentage fits the pages to the width again.
+
+| Button in the bar | What it does |
+| --- | --- |
+| **Comment on page** | Opens the page you're on as a still, where you click a spot or drag an area. See [Comments](#comments). |
+
 ### Rules for HTML plans
 
 ::plan-rules
@@ -77,6 +85,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Text you'd word differently | Select it and pick **Suggest**, then write the words that replace it, or clear them to suggest deleting it. The doc shows the old words struck through and the new ones after them. People who can edit the doc **Accept** it, which publishes the next version with the change and resolves it. **Undo** in the note that follows publishes the text from before and opens the suggestion again. |
 | An image | In a Markdown doc or an image drop, click it to zoom, then click a spot or drag an area. In an HTML doc or an app, clicks stay the page's own, so use the Comment tool. |
 | A video's frame | Press **Comment on this frame** in the player, then click a spot or drag an area on the still. A marker under the seek bar opens that frame and its thread again. The comment carries the frame as its image, so agents see it. |
+| A PDF's page | Press **Comment on page** in the bar over the pages, then click a spot or drag an area on the page. Its pin stays on that page and opens the page and its thread again. The comment keeps the page's number and carries the page as its image, so agents see it. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |

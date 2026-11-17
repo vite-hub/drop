@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // A prototype's state in the review dock's bar, in place of the bar its picker (skills/prototype) draws on a page alone.
-// On the canvas: how many items, and the camera. In focus: the item showing with its note, a step either way, and the
+// On the canvas: the tool (Move, or Hand to pan from anywhere, as in Figma), how many items, and the camera. In focus: the item showing with its note, a step either way, and the
 // way back to the canvas. The page keeps the state and does the switching; this shows it and sends the reader's
-// commands. While the page isn't focused, 1–9 open an item here too and ← → step in focus. The address's #v-… names
+// commands. While the page isn't focused, 1–9 open an item here too, ← → step in focus, and holding Space pans.
+// H and V are DropViewer's shortcuts, since H means History elsewhere. The address's #v-… names
 // the item in focus, as it does on the page alone, and opens it in focus on the next visit.
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
@@ -40,6 +41,11 @@ useEventListener("keydown", (event: KeyboardEvent) => {
   const target = event.target
   const inBar = target instanceof Node && Boolean(group.value?.contains(target))
   if (target !== document.body && !inBar) return
+  if (event.key === " " && props.state.canvas && target === document.body) {
+    if (!holding) emit("command", "hold")
+    holding = true
+    return event.preventDefault()
+  }
   const n = Number(event.key)
   if (/^[1-9]$/.test(event.key) && n <= count.value) emit("command", "show", n - 1)
   else if (props.state.canvas) return
@@ -50,6 +56,20 @@ useEventListener("keydown", (event: KeyboardEvent) => {
   else return
   event.preventDefault()
 })
+
+let holding = false
+const release = () => {
+  if (holding) emit("command", "release")
+  holding = false
+}
+useEventListener("keyup", (event: KeyboardEvent) => event.key === " " && release())
+useEventListener("blur", release)
+
+const tools = [
+  { command: "move", label: "Move", icon: "i-mingcute-cursor-3-line", kbd: "V" },
+  { command: "hand", label: "Hand", icon: "i-mingcute-hand-line", kbd: "H" },
+] as const
+const tool = computed(() => props.state.tool ?? "move")
 
 const camera: { command: PickerCommand; label: string; icon?: string; kbd: string }[] = [
   { command: "zoom-out", label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbd: "−" },
@@ -62,6 +82,25 @@ const camera: { command: PickerCommand; label: string; icon?: string; kbd: strin
 <template>
   <div ref="group" aria-label="Prototype" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
     <template v-if="state.canvas">
+      <UTooltip
+        v-for="item in tools"
+        :key="item.command"
+        :content="{ side: 'top', sideOffset: 8 }"
+        :kbds="[item.kbd]"
+        :text="item.command === 'hand' ? 'Hand: drag anywhere to pan, or hold Space' : item.label"
+      >
+        <button
+          :aria-keyshortcuts="item.kbd"
+          :aria-label="item.label"
+          :aria-pressed="tool === item.command"
+          class="inline-flex shrink-0 items-center"
+          type="button"
+          @click="emit('command', item.command)"
+        >
+          <UIcon aria-hidden="true" :name="item.icon" />
+        </button>
+      </UTooltip>
+      <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
       <UTooltip :content="{ side: 'top', sideOffset: 8 }" text="Double-click a name, or press 1–9, to open one">
         <span class="shrink-0 px-2 text-muted tabular-nums">{{ count }} items</span>
       </UTooltip>
