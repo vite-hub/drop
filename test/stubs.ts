@@ -32,9 +32,10 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
 }
 export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
+  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls. An
+  // access token is `dropTest.mcpCaller`'s.
   "vite-hub/auth/mcp":
-    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
+    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }; export const verifyMcpRequest = async () => globalThis.dropTest.mcpCaller ? [undefined, globalThis.dropTest.mcpCaller] : [new Error('invalid token')]",
   // ViteHub Auth's VITEHUB_MEMBERS check, on the test's emails: `state.members` lists them, empty lets everyone in.
   "vite-hub/auth/server": `import { sql } from "drizzle-orm"
 export const checkAuthMember = async (userId) => {
@@ -44,7 +45,11 @@ export const checkAuthMember = async (userId) => {
   const [row] = await globalThis.dropTest.db.all(sql\`SELECT email FROM user WHERE id = \${userId}\`)
   return row && listed.includes(row.email.toLowerCase()) ? [undefined, undefined] : [{ code: "AUTH_NOT_MEMBER" }, undefined]
 }
-export const useAuth = () => { throw new Error("Tests build Better Auth themselves") }
+// A test that needs Better Auth's API sets \`dropTest.authApi\`; the rest build Better Auth themselves.
+export const useAuth = () => {
+  if (!globalThis.dropTest.authApi) throw new Error("Tests build Better Auth themselves")
+  return { api: globalThis.dropTest.authApi }
+}
 export default () => new Response(null, { status: 404 })`,
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
