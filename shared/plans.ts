@@ -17,6 +17,9 @@ export function videoType(filename: string): string | undefined {
   return type?.startsWith("video/") ? type : undefined
 }
 
+/** Whether the viewer draws the file's pages (ViewerPdf). It stays a `file` drop. */
+export const isPdf = (filename: string) => lookup(filename) === "application/pdf"
+
 /**
  * An HTML doc's <title> or first <h1>, else `fallback` (the title of the version it replaces), else the filename.
  * (Markdown titles come from Comark's parse.)

@@ -4,12 +4,13 @@
 // Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
+import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
 import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
-import { videoType } from "#shared/plans"
+import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
 import { faviconUrl, resourceLabel } from "#shared/resources"
@@ -53,6 +54,7 @@ const { width: windowWidth, height: windowHeight } = useWindowSize()
 
 const isApp = computed(() => drop.value.kind === "app")
 const video = computed(() => (drop.value.kind === "file" ? videoType(drop.value.filename) : undefined))
+const pdf = computed(() => drop.value.kind === "file" && isPdf(drop.value.filename))
 // The owner gets their controls on the public link too: it is where they land after sharing it.
 const owner = computed(() => drop.value.isOwner)
 // Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
@@ -245,7 +247,7 @@ watch(
   () => overlays.pins,
   (pins) => (commentsShown.value = pins),
 )
-/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a link, a video. */
+/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a link, a video, a PDF. */
 const framed = computed(
   () =>
     !editing.value &&
@@ -257,11 +259,16 @@ watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
 /** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
- * clears the dock inside its own stage, so the stage's color runs under the dock. Apps and sites run under the dock like
+ * clears the dock inside its own stage, so the stage's color runs under the dock, and a PDF's pages scroll under it. Apps and sites run under the dock like
  * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
  * room (ViewerSite). */
 const dockClearance = computed(
-  () => !editing.value && !trashed.value && !video.value && ["board", "file", "folder"].includes(drop.value.kind),
+  () =>
+    !editing.value &&
+    !trashed.value &&
+    !video.value &&
+    !pdf.value &&
+    ["board", "file", "folder"].includes(drop.value.kind),
 )
 function closeLightbox() {
   lightbox.value = null
@@ -1064,6 +1071,17 @@ async function focusComment(comment: DropComment) {
     popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
     return
   }
+  // So does one on a PDF's page, after the pages scroll to it.
+  if (comment.pdfPage !== null && pdf.value) {
+    await until(pdfRef)
+      .toBeTruthy({ timeout: 5000 })
+      .catch(() => {})
+    const still = await pdfRef.value?.pageAt(comment.pdfPage).catch(() => null)
+    if (!still || popover.value?.type !== "thread" || popover.value.id !== comment.id) return
+    showPage(still)
+    popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
+    return
+  }
   // A resolved comment joins the pins once its thread opens: the frame takes the new pins first.
   await nextTick()
   send({ type: "focus", id: comment.id, open: false })
@@ -1183,16 +1201,17 @@ usePaletteOffer("drop", () => {
 })
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too. A video's frame shows
-// the comments on that frame.
-const sameFrame = (comment: DropComment, at: number | undefined) =>
-  at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05
+// the comments on that frame, and a PDF's page the ones on that page.
+const sameFrame = (comment: DropComment, at: number | undefined, pdfPage: number | undefined) =>
+  (at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05) &&
+  (comment.pdfPage ?? undefined) === pdfPage
 const imageComments = computed(() =>
   lightbox.value
     ? pageComments.value.filter(
         (comment) =>
           comment.kind !== "text" &&
           comment.selector === lightbox.value!.selector &&
-          sameFrame(comment, lightbox.value!.at) &&
+          sameFrame(comment, lightbox.value!.at, lightbox.value!.pdfPage) &&
           !outdated.value.has(comment.id),
       )
     : [],
@@ -1209,6 +1228,21 @@ function showFrame(still: VideoFrame) {
     selector: "video",
     label: `the frame at ${clock(still.at)}`,
     at: still.at,
+    file: still.file,
+    from: still.rect,
+  }
+}
+const pdfRef = useTemplateRef<{ pageAt: (page?: number) => Promise<PdfPage | null> }>("pdfRef")
+/** The comments on a PDF's pages, for their pins. */
+const pdfComments = computed(() => (pdf.value ? pageComments.value.filter((comment) => comment.pdfPage !== null) : []))
+/** A PDF's page, still in the lightbox, where a click or a drag comments on it. */
+function showPage(still: PdfPage) {
+  lightbox.value = {
+    src: still.src,
+    alt: `Page ${still.page}`,
+    selector: "pdf",
+    label: `page ${still.page}`,
+    pdfPage: still.page,
     file: still.file,
     from: still.rect,
   }
@@ -1396,6 +1430,16 @@ watch(
             :type="video"
             @frame="showFrame"
             @open="focusComment"
+          />
+          <LazyViewerPdf
+            v-else-if="pdf && drop.url"
+            ref="pdfRef"
+            :can-comment="drop.canComment && annotationsEnabled && !trashed"
+            :comments="overlays.pins ? pdfComments : []"
+            :src="drop.url"
+            :title="drop.title"
+            @open="focusComment"
+            @page="showPage"
           />
           <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
