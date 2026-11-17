@@ -435,7 +435,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.rail .cr-entry{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}' +
     '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}' +
     '</style>';
-  shadow.innerHTML = STYLE + RAIL_STYLE + LAYERS;
+  // While Comark's zoom holds this layer (see onZoom), the page's own marks, which sit at page coordinates, stay hidden
+  // behind it as they were behind the top layer; the tool's layer, hover outlines, and rulers are fixed and work on it.
+  const ZOOMED_STYLE = '<style>:host([data-zoomed]) :is(.marks,.draft,.leave,.pcs){display:none}</style>';
+  shadow.innerHTML = STYLE + RAIL_STYLE + ZOOMED_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
   const leave = shadow.appendChild(Object.assign(document.createElement("div"), { className: "leave" }));
 
@@ -1523,11 +1526,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (left[0]) { left[0].dispatchEvent(new PointerEvent("pointerout", { ...init, bubbles: true })); left[0].dispatchEvent(new MouseEvent("mouseout", { ...init, bubbles: true })); }
     for (const el of left) { el.dispatchEvent(new PointerEvent("pointerleave", init)); el.dispatchEvent(new MouseEvent("mouseleave", init)); }
   }
+  function openLayer() {
+    try { return document.querySelector(":popover-open, dialog:modal"); } catch { return null; }
+  }
   // A modal dialog sits above the page, Drop's layer included, and makes the rest inert: under a tool, the layer goes in it.
   function modalShadow() {
     let modal = null;
     try { modal = document.querySelector("dialog:modal"); } catch {}
-    if (!modal) return null;
+    if (!modal || modal.contains(host)) return null;
     const inner = document.createElement("drop-comments");
     inner.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
     inner.attachShadow({ mode: "open" }).innerHTML = STYLE;
@@ -1960,13 +1966,23 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
   drawRulers();
 
+  // Comark's zoom is a modal <dialog>, which makes the rest of the page inert, this layer included. While it's open the
+  // layer lives in the dialog, so a tool still takes the pointer over the zoom, and it returns to the page on close.
+  // The dialog is already gone by then (comark-zoom removes it rather than closing it), with the layer in it.
   const onZoom = (e) => {
     zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item && e.detail.copyOf ? e.detail : null;
+    const dialog = zoom && zoom.dialog;
+    if (dialog && host.parentNode !== dialog) { host.setAttribute("data-zoomed", ""); dialog.appendChild(host); }
     render();
   };
   document.addEventListener("comark-zoom:open", onZoom);
   document.addEventListener("comark-zoom:change", onZoom);
-  document.addEventListener("comark-zoom:close", () => { zoom = null; render(); });
+  document.addEventListener("comark-zoom:close", () => {
+    zoom = null;
+    host.removeAttribute("data-zoomed");
+    if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
+    render();
+  });
 
   // Paper is light and takes no pins: a dark doc prints in its light colors, and comments stay on screen. Any print of
   // the frame does this, the reader's own Ctrl+P too.
@@ -2066,8 +2082,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     post({ type: "key", key: "Escape" });
   }, true);
   window.addEventListener("keydown", (e) => {
-    // Escape the page used itself, to close its own dialog or menu, stays in the page.
-    if (e.key === "Escape" && !e.defaultPrevented) post({ type: "key", key: "Escape" });
+    // Escape the page used itself, to close its own dialog or menu, stays in the page. A native popover or modal dialog
+    // takes it after this listener, so one that's open counts as the page's too.
+    if (e.key === "Escape" && !e.defaultPrevented && !openLayer()) post({ type: "key", key: "Escape" });
     // Drop's tool shortcuts, for when the page has focus. Never while typing, and never once the page used the key.
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
