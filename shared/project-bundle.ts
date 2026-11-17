@@ -161,7 +161,7 @@ function pageRuntime(files: ProjectFiles, page: string): string {
       if (!message || message.__drop !== true) return;
       if (event.source === parent && message.type === "read" && typeof message.page === "string") {
         const read = message.page;
-        native("/" + read.split("/").map(encodeURIComponent).join("/"), { headers: { "x-drop-read": "page" } })
+        native("/" + read.split("/").map(encodeURIComponent).join("/"), { cache: "no-store", headers: { "x-drop-read": "page" } })
           .then((response) => (response.ok ? response.text() : undefined))
           .catch(() => undefined)
           .then((html) => post({ type: "page", page: read, html }));

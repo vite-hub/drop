@@ -154,7 +154,7 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
     if (message.type === "read" && typeof message.page === "string") {
       const page = message.page;
-      return void fetch("/" + page.split("/").map(encodeURIComponent).join("/"), { headers: { "x-drop-read": "page" } })
+      return void fetch("/" + page.split("/").map(encodeURIComponent).join("/"), { cache: "no-store", headers: { "x-drop-read": "page" } })
         .then((response) => (response.ok ? response.text() : undefined))
         .catch(() => undefined)
         .then((html) => parent.postMessage({ __drop: true, type: "page", page, html }, "*"));

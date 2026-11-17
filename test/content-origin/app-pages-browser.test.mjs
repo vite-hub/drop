@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { createServer } from "node:http"
+import { once } from "node:events"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { H3Event } from "h3"
@@ -105,5 +107,80 @@ test("a served app's frame reads each page on its origin, renders it, and follow
     assert.deepEqual(errors, [])
   } finally {
     await browser.close()
+  }
+}, 60_000)
+
+// Use a real HTTP server: Playwright routing disables the browser cache and hides this regression.
+test("explicit HTML page reads bypass cached frame-host navigations", async () => {
+  reset()
+  state.contentOrigin = "https://*-drop.test"
+  state.authSecret = "test-secret"
+  state.who = { userId: "owner", role: "member" }
+  state.identities = { owner: state.who }
+  insertDrop("app", { kind: "app", filename: "app/", blob_key: null })
+  const html = "<!doctype html><html><head></head><body><h1>Guide</h1></body></html>"
+  objects.set("apps/app/1/guide.html", { body: new Blob([html]), uploadedAt: new Date() })
+  sql
+    .prepare("INSERT INTO drop_files (drop_id, path, blob_key, size) VALUES (?, ?, ?, ?)")
+    .run("app", "guide.html", "apps/app/1/guide.html", html.length)
+  const detailEvent = event("https://drop.test/api/drops/app")
+  detailEvent.context.params = { id: "app" }
+  const detail = await detailHandler(detailEvent)
+  const reads = []
+  const server = createServer(async (req, res) => {
+    if (req.url === "/viewer") {
+      res.setHeader("Content-Type", "text/html")
+      return res.end('<iframe src="/guide.html"></iframe>')
+    }
+    if (req.headers["x-drop-read"]) reads.push(req.url)
+    // Forward to the real per-drop middleware without intercepting browser requests or its HTTP cache.
+    const response = await contentMiddleware(event(detail.contentOrigin + req.url, { headers: req.headers }))
+    res.writeHead(response.status, Object.fromEntries(response.headers))
+    res.end(Buffer.from(await response.arrayBuffer()))
+  })
+  const browser = await chromium.launch()
+  try {
+    server.listen(0, "127.0.0.1")
+    await once(server, "listening")
+    const page = await browser.newPage()
+    await page.goto(`http://localhost:${server.address().port}/viewer`)
+    const frame = page.frames().find((candidate) => candidate.url().endsWith("/guide.html"))
+    await page.evaluate((grant) => {
+      window.result = new Promise((resolve) => {
+        addEventListener("message", (e) => {
+          if (e.data?.type === "page") resolve(e.data.html)
+        })
+      })
+      document
+        .querySelector("iframe")
+        .contentWindow.postMessage({ __drop: true, type: "read", page: "guide.html", grant }, "*")
+    }, detail.contentGrant)
+    assert.equal(await page.evaluate(() => window.result), html)
+    assert.deepEqual(reads, ["/guide.html"])
+    // The app runtime's nested-page reader must bypass that same cached host too.
+    await frame.evaluate(
+      (document) => {
+        window.document.open()
+        window.document.write(document)
+        window.document.close()
+      },
+      buildProjectDocument({ "guide.html": html }, "guide.html"),
+    )
+    await page.evaluate(() => {
+      window.result = new Promise((resolve) => {
+        addEventListener("message", (e) => {
+          if (e.data?.type === "page") resolve(e.data.html)
+        })
+      })
+      document
+        .querySelector("iframe")
+        .contentWindow.postMessage({ __drop: true, type: "read", page: "guide.html" }, "*")
+    })
+    assert.equal(await page.evaluate(() => window.result), html)
+    assert.deepEqual(reads, ["/guide.html", "/guide.html"])
+  } finally {
+    await browser.close()
+    server.closeAllConnections()
+    await new Promise((resolve) => server.close(resolve))
   }
 }, 60_000)

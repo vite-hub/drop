@@ -119,7 +119,7 @@ export function useViewerFrame(options: {
   function appDocument(path: string) {
     if (unread(path)) return ""
     const html = readPages.value.get(path)
-    const source = typeof html === "string" ? { ...files.value, [path]: html } : files.value
+    const source = html != null ? { ...files.value, [path]: html } : files.value
     return injectRuntime(buildProjectDocument(source, path), dark.value, startInset, true)
   }
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints

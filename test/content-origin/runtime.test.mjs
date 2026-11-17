@@ -806,6 +806,7 @@ test("the frame host reads a page on its own origin for the viewer, with the gra
     addEventListener: (_type, handler) => (onMessage = handler),
     fetch: async (url, init) => {
       assert.equal(init.headers["x-drop-read"], "page", "a page read, whatever Sec-Fetch-Dest says")
+      assert.equal(init.cache, "no-store", "never reuse the cached navigation host at the page URL")
       fetched.push({ url, cookies: cookies.length })
       return url === "/docs/getting%20started.html"
         ? { ok: true, text: async () => "<p>Start</p>" }
