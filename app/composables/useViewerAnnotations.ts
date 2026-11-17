@@ -14,8 +14,12 @@ type Lightbox = {
   selector: string
   label: string
   from?: { left: number; top: number; width: number; height: number }
-  /** A video's frame: the second it's at, and the frame as a file, which its comments carry for agents to see. */
+  /**
+   * A video's frame or a PDF's page: the second it's at or the page's number, and the still as a file, which its
+   * comments carry for agents to see.
+   */
   at?: number
+  pdfPage?: number
   file?: File
 }
 // `body` and `error`: a comment that didn't go through, back in its box with why.
@@ -338,13 +342,15 @@ export function useViewerAnnotations(options: {
   // Areas drawn over an image in the page anchor to that image, so the lightbox takes comments too.
   function pickImage(area: Area, x: number, y: number) {
     if (!lightbox.value || !commenting.value) return
-    const { selector, alt, label, at, file } = lightbox.value
+    const { selector, alt, label, at, pdfPage, file } = lightbox.value
     popover.value = {
       type: "new",
       pending:
-        at === undefined
-          ? { kind: "image", selector, ...area, label: alt || "image" }
-          : { kind: "image", selector, ...area, label, at },
+        at !== undefined
+          ? { kind: "image", selector, ...area, label, at }
+          : pdfPage !== undefined
+            ? { kind: "image", selector, ...area, label, pdfPage }
+            : { kind: "image", selector, ...area, label: alt || "image" },
       x,
       y,
     }
