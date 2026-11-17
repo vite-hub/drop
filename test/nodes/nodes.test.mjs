@@ -300,6 +300,12 @@ test("folder search finds what's anywhere below the folder and nothing outside i
 
   const children = await listHandler(request(`/api/drops?folder=${review.id}`))
   assert.deepEqual(children.map((drop) => drop.title).sort(), ["Login notes", "Screenshots"])
+  // A doc's header lists only the folder's newest few.
+  const newest = await listHandler(request(`/api/drops?folder=${review.id}&limit=1`))
+  assert.deepEqual(
+    newest.map((drop) => drop.id),
+    [children.toSorted((a, b) => b.updatedAt - a.updatedAt)[0].id],
+  )
 
   const found = await listHandler(request(`/api/drops?folder=${review.url.match(/\/d\/([^/]+)/)[1]}&q=login%20before`))
   assert.deepEqual(
@@ -373,6 +379,7 @@ test("an agent files its work in a folder, reads it, and moves a drop out", asyn
     detail.ancestors.map((crumb) => crumb.title),
     ["PR 12 evidence", "Inner"],
   )
+  assert.deepEqual(detail.owner, { name: "Owner", image: null }, "the doc header says whose it is")
   state.who = null
   const visitor = await detailHandler(request(`/api/drops/${inner.id}`, { id: inner.id }))
   assert.deepEqual(
