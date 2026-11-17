@@ -128,11 +128,11 @@ drop-folder-menu button > time { flex: none; color: var(--muted-foreground); fon
 drop-folder-menu button[aria-current] > span { font-weight: 600; }
 drop-folder-menu hr { margin: .25rem -.25rem; border: 0; border-top: 1px solid var(--border); }
 drop-folder-menu p { margin: 0; padding: .5rem; color: var(--muted-foreground); font: 400 .8125rem/1.25 var(--font-sans); }
-.drop-folder { display: inline-flex; align-items: center; gap: .25rem; max-width: 100%; margin: -.125rem -.375rem; padding: .125rem .375rem; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; anchor-name: --drop-folder; }
+.drop-folder { display: inline-flex; align-items: center; gap: .25rem; max-width: 100%; margin: 0 -.375rem; padding: 0 .375rem; line-height: inherit; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; anchor-name: --drop-folder; }
 .drop-folder:hover, .drop-folder[aria-expanded="true"] { background: var(--accent); }
 .drop-folder svg { flex: none; width: .875rem; height: .875rem; color: var(--muted-foreground); }
 .drop-who { display: inline-flex; align-items: center; gap: .375rem; max-width: 100%; vertical-align: top; }
-.drop-who img { flex: none; width: 1rem; height: 1rem; border-radius: 50%; object-fit: cover; }
+.drop-who img { display: block; flex: none; width: 1rem; height: 1rem; margin: 0; border-radius: 50%; object-fit: cover; }
 .drop-who .drop-logo { border-radius: .25rem; }
 .drop-who .drop-initial { display: inline-grid; flex: none; place-items: center; width: 1rem; height: 1rem; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); font: 600 .5625rem/1 var(--font-sans); }
 .drop-who .drop-dot { color: var(--muted-foreground); }
