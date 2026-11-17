@@ -21,7 +21,8 @@ const cached = <T>(read: (path: string) => Promise<T>) => {
   return (path: string) => {
     let file = fetched.get(path)
     if (!file) {
-      file = read(path).catch(() => {
+      file = read(path).catch((error: unknown) => {
+        reportClientError("attachment", error)
         fetched.delete(path)
         return null
       })

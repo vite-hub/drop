@@ -1,10 +1,12 @@
 // Teams on a personal Drop (server/utils/teams.ts), through Better Auth's organization and Stripe plugins. Each call
 // answers with `{ data, error }`; these turn an error into a thrown one so callers notify like any other request.
-type Result<T> = { data: T | null; error: { message?: string; statusText?: string } | null }
+type Result<T> = { data: T | null; error: { message?: string; statusText?: string; status: number } | null }
 
 async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error } = await call
-  if (error || data === null) throw new Error(error?.message || error?.statusText || "Something went wrong.")
+  // The answer's status goes along, so a refusal reads as one and isn't reported as a failure (reportClientError).
+  if (error) throw answerError(error.message || error.statusText || "Something went wrong.", error.status)
+  if (data === null) throw new Error("Something went wrong.")
   return data
 }
 

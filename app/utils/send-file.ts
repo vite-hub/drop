@@ -25,20 +25,26 @@ export function sendFile<Schema extends v.GenericSchema>(
     request.addEventListener("load", () => {
       const data = parseBody(request.responseText)
       if (request.status < 200 || request.status >= 300)
-        return reject(new SendFileError(request.status, request.statusText || undefined, data))
+        return reject(
+          new SendFileError(request.status, request.statusText || undefined, data, {
+            requestId: request.getResponseHeader("cf-ray") ?? undefined,
+          }),
+        )
       report?.(1)
       const parsed = v.safeParse(schema, data)
       if (parsed.success) resolve(parsed.output)
-      else reject(new SendFileError(request.status, "Drop answered the upload with something unexpected.", data))
+      else
+        reject(
+          new SendFileError(request.status, "Drop answered the upload with something unexpected.", data, {
+            requestId: request.getResponseHeader("cf-ray") ?? undefined,
+          }),
+        )
     })
     request.addEventListener("error", () =>
       reject(
-        new SendFileError(
-          0,
-          undefined,
-          undefined,
-          "The upload couldn't reach Drop. Check your connection and try again.",
-        ),
+        new SendFileError(0, undefined, undefined, {
+          message: "The upload couldn't reach Drop. Check your connection and try again.",
+        }),
       ),
     )
     request.send(body)
@@ -47,15 +53,19 @@ export function sendFile<Schema extends v.GenericSchema>(
 
 /** An upload the server refused, shaped like ofetch's FetchError. */
 class SendFileError extends Error {
+  // The answer's request id (Cloudflare's `cf-ray`), which finds the upload in the server's logs.
+  readonly requestId: string | undefined
+
   constructor(
     readonly status: number,
     // Undefined rather than empty: HTTP/2 sends no status text, and errorText reads the first one that's set.
     readonly statusText: string | undefined,
     readonly data: unknown,
-    message = `${status} ${statusText ?? ""}`.trim(),
+    { message = `${status} ${statusText ?? ""}`.trim(), requestId }: { message?: string; requestId?: string } = {},
   ) {
     super(message)
     this.name = "SendFileError"
+    this.requestId = requestId
   }
 
   get statusCode() {
