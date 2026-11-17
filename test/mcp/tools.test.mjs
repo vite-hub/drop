@@ -4,7 +4,7 @@ import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { createTarGzip } from "nanotar"
-import { objects, sql, state, migrate, reset, who, calls, insertDrop, threads } from "../cost/harness.mjs"
+import { objects, sql, state, migrate, reset, who, calls, insertDrop, threads, event } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: readFile } = await import("../../server/mcp/tools/read_file.ts")
@@ -1791,6 +1791,83 @@ test.each(["data:image/png;BASE64,", "DATA:image/png;base64,", "DaTa:image/png;B
     assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), html)
   },
 )
+
+test("a Console call, admitted to Comments without a Drop session, reads Drop's page threads and nothing more", async () => {
+  const { commentsOperations } = await import("vite-hub/comments/server")
+  const { commentsMcpTools } = await import("vite-hub/comments/runtime")
+  // As the Console's operations endpoint runs one after the access check: the input through its schema, then `run`.
+  const operation = async (name, value) => {
+    const op = commentsOperations.find((candidate) => candidate.name === name)
+    const parsed = await op.input["~standard"].validate(value)
+    assert.equal(parsed.issues, undefined)
+    return op.run(parsed.value, { access: { mode: "auth", sections: "all" }, surface: "console", user: null })
+  }
+  const doc = (await call(publish, { markdown: "# Plan", note: "v1", lifetime: "review" })).structuredContent
+  const author = { id: "owner", name: "Owner" }
+  const [, pageThread] = await comments.create({
+    page: `/d/${doc.id}/plan`,
+    body: "The bar overlaps the title",
+    author,
+  })
+  await addThread(await findDrop(doc.id), {
+    fields: {
+      kind: "page",
+      selector: "",
+      ox: 0,
+      oy: 0,
+      ow: 0,
+      oh: 0,
+      quote: null,
+      label: null,
+      page: null,
+      elementX: null,
+      elementY: null,
+    },
+    body: "On the private doc",
+    author,
+  })
+  const dropThread = threads().find((thread) => thread.subject_kind === "drop")
+  state.who = null
+
+  const admitted = await operation("comments.threads", { page: `https://drop.vitehub.dev/d/${doc.id}/plan` })
+  assert.deepEqual(
+    admitted.threads.map((thread) => thread.id),
+    [pageThread.id],
+  )
+  assert.equal(admitted.hidden, 0)
+  // The doc is private: Console admission doesn't open its comments to a caller Drop doesn't know.
+  assert.deepEqual(
+    (await operation("comments.list", {})).map((thread) => thread.id),
+    [pageThread.id],
+  )
+  assert.equal(
+    await comments.can({ user: null, action: "read", thread: (await comments.get(dropThread.id))[1], console: true }),
+    false,
+  )
+  assert.equal(await comments.can({ user: null, action: "resolve", thread: pageThread, console: true }), true)
+
+  // Without Console admission and without a session, the list itself is refused, before any thread is read or counted.
+  const [list] = commentsMcpTools(comments)
+  const outside = await list.call({}, { user: null, event: event("/mcp", "POST") })
+  assert.equal(outside.isError, true)
+  assert.equal(outside.structured, undefined)
+  assert.doesNotMatch(outside.text, /overlaps/)
+})
+
+test("comments_list_threads takes a drop's full link as page", async () => {
+  state.who = { ...who, role: "admin" }
+  const [, thread] = await comments.create({
+    page: "/d/abc/plan",
+    body: "Too tight",
+    author: { id: "owner", name: "Owner" },
+  })
+  const [list] = siteCommentTools
+  const listed = await call(list, { page: "https://drop.vitehub.dev/d/abc/plan?v=2" })
+  assert.deepEqual(
+    listed.structuredContent.threads.map((item) => item.id),
+    [thread.id],
+  )
+})
 
 // An annotated screenshot whose first annotation starts past the image's right edge. The problem is the screenshot's, on
 // line 3.

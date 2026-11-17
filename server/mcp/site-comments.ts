@@ -44,7 +44,7 @@ const SITE_REVIEWS =
 const describe = (name: string) =>
   `${
     name === "comments_list_threads"
-      ? "ViteHub toolbar comments: threads left with the ViteHub Comments toolbar on Drop's own interface, on any Drop page including a drop's page (/d/<id>/<slug>), about Drop's UI, not a drop's content. For Drop admins. Pass a drop link's path as page."
+      ? "ViteHub toolbar comments: threads left with the ViteHub Comments toolbar on Drop's own interface, on any Drop page including a drop's page (/d/<id>/<slug>), about Drop's UI, not a drop's content. For Drop admins. Pass a drop's link as page."
       : "ViteHub toolbar comments on Drop's interface, for Drop admins:"
   } ${tools.get(name)!.description} ${SITE_REVIEWS}`
 
@@ -65,7 +65,7 @@ export const siteCommentTools = [
         page: v.optional(
           v.pipe(
             v.string(),
-            v.description("Only threads on this Drop page: its path, such as /d/<id>/<slug> from a drop's link."),
+            v.description("Only threads on this Drop page: a drop's link, or its path such as /d/<id>/<slug>."),
           ),
         ),
         status: v.optional(v.pipe(v.picklist(["open", "resolved"]), v.description("Default: open."))),

@@ -1390,7 +1390,7 @@ test("an agent on a pull request finds the review by its preview's address, says
   // The tools for Drop's own pages say where site comments are instead of only refusing.
   const wrong = await call(siteCommentTools[0], {})
   assert.match(wrong.message, /Only Drop admins.*call read_drop with the page's address/)
-  assert.match(siteCommentTools[0].description, /^Drop's own pages, for Drop admins/)
+  assert.match(siteCommentTools[0].description, /^ViteHub toolbar comments: .*not a drop's content/)
 })
 
 test("an agent finds the review by a page's address on a fixed staging host and on localhost too", async () => {
