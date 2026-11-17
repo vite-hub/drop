@@ -19,6 +19,7 @@ import {
   billingConfig,
   checkoutParams,
   leaveTeams,
+  logSubscription,
   teamOptions,
   teamPlans,
   teamsEnabled,
@@ -31,23 +32,21 @@ import { TIERS } from "#shared/quotas"
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
 
-interface BilledSubscription {
-  id: string
-  referenceId: string
-  plan: string
-  status?: string | null
-  seats?: number | null
+/** An account deleted by its owner, or by an admin. */
+function auditDeletion(
+  user: { id: string },
+  context: { context: { session?: { user: { id: string } } | null } } | null,
+  outcome: "success" | "failure",
+) {
+  const by = context?.context.session?.user.id ?? user.id
+  logAudit(
+    authRequest.getStore(),
+    { userId: by, actorKind: "browser" },
+    "account.delete",
+    { type: "user", id: user.id },
+    outcome,
+  )
 }
-
-/** A Stripe webhook's outcome for a team's subscription, on the webhook request's wide event. */
-const billed =
-  (change: string) =>
-  async ({ subscription }: { subscription: BilledSubscription }) => {
-    const event = authRequest.getStore()
-    const { id, referenceId: team, plan, status, seats } = subscription
-    requestLog(event)?.set({ stripe: { subscription: { id, team, plan, status, seats, change } } })
-    logAudit(event, "stripe", `billing.${change}`, { type: "team", id: team })
-  }
 
 /**
  * Who can sign in, and how.
@@ -179,16 +178,17 @@ export default defineAuth(({ env, requestOrigin }) => {
       user: {
         create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
+        // The audit is written once the outcome is known: after the account is gone, or when leaving its teams fails.
         delete: {
           before: async (user, context) => {
-            // An admin may delete someone else's account.
-            const by = context?.context.session?.user.id ?? user.id
-            logAudit(authRequest.getStore(), { userId: by, actorKind: "browser" }, "account.delete", {
-              type: "user",
-              id: user.id,
-            })
-            await leaveTeams(user, context, teamBilling)
+            try {
+              await leaveTeams(user, context, teamBilling)
+            } catch (error) {
+              auditDeletion(user, context, "failure")
+              throw error
+            }
           },
+          after: async (user, context) => auditDeletion(user, context, "success"),
         },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
@@ -219,11 +219,11 @@ export default defineAuth(({ env, requestOrigin }) => {
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
-                onSubscriptionCreated: billed("created"),
-                onSubscriptionComplete: billed("completed"),
-                onSubscriptionUpdate: billed("updated"),
-                onSubscriptionCancel: billed("canceling"),
-                onSubscriptionDeleted: billed("deleted"),
+                onSubscriptionCreated: logSubscription("created"),
+                onSubscriptionComplete: logSubscription("completed"),
+                onSubscriptionUpdate: logSubscription("updated"),
+                onSubscriptionCancel: logSubscription("canceling"),
+                onSubscriptionDeleted: logSubscription("deleted"),
               },
             }),
           ]
