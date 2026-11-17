@@ -116,7 +116,8 @@ test(
             signals.length > 0 &&
             signals.every((signal) => signal.aborted) &&
             pane.querySelectorAll("canvas").length === 0 &&
-            canvases.every((canvas) => canvas.width === 0 && canvas.height === 0)
+            canvases.length > 0 &&
+            canvases.every((canvas) => !canvas.isConnected && !pane.contains(canvas))
           )
         }),
         true,

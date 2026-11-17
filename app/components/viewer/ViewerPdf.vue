@@ -57,13 +57,15 @@ onMounted(async () => {
     if (lifecycle.signal.aborted || !container.value || !viewerElement.value) return
     bus = new EventBus()
     const links = new PDFLinkService({ eventBus: bus, externalLinkTarget: LinkTarget.BLANK })
-    viewer = new PDFViewer({
+    // pdf.js 6.5 supports abortSignal at runtime but omits it from PDFViewerOptions.
+    const options = {
       container: container.value,
       viewer: viewerElement.value,
       eventBus: bus,
       linkService: links,
       abortSignal: lifecycle.signal,
-    })
+    }
+    viewer = new PDFViewer(options)
     links.setViewer(viewer)
     bus.on("pagesinit", () => {
       // Fits the page's width up to a comfortable reading size, then leaves zoom to the reader.
