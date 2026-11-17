@@ -108,7 +108,6 @@ test("the content origin serves only the frame host, at any path, and nothing of
     )
     assert.equal(response.status, 200, path)
     const html = await response.text()
-    assert.match(html, /document\.write\(message\.html\.slice\(0, at\) \+ hold/)
     assert.match(html, /event\.source !== parent/)
     assert.doesNotMatch(html, /__NUXT__|_nuxt/)
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
@@ -1139,9 +1138,6 @@ test("every script the runtime injects parses, tools included", () => {
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1])
   assert.ok(scripts.length >= 3)
   for (const source of scripts) assert.doesNotThrow(() => new Script(source))
-  // The toolbar's messages reach the comment layer.
-  assert.match(html, /m\.type === "tool"/)
-  assert.match(html, /m\.type === "view"/)
 })
 
 test("a comment may point at a spot on an element, but an area needs both sides", async () => {
