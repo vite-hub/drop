@@ -38,6 +38,7 @@ let task: PDFDocumentLoadingTask | null = null
 let pdf: PDFDocumentProxy | null = null
 let viewer: PDFViewer | null = null
 let bus: EventBus | null = null
+const lifecycle = new AbortController()
 const loaded = ref(false)
 const failed = ref(false)
 const pages = ref(0)
@@ -53,7 +54,7 @@ onMounted(async () => {
     const [lib, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")])
     lib.GlobalWorkerOptions.workerSrc = worker.default
     const { EventBus, PDFLinkService, PDFViewer, LinkTarget } = await import("pdfjs-dist/web/pdf_viewer.mjs")
-    if (!container.value || !viewerElement.value) return
+    if (lifecycle.signal.aborted || !container.value || !viewerElement.value) return
     bus = new EventBus()
     const links = new PDFLinkService({ eventBus: bus, externalLinkTarget: LinkTarget.BLANK })
     viewer = new PDFViewer({
@@ -61,6 +62,7 @@ onMounted(async () => {
       viewer: viewerElement.value,
       eventBus: bus,
       linkService: links,
+      abortSignal: lifecycle.signal,
     })
     links.setViewer(viewer)
     bus.on("pagesinit", () => {
@@ -75,18 +77,25 @@ onMounted(async () => {
       void nextTick(() => layout.value++)
     })
     // The file comes from Drop's own origin with the reader's cookie, in ranges once the server says it can.
-    task = lib.getDocument({ url: props.src })
+    // Compressed page images need pdf.js's binary decoders, including in comment snapshots.
+    task = lib.getDocument({ url: props.src, wasmUrl: "/vendor/pdfjs/wasm/" })
     pdf = await task.promise
+    if (lifecycle.signal.aborted) return
     pages.value = pdf.numPages
     viewer.setDocument(pdf)
     links.setDocument(pdf)
   } catch (error) {
+    if (lifecycle.signal.aborted) return
     failed.value = true
     reportClientError("pdf", error)
   }
 })
 onBeforeUnmount(() => {
-  viewer?.cleanup()
+  // The lifecycle signal owns scroll/resize handlers; clearing the document releases copy listeners and canvases.
+  lifecycle.abort()
+  viewer?.setDocument(null)
+  viewer = null
+  pdf = null
   void task?.destroy()
 })
 useResizeObserver(container, () => {
@@ -115,7 +124,7 @@ function submitPage() {
 
 /** The page's box on the screen, past its border. */
 function pageBox(page: number) {
-  const div = viewer?.getPageView(page - 1)?.div as HTMLElement | undefined
+  const div = viewer?.getPageView(page - 1)?.div
   if (!div) return null
   const style = getComputedStyle(div)
   const x = Number.parseFloat(style.borderLeftWidth) || 0,
@@ -127,7 +136,7 @@ function pageBox(page: number) {
 async function pageAt(page = current.value): Promise<PdfPage | null> {
   // A comment's link can ask for its page before the pages are laid out.
   await until(() => loaded.value || failed.value).toBe(true, { timeout: 15000 })
-  if (!pdf || !viewer || failed.value) return null
+  if (!pdf || !viewer || failed.value || lifecycle.signal.aborted) return null
   go(page)
   await nextTick()
   const proxy = await pdf.getPage(page)

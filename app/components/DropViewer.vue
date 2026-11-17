@@ -1234,7 +1234,13 @@ function showFrame(still: VideoFrame) {
 }
 const pdfRef = useTemplateRef<{ pageAt: (page?: number) => Promise<PdfPage | null> }>("pdfRef")
 /** The comments on a PDF's pages, for their pins. */
-const pdfComments = computed(() => (pdf.value ? pageComments.value.filter((comment) => comment.pdfPage !== null) : []))
+const pdfComments = computed(() =>
+  pdf.value
+    ? pinned.value.filter(
+        (comment) => comment.pdfPage !== null && (overlays.pins || shownWhileHidden.value.includes(comment.id)),
+      )
+    : [],
+)
 /** A PDF's page, still in the lightbox, where a click or a drag comments on it. */
 function showPage(still: PdfPage) {
   lightbox.value = {
@@ -1435,7 +1441,7 @@ watch(
             v-else-if="pdf && drop.url"
             ref="pdfRef"
             :can-comment="drop.canComment && annotationsEnabled && !trashed"
-            :comments="overlays.pins ? pdfComments : []"
+            :comments="pdfComments"
             :src="drop.url"
             :title="drop.title"
             @open="focusComment"
@@ -1671,7 +1677,7 @@ watch(
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
                 :list-open="commentsOpen && !popover"
-                :pins="!lightbox && !shownVersion && framed && pinned.length > 0"
+                :pins="!lightbox && !shownVersion && (framed || pdf) && pinned.length > 0"
                 :pins-shown="overlays.pins"
                 @toggle="toggleCommentMode"
                 @list="toggleComments"
