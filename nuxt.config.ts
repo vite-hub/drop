@@ -333,11 +333,6 @@ export default defineNuxtConfig({
     // (pages/d/) pick their own layout in their own middleware.
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
-    // The standalone Console owns its scripts; Nuxt's renderer never adds its nonce to them.
-    "/_vitehub/**": {
-      headers: { "cache-control": "private, no-store" },
-      security: { headers: { contentSecurityPolicy: { "script-src": ["'self'"] } } },
-    },
     "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,

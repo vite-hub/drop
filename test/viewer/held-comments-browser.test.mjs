@@ -403,3 +403,41 @@ test("under the Comment tool a box drawn in a modal dialog comments on the dialo
     await browser.close()
   }
 }, 30_000)
+
+// A tooltip shown by a CSS :hover rule alone: no script keeps it open, so the page's hover look itself must hold.
+const cssHover = `<!doctype html><html><head><style>
+  body { margin: 40px; font: 16px/1.5 sans-serif; }
+  .wrap { position: relative; display: inline-block; }
+  .tip { display: none; position: absolute; left: 0; top: 100%; width: 320px; padding: 12px; background: #222; color: #fff; }
+  .wrap:hover .tip { display: block; }
+</style></head><body>
+  <span class="wrap"><span class="metric">8.4× average demand line</span>
+  <span class="tip" id="css-tip">The average per demand line. Not monthly demand.</span></span>
+  <p style="margin-top: 200px">Below the tooltip.</p>
+</body></html>`
+
+test("under the Comment tool a tooltip shown only by CSS :hover stays open while a box is drawn and posted", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, { page: cssHover })
+    await frame.hover(".metric")
+    await frame.locator("#css-tip").waitFor({ state: "visible" })
+
+    await setTool(page, "comment")
+    const box = await frame.evaluate(() => document.getElementById("css-tip").getBoundingClientRect().toJSON())
+    await drag(page, box, 160, 20)
+    const area = await page
+      .waitForFunction(() => posts.find((m) => m.type === "area"), null, { timeout: 5000 })
+      .then((h) => h.jsonValue())
+    assert.match(area.selector, /#css-tip/)
+    assert.equal(await frame.locator("#css-tip").isVisible(), true)
+
+    // Back under Browse the page's hover look follows the pointer again.
+    await setTool(page, "browse")
+    await frame.waitForFunction(() => !document.querySelector("[data-drop-hover]"))
+    await page.mouse.move(800, 500, { steps: 5 })
+    await frame.locator("#css-tip").waitFor({ state: "hidden" })
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

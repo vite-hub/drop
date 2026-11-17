@@ -11,9 +11,9 @@ export function currentRoleAdapter(
   function wrap(adapter: DBTransactionAdapter): DBTransactionAdapter {
     return {
       ...adapter,
-      async findOne(input) {
-        const row = await adapter.findOne(input)
-        if (input.model !== "user" || !row) return row
+      async findOne<T>(input: Parameters<DBTransactionAdapter["findOne"]>[0]): Promise<T | null> {
+        const row = await adapter.findOne<T>(input)
+        if (input.model !== "user" || !row || typeof row !== "object") return row
         // Policy reads request the whole user; leave projections without an email alone.
         if ("email" in row && typeof row.email === "string") {
           const emailVerified = "emailVerified" in row && row.emailVerified === true
