@@ -1057,10 +1057,9 @@ test("Drop's scripts go first in the head without dropping the page out of stand
     false,
   )
   assert.ok(app.startsWith("<!doctype html>"))
-  assert.ok(
-    app.indexOf('if (self.origin !== "null") return;') < app.indexOf("const pageAt"),
-    "the opaque shim runs before the app runtime",
-  )
+  const shim = app.indexOf(OPAQUE_ORIGIN_SHIM)
+  assert.notEqual(shim, -1, "the page carries the opaque shim")
+  assert.ok(shim < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
 })
 
 /** Runs the shim in a window whose storage, cookies, and URL changes throw, like an opaque-origin sandbox. */
