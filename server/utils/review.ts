@@ -49,6 +49,7 @@ import {
   storageFailure,
 } from "./drops"
 import { type Identity, roleOf } from "./identity"
+import { logDrop } from "./logs"
 import { isMember, membersOnly } from "./members"
 import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
@@ -474,6 +475,7 @@ export async function createSiteDrop(
       resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
+    logDrop(event, row, { change: "create" })
     return row
   })
 }

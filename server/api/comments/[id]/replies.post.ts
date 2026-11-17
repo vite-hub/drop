@@ -5,6 +5,7 @@ import { imageParent, readCommentBody, withImages } from "../../../utils/comment
 import { actorOf, authorOf, findThread, replyTo, toReply } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 /** Reply in a comment's thread: anyone who may comment on the drop, like a new comment. Images as for a comment. */
@@ -27,5 +28,6 @@ export default defineHandler(async (event) => {
     (ids) => replyTo(thread, author, input.body, { actor: actorOf(who), mentions: input.mentions, attachments: ids }),
     (added) => ({ commentId: thread.messages[0]!.id, replyId: added.id }),
   )
+  logDrop(event, drop, { change: "reply" })
   return toReply(row, who, new Map(attachments.map((file) => [file.id, file])))
 })

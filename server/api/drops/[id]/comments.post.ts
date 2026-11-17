@@ -5,6 +5,7 @@ import { imageParent, readCommentBody, withImages } from "../../../utils/comment
 import { actorOf, addThread, authorOf, mentionedIn, toComment } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 /**
@@ -47,5 +48,6 @@ export default defineHandler(async (event) => {
       }),
     (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
   )
+  logDrop(event, drop, { change: "comment" })
   return toComment(row, who, new Map(attachments.map((file) => [file.id, file])), await mentionedIn([row]))
 })
