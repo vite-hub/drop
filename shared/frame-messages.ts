@@ -19,6 +19,8 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("host"), ...path }),
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
+  // An app page's HTML, read on the app's own origin for a viewer that came without it; none when it didn't load.
+  v.object({ type: v.literal("page"), page: v.string(), html: v.optional(v.string()) }),
   v.object({ type: v.literal("copy"), text: v.string() }),
   // A Markdown doc's section the reader went to, or (`copy`) whose link they copied: Drop's address keeps it as #id.
   v.object({ type: v.literal("heading"), id: v.pipe(v.string(), v.maxLength(300)), copy: v.optional(v.boolean()) }),
