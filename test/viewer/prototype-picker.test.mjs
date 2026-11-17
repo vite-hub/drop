@@ -321,6 +321,90 @@ test("the canvas camera stops before the last item leaves the screen, and the mi
   }
 })
 
+test("the Hand tool pans from over an item, which gets no clicks, and Space does the same while held", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("").replace(
+        "<input",
+        '<button id="v-one-button" onclick="window.clicks = (window.clicks || 0) + 1">press</button><input',
+      ),
+      false,
+      0,
+      true,
+    )
+    const tab = await context.newPage()
+    await tab.route("https://picker.test/hand", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/hand")
+    await tab.waitForFunction(() => document.documentElement.dataset.prototypeLayout === "canvas")
+    await tab.keyboard.press("0")
+    const at = () => tab.evaluate(() => document.getElementById("v-one").getBoundingClientRect().x)
+    const button = await tab.locator("#v-one-button").boundingBox()
+    const centre = { x: button.x + button.width / 2, y: button.y + button.height / 2 }
+    const cursor = () =>
+      tab.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x, y)
+          return getComputedStyle(el.shadowRoot ? el.shadowRoot.elementFromPoint(x, y) : el).cursor
+        },
+        [centre.x, centre.y],
+      )
+    const drag = async (dx) => {
+      await tab.mouse.move(centre.x, centre.y)
+      await tab.mouse.down()
+      for (let step = 1; step <= 5; step++) await tab.mouse.move(centre.x + (dx * step) / 5, centre.y)
+      await tab.mouse.up()
+    }
+
+    // Under Move, the item's button takes the click and a drag over it doesn't pan.
+    await tab.mouse.click(centre.x, centre.y)
+    assert.equal(await tab.evaluate(() => window.clicks), 1)
+    let before = await at()
+    await drag(-80)
+    assert.equal(await at(), before)
+
+    // H picks the Hand tool: grab cursor over the item, a drag pans, and the release clicks nothing.
+    await tab.keyboard.press("h")
+    assert.equal(await cursor(), "grab")
+    assert.equal(
+      await tab.evaluate(() =>
+        document.querySelector("prototype-picker").shadowRoot.querySelector(".hand").getAttribute("aria-pressed"),
+      ),
+      "true",
+    )
+    before = await at()
+    await drag(120)
+    assert.equal(Math.round((await at()) - before), 120)
+    await tab.mouse.click(centre.x + 120, centre.y)
+    assert.equal(await tab.evaluate(() => window.clicks), 1, "the Hand tool gives the items no clicks")
+
+    // V puts it down; holding Space picks it up again only while held. Space on a focused button still presses it.
+    await tab.keyboard.press("v")
+    await tab.evaluate(() => document.activeElement.blur())
+    assert.notEqual(await cursor(), "grab")
+    await tab.keyboard.down(" ")
+    assert.equal(await cursor(), "grab")
+    before = await at()
+    await tab.mouse.move(centre.x + 120, centre.y)
+    await tab.mouse.down()
+    assert.equal(await tab.evaluate(() => document.documentElement.dataset.prototypeHand), "grabbing")
+    await tab.mouse.move(centre.x + 60, centre.y, { steps: 4 })
+    await tab.mouse.up()
+    await tab.keyboard.up(" ")
+    assert.equal(Math.round((await at()) - before), -60)
+    assert.equal(await tab.evaluate(() => "prototypeHand" in document.documentElement.dataset), false)
+
+    // Focus has no Hand: the item takes its clicks.
+    await tab.keyboard.press("h")
+    await tab.keyboard.press("1")
+    await tab.locator("#v-one-button").click()
+    assert.equal(await tab.evaluate(() => window.clicks), 2)
+  } finally {
+    await browser.close()
+  }
+})
+
 test("inside Drop's viewer the page reports to Drop's bar and takes its commands, even with a trimmed copy pasted", async () => {
   const browser = await chromium.launch()
   try {
@@ -366,6 +450,7 @@ test("inside Drop's viewer the page reports to Drop's bar and takes its commands
         current: 0,
         canvas: true,
         zoom: undefined,
+        tool: "move",
       },
     )
     assert.ok(parseFrameMessage(report), "Drop's viewer accepts what the picker posts")
@@ -397,6 +482,17 @@ test("inside Drop's viewer the page reports to Drop's bar and takes its commands
     const before = (await last()).zoom
     await hosted.evaluate(() => send({ type: "picker", do: "zoom-out" }))
     await hosted.waitForFunction((zoom) => reports.at(-1).zoom < zoom, before)
+    // Drop's bar picks the Hand tool and back, and Space held in Drop's window pans for as long as it's held.
+    await hosted.evaluate(() => send({ type: "picker", do: "hand" }))
+    await hosted.waitForFunction(() => reports.at(-1).tool === "hand")
+    assert.equal(await frame.evaluate(() => document.documentElement.dataset.prototypeHand), "")
+    await hosted.evaluate(() => send({ type: "picker", do: "move" }))
+    await hosted.waitForFunction(() => reports.at(-1).tool === "move")
+    await hosted.evaluate(() => send({ type: "picker", do: "hold" }))
+    await frame.waitForFunction(() => document.documentElement.dataset.prototypeHand === "")
+    assert.equal((await last()).tool, "move", "Space doesn't change the tool")
+    await hosted.evaluate(() => send({ type: "picker", do: "release" }))
+    await frame.waitForFunction(() => !("prototypeHand" in document.documentElement.dataset))
   } finally {
     await browser.close()
   }
