@@ -9,7 +9,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright"
-import { afterAll, test } from "vite-plus/test"
+import { afterAll, expect, test } from "vite-plus/test"
 
 const skill = fileURLToPath(new URL("../../skills/data-explorer/", import.meta.url))
 const dir = mkdtempSync(join(tmpdir(), "data-explorer-display-"))
@@ -37,6 +37,9 @@ const report = {
       { month, team: "Beta", count: 10 + i },
     ]),
     repos: names,
+    timestamps: [1769904000000, 1767225600000].map((x, i) => ({ x, y: i + 1, team: "Alpha" })),
+    numericStrings: ["2", "10"].map((x, i) => ({ x, y: i + 1, team: "Alpha" })),
+    categories: ["Zebra", "Apple"].map((x, i) => ({ x, y: i + 1, team: "Alpha" })),
   },
   top: [{ type: "stats", items: [{ label: "balance", value: { data: "totals", field: "balance" }, format: "money" }] }],
   views: [
@@ -44,6 +47,21 @@ const report = {
       id: "overview",
       label: "Overview",
       blocks: [
+        ...[
+          ["Timestamp line", "line", "timestamps", "temporal"],
+          ["Timestamp area", "area", "timestamps", "temporal"],
+          ["Numeric strings", "line", "numericStrings", "quantitative"],
+          ["Nominal categories", "line", "categories", "nominal"],
+        ].map(([title, chart, data, xType]) => ({
+          type: "chart",
+          title,
+          chart,
+          data,
+          xType,
+          x: "x",
+          y: "y",
+          ...(chart === "line" ? { series: "team" } : {}),
+        })),
         { type: "chart", chart: "line", title: "Per month", data: "byMonth", x: "month", y: "count", series: "team" },
         {
           type: "table",
@@ -87,18 +105,34 @@ test("line names, month ticks, a negative amount, headers and the table button r
 
     // Each line's name sits at its last month, on the right, not at the first row of the data.
     const chart = block("Per month").locator("svg").first()
-    const box = await chart.boundingBox()
-    for (const team of ["Alpha", "Beta"]) {
-      const label = await chart.locator(".role-mark text", { hasText: new RegExp(`^${team}$`) }).boundingBox()
-      assert.ok(
-        label.x > box.x + box.width * 0.6,
-        `${team} is named at x ${label.x} in a chart from ${box.x} to ${box.x + box.width}`,
-      )
+    const assertEndpoints = async (title, teams) => {
+      // Reacquire the current SVG and measure all boxes in one browser task: resize can replace it.
+      await expect
+        .poll(() =>
+          block(title).evaluate((section, teams) => {
+            const svg = section.querySelector('.rp-chart[data-state="ok"] svg')
+            if (!svg) return false
+            const box = svg.getBoundingClientRect()
+            if (!box.width) return false
+            return teams.every((team) => {
+              const label = [...svg.querySelectorAll(".role-mark text")].find((el) => el.textContent === team)
+              const rect = label?.getBoundingClientRect()
+              return rect && rect.width > 0 && rect.x > box.x + box.width * 0.6
+            })
+          }, teams),
+        )
+        .toBe(true)
     }
+    await assertEndpoints("Per month", ["Alpha", "Beta"])
+    for (const title of ["Timestamp line", "Numeric strings", "Nominal categories"]) {
+      await assertEndpoints(title, ["Alpha"])
+    }
+    await expect.poll(() => block("Timestamp area").locator('.rp-chart[data-state="ok"] svg').count()).toBe(1)
 
     // Three months print three labels, one per month.
-    const ticks = await chart.locator('[aria-label^="X-axis"] .role-axis-label text').allTextContents()
-    assert.deepEqual(ticks, ["Jan 2026", "Feb 2026", "Mar 2026"])
+    await expect
+      .poll(() => chart.locator('[aria-label^="X-axis"] .role-axis-label text').allTextContents())
+      .toEqual(["Jan 2026", "Feb 2026", "Mar 2026"])
 
     // The minus stays with the figure; only the "$" prints small.
     const stat = page.locator(".rp-stat-value").first()

@@ -361,8 +361,12 @@ const xEncoding = (block, rows, x, kind, width) => {
   if (kind === "temporal") {
     // Monthly rows ("2026-03" or "2026-03-01") tick on month starts only: free ticks on three months fall mid-month
     // too, and print each month twice.
-    const monthly = rows.every((r) => r[x] == null || /^\d{4}-\d{2}(-01)?$/.test(r[x]));
-    const ym = rows.filter((r) => r[x] != null).map((r) => +r[x].slice(0, 4) * 12 + +r[x].slice(5, 7));
+    const monthly = rows.every(
+      (r) => r[x] == null || (typeof r[x] === "string" && /^\d{4}-\d{2}(-01)?$/.test(r[x])),
+    );
+    const ym = monthly
+      ? rows.filter((r) => r[x] != null).map((r) => +r[x].slice(0, 4) * 12 + +r[x].slice(5, 7))
+      : [];
     const months = monthly && ym.length ? Math.max(...ym) - Math.min(...ym) + 1 : 0;
     return {
       field: field(x),
@@ -484,9 +488,12 @@ function lineSpec(block, input, width) {
   ];
   if (series && !stacked && !log) {
     // A line is named at its rightmost point, which is not the last row when the rows aren't sorted by `x`.
-    const cats = kind === "ordinal" ? [...new Set(rows.map((r) => r[x]))] : [];
-    const at = (r) =>
-      kind === "temporal" ? Date.parse(r[x]) : kind === "ordinal" ? cats.indexOf(r[x]) : r[x];
+    const cats = X.type === "ordinal" ? [...new Set(rows.map((r) => r[x]))] : [];
+    const at = (r) => {
+      if (X.type === "ordinal") return cats.indexOf(r[x]);
+      if (X.type === "temporal") return typeof r[x] === "number" ? r[x] : Date.parse(r[x]);
+      return +r[x];
+    };
     const last = new Map();
     for (const r of rows) {
       const prev = last.get(r[series]);
