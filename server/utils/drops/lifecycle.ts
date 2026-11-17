@@ -62,9 +62,14 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
 /**
  * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops at the top past their window move to
  * the Trash as of when they expired (the drops below follow them); drops 15 days into the Trash, with everything below
- * them, and nodes whose parent is gone, are deleted.
+ * them, and nodes whose parent is gone, are deleted. `note` hears of each deletion as it happens, so a run that fails
+ * halfway still says what it deleted.
  */
-export async function deleteExpiredDrops(now: Date, limit = 50) {
+export async function deleteExpiredDrops(
+  now: Date,
+  limit = 50,
+  note: (deleted: { id: string; owner: string; reason: string | null }) => void = () => {},
+) {
   const at = now.getTime()
   const { days } = expiryPolicy()
   let expired = 0
@@ -100,18 +105,16 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     .limit(limit)
   await drainBlobCleanup()
   await drainCommentCleanup()
-  for (const row of [...due, ...orphans]) await deleteDrop(row)
-  // What the run deleted, for the cleanup's run event: drops whose Trash time ran out, and drops whose parent was gone.
-  return {
-    expired,
-    purged: due.length,
-    orphans: orphans.length,
-    deleted: [...due, ...orphans].map((row) => ({
-      id: row.id,
-      owner: row.ownerId,
-      reason: due.includes(row) ? row.trashReason : "orphan",
-    })),
+  // Drops whose Trash time ran out, then drops whose parent was gone.
+  for (const row of due) {
+    await deleteDrop(row)
+    note({ id: row.id, owner: row.ownerId, reason: row.trashReason })
   }
+  for (const row of orphans) {
+    await deleteDrop(row)
+    note({ id: row.id, owner: row.ownerId, reason: "orphan" })
+  }
+  return { expired, purged: due.length, orphans: orphans.length }
 }
 
 /** The drop's share link, which opens its latest version. */
