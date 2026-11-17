@@ -29,7 +29,9 @@ Three wait on Morten.
 // Vitest empties CSS imports, including ?raw, so the frame gets the document's actual styles here.
 const styles = (
   await Promise.all(
-    ["../../shared/typeset.css", "../../shared/document-shell.css"].map((file) => readFile(new URL(file, import.meta.url), "utf8")),
+    ["../../shared/typeset.css", "../../shared/document-shell.css"].map((file) =>
+      readFile(new URL(file, import.meta.url), "utf8"),
+    ),
   )
 ).join("\n")
 
@@ -69,23 +71,33 @@ async function open(browser, width) {
   })
 }
 
-test("a wide table grows into the room left of the text and keeps clear of the outline", { timeout: 30000 }, async () => {
-  const browser = await chromium.launch()
-  try {
-    const shown = await open(browser, 1600)
-    assert.ok(shown.table.left < shown.text.left - 100, `table starts at ${shown.table.left}, text at ${shown.text.left}`)
-    assert.ok(shown.table.width > shown.text.width + 200)
-    assert.ok(shown.outline, "the outline shows")
-    assert.ok(shown.outline.left >= shown.table.right, `outline at ${shown.outline.left}, table ends at ${shown.table.right}`)
-    assert.equal(shown.stacked, false)
-    // "portal #1596" and each link chip stay on one line.
-    assert.deepEqual(new Set(shown.chips), new Set([1]))
-    assert.equal(shown.overflow, 0)
+test(
+  "a wide table grows into the room left of the text and keeps clear of the outline",
+  { timeout: 30000 },
+  async () => {
+    const browser = await chromium.launch()
+    try {
+      const shown = await open(browser, 1600)
+      assert.ok(
+        shown.table.left < shown.text.left - 100,
+        `table starts at ${shown.table.left}, text at ${shown.text.left}`,
+      )
+      assert.ok(shown.table.width > shown.text.width + 200)
+      assert.ok(shown.outline, "the outline shows")
+      assert.ok(
+        shown.outline.left >= shown.table.right,
+        `outline at ${shown.outline.left}, table ends at ${shown.table.right}`,
+      )
+      assert.equal(shown.stacked, false)
+      // "portal #1596" and each link chip stay on one line.
+      assert.deepEqual(new Set(shown.chips), new Set([1]))
+      assert.equal(shown.overflow, 0)
 
-    const phone = await open(browser, 390)
-    assert.equal(phone.stacked, true)
-    assert.equal(phone.overflow, 0)
-  } finally {
-    await browser.close()
-  }
-})
+      const phone = await open(browser, 390)
+      assert.equal(phone.stacked, true)
+      assert.equal(phone.overflow, 0)
+    } finally {
+      await browser.close()
+    }
+  },
+)
