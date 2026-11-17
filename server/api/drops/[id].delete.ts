@@ -3,6 +3,7 @@ import * as v from "valibot"
 import { deleteDrop, findDrop, permissions } from "../../utils/drops"
 import { updateDrop } from "../../utils/drop-update"
 import { requireIdentity } from "../../utils/identity"
+import { logAudit, logDrop } from "../../utils/logs"
 import { isAttachment } from "../../utils/nodes"
 import { routeId } from "../../utils/params"
 
@@ -26,6 +27,8 @@ export default defineValidatedHandler({
         statusText: "Only people can delete a drop for good. Move it to the Trash instead.",
       })
     await deleteDrop(drop)
+    logDrop(event, drop, { change: "delete" })
+    logAudit(event, who, "drop.delete", { type: "drop", id: drop.id, owner: drop.ownerId })
     return { ok: true }
   },
 })

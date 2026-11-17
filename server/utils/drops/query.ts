@@ -1,5 +1,4 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database"
@@ -41,6 +40,7 @@ import { viewsOf } from "../views"
 import { dropExcerpt } from "../og"
 import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
 import type { Identity } from "../identity"
+import { logDrop, logError } from "../logs"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"
 import { d1Chunks } from "../d1"
@@ -63,7 +63,7 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
   const ancestors = row.drop.parentId
     ? walkUp([row.drop], new Map(rows.map((item) => [item.drop.id, item.drop]))).get(row.drop.id)!
     : []
-  return currentReview(
+  const found = await currentReview(
     {
       ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
       ownerBanned: !row.owner || Boolean(row.owner.banned),
@@ -71,6 +71,8 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
     row.owner,
     event,
   )
+  logDrop(event, found)
+  return found
 }
 
 /**
@@ -477,7 +479,7 @@ export async function searchEverything(
 }
 
 /** Remembers a public drop a signed-in person opened, at most once a day per drop. */
-export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
+export async function recordSharedVisit(drop: DropRow, who: Identity | null, event?: H3Event) {
   if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || !isPublic(drop.share) || isAttachment(drop))
     return
   const at = Date.now()
@@ -491,16 +493,12 @@ export async function recordSharedVisit(drop: DropRow, who: Identity | null) {
         setWhere: lte(dropVisits.at, at - DAY_MS),
       })
   } catch (error) {
-    log.error({ action: "drop-shared-visit", error: String(error) })
+    logError(event, error, { action: "drop-shared-visit" })
   }
 }
 
+/** A Blob failure as the 503 a request answers with; the request's wide event logs it, with the cause, when it's thrown. */
 export function storageFailure(error: Error) {
-  log.error({
-    action: "storage",
-    error: error.message,
-    cause: error.cause instanceof Error ? error.cause.message : error.cause,
-  })
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 
@@ -571,7 +569,7 @@ export async function dropDetail(
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
-    who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
+    who && answerable(row, who) ? quizOf(row, who.userId, event) : undefined,
     galleryOf(row, who, days),
   ])
   // Everyone who can open it sees what it links to.

@@ -16,6 +16,7 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
+import { logDrop } from "../logs"
 import { requireKeepSlot, withDropQuota } from "../quotas"
 import { expiryPolicy } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
@@ -237,7 +238,7 @@ export async function createDocDrop(
   // Before anything is stored, so a doc Comark can't render right leaves no file and no version behind.
   const warnings =
     kind === "markdown" && text !== undefined
-      ? await (await import("../markdown-document")).requirePublishableMarkdown(text)
+      ? await (await import("../markdown-document")).requirePublishableMarkdown(text, event)
       : []
 
   return withDropQuota(
@@ -421,6 +422,7 @@ export async function createDocDrop(
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
       // internal-only on vite-hub/vitehub's feat/forge-primitive branch today, and on a token that may write to the
       // owner's repo (a GitHub App install, or a wider scope on GitHub sign-in).
+      logDrop(event, row, { change: "publish" })
       return Object.assign(row, { warnings })
     },
   )
@@ -712,6 +714,7 @@ export async function publishApp(
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
           await refreshLatest(next.id)
         }
+        logDrop(event, next, { change: "publish" })
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths), paths })
       } catch (error) {
         if (!committedPublish) {

@@ -1,5 +1,6 @@
 import { useLogger } from "evlog/nitro/v3"
 import { requireRateLimit } from "vite-hub/rate-limit"
+import { logDrop } from "../../utils/logs"
 import {
   addReviewComment,
   readReviewComment,
@@ -30,6 +31,7 @@ export default reviewApi(async (event) => {
 
   const { row, attachments } = await addReviewComment(site, { who, name: claims.n }, input, shot, claims.o, images)
   timing.step("save")
+  logDrop(event, site, { change: "comment" })
   useLogger(event).set({
     review: { site: site.id, comment: row.n, screenshot: Boolean(shot), images: images.length },
   })
