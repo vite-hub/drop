@@ -89,12 +89,12 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     rateLimit: true,
     schedule: true,
     // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/utils/live-drafts.ts).
-    realtime: { authority: "cloudflare" },
+    realtime: { driver: "cloudflare" },
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
   vercel: {
     host: "vercel",
-    blob: { ...files, driver: "vercel-blob", access: "private" },
+    blob: { ...files, driver: "vercel", access: "private" },
     database: d1("vitehub-drop-vercel"),
     // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
     schedule: { cron: { cleanup: "0 0 * * *" } },
@@ -138,7 +138,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
     // Live editing rooms stay in this one process and save their drafts to .data/blob.
-    realtime: { authority: "memory" },
+    realtime: { driver: "memory" },
   },
 }
 
@@ -177,6 +177,9 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // Uncaught browser errors, and the ones the app catches and passes to reportError(), land in the wide event of
+    // POST /api/_vitehub/browser-errors, so a toast like "Couldn't copy" leaves a trace in the logs.
+    observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
