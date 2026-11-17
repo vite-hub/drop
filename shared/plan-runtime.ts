@@ -533,23 +533,30 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     for (const root of [query(selector), document.body]) {
       if (!root) continue;
       // Text that isn't drawn is never in a selection's quote: a <style> a block writes before itself, inside a
-      // paragraph when it's an inline formula, and a formula's TeX in its MathML's <annotation>.
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (node) => (node.parentElement && node.parentElement.closest("style, script, annotation") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+      // paragraph when it's an inline formula, a formula's TeX in its MathML's <annotation>, and its <mphantom> space.
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (node) => (node.parentElement && node.parentElement.closest("style, script, annotation, mphantom") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
       const nodes = []; let text = "";
       while (walker.nextNode()) { nodes.push([walker.currentNode, text.length]); text += walker.currentNode.data; }
       let at = text.indexOf(quote), stop = at + quote.length;
       if (at < 0) {
         // A selection quotes a formula as it's drawn: a line between its symbols, and a letter such as k as the italic
         // 𝑘. The quote is matched again without whitespace and with each character in its plain form (NFKC), which
-        // keeps where each one came from in the page's text.
+        // keeps where each one came from in the page's text. A character only a formula draws that way, such as 𝑘,
+        // must land in a formula, so the k of "stock" doesn't take the comment of the 𝑘 after it.
         const plain = (chars) => chars.normalize("NFKC").replace(/\s+/g, "");
-        const bare = plain(quote), starts = [], ends = []; let squeezed = "";
-        for (let i = 0; i < text.length; ) {
-          const char = String.fromCodePoint(text.codePointAt(i)), folded = plain(char);
-          for (let k = 0; k < folded.length; k++) { starts.push(i); ends.push(i + char.length); }
-          squeezed += folded; i += char.length;
+        let bare = ""; const mathOnly = [];
+        for (const char of quote) { const folded = plain(char); bare += folded; for (let k = 0; k < folded.length; k++) mathOnly.push(folded !== char); }
+        const starts = [], ends = [], inMath = []; let squeezed = "";
+        for (let n = 0; n < nodes.length; n++) {
+          const [node, offset] = nodes[n], math = !!node.parentElement.closest("math");
+          for (let i = 0; i < node.data.length; ) {
+            const char = String.fromCodePoint(node.data.codePointAt(i)), folded = plain(char);
+            for (let k = 0; k < folded.length; k++) { starts.push(offset + i); ends.push(offset + i + char.length); inMath.push(math); }
+            squeezed += folded; i += char.length;
+          }
         }
-        const from = bare ? squeezed.indexOf(bare) : -1;
+        let from = bare ? squeezed.indexOf(bare) : -1;
+        while (from >= 0 && mathOnly.some((only, k) => only && !inMath[from + k])) from = squeezed.indexOf(bare, from + 1);
         if (from < 0) continue;
         at = starts[from]; stop = ends[from + bare.length - 1];
       }

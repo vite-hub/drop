@@ -16,6 +16,8 @@ $$
 $$
 
 so it settles where saving covers depreciation.
+
+The capital stock is $k$, with input $x\\phantom{ABC}+y$.
 `
 const { html } = await renderMarkdownCached("math-comments", async () => markdown)
 // Vitest reads CSS `?raw` imports as empty strings, so the frame gets the real stylesheets the way the app builds them.
@@ -85,7 +87,13 @@ test("comments quote, anchor, and mark text around and inside math, and leave th
       into.setEnd(p.querySelector("math mi").firstChild, 1)
       const display = document.createRange()
       display.selectNodeContents(document.querySelector("math[display=block]"))
-      return { into: select(into), display: select(display) }
+      // A letter in a formula, with the same letter in the prose before it, and a formula with invisible space.
+      const [stock, phantom] = document.querySelectorAll("main p:last-of-type math")
+      const letter = document.createRange()
+      letter.selectNodeContents(stock)
+      const spaced = document.createRange()
+      spaced.selectNodeContents(phantom)
+      return { into: select(into), display: select(display), letter: select(letter), spaced: select(spaced) }
     })
     await probe.context.close()
     assert.match(quotes.into, /^output is \S+$/)
@@ -95,12 +103,16 @@ test("comments quote, anchor, and mark text around and inside math, and leave th
       comment("c1", "In the Solow model, output is"),
       comment("c2", quotes.into),
       comment("c3", quotes.display),
+      comment("c4", quotes.letter),
+      comment("c5", quotes.spaced),
     ])
-    await frame.waitForFunction(() => document.querySelectorAll("drop-bubble").length === 3, null, { timeout: 8000 })
+    await frame.waitForFunction(() => document.querySelectorAll("drop-bubble").length === 5, null, { timeout: 8000 })
     const drawn = await frame.evaluate(() => ({
       marked: CSS.highlights.get("drop-margin")?.size ?? 0,
       // MathML holds no HTML: a bubble at a quote's end inside a formula goes right after its <math>.
       inMath: document.querySelectorAll("math drop-bubble").length,
+      // The formula's 𝑘 keeps its comment, not the k of "stock".
+      letter: document.querySelector('drop-bubble[data-id="c4"]').previousElementSibling?.localName,
       display: (() => {
         const bubble = document.querySelector('drop-bubble[data-id="c3"]')
         const math = document.querySelector("math[display=block]").getBoundingClientRect()
@@ -112,8 +124,9 @@ test("comments quote, anchor, and mark text around and inside math, and leave th
         }
       })(),
     }))
-    assert.equal(drawn.marked, 3)
+    assert.equal(drawn.marked, 5)
     assert.equal(drawn.inMath, 0)
+    assert.equal(drawn.letter, "math")
     assert.ok(drawn.display.beside, JSON.stringify(drawn.display))
     assert.ok(drawn.display.height < drawn.display.mathHeight, JSON.stringify(drawn.display))
     await context.close()
