@@ -1797,7 +1797,7 @@ watch(
       class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain bg-default motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
       :class="
         compactFloat
-          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)]'
+          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)] has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(0_0_0/22%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(255_255_255/22%)]'
           : 'rounded-lg border border-default shadow-lg'
       "
       :style="floatStyle"
@@ -1818,7 +1818,7 @@ watch(
         class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overscroll-contain border border-default bg-default shadow-lg"
         :class="
           pinDraft
-            ? 'overflow-y-auto rounded-[6px_18px_18px_18px]'
+            ? 'overflow-y-auto rounded-[6px_18px_18px_18px] has-[textarea:focus-visible]:border-accented'
             : threadSpot?.rail
               ? 'overflow-hidden rounded-xl'
               : 'overflow-hidden rounded-[6px_16px_16px_16px]'

@@ -7,6 +7,7 @@ import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
 import MARKS_CSS from "@vite-hub/ui/comment-marks.css?raw"
+import { commentLeaveMs } from "vite-hub/ui/headless"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
@@ -1953,7 +1954,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (pins) leave.replaceChildren();
     for (const ghost of ghosts) {
       leave.appendChild(ghost);
-      setTimeout(() => ghost.remove(), 180);
+      setTimeout(() => ghost.remove(), ${commentLeaveMs});
     }
   }
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });

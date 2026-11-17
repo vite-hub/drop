@@ -141,11 +141,13 @@ const popoverUi = {
       type="button"
       @click="open = !open"
     >
-      <!-- The + turns into a × as the pill grows, at the segment's own pace. -->
+      <!-- The + turns into a × as the pill grows, at the segment's own pace. An inline SVG, not the icon mask, so the
+           closed + snaps its two bars to whole pixels instead of blurring them at 1x; the × keeps its smooth edges. -->
       <UIcon
         name="i-mingcute-add-line"
+        mode="svg"
         class="size-4 transition-[rotate] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none"
-        :class="open && 'rotate-45'"
+        :class="open ? 'rotate-45' : '[shape-rendering:crispEdges]'"
       />
     </button>
   </UTooltip>

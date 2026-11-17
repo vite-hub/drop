@@ -168,6 +168,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         :error="error || problem"
         :guard="false"
         layout="row"
+        size="sm"
         :placeholder="
           files.length || suggesting
             ? 'Add a note (optional)'
@@ -233,6 +234,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
       :on-reopen="() => emit('resolve', comment!.id, false)"
       :on-reply="reply"
       :on-resolve="() => emit('resolve', comment!.id, true)"
+      size="sm"
       :thread="thread"
       :user="user"
       :users="dropComments.users"
@@ -293,7 +295,8 @@ const edit = (messageId: string, text: string, ids: string[]) =>
 </template>
 
 <style scoped>
-/* The thread fills the dock or the card: its messages scroll, its reply box stays at the bottom. */
+/* The thread fills the dock or the card: its messages scroll, its reply box stays at the bottom. vite-hub/ui's sm size
+   sets the rest: 14px text, the replies' rows, and the soft reply field. */
 .drop-comment-card :deep([data-slot="comment-thread"]) {
   display: flex;
   min-height: 0;
@@ -310,76 +313,11 @@ const edit = (messageId: string, text: string, ids: string[]) =>
   padding-block: 0.25rem;
 }
 
-/* A thread reads at the app's 14px, as the comment list and the composer do: vite-hub/ui's names are 16px and a
-   message's Comark body 15px on a 1.65 line, which left four words a line in the floating card. */
-.drop-comment-card :deep([data-slot="comment-thread"]) {
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-
 .drop-comment-card :deep([data-slot="comment-thread-header"]) {
   min-height: 2.75rem;
 }
 
 .drop-comment-card :deep([data-slot="comment-thread-title"]) {
   font-size: var(--text-sm);
-}
-
-.drop-comment-card :deep([data-slot="comment-thread-quote"]) {
-  margin-top: 0.5rem;
-}
-
-.drop-comment-card :deep([data-slot="comment-reply"]) {
-  position: relative;
-  padding: 0.5rem 0.75rem;
-}
-
-/* The 14px name and the 12px time share a baseline. Centred, the smaller time sat a pixel high. The name's line is as
-   tall as the avatar, which stays centred on it. */
-.drop-comment-card :deep([data-slot="comment-reply-header"]) {
-  align-items: baseline;
-}
-
-.drop-comment-card :deep([data-slot="comment-reply-header"] > [data-slot="avatar-stack"]) {
-  align-self: center;
-}
-
-.drop-comment-card :deep([data-slot="comment-reply-author"]) {
-  font-size: var(--text-sm);
-  line-height: 1.5rem;
-}
-
-.drop-comment-card :deep([data-slot="comment-reply-body"]) {
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-
-/* Edit and Delete float over the end of the name's row, so a message's text runs the card's full width instead of
-   wrapping early beside two buttons that only show on hover. */
-.drop-comment-card :deep([data-slot="comment-reply-actions"]) {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.5rem;
-  border-radius: var(--radius-md);
-  background: var(--ui-bg);
-}
-
-/* The reply box is a soft filled field with no divider above it: the card's edge already bounds it, and a line over a
-   bordered field read as two borders. Its border shows only while it has the focus, without a second 3px ring. */
-.drop-comment-card :deep([data-slot="comment-thread"] > [data-slot="comment-composer"]) {
-  border-block-start: 0;
-}
-
-.drop-comment-card
-  :deep([data-slot="comment-thread"] > [data-slot="comment-composer"] [data-slot="prompt-input-group"]) {
-  border-color: transparent;
-  background: var(--ui-bg-elevated);
-  box-shadow: none;
-}
-
-.drop-comment-card
-  :deep([data-slot="comment-thread"] > [data-slot="comment-composer"] [data-slot="prompt-input-group"]:focus-within) {
-  border-color: var(--ui-border-accented);
-  background: var(--ui-bg);
 }
 </style>

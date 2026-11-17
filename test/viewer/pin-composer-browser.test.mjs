@@ -135,6 +135,13 @@ test(
     try {
       const page = await open(browser)
       const field = page.locator("textarea")
+      // The bubble around the box is its frame, so the box draws no edge of its own on focus (Drop comment #14).
+      const box = page.locator('[data-slot="comment-composer"]')
+      assert.equal(await box.getAttribute("data-frame"), "none")
+      assert.equal(await box.getAttribute("data-size"), "sm")
+      await field.focus()
+      const group = page.locator('[data-slot="prompt-input-group"]')
+      assert.equal(await group.evaluate((element) => getComputedStyle(element).borderTopColor), "rgba(0, 0, 0, 0)")
       await field.fill("Keep this feedback")
       await pastePicture(page, "original.png")
       await field.press("Enter")
