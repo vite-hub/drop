@@ -104,10 +104,11 @@ const fmt = (v, kind = "number") => {
   if (typeof v !== "number") return String(v);
   return (NUMBER[kind] ?? NUMBER.number)(v);
 };
-// A number split into its figure and a short unit, so tiles print "53" big and "%" small.
+// A number split into its sign, a leading unit, its figure and a trailing unit, so tiles print "53" big and "%" small,
+// and "-$1,234" keeps its minus in front of the small "$".
 const splitUnit = (text) => {
-  const m = String(text).match(/^([^\d-]*)([-\d.,]+)(.*)$/);
-  return m ? [m[1], m[2], m[3]] : ["", String(text), ""];
+  const m = String(text).match(/^(-?)([^\d-]*)([\d.,]+)(.*)$/);
+  return m ? [m[1], m[2], m[3], m[4]] : ["", "", String(text), ""];
 };
 const DATE = /^\d{4}-\d{2}(-\d{2})?([T ][\d:.]+Z?)?$/;
 const dateLabel = (s) => {
@@ -357,17 +358,23 @@ const seriesColor = (block, seriesField, keys) => {
 
 const xEncoding = (block, rows, x, kind, width) => {
   const title = block.xTitle ?? null;
-  if (kind === "temporal")
+  if (kind === "temporal") {
+    // Monthly rows ("2026-03" or "2026-03-01") tick on month starts only: free ticks on three months fall mid-month
+    // too, and print each month twice.
+    const monthly = rows.every((r) => r[x] == null || /^\d{4}-\d{2}(-01)?$/.test(r[x]));
+    const ym = rows.filter((r) => r[x] != null).map((r) => +r[x].slice(0, 4) * 12 + +r[x].slice(5, 7));
+    const months = monthly && ym.length ? Math.max(...ym) - Math.min(...ym) + 1 : 0;
     return {
       field: field(x),
       type: "temporal",
       title,
       scale: { type: "utc" },
       axis: {
-        labelExpr: `utcFormat(datum.value, ${JSON.stringify(block.xFormat ?? (rows.some((r) => String(r[x]).length > 7) ? "%b %d" : "%b %Y"))})`,
-        tickCount: 6,
+        labelExpr: `utcFormat(datum.value, ${JSON.stringify(block.xFormat ?? (!monthly && rows.some((r) => String(r[x]).length > 7) ? "%b %d" : "%b %Y"))})`,
+        tickCount: monthly ? { interval: "month", step: Math.max(1, Math.ceil(months / 6)) } : 6,
       },
     };
+  }
   if (kind === "quantitative") {
     const years = rows.every(
       (r) => r[x] == null || (Number.isInteger(r[x]) && r[x] > 1900 && r[x] < 2200),
@@ -476,8 +483,15 @@ function lineSpec(block, input, width) {
     },
   ];
   if (series && !stacked && !log) {
+    // A line is named at its rightmost point, which is not the last row when the rows aren't sorted by `x`.
+    const cats = kind === "ordinal" ? [...new Set(rows.map((r) => r[x]))] : [];
+    const at = (r) =>
+      kind === "temporal" ? Date.parse(r[x]) : kind === "ordinal" ? cats.indexOf(r[x]) : r[x];
     const last = new Map();
-    for (const r of rows) if (r[y] != null) last.set(r[series], r);
+    for (const r of rows) {
+      const prev = last.get(r[series]);
+      if (r[y] != null && !(prev && at(prev) > at(r))) last.set(r[series], r);
+    }
     const ends = [...last.values()]
       .map((r) => ({
         name: r[series],
@@ -1145,7 +1159,7 @@ function statsBlock(block) {
     block.items.map((item) => {
       const value = resolve(item.value);
       const delta = resolve(item.delta);
-      const [pre, num, unit] = splitUnit(fmt(value, item.format ?? "number"));
+      const [sign, pre, num, unit] = splitUnit(fmt(value, item.format ?? "number"));
       const deltaText =
         delta == null
           ? null
@@ -1157,6 +1171,7 @@ function statsBlock(block) {
         h(
           "div",
           { class: "rp-stat-value" },
+          sign,
           pre && h("small", {}, pre),
           num,
           unit && h("small", {}, unit),
@@ -1185,7 +1200,7 @@ function factsBlock(block) {
     "div",
     { class: "rp-facts" },
     block.items.map((item) => {
-      const [pre, num, unit] = splitUnit(
+      const [sign, pre, num, unit] = splitUnit(
         typeof item.value === "string"
           ? item.value
           : fmt(resolve(item.value), item.format ?? "number"),
@@ -1193,7 +1208,7 @@ function factsBlock(block) {
       return h(
         "div",
         { class: "rp-fact" },
-        h("div", { class: "rp-fact-value" }, pre, num, unit && h("small", {}, unit)),
+        h("div", { class: "rp-fact-value" }, sign, pre, num, unit && h("small", {}, unit)),
         h("p", { html: inline(item.text) }),
       );
     }),
@@ -1592,12 +1607,16 @@ function tableBlock(block) {
                 h(
                   "th",
                   {
-                    class:
-                      ["user", "text", "country", "link", "entity", "chips", "stack"].includes(
-                        c.format ?? "text",
-                      ) && c.format !== undefined
-                        ? ""
-                        : "rp-num",
+                    // A header aligns with its cells: a column without a `format` is a number column only when it
+                    // holds numbers, as `cell` decides.
+                    class: ["user", "text", "country", "link", "entity", "chips", "stack"].includes(
+                      c.format ??
+                        ((data[block.data] ?? []).some((r) => typeof r[c.field] === "number")
+                          ? "number"
+                          : "text"),
+                    )
+                      ? ""
+                      : "rp-num",
                     "aria-sort":
                       own.sort === c.field ? (own.desc ? "descending" : "ascending") : null,
                   },
@@ -1653,7 +1672,7 @@ function tableBlock(block) {
       h(
         "button",
         { class: "rp-more", onclick: () => ((own.shown += step), draw()) },
-        `Show ${Math.min(step, rows.length - own.shown)} more of ${rows.length - own.shown}`,
+        own.shown + step >= rows.length ? `Show all ${rows.length}` : `Show ${step} more`,
       );
     wrap.replaceChildren(
       ...(block.search
