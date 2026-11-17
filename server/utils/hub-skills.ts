@@ -404,7 +404,9 @@ async function hubSkills(id: string, event?: H3Event, only?: string) {
   const entries = (tree ?? []).filter((entry) => only === undefined || entry.name === only)
   // Reserve all entries, including hits, before borrowing any cached objects. Eviction may remove the cache's
   // charge while this request still holds them; this reservation covers that entire lifetime through serveSkills.
-  const release = await buildBudget.acquire(costOf(entries.flatMap((entry) => [...entry.files.values()]), entries.length))
+  const release = await buildBudget.acquire(
+    costOf(entries.flatMap((entry) => [...entry.files.values()]), entries.length),
+  )
   if (!release) return undefined
   try {
     const read = pool(READ_POOL)

@@ -455,16 +455,13 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
     { nodes: [["properties", {}, ...rows]] } as Parameters<typeof renderHtmlFromDocument>[0],
     { components: preset.components },
   )
-  if (open === -1) return rendered + html
-  // The page already has the box's styles and date script: only its rows go in, after the front matter's, with the
-  // chips' styles when none of the doc's own links brought them.
+  // comark-chips writes its styles before the first chip, inside the rows, and the doc's render has its own copy when
+  // its box or text has a chip. The page keeps one: the doc's, or the rows' when the doc has none.
+  const own = CHIP_STYLES.test(html)
+  if (open === -1) return (own ? rendered.replace(CHIP_STYLES, "") : rendered) + html
+  // The page already has the box's styles and date script: only its rows go in, after the front matter's.
   const opening = PROPERTIES_BOX.exec(rendered)!
   const start = opening.index + opening[0].length
-  const chipStyles = CHIP_STYLES.exec(rendered)?.[0] ?? ""
-  return (
-    (CHIP_STYLES.test(html) ? "" : chipStyles) +
-    html.slice(0, close) +
-    rendered.slice(start, rendered.lastIndexOf("</dl>")) +
-    html.slice(close)
-  )
+  const added = rendered.slice(start, rendered.lastIndexOf("</dl>"))
+  return html.slice(0, close) + (own ? added.replace(CHIP_STYLES, "") : added) + html.slice(close)
 }

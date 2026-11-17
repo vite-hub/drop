@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
-import { computed, reactive, ref } from "vue"
-import { test } from "vite-plus/test"
+import { computed, effectScope, nextTick, onScopeDispose, reactive, ref, shallowRef, watch } from "vue"
+import { createCommentVisibility } from "vite-hub/ui"
+import { test, vi } from "vite-plus/test"
+import { transpileModule } from "typescript"
 
 // Execute the actual viewer handlers with Vue's reactive state, without Nuxt services.
 const source = readFileSync(new URL("../../app/components/DropViewer.vue", import.meta.url), "utf8")
@@ -9,13 +11,20 @@ const close = source.match(/function closeComments\(\) \{[\s\S]*?\n\}/)[0]
 const show = source.match(/function showComments\(\) \{[\s\S]*?\n\}/)[0]
 const annotationSource = readFileSync(new URL("../../app/composables/useViewerAnnotations.ts", import.meta.url), "utf8")
 const select = annotationSource.match(/function commentOnSelection\(suggest = false\) \{[\s\S]*?\n  \}/)[0]
-const shown = source.match(/const shownWhileHidden = computed\([\s\S]*?\n\)/)[0]
-const setup = new Function(
+const shown = transpileModule(
+  source.match(/const visibility = createCommentVisibility\([\s\S]*?\nconst showSent = .*\n/)[0],
+  {},
+).outputText
+const build = new Function(
   "ref",
   "reactive",
   "computed",
+  "shallowRef",
+  "watch",
+  "onScopeDispose",
+  "createCommentVisibility",
   `
-  const commentsOpen = ref(true), popover = ref({ type: 'thread', id: 'area' }), sentShown = ref([])
+  const commentsOpen = ref(true), popover = ref({ type: 'thread', id: 'area' })
   const overlays = reactive({ pins: false }), tool = ref('comment'), selection = ref(null)
   const annotations = { beginFocus() {} }, reviewDock = ref(null)
   const hasComments = ref(true), editing = ref(false), shareOpen = ref(false), detailsPop = ref(null)
@@ -23,33 +32,44 @@ const setup = new Function(
   ${show}
   ${select}
   ${shown}
-  return { commentsOpen, popover, sentShown, overlays, shownWhileHidden, closeComments, showComments, selection, commentOnSelection }
+  return { commentsOpen, popover, showSent, overlays, shownWhileHidden, closeComments, showComments, selection, commentOnSelection }
 `,
 )
+const setup = () =>
+  effectScope().run(() => build(ref, reactive, computed, shallowRef, watch, onScopeDispose, createCommentVisibility))
 
-test("closing comments ends a thread reveal without changing the eye or a sent comment's exception", () => {
-  const state = setup(ref, reactive, computed)
-  assert.deepEqual(state.shownWhileHidden.value, ["area"])
-  state.sentShown.value = ["just-sent"]
-  state.closeComments()
-  assert.equal(state.commentsOpen.value, false)
-  assert.equal(state.popover.value, null)
-  assert.equal(state.overlays.pins, false)
-  assert.deepEqual(state.shownWhileHidden.value, ["just-sent"])
-  state.commentsOpen.value = true
-  assert.equal(state.popover.value, null)
-  state.sentShown.value = []
-  assert.deepEqual(state.shownWhileHidden.value, [])
+test("closing comments ends a thread reveal without changing the eye or a sent comment's exception", async () => {
+  vi.useFakeTimers()
+  try {
+    const state = setup()
+    assert.deepEqual(state.shownWhileHidden.value, ["area"])
+    state.showSent("just-sent")
+    state.closeComments()
+    await nextTick()
+    assert.equal(state.commentsOpen.value, false)
+    assert.equal(state.popover.value, null)
+    assert.equal(state.overlays.pins, false)
+    assert.deepEqual(state.shownWhileHidden.value, ["just-sent"])
+    state.commentsOpen.value = true
+    await nextTick()
+    assert.equal(state.popover.value, null)
+    // ViteHub's model keeps a comment just sent for 2.5 s, then lets it go.
+    vi.advanceTimersByTime(2500)
+    assert.deepEqual(state.shownWhileHidden.value, [])
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
-test("a retained popover cannot reveal a thread while the dock is dismissed", () => {
-  const state = setup(ref, reactive, computed)
+test("a retained popover cannot reveal a thread while the dock is dismissed", async () => {
+  const state = setup()
   state.commentsOpen.value = false
+  await nextTick()
   assert.deepEqual(state.shownWhileHidden.value, [])
 })
 
 test("collapsing and reopening comments retains the pending anchor and edited suggestion", () => {
-  const state = setup(ref, reactive, computed)
+  const state = setup()
   state.selection.value = {
     selector: "main > article > p",
     quote: "twelve pigeons",

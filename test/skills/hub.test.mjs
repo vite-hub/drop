@@ -868,8 +868,14 @@ test("failed builds drain started reads and skip queued reads before releasing c
     await withBudget({ limit: 1, waitMs: 40 }, async () => {
       let settled = false
       const one = discovery(event(archiveOf(first, "drain-live"))).then(
-        () => { settled = true; return undefined },
-        () => { settled = true; return undefined },
+        () => {
+          settled = true
+          return undefined
+        },
+        () => {
+          settled = true
+          return undefined
+        },
       )
       await failed
       await reads.started

@@ -49,6 +49,11 @@ const baseline = new Set([
   "server/utils/code-image-store.ts",
 ])
 const PREFIX = "\0drop-stub:"
+// By stub name, which has no `?raw` for Vite to see: the import, and the file under node_modules.
+const rawCss: Record<string, [string, string]> = {
+  "comments-css": ["comark-comments/style.css?raw", "comark-comments/dist/style.css"],
+  "comment-marks-css": ["@vite-hub/ui/comment-marks.css?raw", "@vite-hub/ui/dist/comment-marks.css"],
+}
 
 /** Swaps the runtime modules server code imports for test doubles. Tests import the real packages directly. */
 export function dropTestStubs(): Plugin {
@@ -59,8 +64,10 @@ export function dropTestStubs(): Plugin {
     apply: () => Boolean(process.env.VITEST),
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
-      // Vitest empties CSS `?raw` imports; the frame's comment layer needs comark-comments' real stylesheet.
-      if (id === "comark-comments/style.css?raw") return `${PREFIX}comments-css`
+      // Vitest empties CSS `?raw` imports; the frame's comment layer needs the real stylesheets of comark-comments and
+      // ViteHub's comment marks.
+      const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
+      if (css) return PREFIX + css[0]
       if (id in stubs) return PREFIX + id
       const module = Object.keys(modules).find(
         (name) => id.endsWith(`/utils/${name}`) || id === `./${name}` || id === `../${name}`,
@@ -71,8 +78,8 @@ export function dropTestStubs(): Plugin {
     load(id) {
       if (id.startsWith(PREFIX)) {
         const name = id.slice(PREFIX.length)
-        if (name === "comments-css")
-          return `export default ${JSON.stringify(readFileSync(`${root}node_modules/comark-comments/dist/style.css`, "utf8"))}`
+        const css = rawCss[name]
+        if (css) return `export default ${JSON.stringify(readFileSync(`${root}node_modules/${css[1]}`, "utf8"))}`
         return modules[name] ?? stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE
