@@ -29,13 +29,16 @@ const STEPS = {
 
 /**
  * The hourly cleanup: expired reservations and code images, the Trash, closed public links, unused OAuth clients,
- * yesterday's viewers, and the search index's backlog. Each run is one wide event: what each step did, how long it
+ * yesterday's viewers, and the search index's backlog.
+ *
+ * ViteHub's Schedule gives each run its own event, `schedule: { name, runId, scheduledAt, ms, outcome }`, with the
+ * error this throws. Drop's event, `action: "cleanup"` with the same `runId`, adds what each step did, how long it
  * took, and which steps failed.
  */
 export default defineSchedule({
   cron: "0 * * * *",
-  async handler({ scheduledAt }) {
-    const run = background.logger({ schedule: "cleanup", scheduledAt: scheduledAt.toISOString() })
+  async handler({ scheduledAt, runId }) {
+    const run = background.logger({ action: "cleanup", ...(runId ? { runId } : {}) })
     // Each step runs even when another fails, so a storage hiccup doesn't hold back the Trash purge.
     const errors: unknown[] = []
     const failed: string[] = []
@@ -50,10 +53,10 @@ export default defineSchedule({
         failed.push(name)
         const message = error instanceof Error ? error.message : String(error)
         run.set({ steps: { [name]: { error: message, ms: Date.now() - started } } })
-        run.error(error instanceof Error ? error : new Error(message))
       }
     }
-    if (failed.length) run.set({ failed })
+    // The error and its stack are on ViteHub's run event, which logs what this throws.
+    if (failed.length) run.warn("Cleanup steps failed", { failed })
     run.emit()
     if (errors.length === 1) throw errors[0]
     if (errors.length)

@@ -202,17 +202,17 @@ test("a person in the browser is their id on the event, never their name; an age
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {
   session.current = { user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true } }
   const banned = await request("/api/me", identify)
-  assert.equal(banned.event.auth.denied, "banned")
+  assert.equal(banned.event.identity.denied, "banned")
   assert.equal(banned.event.user, undefined)
 
   session.current = new Error("D1 is unavailable")
   const failed = await request("/api/me", identify)
   assert.equal(failed.event.level, "error")
   assert.equal(failed.event.error.message, "D1 is unavailable")
-  assert.equal(failed.event.auth.session, "failed")
+  assert.equal(failed.event.identity.session, "failed")
 })
 
-test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed", async () => {
+test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed without repeating its error", async () => {
   const now = Date.UTC(2026, 10, 17, 12)
   vi.useFakeTimers({ toFake: ["Date"], now })
   insertDrop("old", { trashed_at: now - 16 * 86_400_000, trash_reason: "deleted" })
@@ -220,11 +220,15 @@ test("the hourly cleanup emits one event a run, with each step's count, and name
     .prepare("INSERT INTO code_images (blob_key, owner_id, size, expires_at) VALUES (?, ?, ?, ?)")
     .run("code-images/expired.png", "owner", 10, now - 1)
   state.failDelete = true
-  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now) }))
-  const runs = background.filter((event) => event.schedule === "cleanup")
+  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now), runId: "srun_static_cleanup" }))
+  const runs = background.filter((event) => event.action === "cleanup")
   assert.equal(runs.length, 1)
   const [run] = runs
-  assert.equal(run.level, "error")
+  // The error itself is on ViteHub's run event, which logs what the handler throws.
+  assert.equal(run.level, "warn")
+  assert.equal(run.error, undefined)
+  assert.equal(run.runId, "srun_static_cleanup")
+  assert.equal(run.schedule, undefined)
   assert.equal(run.version, "1.2.3")
   assert.deepEqual(run.deployment, { host: "vps" })
   assert.deepEqual(run.failed, ["codeImages"])
@@ -313,7 +317,7 @@ test("a purge that fails halfway still lists the drops the run deleted", async (
   } finally {
     sql.exec("DROP TRIGGER fail_second")
   }
-  const run = background.find((event) => event.schedule === "cleanup")
+  const run = background.find((event) => event.action === "cleanup")
   assert.deepEqual(run.failed, ["drops"])
   assert.deepEqual(run.steps.drops.deleted, [{ id: "first", owner: "owner", reason: "deleted" }])
 })
@@ -384,7 +388,7 @@ test("a realtime room says why it refused someone", async () => {
   const { event } = await request("/api/_vitehub/realtime/latest/gone", (event) =>
     latest.authorize({ event, documentId: "gone", mode: "read" }),
   )
-  assert.deepEqual(event.realtime, { reason: "not-found" })
+  assert.deepEqual(event.roomAccess, { refused: "not-found" })
 })
 
 test("a missing drop's page adds nothing to its request's event, which is already out", async () => {

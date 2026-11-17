@@ -30,7 +30,7 @@ export default defineHandler(async (event) => {
   // A failed lookup signs in again through the proxy; the wide event keeps why.
   const current = await auth.api.getSession({ headers: event.req.headers }).catch((error: unknown) => {
     requestLog(event)?.warn("Session lookup failed", {
-      auth: { session: error instanceof Error ? error.message : String(error) },
+      identity: { session: error instanceof Error ? error.message : String(error) },
     })
     return null
   })

@@ -38,7 +38,8 @@ export default defineRealtime({
         : !liveEditable(drop, await identify(event))
           ? "not-editable"
           : null
-    if (refused) requestLog(event)?.set({ realtime: { reason: refused } })
+    // ViteHub's `realtime` says the room refused (`refused: "authorize"`); `roomAccess` says which of Drop's rules did.
+    if (refused) requestLog(event)?.set({ roomAccess: { refused } })
     return !refused
   },
   document: blobDocument(blob),

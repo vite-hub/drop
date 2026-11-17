@@ -101,7 +101,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   const session = await authFor(event)
     .api.getSession({ headers: event.req.headers })
     .catch((error: unknown) => {
-      logError(event, error, { auth: { session: "failed" } })
+      logError(event, error, { identity: { session: "failed" } })
       return null
     })
   if (!session?.user) return null

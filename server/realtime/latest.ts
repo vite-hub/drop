@@ -20,8 +20,9 @@ export default defineRealtime({
       import("../utils/identity"),
       import("../utils/logs"),
     ])
+    // ViteHub's `realtime` says the room refused (`refused: "authorize"`); `roomAccess` says which of Drop's rules did.
     const refuse = (refused: string) => {
-      requestLog(event)?.set({ realtime: { reason: refused } })
+      requestLog(event)?.set({ roomAccess: { refused } })
       return false
     }
     if (mode === "write") return refuse("write")

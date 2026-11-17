@@ -64,8 +64,12 @@ export function logActor(event: H3Event, who: Pick<Identity, "userId" | "role" |
 /** Why a request's identity was refused, while it still answers as signed out. */
 export type AuthDenial = "banned" | "not-member" | "not-listed"
 
+/**
+ * Drop's reason, as `identity.denied`. ViteHub's Auth owns `auth` on the same event: on a sign-in it says what Better
+ * Auth answered (`auth.outcome`, `auth.code`), not which of Drop's rules refused the person.
+ */
 export function logDenied(event: H3Event | undefined, denied: AuthDenial) {
-  requestLog(event)?.set({ auth: { denied } })
+  requestLog(event)?.set({ identity: { denied } })
 }
 
 type LoggedDrop = Pick<DropRow, "id" | "kind" | "version">
