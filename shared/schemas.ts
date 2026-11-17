@@ -274,4 +274,10 @@ export const ClientErrorSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.maxLength(120))),
   message: v.pipe(v.string(), v.maxLength(1000)),
   stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
+  // A failed request's answer, which finds it in the server's logs, and where in Drop it happened.
+  status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
+  requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
+  drop: v.optional(v.pipe(v.string(), v.maxLength(40))),
+  title: v.optional(v.pipe(v.string(), v.maxLength(200))),
+  source: v.optional(v.pipe(v.string(), v.maxLength(300))),
 })

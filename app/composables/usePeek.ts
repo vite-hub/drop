@@ -18,7 +18,10 @@ async function flush() {
   for (let offset = 0; offset < ids.length; offset += BATCH) {
     const batch = ids.slice(offset, offset + BATCH)
     const found = await $fetch<DropPeeks>("/api/drops/peeks", { query: { ids: batch.join(",") } }).catch(
-      (): DropPeeks => ({}),
+      (error: unknown): DropPeeks => {
+        reportClientError("peeks", error)
+        return {}
+      },
     )
     // A drop that sent nothing (someone else's, or gone) keeps its kind's placeholder instead of asking again.
     for (const id of batch) store.value[asked.get(id)!] = found[id] ?? null
