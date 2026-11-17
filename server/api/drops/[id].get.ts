@@ -11,6 +11,7 @@ import {
 } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { identify } from "../../utils/identity"
+import { requestLog } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 import { countView } from "../../utils/views"
 
@@ -35,7 +36,7 @@ export default defineHandler(async (event) => {
     ? Promise.all([
         recordVisit(event, drop, who, "beacon"),
         countView(event, drop, who, "beacon"),
-        recordSharedVisit(drop, who),
+        recordSharedVisit(drop, who, event),
       ])
     : undefined
   // Named after the drop, so every version of an HTML doc keeps the browser storage the last one left.
@@ -46,7 +47,14 @@ export default defineHandler(async (event) => {
   // Install metadata is optional: unavailable child content must not prevent browsing the folder itself.
   const hub =
     drop.kind === "folder" && permissions(drop, null).view
-      ? import("../../utils/hub-skills").then(({ hubInstall }) => hubInstall(drop, event)).catch(() => undefined)
+      ? import("../../utils/hub-skills")
+          .then(({ hubInstall }) => hubInstall(drop, event))
+          .catch((error: unknown) => {
+            requestLog(event)?.warn("Skill hub install metadata failed", {
+              hub: { failure: error instanceof Error ? error.message : String(error) },
+            })
+            return undefined
+          })
       : undefined
   const [detail, install] = await Promise.all([
     dropDetail(drop, who, event.url.origin, event, served ? "pages" : "all"),
