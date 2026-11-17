@@ -74,7 +74,10 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
       leave()
       const current = generation
       if (!id || !me.value) return
-      const found = await $fetch<{ room: string }>(`/api/drops/${id}/presence`).catch(() => null)
+      const found = await $fetch<{ room: string }>(`/api/drops/${id}/presence`).catch((error: unknown) => {
+        reportClientError("presence", error, { drop: id })
+        return null
+      })
       if (!found || current !== generation) return
       const { connectRealtimeRoom } = await import("@vite-hub/realtime/client")
       if (current !== generation) return

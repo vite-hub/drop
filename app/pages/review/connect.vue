@@ -40,6 +40,7 @@ async function connect(site: ReviewSite) {
       await issueReviewToken({ origin: origin.value, choice: site.choice, ...(me.value ? {} : { name: name.value }) }),
     )
   } catch (cause) {
+    reportClientError("review-connect", cause)
     error.value = errorText(cause, "Couldn't connect to this review.")
     state.value = "error"
   } finally {
@@ -57,6 +58,7 @@ async function start() {
     if (!site) throw new Error("The new review didn't show up. Press Comment on the site again.")
     await connect(site)
   } catch (cause) {
+    reportClientError("review-start", cause)
     error.value = errorText(cause, "Couldn't start a review of this site.")
     state.value = "error"
   } finally {
@@ -73,6 +75,7 @@ onMounted(async () => {
   try {
     sites.value = (await reviewSites(origin.value)).sites
   } catch (cause) {
+    reportClientError("review-sites", cause)
     error.value = errorText(cause, "Couldn't look up this site's review.")
     state.value = "error"
     return

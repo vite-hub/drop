@@ -12,6 +12,8 @@ const host = useTemplateRef<HTMLElement>("host")
 const colorMode = useColorMode()
 const state = ref<"loading" | "ready" | "failed">("loading")
 const saving = ref(false)
+// Why the last save failed, shown until one goes through.
+const unsaved = ref<string>()
 const readOnly = ref(true)
 
 type Excalidraw = typeof import("@excalidraw/excalidraw")
@@ -81,7 +83,7 @@ onMounted(async () => {
     // Excalidraw follows Drop's theme; re-rendering only passes the new prop, the scene stays.
     watch(() => colorMode.value, render)
   } catch (error) {
-    console.error(error)
+    reportClientError("board-load", error, { drop: id })
     state.value = "failed"
   }
 })
@@ -201,12 +203,21 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       await $fetch(`/api/drops/${id}/board`, { method: "POST", body: { elements } })
       for (const element of elements)
         if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
+      unsaved.value = undefined
       clearTimeout(imageTimer)
       imageTimer = setTimeout(() => void images(), 4000)
     } catch (error) {
       // Kept for the next save, unless something newer replaced them meanwhile.
       for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
-      console.error("Board save failed", error)
+      reportClientError("board-save", error, { drop: id })
+      // A refusal (no longer allowed to draw, too big) says why and waits for the next change; anything else tries again.
+      const status = httpStatus(error)
+      const refused = status !== undefined && status < 500
+      unsaved.value = refused ? `Not saved: ${errorText(error)}` : "Not saved. Trying again…"
+      if (!refused) {
+        clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => (busy = busy.then(save)), 5000)
+      }
     } finally {
       saving.value = false
     }
@@ -216,7 +227,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   async function pull() {
     if (document.hidden) return
     await busy
-    const data = await $fetch<{ snapshot: Board }>(`/api/drops/${id}/board`).catch(() => null)
+    const data = await $fetch<{ snapshot: Board }>(`/api/drops/${id}/board`).catch((error: unknown) => {
+      reportClientError("board-pull", error, { drop: id })
+      return null
+    })
     if (!data) return
     const local = new Map(api.getSceneElementsIncludingDeleted().map((element) => [element.id, element.version]))
     const newer = data.snapshot.elements.filter((element) => element.version > (local.get(element.id) ?? 0))
@@ -322,7 +336,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- an upload, from Excalidraw's callbacks in the browser
       await $fetch(`/api/drops/${id}/board/images`, { method: "POST", body: { images: out } })
     } catch (error) {
-      console.error("Board images failed", error)
+      reportClientError("board-images", error, { drop: id })
     }
   }
   // The first person to open a board an agent made gives agents its first images.
@@ -356,10 +370,11 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     </div>
     <div
       v-if="state === 'ready'"
-      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
+      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs"
+      :class="unsaved && !readOnly ? 'text-error' : 'text-dimmed'"
       aria-live="polite"
     >
-      {{ readOnly ? "View only" : saving ? "Saving…" : "" }}
+      {{ readOnly ? "View only" : saving ? "Saving…" : (unsaved ?? "") }}
     </div>
   </div>
 </template>

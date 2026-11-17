@@ -53,7 +53,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       void wrote.trigger()
       return { value: comment }
     } catch (error) {
-      return { error: notify.problem(error) }
+      return { error: notify.problem(error, "Couldn't send the comment") }
     }
   }
 
@@ -107,7 +107,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       void wrote.trigger()
       return { value: reply }
     } catch (error) {
-      return { error: notify.problem(error) }
+      return { error: notify.problem(error, "Couldn't send the reply") }
     }
   }
 
@@ -132,7 +132,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       void wrote.trigger()
       return { value: edited } satisfies Sent<CommentReply>
     } catch (error) {
-      return { error: notify.problem(error) } satisfies Sent<CommentReply>
+      return { error: notify.problem(error, "Couldn't edit the message") } satisfies Sent<CommentReply>
     }
   }
 
