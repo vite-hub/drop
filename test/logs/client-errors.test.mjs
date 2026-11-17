@@ -1,5 +1,8 @@
 import assert from "node:assert/strict"
-import { test } from "vite-plus/test"
+import { test, vi } from "vite-plus/test"
+import * as v from "valibot"
+import { createFetch } from "ofetch"
+import { sendFile } from "../../app/utils/send-file.ts"
 import { createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
 
 const page = { path: "/d/abc123", online: true, leaving: false }
@@ -66,14 +69,14 @@ test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its statu
   )
 })
 
-test("any other 5xx is Drop's own answer, which its server logged, whatever the body", () => {
+test("a 5xx without Drop's error body is reported", () => {
   const { sent, report } = reporter()
   // A file fetched as a blob, an HTML error page, Better Auth's answer.
   report("image-load", fetchError({ status: 500, data: new Blob(["Server Error"]) }))
   report("visit", fetchError({ status: 500, data: "<!doctype html><title>500</title>" }))
   report("signin", { status: 500, statusText: "Internal Server Error", message: "Failed" })
   report("notify", fetchError({ status: 501 }))
-  assert.deepEqual(sent, [])
+  assert.equal(sent.length, 4)
 })
 
 test("aborted requests, offline browsers, and pages that are leaving aren't reported", () => {
@@ -115,4 +118,52 @@ test("httpStatus reads ofetch's, Better Auth's, and an upload's status, and none
   assert.equal(httpStatus(Object.assign(new Error("0"), { status: 0 })), undefined)
   assert.equal(httpStatus(fetchError({ cause: new TypeError("Failed to fetch") })), undefined)
   assert.equal(httpStatus(new Error("x")), undefined)
+})
+
+for (const status of [200, 500, 503])
+  test(`an invalid upload answer (${status}) is reported with its fallback request id`, async () => {
+    class Request {
+      status = status
+      statusText = ""
+      responseText = status === 200 ? "{}" : "<html>cloudflare</html>"
+      open() {}
+      setRequestHeader() {}
+      getResponseHeader(name) {
+        return name === "x-request-id" ? "upload-123" : null
+      }
+      addEventListener(name, callback) {
+        if (name === "load") this.load = callback
+      }
+      send() {
+        this.load()
+      }
+    }
+    vi.stubGlobal("XMLHttpRequest", Request)
+    try {
+      const error = await sendFile("/upload", new FormData(), v.object({ id: v.string() })).catch((error) => error)
+      const { sent, report } = reporter()
+      report("upload", error)
+      assert.equal(sent.length, 1)
+      assert.equal(sent[0].status, status)
+      assert.equal(sent[0].requestId, "upload-123")
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+test("an ofetch HTML 500 from the edge keeps its cf-ray", async () => {
+  const fetch = createFetch({
+    defaults: { retry: 0 },
+    fetch: async () =>
+      new Response("<html>cloudflare</html>", {
+        status: 500,
+        headers: { "content-type": "text/html", "cf-ray": "edge-500" },
+      }),
+  })
+  const error = await fetch("https://drop.example/api/drops").catch((error) => error)
+  const { sent, report } = reporter()
+  report("notify", error)
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].status, 500)
+  assert.equal(sent[0].requestId, "edge-500")
 })

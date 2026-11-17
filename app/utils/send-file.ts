@@ -27,7 +27,7 @@ export function sendFile<Schema extends v.GenericSchema>(
       if (request.status < 200 || request.status >= 300)
         return reject(
           new SendFileError(request.status, request.statusText || undefined, data, {
-            requestId: request.getResponseHeader("cf-ray") ?? undefined,
+            requestId: request.getResponseHeader("cf-ray") ?? request.getResponseHeader("x-request-id") ?? undefined,
           }),
         )
       report?.(1)
@@ -36,7 +36,7 @@ export function sendFile<Schema extends v.GenericSchema>(
       else
         reject(
           new SendFileError(request.status, "Drop answered the upload with something unexpected.", data, {
-            requestId: request.getResponseHeader("cf-ray") ?? undefined,
+            requestId: request.getResponseHeader("cf-ray") ?? request.getResponseHeader("x-request-id") ?? undefined,
           }),
         )
     })

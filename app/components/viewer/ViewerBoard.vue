@@ -226,10 +226,11 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       // Kept for the next save, unless something newer replaced them meanwhile.
       for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
       reportClientError("board-save", error, { drop: id })
-      // A refusal (no longer allowed to draw, too big) says why and waits for the next change; anything else tries
+      // A permanent refusal (no longer allowed to draw, too big) waits for the next change; rate limits try
       // again, less often each time, down to once a minute.
       const status = httpStatus(error)
-      if (status !== undefined && status < 500) unsaved.value = `Not saved: ${errorText(error)}`
+      if (status !== undefined && status >= 400 && status < 500 && status !== 429)
+        unsaved.value = `Not saved: ${errorText(error)}`
       else {
         schedule(saveRetryDelay(++failures))
         unsaved.value = "Not saved. Trying again…"
