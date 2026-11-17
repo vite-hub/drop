@@ -38,7 +38,7 @@ test("the client loads on its first call, once, and calls each method on its own
   assert.deepEqual(all, ["cus_1", "cus_2"])
   assert.equal(loads, 1)
 
-  await assert.rejects(client.customers.prefix(), /customers\.prefix is not a function/)
+  await assert.rejects(client.customers.prefix(), TypeError, "a path that names no method")
 })
 
 test("a lazy Stripe client verifies a webhook as the SDK does", async () => {

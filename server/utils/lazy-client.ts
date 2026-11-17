@@ -9,31 +9,34 @@
 export function lazyClient<T extends object>(load: () => Promise<T>): T {
   let loading: Promise<T> | undefined
   const real = () => (loading ??= load())
-  const at = (path: readonly PropertyKey[]): T =>
-    // SAFETY: the proxy answers every property path of T with a callable stand-in that forwards to the real client.
+  const at = (path: readonly PropertyKey[]): unknown =>
     new Proxy(function () {}, {
       // An awaited client is not a promise: `await client` keeps the proxy.
       get: (_, key) => (key === "then" ? undefined : at([...path, key])),
       apply: (_, __, args: unknown[]) => call(real, path, args),
-    }) as unknown as T
-  return at([])
+    })
+  const client = at([])
+  // SAFETY: the proxy answers every property path of T with a callable stand-in that forwards to the real client.
+  return client as T
 }
 
 function call(real: () => Promise<object>, path: readonly PropertyKey[], args: unknown[]) {
   // Boxed, so awaiting it doesn't flatten a result that is itself a promise and an iterator (Stripe's list()).
-  const result = real().then((client) => {
+  const result: Promise<{ value: unknown }> = real().then((client) => {
     let self: unknown = client
     for (const key of path.slice(0, -1)) self = Reflect.get(Object(self), key)
-    const method: unknown = Reflect.get(Object(self), path.at(-1)!)
-    if (typeof method !== "function") throw new TypeError(`${path.map(String).join(".")} is not a function`)
-    return { value: Reflect.apply(method, self, args) as unknown }
+    // Reflect.apply throws a TypeError when the path names no method.
+    const method: (...args: unknown[]) => unknown = Reflect.get(Object(self), path.at(-1) ?? "")
+    return { value: Reflect.apply(method, self, args) }
   })
   // The same shape as Stripe's own results: a promise that iterates too.
   return Object.assign(
     result.then((box) => box.value),
     {
       async *[Symbol.asyncIterator]() {
-        yield* (await result).value as AsyncIterable<unknown>
+        const { value } = await result
+        // SAFETY: yield* throws a TypeError when the real result isn't async iterable, as iterating it directly would.
+        yield* value as AsyncIterable<unknown>
       },
     },
   )
