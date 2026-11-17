@@ -63,12 +63,23 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
   const ancestors = row.drop.parentId
     ? walkUp([row.drop], new Map(rows.map((item) => [item.drop.id, item.drop]))).get(row.drop.id)!
     : []
-  const drop: DropRow = {
-    ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
-    ownerBanned: !row.owner || Boolean(row.owner.banned),
-  }
-  if (event && drop.shareReview && (await shareReviewFor(drop.ownerId, event, row.owner)) === null)
-    drop.shareReview = null
+  return currentReview(
+    {
+      ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
+      ownerBanned: !row.owner || Boolean(row.owner.banned),
+    },
+    row.owner,
+    event,
+  )
+}
+
+/**
+ * `drop` as review policy stands now: a review its path stored while sharing is dropped once the policy no longer asks
+ * for one (approval turned off, or the owner approved since). `owner` is the drop's owner row, joined by the caller's
+ * query, so this adds none. Without an event, the stored review stands.
+ */
+export async function currentReview(drop: DropRow, owner: typeof user.$inferSelect | null, event?: H3Event) {
+  if (event && drop.shareReview && (await shareReviewFor(drop.ownerId, event, owner)) === null) drop.shareReview = null
   return drop
 }
 
@@ -502,7 +513,7 @@ async function readFile(key: string) {
 
 export const readText = async (key: string) => (await readFile(key)).text()
 
-const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
+export const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
 
 /**
  * Whether someone may open this drop in the live editor: a person in the browser (never an agent) who may edit the

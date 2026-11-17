@@ -71,9 +71,10 @@ test("Discovery v0.2.0: a multi-file skill is a tar.gz of the skill directory, S
   assert.equal(single.digest, await sha256(new Uint8Array(await (await get(single.url)).arrayBuffer())))
 })
 
-test("each skill file is served on its own with its content type, and v0.1.0 lists the files", async () => {
+test("each skill file is served on its own as sandboxed text, Markdown as Markdown, and v0.1.0 lists the files", async () => {
   const picker = await get("/.well-known/agent-skills/prototype/assets/picker.js")
-  assert.equal(picker.headers.get("content-type"), "text/plain; charset=utf-8") // vitehub#4635 serves every non-Markdown skill file as sandboxed text
+  assert.equal(picker.headers.get("content-type"), "text/plain; charset=utf-8")
+  assert.equal(picker.headers.get("content-security-policy"), "default-src 'none'; sandbox")
   assert.equal(
     (await get("/.well-known/skills/prototype/SKILL.md")).headers.get("content-type"),
     "text/markdown; charset=utf-8",

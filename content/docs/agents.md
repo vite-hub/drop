@@ -32,13 +32,40 @@ Drop's skills come with the server through the MCP Skills extension (`skills/lis
 - `data-explorer` turns a dataset, such as a CSV, an export, or what your agent pulls from PostHog or another tool, into one interactive page: findings, charts, matrices and tables behind tabs, and a sidebar where a click on any name filters the whole page. Publish it to Drop and a rebuild on new data becomes the next version at the same link.
 - `show-me` explains the current topic with diagrams and short docs in Drop. Agents use it only when you ask for it.
 - `learning` keeps a model of what you know per topic in a `learning` folder, with the answers behind it and when each concept is due for review, so a lesson starts where your knowledge stops. It also quizzes you, in chat or in a doc, to place you on a new topic or review what's due. The first time, it suggests the folders to create.
-- `skill-hub` shares agent skills through a Drop folder: it publishes a skill from your disk into the hub, and installs one from it into the agents you pick with the [skills CLI](https://github.com/vercel-labs/skills), so private and team skills install the same way as public ones.
+- `skill-hub` shares agent skills through a Drop folder: it publishes a skill from your disk into the folder, and installs one from it into the agents you pick. See [Share skills from a folder](#skill-hub).
 
 The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there for everyone; every way of getting skills then leaves it out.
+
+To install them into agents that don't load skills over MCP, run the [skills CLI](https://github.com/vercel-labs/skills) with this Drop's address. It asks which skills and which agents, and copies each skill where those agents read it:
+
+```sh
+npx skills add $ORIGIN
+```
+
+Add `--skill <name>` to install one, such as `--skill pr-evidence`. `npx skills update` brings installed skills up to date.
 
 Agents that discover skills over HTTP find them at `/.well-known/agent-skills/index.json`, which follows [Agent Skills Discovery](https://github.com/cloudflare/agent-skills-discovery-rfc) v0.2.0, and at the older `/.well-known/skills/`. Fetching Drop's home page with `Accept: text/markdown` returns the `vitehub-drop` skill.
 
 Agents that start from the web read `/llms.txt`, an index of everything below, and `/agents.md`, a start guide with this Drop's limits and the skill. Every docs page is also Markdown at its path plus `.md`, such as `/docs/agents.md`.
+
+### Share skills from a folder {#skill-hub}
+
+A **skill hub** is a folder with one subfolder per skill, laid out as the `skill-hub` skill describes. Ask your agent to publish a skill into it, and anyone who can open the folder installs from it.
+
+| Hub's share | Install | Update |
+| --- | --- | --- |
+| Public link, or Public, anyone comments | `npx skills add <folder link>` | `npx skills update` |
+| Only me, Team, or Team can edit | Ask an agent with the `skill-hub` skill | Ask the agent again |
+
+A public hub's link works as a skills CLI source. The **Install** button on the hub's page copies the command, and on a skill's folder it adds `--skill <name>` to install only that skill:
+
+```sh
+npx skills add <folder link> --skill release-notes
+```
+
+A new version published to the hub reaches `npx skills update` within about a minute. The CLI doesn't sign in, so a private or team hub installs through your agent instead: it downloads the skill over MCP and runs the CLI on the copy. Installing doesn't count as a [visit](/docs/review#expiry), so set the hub's lifetime to Never delete.
+
+If this Drop closes public links after some days (`DROP_PUBLIC_LINK_DAYS`, 7 by default on a team Drop), the hub stops installing when its link closes. Share it public again to reopen it.
 
 ## Tools and prompts {#tools}
 
