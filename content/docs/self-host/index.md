@@ -145,7 +145,7 @@ Drop leaves out the caught failures in the first three rows. The last applies to
 | Not sent | Why |
 | --- | --- |
 | A refusal (any 4xx) | The server gave that answer on purpose. |
-| Drop's own 5xx | The server already logged it. A gateway's 502, 503, 504, or 52x is sent, since Drop may never have seen the request. |
+| A 5xx with Drop's error body | The server already logged it. Any other 5xx, such as a gateway's HTML page, is sent, since Drop may never have seen the request. |
 | An aborted request, an offline browser, a page that's closing | None of these is a failure. |
 | The same message twice, or past ten a page | The page sends each once, and at most ten a page load. |
 
