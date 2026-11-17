@@ -132,10 +132,11 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
 
 /**
  * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
- * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's other
- * files do, with per-drop origins: the viewer sends a grant along, kept here as a cookie, which opens that app's files
- * on this origin and nothing else (server/utils/app-files.ts). Opened outside a frame it shows nothing: there is no
- * parent to take a document from. The viewer's page renders the frame on the server, so this page can load before the
+ * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's files
+ * do, with per-drop origins: the viewer sends a grant along, kept here as a cookie, which opens that app's files on
+ * this origin and nothing else (server/utils/app-files.ts). Its pages too: the viewer asks for one (`read`), the host
+ * reads it here and posts its HTML back (`page`), and the document the viewer builds from it comes down as above.
+ * Opened outside a frame it shows nothing: there is no parent to take a document from. The viewer's page renders the frame on the server, so this page can load before the
  * viewer's script listens: it says hello once it does, and the host asks again.
  *
  * The `data-vitehub-page-tools` mark keeps ViteHub from adding its page tools loader to this page. That loader is a
@@ -149,9 +150,16 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
     const message = event.data;
     if (event.source !== parent || !message || message.__drop !== true) return;
     if (message.type === "hello") return ask();
-    if (message.type !== "document" || typeof message.html !== "string") return;
     if (typeof message.grant === "string" && /^[\\w.:-]+$/.test(message.grant))
       document.cookie = "drop_grant=" + message.grant + "; Path=/; Max-Age=43200" + (isSecureContext ? "; Secure; SameSite=None; Partitioned" : "; SameSite=Lax");
+    if (message.type === "read" && typeof message.page === "string") {
+      const page = message.page;
+      return void fetch("/" + page.split("/").map(encodeURIComponent).join("/"), { headers: { "x-drop-read": "page" } })
+        .then((response) => (response.ok ? response.text() : undefined))
+        .catch(() => undefined)
+        .then((html) => parent.postMessage({ __drop: true, type: "page", page, html }, "*"));
+    }
+    if (message.type !== "document" || typeof message.html !== "string") return;
     // A written document paints before its stylesheets load, unlike one the browser navigates to, so an app would show
     // unstyled first. Keep it hidden until they load or fail, with a 3-second cap for a stylesheet that never answers.
     const hold = "<style data-drop-hold>html{visibility:hidden!important}</style>";

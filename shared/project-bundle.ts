@@ -153,12 +153,20 @@ function pageRuntime(files: ProjectFiles, page: string): string {
     addEventListener("popstate", report);
     addEventListener("hashchange", report);
     // Apps that frame their own pages load the frame host again, one level down. Pass its request up to Drop
-    // and the document back down, as many levels as the app nests.
+    // and the document back down, as many levels as the app nests. A page Drop lacks the HTML of is read here,
+    // on the app's origin, as the frame host does.
     const waiting = new Map();
     addEventListener("message", (event) => {
       const message = event.data;
       if (!message || message.__drop !== true) return;
-      if (event.source === parent && message.type === "document" && waiting.has(message.id)) {
+      if (event.source === parent && message.type === "read" && typeof message.page === "string") {
+        const read = message.page;
+        native("/" + read.split("/").map(encodeURIComponent).join("/"), { headers: { "x-drop-read": "page" } })
+          .then((response) => (response.ok ? response.text() : undefined))
+          .catch(() => undefined)
+          .then((html) => post({ type: "page", page: read, html }));
+      }
+      else if (event.source === parent && message.type === "document" && waiting.has(message.id)) {
         const [frame, id] = waiting.get(message.id);
         waiting.delete(message.id);
         frame.postMessage({ __drop: true, type: "document", id, html: message.html }, location.origin);

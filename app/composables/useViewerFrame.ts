@@ -103,8 +103,25 @@ export function useViewerFrame(options: {
   watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
   // Only the viewer's direct document uses its bar; nested app frames keep their own picker controls.
   const variantBar = (html: string) => (options.variantBar && html ? withVariantBar(html) : html)
-  const appDocument = (path: string) =>
-    injectRuntime(buildProjectDocument(files.value, path), dark.value, startInset, true)
+  /**
+   * The HTML of the app's pages that its frame read on the app's own origin, when the drop came without it (an app
+   * its origin serves: server/api/drops/[id].get.ts). `null` for a page that didn't load.
+   */
+  const readPages = shallowRef(new Map<string, string | null>())
+  watch([() => drop.value.id, () => drop.value.version], () => {
+    readPages.value = new Map()
+  })
+  const unread = (path: string) =>
+    !!drop.value.contentGrant &&
+    pages.value.includes(path) &&
+    files.value[path] === undefined &&
+    !readPages.value.has(path)
+  function appDocument(path: string) {
+    if (unread(path)) return ""
+    const html = readPages.value.get(path)
+    const source = typeof html === "string" ? { ...files.value, [path]: html } : files.value
+    return injectRuntime(buildProjectDocument(source, path), dark.value, startInset, true)
+  }
   // Built only once mounted: the server can't know the reader's color mode, and a light document in a dark page paints
   // the frame white until the dark one replaces it. The panel's room goes in too (startInset), so a doc opened with the
   // panel showing doesn't slide left once it loads.
@@ -250,6 +267,9 @@ export function useViewerFrame(options: {
     return embed
   }
 
+  /** The app's own frames waiting on a page the frame is reading, by page: their requests' ids. */
+  const reading = new Map<string, string[]>()
+
   const quiz = useViewerQuiz(drop, (message) => send(message))
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
@@ -271,12 +291,29 @@ export function useViewerFrame(options: {
       case "host":
         asked = true
         followFrame(message.path)
+        // The grant lets this app's origin serve it its files (server/utils/app-files.ts), the page itself included,
+        // which the frame reads first when the drop came without it.
+        if (isApp.value && unread(page.value))
+          return send({ type: "read", page: page.value, grant: drop.value.contentGrant })
         frameDocument = srcdoc.value
-        // The grant lets this app's origin serve it its other files (server/utils/app-files.ts).
         return send({ type: "document", html: frameDocument, grant: drop.value.contentGrant })
+      case "page": {
+        if (!isApp.value || !unread(message.page)) return
+        readPages.value = new Map(readPages.value).set(message.page, message.html ?? null)
+        // Sent before the watcher below sees the new document, so it finds the frame showing it already.
+        for (const id of reading.get(message.page) ?? [])
+          send({ type: "document", id, html: appDocument(message.page) })
+        reading.delete(message.page)
+        if (message.page !== page.value) return
+        frameDocument = srcdoc.value
+        return send({ type: "document", html: frameDocument })
+      }
       case "frame-request": {
         if (!isApp.value) return
-        return send({ type: "document", id: message.id, html: appDocument(appPageFor(pages.value, message.path)) })
+        const target = appPageFor(pages.value, message.path)
+        if (!unread(target)) return send({ type: "document", id: message.id, html: appDocument(target) })
+        reading.set(target, [...(reading.get(target) ?? []), message.id])
+        return send({ type: "read", page: target })
       }
       case "location":
         followFrame(message.path)

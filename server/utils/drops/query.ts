@@ -547,10 +547,10 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
 }
 
 /**
- * What an app's detail reads of its files: `all` its text files, for the viewer to build pages from; `pages` only its
- * HTML, when its origin serves the rest; `agent` the smaller text files, for read_drop, and only sizes for the rest.
+ * What an app's detail reads of its files: `all` its text files, for the viewer to build pages from; `none` when its
+ * origin serves them all, its pages too; `agent` the smaller text files, for read_drop, and only sizes for the rest.
  */
-type AppText = "all" | "pages" | "agent"
+type AppText = "all" | "none" | "agent"
 // read_drop's share of a built app: enough to see what it is without pasting a bundle into an agent's context.
 const AGENT_FILE_BYTES = 64 * 1024
 const AGENT_FILES = 40
@@ -615,16 +615,14 @@ async function bodyOf(
   }
   if (row.kind === "app") {
     const files = await db.select().from(dropFiles).where(eq(dropFiles.dropId, row.id))
-    const read = files
-      .filter((file) =>
-        appText === "pages"
-          ? /\.html?$/i.test(file.path)
-          : isTextFile(file.path) && (appText === "all" || file.size <= AGENT_FILE_BYTES),
+    if (appText !== "none") {
+      const read = files
+        .filter((file) => isTextFile(file.path) && (appText === "all" || file.size <= AGENT_FILE_BYTES))
+        .slice(0, appText === "agent" ? AGENT_FILES : undefined)
+      detail.files = Object.fromEntries(
+        await Promise.all(read.map(async (file) => [file.path, await readText(file.blobKey)] as const)),
       )
-      .slice(0, appText === "agent" ? AGENT_FILES : undefined)
-    detail.files = Object.fromEntries(
-      await Promise.all(read.map(async (file) => [file.path, await readText(file.blobKey)] as const)),
-    )
+    }
     detail.paths = files.map((file) => file.path).sort()
     detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
