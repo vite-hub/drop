@@ -502,8 +502,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     "drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#fafafa") + ";border-color:var(--foreground);background-color:var(--foreground);color:var(--background);transition:box-shadow .12s}" +
     ":root.dark drop-bubble.cr-bub{--cr-icon:" + bubbleIcon("#0a0a0a") + "}" +
     "drop-bubble.cr-bub:hover,drop-bubble.cr-bub[data-on]{border-color:var(--foreground);color:var(--background);box-shadow:0 0 0 3px color-mix(in oklab,var(--foreground) 18%,transparent)}" +
-    // The package's .cr-cm tint and underline, on its own comment color, which the bubble resolves (render).
-    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--drop-anchor) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--drop-anchor) 80%,transparent);text-underline-offset:.25em}" +
+    // The package's .cr-cm tint and underline, in ViteHub's comment blue (--vh-comment-mark, from MARKS_CSS in
+    // pageStyle), as the areas are, not the package's amber.
+    "::highlight(drop-margin){background-color:color-mix(in srgb,var(--vh-comment-mark) 22%,transparent);text-decoration:underline 2px color-mix(in srgb,var(--vh-comment-mark) 80%,transparent);text-underline-offset:.25em}" +
     // A suggested edit, in the package's redline (.cr-sg del and ins): the quote struck through in red, as a highlight,
     // and the new words after it in green. They're generated from data-text, so the page gains no text of its own.
     "::highlight(drop-del){color:color-mix(in oklab,var(--destructive) 70%,var(--foreground));background-color:color-mix(in srgb,var(--destructive) 11%,transparent);text-decoration:line-through 1.5px color-mix(in srgb,var(--destructive) 75%,transparent)}" +
@@ -835,9 +836,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (wide && view.pins && !zoom) {
       if (!BUBBLES.isConnected) document.head.appendChild(BUBBLES);
       for (const m of markers) if (inRail(m) && ranges.get(m.id)) insertBubble(m, ranges.get(m.id));
-      const bubble = bubbles.values().next().value;
-      const anchor = bubble && getComputedStyle(bubble).getPropertyValue("--_cr-comment").trim();
-      if (anchor && document.documentElement.style.getPropertyValue("--drop-anchor") !== anchor) document.documentElement.style.setProperty("--drop-anchor", anchor);
     }
     // After the bubbles: each is inserted at its quote's end, so the new words land between the quote and its bubble.
     const redlined = !zoom ? shown.filter((m) => suggests(m) && ranges.get(m.id)) : [];
