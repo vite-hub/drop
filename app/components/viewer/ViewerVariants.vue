@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // A prototype's state in the review dock's bar, in place of the bar its picker (skills/prototype) draws on a page alone.
-// On the canvas: the tool (Move, or Hand to pan from anywhere, as in Figma), how many items, and the camera. In focus: the item showing with its note, a step either way, and the
-// way back to the canvas. The page keeps the state and does the switching; this shows it and sends the reader's
+// On the canvas: one zoom chip whose menu holds the camera and the Hand tool (pan from anywhere, as in Figma); the Hand
+// shows pressed beside it while it's on, so one press puts it down. In focus: the item showing with its note, a step
+// either way, and the way back to the canvas. The page keeps the state and does the switching; this shows it and sends the reader's
 // commands. While the page isn't focused, 1–9 open an item here too, ← → step in focus, and holding Space pans.
 // H and V are DropViewer's shortcuts, since H means History elsewhere. The address's #v-… names
 // the item in focus, as it does on the page alone, and opens it in focus on the next visit.
+import type { DropdownMenuItem } from "@nuxt/ui"
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
 const props = defineProps<{ state: ViewerVariants }>()
@@ -65,62 +67,61 @@ const release = () => {
 useEventListener("keyup", (event: KeyboardEvent) => event.key === " " && release())
 useEventListener("blur", release)
 
-const tools = [
-  { command: "move", label: "Move", icon: "i-mingcute-cursor-3-line", kbd: "V" },
-  { command: "hand", label: "Hand", icon: "i-mingcute-hand-line", kbd: "H" },
-] as const
 const tool = computed(() => props.state.tool ?? "move")
-
-const camera: { command: PickerCommand; label: string; icon?: string; kbd: string }[] = [
-  { command: "zoom-out", label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbd: "−" },
-  { command: "zoom-in", label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbd: "+" },
-  { command: "fit", label: "Fit", kbd: "Shift 1" },
-  { command: "reset", label: "Reset", kbd: "0" },
-]
+const zoomItems = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      type: "label",
+      ui: { label: "font-normal text-muted", itemLabel: "whitespace-normal text-pretty" },
+      label: `${count.value} items. Double-click a name, or press 1–9, to open one`,
+    },
+    { label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbds: ["+"], onSelect: () => emit("command", "zoom-in") },
+    { label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbds: ["−"], onSelect: () => emit("command", "zoom-out") },
+    { label: "Zoom to fit", kbds: ["shift", "1"], onSelect: () => emit("command", "fit") },
+    { label: "Zoom to 100%", kbds: ["0"], onSelect: () => emit("command", "reset") },
+  ],
+  [
+    {
+      type: "checkbox",
+      label: "Hand tool",
+      kbds: ["H"],
+      checked: tool.value === "hand",
+      onSelect: () => emit("command", tool.value === "hand" ? "move" : "hand"),
+    },
+  ],
+])
 </script>
 
 <template>
   <div ref="group" aria-label="Prototype" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
     <template v-if="state.canvas">
       <UTooltip
-        v-for="item in tools"
-        :key="item.command"
+        v-if="tool === 'hand'"
         :content="{ side: 'top', sideOffset: 8 }"
-        :kbds="[item.kbd]"
-        :text="item.command === 'hand' ? 'Hand: drag anywhere to pan, or hold Space' : item.label"
+        :kbds="['V']"
+        text="Hand: drag anywhere to pan. Press to put it down"
       >
         <button
-          :aria-keyshortcuts="item.kbd"
-          :aria-label="item.label"
-          :aria-pressed="tool === item.command"
+          aria-keyshortcuts="H"
+          aria-label="Hand"
+          aria-pressed="true"
           class="inline-flex shrink-0 items-center"
           type="button"
-          @click="emit('command', item.command)"
+          @click="emit('command', 'move')"
         >
-          <UIcon aria-hidden="true" :name="item.icon" />
+          <UIcon aria-hidden="true" name="i-mingcute-hand-line" />
         </button>
       </UTooltip>
-      <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
-      <UTooltip :content="{ side: 'top', sideOffset: 8 }" text="Double-click a name, or press 1–9, to open one">
-        <span class="shrink-0 px-2 text-muted tabular-nums">{{ count }} items</span>
-      </UTooltip>
-      <span aria-hidden="true" class="mx-1 h-4 w-px shrink-0 bg-(--ui-border)" />
-      <template v-for="(item, index) in camera" :key="item.command">
-        <span v-if="index === 1" aria-live="polite" class="min-w-[5ch] shrink-0 text-center text-muted tabular-nums">
-          {{ state.zoom }}%
-        </span>
-        <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="[item.kbd]" :text="item.label">
-          <button
-            :aria-label="item.icon ? item.label : undefined"
-            class="inline-flex shrink-0 items-center"
-            type="button"
-            @click="emit('command', item.command)"
-          >
-            <UIcon v-if="item.icon" aria-hidden="true" :name="item.icon" />
-            <template v-else>{{ item.label }}</template>
-          </button>
-        </UTooltip>
-      </template>
+      <UDropdownMenu :content="{ side: 'top', sideOffset: 10 }" :items="zoomItems" :ui="{ content: 'w-60' }">
+        <button
+          :aria-label="`Zoom, ${state.zoom}%`"
+          class="inline-flex shrink-0 items-center gap-0.5 tabular-nums"
+          type="button"
+        >
+          <span aria-live="polite">{{ state.zoom }}%</span>
+          <UIcon aria-hidden="true" name="i-mingcute-down-small-line" />
+        </button>
+      </UDropdownMenu>
     </template>
     <template v-else>
       <UTooltip :content="{ side: 'top', sideOffset: 8 }" :kbds="['←']" text="Previous">

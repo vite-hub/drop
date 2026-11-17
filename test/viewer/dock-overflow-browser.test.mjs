@@ -59,13 +59,13 @@ const entry = `
           ...["Marker", "Comments", "Share"].map(label => Vue.h("button", null, label)),
           Vue.h(Details, {
             open: open.value, "onUpdate:open": value => open.value = value,
-            pop: null, meta: "12 KB · 42 views", version: "v2",
+            pop: false, chip: "v2 · 42 views", details: true, history: true,
             actions: [
               { id: "edit", label: "Edit", icon: "" },
-              { id: "window", label: "Open in new window", icon: "", to: "#window" },
+              { id: "download", label: "Download original", icon: "", to: "#download" },
               { id: "trash", label: "Move to Trash", icon: "", destructive: true },
             ],
-          }, { tools: () => Vue.h(Toolbar, { tool: "browse", sizable: true, views: ["rulers", "xray"] }) }),
+          }, { tools: () => Vue.h(Toolbar, { tool: "browse", sizable: true, tools: ["measure"], views: ["rulers", "xray"] }) }),
         ],
       })
     },
@@ -74,7 +74,7 @@ const entry = `
   app.component("UTooltip", passthrough)
   app.component("UPopover", passthrough)
   app.component("UIcon", { render: () => Vue.h("span") })
-  app.component("NuxtLink", { setup: (_, { attrs, slots }) => () => Vue.h("a", { ...attrs, href: "#window" }, slots.default?.()) })
+  app.component("NuxtLink", { setup: (_, { attrs, slots }) => () => Vue.h("a", { ...attrs, href: "#download" }, slots.default?.()) })
   app.component("ViewerDeviceButton", { render: () => Vue.h("button", { "aria-label": "Device mode" }, "Device") })
   app.mount("#app")
 `
@@ -115,15 +115,13 @@ for (const width of [320, 640, 667, 1440])
       await page.goto("https://drop.test/")
       await page.getByRole("button", { name: "More", exact: true }).click()
       for (const label of [
-        "Browse",
         "Measure",
         "Rulers and guides",
         "X-ray",
         "Device mode",
         "Edit",
-        "Details",
-        "History, v2",
-        "Open in new window",
+        "Details and history, v2 · 42 views",
+        "Download original",
         "Move to Trash",
       ]) {
         const control = page.getByLabel(label, { exact: true })
@@ -141,7 +139,7 @@ for (const width of [320, 640, 667, 1440])
         await control.tap()
       }
       await page.getByRole("button", { name: "Close", exact: true }).click()
-      assert.equal(await page.getByRole("button", { name: "Browse", exact: true }).count(), 0)
+      assert.equal(await page.getByRole("button", { name: "Measure", exact: true }).count(), 0)
     } finally {
       await browser.close()
     }
