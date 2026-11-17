@@ -48,8 +48,8 @@ const markers = [
   { ...text("c8", ""), kind: "area", selector: "h1", quote: null, ow: 1000, oh: 1000 },
 ]
 
-async function open(browser, width) {
-  const document = planDocument("markdown", "", false, html).replace(FONTS, `${typeset}${shell}</style><style>${theme}`)
+async function open(browser, width, dark = false) {
+  const document = planDocument("markdown", "", dark, html).replace(FONTS, `${typeset}${shell}</style><style>${theme}`)
   const escaped = document.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const context = await browser.newContext({ viewport: { width, height: 900 } })
   await context.route("**/*", (route) =>
@@ -468,6 +468,39 @@ test("a saved area is a soft line of ViteHub's comment blue, full blue while its
     const focused = await look()
     assert.equal(focused.area.border, focused.blue)
     assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("the margin's quotes take ViteHub's comment blue, as its areas do, on light and dark docs", async () => {
+  const browser = await chromium.launch()
+  try {
+    for (const dark of [false, true]) {
+      const { context, frame } = await open(browser, 1440, dark)
+      await frame.waitForFunction(() => CSS.highlights.get("drop-margin")?.size === 5)
+      const look = await frame.evaluate(() => {
+        const mark = getComputedStyle(document.documentElement).getPropertyValue("--vh-comment-mark").trim()
+        const probe = document.body.appendChild(document.createElement("i"))
+        const color = (value) => ((probe.style.color = value), getComputedStyle(probe).color)
+        const quote = getComputedStyle(document.querySelector("main > article > p"), "::highlight(drop-margin)")
+        const result = {
+          mark: color(mark),
+          // The area's blue, from the shadow host (@vite-hub/ui/comment-marks.css).
+          area: color(getComputedStyle(document.querySelector("drop-comments")).getPropertyValue("--vh-comment-mark")),
+          fill: quote.backgroundColor,
+          underline: quote.textDecorationColor,
+          wantFill: color(`color-mix(in srgb, ${mark} 22%, transparent)`),
+          wantUnderline: color(`color-mix(in srgb, ${mark} 80%, transparent)`),
+        }
+        probe.remove()
+        return result
+      })
+      assert.equal(look.mark, look.area, dark ? "dark" : "light")
+      assert.equal(look.fill, look.wantFill)
+      assert.equal(look.underline, look.wantUnderline)
+      await context.close()
+    }
   } finally {
     await browser.close()
   }
