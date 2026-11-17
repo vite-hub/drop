@@ -11,7 +11,7 @@
 // The bookmarklet has no tag, so it starts at the bottom middle.
 import PAGE_PILL from "vite-hub/page/pill.js?raw"
 import DROP_MARK from "./drop-mark.svg?raw"
-import { ELEMENT_NAMING, INK, KEY_SCROLL } from "./plan-runtime"
+import { ELEMENT_NAMING, INK, KEY_SCROLL, PALETTE_KEY } from "./plan-runtime"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
@@ -1129,8 +1129,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("keydown", (e) => {
     // While someone draws, the tips' keys, [ and ] for the size, Undo, Enter, and Esc are Highlight's, not the page's.
     if (!paint.hidden) {
-      // A label being typed takes the keys, but ⌘Enter puts it down and sends.
+      // A label being typed takes the keys, but ⌘Enter puts it down and sends, and ⌘K opens Drop's palette.
       if (typingLabel()) {
+        if (paletteToDrop(e)) return e.stopPropagation();
         return labelKey(e, finishMark);
       }
       // The screenshot and strokes use viewport coordinates, so native scroll keys must also stay here.
@@ -1517,11 +1518,27 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // a drop's own frame. Highlight holds the page still.
   ${KEY_SCROLL}
   const keyScroll = keyScroller(() => !paint.hidden);
+  // There, ⌘K opens Drop's palette, as it does in a drop's own frame: the key never reaches Drop's window while the
+  // site has the focus. Only once Drop answers that it holds the frame ("hello"), so a site framed anywhere else, or
+  // open on its own, keeps the key and the browser's Ctrl+K.
+  ${PALETTE_KEY}
+  let inDrop = false;
+  function paletteToDrop(e) {
+    if (!inDrop || !paletteKey(e)) return false;
+    e.preventDefault();
+    parent.postMessage({ __drop: true, type: "key", key: "meta_k" }, drop);
+    return true;
+  }
+  addEventListener("keydown", paletteToDrop);
+  // The toolbar's own fields stop their keys at its element (below), so they pass ⌘K on from there.
+  host.addEventListener("keydown", paletteToDrop);
   addEventListener("message", (e) => {
     const m = e.data;
     if (e.source !== parent || e.origin !== drop || !m || m.__drop !== true) return;
     if (m.type === "scroll-key") keyScroll(m.key, m.shift === true);
+    if (m.type === "hello") inDrop = true;
   });
+  if (parent !== window) parent.postMessage({ __drop: true, type: "review-ready" }, drop);
 
   // A page's menus and popovers close on a press or focus outside them, which they listen for on the document (Reka
   // UI, Radix). Stopped here, after the toolbar's own listeners, so commenting on an open menu keeps it open, and

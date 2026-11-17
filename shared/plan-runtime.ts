@@ -113,6 +113,19 @@ export const KEY_SCROLL = String.raw`function keyScroller(still) {
 }`
 
 /**
+ * ⌘K on a Mac, Ctrl+K elsewhere: Drop's palette (SearchPalette), whose key never reaches Drop's window while a page in
+ * a frame has the focus. The frame tells Drop instead, and takes the key from the browser, whose Ctrl+K would move the
+ * focus to its own search. It matches Nuxt UI's `meta_k` (defineShortcuts): the same modifier, no Shift or Alt, and in
+ * a field too, as the palette's own shortcut works in Drop's fields. A key the page used itself stays the page's.
+ * Shared by the frame's comment layer and the site review script.
+ */
+export const PALETTE_KEY = String.raw`function paletteKey(e) {
+  if (e.defaultPrevented || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return false;
+  const mac = /Macintosh;/.test(navigator.userAgent);
+  return mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+}`
+
+/**
  * What the frame's comment layer and the site review script share: the Marker's ink (the path of a stroke, a marker,
  * pen, or arrow in viewport pixels, or a text label, drawn on an SVG layer or a canvas, the pointer for a tip, and
  * drawing strokes and typing labels on a layer) and people's initials.
@@ -1950,6 +1963,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The Marker holds the page still.
   ${KEY_SCROLL}
   const keyScroll = keyScroller(() => tool === "mark");
+  ${PALETTE_KEY}
 
   window.addEventListener("message", (e) => {
     const m = e.data;
@@ -1982,6 +1996,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "print") { if (typeof m.title === "string" && m.title) document.title = m.title; print(); }
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
+    // The reader's zen mode: a Markdown doc's outline hides and gives its column back (OUTLINE_SCRIPT in shared/documents.ts).
+    if (m.type === "zen") { document.documentElement.toggleAttribute("data-drop-zen", m.on === true); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
     if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
@@ -2017,8 +2033,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.
   window.addEventListener("keydown", (e) => {
-    // A label being typed takes the keys, but ⌘Enter puts it down and sends.
+    // A label being typed takes the keys, but ⌘Enter puts it down and sends, and ⌘K opens Drop's palette.
     if (tool === "mark" && typingLabel()) {
+      if (paletteKey(e)) { e.preventDefault(); e.stopPropagation(); return post({ type: "key", key: "meta_k" }); }
       return labelKey(e, () => { commitLabel(); finishMark(); });
     }
     // The screenshot and ink use viewport coordinates, including when the page still has keyboard focus.
@@ -2033,6 +2050,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   window.addEventListener("keydown", (e) => {
     // Escape the page used itself, to close its own dialog or menu, stays in the page.
     if (e.key === "Escape" && !e.defaultPrevented) post({ type: "key", key: "Escape" });
+    // ⌘K opens Drop's palette, from a field in the page too (PALETTE_KEY).
+    if (paletteKey(e)) { e.preventDefault(); return post({ type: "key", key: "meta_k" }); }
     // Drop's tool shortcuts, for when the page has focus. Never while typing, and never once the page used the key.
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
@@ -2045,7 +2064,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (e.metaKey || e.ctrlKey || e.altKey || typing || e.defaultPrevented) return;
     // With text selected, C comments on it and E suggests an edit to it: the bar over it is outside the page's focus.
     if (lastQuote && (key === "c" || key === "e")) { e.preventDefault(); return post({ type: "key", key }); }
-    if (/^[vrsuxbpat]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
+    if (/^[vrsuxbpatz]$/.test(key) || (tool === "mark" && (key === "[" || key === "]"))) post({ type: "key", key, tool });
     // An image's page (the one Drop takes point comments on) has no use for ← and →: Drop moves to the folder's next image.
     if (pointComments && (e.key === "ArrowLeft" || e.key === "ArrowRight")) post({ type: "key", key: e.key });
   });

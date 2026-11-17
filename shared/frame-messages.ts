@@ -109,13 +109,15 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
   // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
-  // B, P, and A pick the Marker's tips, [ and ] its size.
+  // B, P, and A pick the Marker's tips, [ and ] its size. Z turns the reader's zen mode on or off.
   // C and E comment on or suggest an edit to the text selected in the page.
   // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
+  // `meta_k` is ⌘K, or Ctrl+K off a Mac, which opens Drop's palette (PALETTE_KEY in ./plan-runtime).
   v.object({
     type: v.literal("key"),
     key: v.picklist([
       "Escape",
+      "meta_k",
       "c",
       "e",
       "v",
@@ -127,6 +129,7 @@ export const FrameMessage = v.variant("type", [
       "p",
       "a",
       "t",
+      "z",
       "[",
       "]",
       "ArrowLeft",
@@ -191,5 +194,18 @@ const Marked = v.object({ __drop: v.literal(true) })
 /** The message, or null when it isn't one a drop frame sends. */
 export function parseFrameMessage(data: unknown): FrameMessage | null {
   const result = v.is(Marked, data) ? v.safeParse(FrameMessage, data) : v.safeParse(QuizMessage, data)
+  return result.success ? result.output : null
+}
+
+// What the review script on a site in Drop's site frame posts up (shared/review-script.ts): that it's running, which Drop
+// answers with "hello", and ⌘K, for the palette.
+const ReviewScriptMessage = v.variant("type", [
+  v.object({ __drop: v.literal(true), type: v.literal("review-ready") }),
+  v.object({ __drop: v.literal(true), type: v.literal("key"), key: v.literal("meta_k") }),
+])
+
+/** The message, or null when it isn't one the review script sends. */
+export function parseReviewScriptMessage(data: unknown) {
+  const result = v.safeParse(ReviewScriptMessage, data)
   return result.success ? result.output : null
 }

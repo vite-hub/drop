@@ -162,7 +162,9 @@ const SHEET_TABS_SCRIPT = String.raw`(() => {
 /**
  * The doc's outline, Docus-style but plain: its h2 and h3 headings in the room right of the text column, the one
  * being read marked. It only shows where it fits beside the column and clear of the viewer's floating panel
- * (--drop-inset). It draws in a shadow root, so comments never take its headings for the doc's own text.
+ * (--drop-inset). It draws in a shadow root, so comments never take its headings for the doc's own text. In the
+ * reader's zen mode (data-drop-zen on the root, from planDocument and the viewer's "zen" message) it hides and gives
+ * back any column it kept, so the text sits where it would in a doc without one.
  */
 const OUTLINE_SCRIPT = String.raw`(() => {
   const headings = [...document.querySelectorAll(".typeset h2, .typeset h3")].filter((heading) => heading.textContent.trim());
@@ -204,6 +206,12 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   const column = 264;
   const right = "(var(--drop-inset, 0px) + " + column + "px)";
   function place() {
+    if (document.documentElement.hasAttribute("data-drop-zen")) {
+      host.removeAttribute("data-fits");
+      document.body.style.removeProperty("--drop-outline");
+      document.body.style.removeProperty("--drop-shift");
+      return;
+    }
     const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
     const text = main.getBoundingClientRect().width - 48;
     const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
@@ -261,14 +269,15 @@ const OUTLINE_SCRIPT = String.raw`(() => {
   addEventListener("resize", place);
   addEventListener("scroll", mark, { passive: true });
   // The viewer's panel opening or closing sets --drop-inset, and the column slides over .2s (body's padding).
-  // Review comments opening the margin (data-drop-rail) widen the column.
-  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-drop-rail"] });
+  // Review comments opening the margin (data-drop-rail) widen the column, and zen (data-drop-zen) hides the outline.
+  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-drop-rail", "data-drop-zen"] });
   document.body.addEventListener("transitionend", place);
 })()`
 
 /**
  * Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
- * server-rendered body for Markdown, and a spreadsheet's sheets for a file. `width` is a Markdown doc's column (DOC_WIDTHS).
+ * server-rendered body for Markdown, and a spreadsheet's sheets for a file. `width` is a Markdown doc's column (DOC_WIDTHS),
+ * and `zen` the reader's zen mode, which opens it without its outline (OUTLINE_SCRIPT).
  */
 export function planDocument(
   kind: PlanKind,
@@ -277,6 +286,7 @@ export function planDocument(
   html = "",
   inset = 0,
   width: DocWidth = "readable",
+  zen = false,
 ): string {
   if (kind === "html") return injectRuntime(source, dark, inset, true)
   if (kind === "image") {
@@ -307,7 +317,7 @@ export function planDocument(
   const relay = globalThis.location ? ` data-quiz-relay="${escapeHtml(globalThis.location.origin)}"` : ""
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en"${relay} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en"${relay}${zen ? " data-drop-zen" : ""} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )
