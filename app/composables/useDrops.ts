@@ -201,6 +201,7 @@ export function useDropActions() {
       await refreshNuxtData([
         keys.drop(drop.id),
         keys.sharedWithMe,
+        keys.pinned,
         ...(drop.parentId ? [keys.folder(drop.parentId)] : []),
       ])
       return true
@@ -244,7 +245,7 @@ export function useDropActions() {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
       edit((list) => list.filter((item) => item.id !== drop.id))
-      await refreshNuxtData([keys.tree, keys.usage, keys.trash, keys.drop(drop.id), ...folders()])
+      await refreshNuxtData([keys.tree, keys.pinned, keys.usage, keys.trash, keys.drop(drop.id), ...folders()])
       notify.say("Moved to the Trash", {
         icon: "i-mingcute-delete-2-line",
         action: { label: "Undo", onClick: () => void restore(drop) },
@@ -259,7 +260,7 @@ export function useDropActions() {
   async function restore(drop: Pick<DropSummary, "id" | "title">) {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "PATCH", body: { trashed: false } })
-      await refreshNuxtData([...LISTS, keys.trash, keys.usage, keys.drop(drop.id), ...folders()])
+      await refreshNuxtData([...LISTS, keys.pinned, keys.trash, keys.usage, keys.drop(drop.id), ...folders()])
       return true
     } catch (error) {
       notify.fail("Couldn't restore", error)
