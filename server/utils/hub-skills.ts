@@ -212,6 +212,7 @@ async function drained<T>(tasks: Promise<T>[]): Promise<T[]> {
   const results = await Promise.allSettled(tasks)
   const failed = results.find((result) => result.status === "rejected")
   if (failed?.status === "rejected") throw failed.reason
+  // SAFETY: all tasks have settled, and any rejected result above throws before this fulfilled-only mapping.
   return results.map((result) => (result as PromiseFulfilledResult<T>).value)
 }
 
