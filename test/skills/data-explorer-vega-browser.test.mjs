@@ -227,7 +227,9 @@ for (const [name, layer, datasets, expected] of [
           return {
             fills: [...svg.querySelectorAll(".mark-rect.role-mark path")].map((el) => el.getAttribute("fill")),
             text: [...svg.querySelectorAll(".mark-text.role-mark text")].map((el) => el.textContent),
-            stops: [...svg.querySelectorAll("stop")].map((el) => el.getAttribute("stop-color")),
+            gradients: [...svg.querySelectorAll("linearGradient")].map((gradient) =>
+              [...gradient.querySelectorAll("stop")].map((el) => el.getAttribute("stop-color")),
+            ),
             dots: [...document.querySelectorAll(".rp-dot")].map((el) => el.style.background),
           }
         })
@@ -238,8 +240,8 @@ for (const [name, layer, datasets, expected] of [
           assert.ok(actual.fills.every((v) => /^#[\da-f]{6}$/i.test(v)))
         }
         if (expected.stops) {
-          assert.equal(actual.stops.length, 2)
-          assert.ok(actual.stops.every((v) => /^#[\da-f]{6}$/i.test(v)))
+          assert.equal(actual.gradients.length, 3)
+          for (const stops of actual.gradients) assert.deepEqual(stops, ["#4d97de", "#3ca694"])
         }
         if (expected.sidebar) {
           assert.equal(actual.fills.length, 3)
@@ -269,6 +271,13 @@ test("paint preprocessing preserves nested records and explicit scale choices", 
     paintSpec`)
   const records = [{ color: "bad", fill: "good", stroke: 2 }]
   const node = {
+    params: [
+      {
+        name: "brush",
+        value: { color: "bad", fill: "good", stroke: 2 },
+        select: { type: "interval", mark: { fill: "accent", stroke: "bad" } },
+      },
+    ],
     datasets: { items: structuredClone(records) },
     layer: [{ data: { values: structuredClone(records) }, spec: { datasets: { nested: structuredClone(records) } } }],
     mark: { color: 2, fill: 0, stroke: 1 },
@@ -279,6 +288,8 @@ test("paint preprocessing preserves nested records and explicit scale choices", 
     },
   }
   paint(node, undefined, {})
+  assert.deepEqual(node.params[0].value, records[0])
+  assert.deepEqual(node.params[0].select.mark, { fill: "#4d97de", stroke: "#cf3f4e" })
   assert.deepEqual(node.datasets.items, records)
   assert.deepEqual(node.layer[0].data.values, records)
   assert.deepEqual(node.layer[0].spec.datasets.nested, records)

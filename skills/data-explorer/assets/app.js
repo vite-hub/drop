@@ -1107,6 +1107,10 @@ function paintSpec(node, rows, c = vars()) {
         }
       }
     }
+    // Selection brushes carry paints, but parameter values remain literal records.
+    if (key === "params" && Array.isArray(v)) {
+      for (const param of v) paintSpec(param?.select?.mark, rows, c);
+    }
     // Data records and expression/metadata payloads are literals, not paint definitions.
     if (!["data", "datasets", "transform", "params", "usermeta"].includes(key)) paintSpec(v, rows, c);
   }
