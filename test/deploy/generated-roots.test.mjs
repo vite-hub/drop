@@ -26,7 +26,7 @@ async function fixture(run) {
 for (const command of ["build", "serve"]) {
   test(`Rate Limit generates Nitro files at the project root during ${command}`, () =>
     fixture(async (root) => {
-      const plugin = hubRateLimit({ provider: "memory" })
+      const plugin = hubRateLimit({ driver: "memory" })
       const config = { root: join(root, "app"), command, nitro: {}, plugins: [], build: {} }
       await plugin.config.handler(config, { command })
       await plugin.configResolved(config)

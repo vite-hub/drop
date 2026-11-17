@@ -408,7 +408,8 @@ function timeNode(at: number): PropertyNode {
     year: "numeric",
     timeZone: "UTC",
   }).format(at)
-  const id = `cfm-${crypto.randomUUID()}`
+  // One per page, and the same on every read, so a render stays the same while the version does.
+  const id = `cfm-updated-${at}`
   return [
     "time",
     { class: "ctm", datetime: time.datetime, "data-mode": "absolute", tabindex: "0", "aria-describedby": id },
