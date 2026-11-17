@@ -5,6 +5,8 @@ import { logAudit } from "../utils/logs"
 
 const AboutUser = v.object({ userId: v.string() })
 const Created = v.object({ user: v.object({ id: v.string() }) })
+// Better Auth's answer, a Response that may come from another realm (workerd, Vite's module runner), so not instanceof.
+const Answered = v.object({ status: v.number(), clone: v.function() })
 
 /**
  * Better Auth's admin POSTs that only read. Every other one changes an account, so an endpoint a Better Auth upgrade adds
@@ -34,12 +36,14 @@ export default defineMiddleware(async (event, next) => {
   const audit = (ok: boolean) => logAudit(event, who, `auth-admin.${endpoint}`, target, ok ? "success" : "failure")
   try {
     const answer = await next()
-    const ok = answer instanceof Response && answer.status < 400
+    const answered = v.safeParse(Answered, answer)
+    const ok = answered.success && answered.output.status < 400
     // A new account's id is only in the answer. revoke-user-session names a session token, which stays out of logs.
     if (ok && endpoint === "create-user") {
       const created = v.safeParse(
         Created,
-        await answer
+        // SAFETY: Answered checked it is Response-shaped; instanceof can't, across realms.
+        await (answer as Response)
           .clone()
           .json()
           .catch(() => null),
