@@ -70,6 +70,19 @@ test("a doc without front matter gets the box, with its styles", async () => {
   )
 })
 
+test("a doc's box and text carry the chips' styles once, whichever of them has chips", async () => {
+  const chipStyles = (html) => html.match(/<style data-comark-chips[^>]*>/g)?.length ?? 0
+  const links = { resources: [{ url: "https://linear.app/acme/issue/ACM-7", title: "ACM-7" }], updatedAt: at }
+  for (const source of [
+    `---\nstatus: Ready\npr: ${PR}\n---\n\n# Plan\n\nSee https://vite.dev.\n`,
+    `---\nstatus: Ready\n---\n\n# Plan\n\nText.\n`,
+    "# Plan\n\nSee https://vite.dev.\n",
+  ]) {
+    const { html } = await renderMarkdownCached(`props-chips-${source.length}.md`, async () => source)
+    assert.equal(chipStyles(await withDocProperties(html, links)), 1, source)
+  }
+})
+
 test("the doc the viewer gets carries them; its source and cached render don't", async () => {
   state.who = who
   const row = await createDocDrop(who, {
