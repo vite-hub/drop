@@ -8,6 +8,7 @@ import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/default/index.ts")
 const { authorizeBilling, checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
+const { lazyClient } = await import("../../server/utils/lazy-client.ts")
 
 // The Team plan through Stripe's plugin, with a Stripe client that keeps what Checkout was asked to bill.
 migrate()
@@ -40,7 +41,8 @@ async function checkout(annual, managedPayments = false, { status } = {}) {
     plugins: [
       organization({ creatorRole: "owner" }),
       stripe({
-        stripeClient: stripeClient(sessions),
+        // Loaded on its first call, as server/auth.ts loads Stripe's SDK.
+        stripeClient: lazyClient(async () => stripeClient(sessions)),
         stripeWebhookSecret: "whsec_test",
         organization: { enabled: true },
         subscription: {
