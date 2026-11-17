@@ -8,6 +8,7 @@ import { ModuleKind, transpileModule } from "typescript"
 import { build } from "vite-plus"
 import { test } from "vite-plus/test"
 import { compileScript, compileStyle, parse } from "vue/compiler-sfc"
+import { REVIEW_SCRIPT } from "../../shared/review-script.ts"
 
 // Mount the actual site frame, device frame and review dock. Only Nuxt services and unrelated UI are stubbed.
 const require = createRequire(import.meta.url)
@@ -40,7 +41,9 @@ const entry = `
   import Site from "ViewerSiteFrame"
   import Device from "ViewerDevice"
   import Dock from "ViewerReviewDock"
-  Object.assign(window, Vue, VueUse)
+  import { frameScrollKey } from "${root}app/utils/frame-scroll-key.ts"
+  Object.assign(window, Vue, VueUse, { frameScrollKey })
+  window.reviewing = Vue.ref(false)
   window.device = Vue.ref({ on: false, id: "iphone", width: 393, height: 852, zoom: null })
   window.useDeviceSize = () => device
   window.useHead = () => {}
@@ -52,7 +55,7 @@ const entry = `
     setup() {
       const dock = Vue.ref(null)
       return () => [
-        Vue.h(Site, { drop: { title: "Site", siteUrl: "https://site.test" }, address: "https://site.test/", reviewing: false, dockTop: dock.value?.top }),
+        Vue.h(Site, { drop: { title: "Site", siteUrl: "https://site.test" }, address: "https://site.test/", reviewing: reviewing.value, dockTop: dock.value?.top }),
         Vue.h(Dock, { ref: dock, open: false, heading: "none" }, {
           toolbar: () => ["Preview tools", "Device mode", "Comments", "Details", "Share"].map(label =>
             Vue.h("button", { style: { display: "inline-flex", flexShrink: 0 } }, label)),
@@ -153,3 +156,49 @@ for (const touch of [true, false])
       await browser.close()
     }
   }, 30_000)
+
+test("under Comments, scroll keys in Drop's window scroll the site through its review script", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1200, height: 800 }, reducedMotion: "reduce" })
+    await context.route("**/*", (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname === "site.test")
+        return route.fulfill({
+          contentType: "text/html",
+          body: '<style>body{margin:0;height:5000px}</style><p>Long page</p><script src="https://drop.test/review.js"></script>',
+        })
+      if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
+      if (url.pathname === "/fixture.js") return route.fulfill({ contentType: "text/javascript", body: script })
+      if (url.pathname !== "/") return route.fulfill({ status: 404 })
+      return route.fulfill({
+        contentType: "text/html",
+        body: `<style>${styles} #app{display:flex;flex-direction:column;height:100vh}</style><div id="app"></div>
+        <script type="module" src="/fixture.js"></script>`,
+      })
+    })
+    const page = await context.newPage()
+    await page.goto("https://drop.test/")
+    await page.locator("iframe").waitFor({ timeout: 5000 })
+    const site = page.frames().find((frame) => frame.url().startsWith("https://site.test"))
+    await site.waitForFunction(() => window.__dropReview === true, null, { timeout: 5000 })
+    await page.evaluate(() => (reviewing.value = true))
+    // The layer over the frame takes the pointer, so focus stays in Drop's window.
+    await page.locator(".cursor-crosshair").waitFor()
+    await page.locator(".cursor-crosshair").click({ position: { x: 5, y: 5 } })
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("ArrowDown")
+    await site.waitForFunction(() => scrollY === 80, null, { timeout: 5000 })
+    await page.keyboard.press("End")
+    await site.waitForFunction(() => scrollY === document.scrollingElement.scrollHeight - innerHeight, null, {
+      timeout: 5000,
+    })
+    // A key typed in the address bar stays there.
+    await page.getByLabel("Address of the page under review").focus()
+    await page.keyboard.press("Home")
+    await page.waitForTimeout(200)
+    assert.notEqual(await site.evaluate(() => scrollY), 0)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
