@@ -17,7 +17,19 @@ type RuntimeReport = {
 /** A prototype's variants and the one showing, as its picker reports them. */
 export type ViewerVariants = Omit<Extract<FrameMessage, { type: "variants" }>, "type">
 /** What the viewer's bar asks a prototype's picker to do (picker.js in skills/prototype). */
-export type PickerCommand = "show" | "prev" | "next" | "canvas" | "zoom-in" | "zoom-out" | "fit" | "reset"
+export type PickerCommand =
+  | "show"
+  | "prev"
+  | "next"
+  | "canvas"
+  | "zoom-in"
+  | "zoom-out"
+  | "fit"
+  | "reset"
+  | "move"
+  | "hand"
+  | "hold"
+  | "release"
 
 /**
  * The frame the drop renders in, and everything that goes over its postMessage bridge (useDropFrame): the document

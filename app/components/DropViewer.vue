@@ -601,6 +601,22 @@ const {
   },
   openDrop: (id) => void router.push(`/drops/${id}`),
 })
+/** A prototype's canvas is in the bar (ViewerVariants), where its Move and Hand tools are. */
+const canvasShown = computed(
+  () => Boolean(variants.value?.canvas) && !editing.value && !lightbox.value && !shownVersion.value,
+)
+/** The Hand tool pans: picking it puts Drop's comment and inspection tools down, and picking one of those puts it down. */
+function canvasTool(command: "move" | "hand") {
+  if (command === "hand") {
+    commentMode.value = false
+    if (tool.value !== "browse") tool.value = "browse"
+  }
+  picker(command)
+}
+watch(
+  () => commentMode.value || tool.value !== "browse",
+  (busy) => busy && variants.value?.tool === "hand" && picker("move"),
+)
 // A link to a section (#id) opens the doc there, once the frame has it. The frame also gets the drop's link, for the
 // headings' # links.
 watch(ready, (loaded) => {
@@ -685,10 +701,14 @@ defineShortcuts({
     if (drop.value.canEdit) startEdit()
     else editNoteOpen.value = true
   },
-  h: () => hasHistory.value && showDetails("history"),
+  // On a prototype's canvas H is the Hand tool, as in Figma; History is still in Details.
+  h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails("history")),
   i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
   r: toggleCommentArea,
-  v: () => (tool.value = "browse"),
+  v: () => {
+    tool.value = "browse"
+    if (canvasShown.value) canvasTool("move")
+  },
   s: () => framed.value && setTool("measure"),
   b: () => canMark.value && annotations.mark("marker"),
   p: () => canMark.value && annotations.mark("pen"),
@@ -1591,7 +1611,13 @@ watch(
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="variants && !editing && !lightbox && !shownVersion">
-              <LazyViewerVariants :state="variants" @command="picker" />
+              <LazyViewerVariants
+                :state="variants"
+                @command="
+                  (command, index) =>
+                    command === 'move' || command === 'hand' ? canvasTool(command) : picker(command, index)
+                "
+              />
               <span aria-hidden="true" class="w-1 shrink-0" />
             </template>
             <template v-if="editing">
