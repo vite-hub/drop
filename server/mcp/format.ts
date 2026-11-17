@@ -189,8 +189,8 @@ export function pagesSection(pages: { page: string; url: string }[]) {
 
 /** Base64 shorter than this stays in the text: an icon costs less than the placeholder that would replace it. */
 const KEEP_INLINE = 1024
-/** A base64 data URI, with the Markdown image around it when there is one, so its alt text names it. */
-const INLINE_DATA = /(!\[([^\]\n]*)\]\()?data:([\w.+-]+\/[\w.+-]+)?(?:;[\w.+-]+=[^;,)"'\s]*)*;base64,([A-Za-z0-9+/=]+)/g
+/** Match data URIs first so unmatched Markdown image prefixes cannot cause quadratic rescanning. */
+const INLINE_DATA = /data:([\w.+-]+\/[\w.+-]+)?(?:;[\w.+-]+=[^;,)"'\s]*)*;base64,([A-Za-z0-9+/=]+)/gi
 
 /** A figure whose bytes `withoutInlineData` left out of a doc's text. */
 export interface InlineFigure {
@@ -209,17 +209,20 @@ const sizeLabel = (bytes: number) =>
  */
 export function withoutInlineData(text: string): { text: string; figures: InlineFigure[] } {
   const figures: InlineFigure[] = []
-  const out = text.replace(
-    INLINE_DATA,
-    (match, image: string | undefined, alt: string | undefined, type, data: string) => {
-      if (data.length < KEEP_INLINE) return match
-      const mediaType = type ?? "text/plain"
-      const bytes = Math.floor((data.length * 3) / 4) - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0)
-      const figure = { n: figures.length + 1, alt: alt?.trim() || null, mediaType, bytes }
-      figures.push(figure)
-      return `${image ?? ""}[inline figure ${figure.n}: ${mediaType}, ${sizeLabel(bytes)}, left out]`
-    },
-  )
+  let previousEnd = 0
+  const out = text.replace(INLINE_DATA, (match, type: string | undefined, data: string, offset: number) => {
+    // Each gap is inspected once, and only after finding a data URI.
+    const before = text.slice(previousEnd, offset)
+    previousEnd = offset + match.length
+    const imageStart = before.lastIndexOf("![")
+    const alt = imageStart < 0 ? undefined : before.slice(imageStart + 2).match(/^([^\]\n]*)\]\($/)?.[1]
+    if (data.length < KEEP_INLINE) return match
+    const mediaType = type ?? "text/plain"
+    const bytes = Math.floor((data.length * 3) / 4) - (data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0)
+    const figure = { n: figures.length + 1, alt: alt?.trim() || null, mediaType, bytes }
+    figures.push(figure)
+    return `[inline figure ${figure.n}: ${mediaType}, ${sizeLabel(bytes)}, left out]`
+  })
   return { text: out, figures }
 }
 

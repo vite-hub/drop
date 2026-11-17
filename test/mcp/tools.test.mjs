@@ -1765,6 +1765,33 @@ test("read_drop leaves a doc's inline figure bytes out of its text and names eac
   assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), markdown)
 })
 
+test("read_drop scans unmatched Markdown image prefixes without blocking on HTML", async () => {
+  const html = "<!doctype html><pre>" + "![".repeat(100000) + "</pre>"
+  insertDrop("prefixes", { kind: "html", blob_key: "prefixes.html", size: html.length })
+  objects.set("prefixes.html", { body: new Blob([html]), uploadedAt: new Date() })
+  const start = performance.now()
+  const read = await call(readDrop, { id: "prefixes" })
+  assert.equal(read.structuredContent.content, html)
+  assert.equal(read.structuredContent.inlineFigures, undefined)
+  assert.ok(performance.now() - start < 2000, "200 KB without data URLs must not block for seconds")
+})
+
+test.each(["data:image/png;BASE64,", "DATA:image/png;base64,", "DaTa:image/png;BaSe64,"])(
+  "read_drop omits mixed-case inline data URLs (%s)",
+  async (prefix) => {
+    const data = Buffer.alloc(40000, 1).toString("base64")
+    const html = `<img src="${prefix}${data}">`
+    insertDrop("mixed-case", { kind: "html", blob_key: "mixed-case.html", size: html.length })
+    objects.set("mixed-case.html", { body: new Blob([html]), uploadedAt: new Date() })
+    const read = await call(readDrop, { id: "mixed-case" })
+    assert.doesNotMatch(read.content[0].text, /[A-Za-z0-9+/]{1024}/)
+    assert.equal(read.structuredContent.content, '<img src="[inline figure 1: image/png, 39 KB, left out]">')
+    assert.deepEqual(read.structuredContent.inlineFigures, [{ n: 1, alt: null, mediaType: "image/png", bytes: 40000 }])
+    const original = await call(readFile, { id: "mixed-case" })
+    assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), html)
+  },
+)
+
 // An annotated screenshot whose first annotation starts past the image's right edge. The problem is the screenshot's, on
 // line 3.
 const OFF_IMAGE = `# Evidence

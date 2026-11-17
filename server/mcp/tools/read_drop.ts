@@ -131,7 +131,7 @@ export default defineMcpTool({
     const folder = detail.ancestors.map((crumb) => crumb.title).join(" / ")
     const pages = drop.kind === "app" ? appPageLinks(meta.url, detail.paths ?? []) : []
     // A doc's text without the bytes of its inline figures: a converted paper's ran to 3 MB.
-    const source = typeof detail.content === "string" ? withoutInlineData(detail.content) : null
+    const source = detail.content !== undefined ? withoutInlineData(detail.content) : null
 
     const sections = [
       `${meta.title} (${meta.kind} v${meta.version}, ${meta.share}${meta.sharedThrough ? ` through ${meta.sharedThrough}` : ""}, ${meta.lifetime}, ${meta.status.toLowerCase()}) ${meta.url}${folder ? `\nIn ${folder}` : ""}${views ? `\n${viewsLine(views)}` : ""}${links}`,
