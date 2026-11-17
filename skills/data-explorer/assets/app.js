@@ -1074,17 +1074,20 @@ function paintSpec(node, rows, c = vars()) {
   if (Array.isArray(node)) return node.forEach((n) => paintSpec(n, rows, c));
   if (!node || typeof node !== "object") return;
   for (const [key, v] of Object.entries(node)) {
-    if (PAINT.includes(key) && typeof v === "string") node[key] = named(v);
+    if (PAINT.includes(key) && (typeof v === "string" || typeof v === "number")) node[key] = named(v);
     if (PAINT.includes(key) && v && typeof v === "object" && !Array.isArray(v)) {
-      for (const ref of [v, ...[v.condition ?? []].flat()]) if ("value" in ref) ref.value = named(ref.value);
-      if (Array.isArray(v.scale?.range)) v.scale.range = v.scale.range.map(named);
-      else if (COLORS[v.field] && !v.scale?.range && !v.scale?.scheme) {
-        const present = new Set(rows?.map((r) => r[v.field]));
-        const keys = [...COLORS[v.field].keys()].filter((k) => !rows || present.has(k));
-        if (keys.length) v.scale = { ...v.scale, domain: keys, range: keys.map((k) => COLORS[v.field].get(k)) };
+      for (const ref of [v, ...[v.condition ?? []].flat()]) {
+        if ("value" in ref) ref.value = named(ref.value);
+        if (Array.isArray(ref.scale?.range)) ref.scale.range = ref.scale.range.map(named);
+        else if (COLORS[ref.field] && ref.scale !== null && !ref.scale?.range && !ref.scale?.scheme) {
+          const present = new Set(rows?.map((r) => r[ref.field]));
+          const keys = [...COLORS[ref.field].keys()].filter((k) => !rows || present.has(k));
+          if (keys.length) ref.scale = { ...ref.scale, domain: keys, range: keys.map((k) => COLORS[ref.field].get(k)) };
+        }
       }
     }
-    if (key !== "data") paintSpec(v, rows, c);
+    // Data records and expression/metadata payloads are literals, not paint definitions.
+    if (!["data", "datasets", "transform", "params", "usermeta"].includes(key)) paintSpec(v, rows, c);
   }
 }
 
