@@ -11,6 +11,7 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops } from "../databases/default/index"
 import { type DropRow, lifetimeFields, type LifetimeInput } from "./drops"
 import type { Identity } from "./identity"
+import { logDrop } from "./logs"
 import { touchFolder, uniqueSlug } from "./nodes"
 import { requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
@@ -106,6 +107,7 @@ export async function createLinkDrop(
       resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
+    logDrop(event, row, { change: "create" })
     return row
   })
 }

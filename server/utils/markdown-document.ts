@@ -1,7 +1,6 @@
 import { type H3Event, HTTPError } from "h3"
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
-import { log } from "evlog"
 import { createMarkdownParser } from "@comark/html/parse"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
@@ -16,6 +15,7 @@ import * as v from "valibot"
 import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { loadHighlighter } from "#shared/highlighter"
+import { logError } from "./logs"
 import { cachedMarkdown } from "./markdown-cache"
 import { FAVICON_PATH, faviconUrl, linkText } from "#shared/resources"
 import { chipNode } from "comark-chips"
@@ -282,13 +282,13 @@ const LINT_COMPONENTS = [...ALLOWED_TAGS, ...preset.blocks]
  * external URLs aren't checked: a published doc has no folder around it. The checks read the source, so they can say
  * an annotation's box is outside its image, not that it points at the button it means.
  */
-export async function lintMarkdown(markdown: string): Promise<MarkdownProblem[]> {
+export async function lintMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
   const found = await lint(renameLegacyProps(markdown), { plugins: renderPlugins, components: LINT_COMPONENTS })
   return found.flatMap(({ rule, severity, line, column, message, fix, cause }) => {
     // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
     // is the doc's.
     if (cause !== undefined && !(rule === "comark/invalid-frontmatter" || message.startsWith("Comark could not"))) {
-      log.error({ action: "markdown_lint", rule, error: message })
+      logError(event, cause, { action: "markdown_lint", rule, message })
       return []
     }
     const error = cause !== undefined || severity === "error" || DROP_ERROR_RULE.test(rule)
@@ -304,8 +304,8 @@ export const problemLine = ({ line, column, rule, message, fix }: MarkdownProble
  * Lints a Markdown doc before it's stored: one with an error is refused with all its problems, as `message`, and as
  * `data.problems` for clients. Returns the warnings it publishes with.
  */
-export async function requirePublishableMarkdown(markdown: string): Promise<MarkdownProblem[]> {
-  const problems = await lintMarkdown(markdown)
+export async function requirePublishableMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
+  const problems = await lintMarkdown(markdown, event)
   const errors = problems.filter((problem) => problem.severity === "error")
   if (!errors.length) return problems
   const [first] = errors
@@ -324,7 +324,11 @@ export async function requirePublishableMarkdown(markdown: string): Promise<Mark
  * The one Markdown renderer: Comark with front matter, task lists, every comark-ui package, and a tag allowlist. The
  * /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
-async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
+async function renderMarkdownBody(
+  markdown: string,
+  blobKey: string,
+  event?: H3Event,
+): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseMarkdown(markdown)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
@@ -354,10 +358,12 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
       ...(retry && { retry: true as const }),
     }
   } catch (error) {
-    log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })
+    logError(event, error, { action: "markdown_render", blobKey })
+    // Kept for minutes, not the month a render is: reads don't each fail again.
     return {
       title: "Untitled document",
       html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`,
+      failed: true,
     }
   }
 }
@@ -367,7 +373,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
  * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
  */
 export const renderMarkdownCached = (key: string, markdown: () => Promise<string>, event?: H3Event) =>
-  cachedMarkdown(key, markdown, renderMarkdownBody, event)
+  cachedMarkdown(key, markdown, (text) => renderMarkdownBody(text, key, event), event)
 
 export async function renderMarkdownDocument(
   markdown: () => Promise<string>,

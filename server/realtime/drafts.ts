@@ -22,15 +22,24 @@ export default defineRealtime({
     if (documentId === null) return true
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which findDrop and identify read.
     const event = hostEvent as H3Event
-    const [{ findDrop, liveEditable }, { identify }] = await Promise.all([
+    const [{ findDrop, liveEditable }, { identify }, { requestLog }] = await Promise.all([
       import("../utils/drops"),
       import("../utils/identity"),
+      import("../utils/logs"),
     ])
     // Only the latest version's draft: a room left open on an older one can't write over it. Its editor finds out
     // when it can't get back in (useLiveEditor).
     const draft = draftOf(documentId)
     const drop = draft ? await findDrop(draft.id, event) : null
-    return Boolean(drop && drop.version === draft!.version && liveEditable(drop, await identify(event)))
+    const refused = !drop
+      ? "not-found"
+      : drop.version !== draft!.version
+        ? "old-version"
+        : !liveEditable(drop, await identify(event))
+          ? "not-editable"
+          : null
+    if (refused) requestLog(event)?.set({ realtime: { reason: refused } })
+    return !refused
   },
   document: blobDocument(blob),
   editor: liveEditor,

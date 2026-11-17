@@ -3,6 +3,7 @@ import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { oauthAccessToken, oauthConsent, oauthRefreshToken } from "../../databases/default/index"
 import { requireIdentity } from "../../utils/identity"
+import { logAudit } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 
 /**
@@ -22,5 +23,6 @@ export default defineHandler(async (event) => {
   await db.delete(oauthRefreshToken).where(mine(oauthRefreshToken))
   await db.delete(oauthAccessToken).where(mine(oauthAccessToken))
   await db.delete(oauthConsent).where(eq(oauthConsent.id, consent.id))
+  logAudit(event, who, "agent.disconnect", { type: "oauth-client", id: consent.clientId })
   return { ok: true }
 })

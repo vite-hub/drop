@@ -4,6 +4,7 @@ import { handleOAuthUserInfo } from "better-auth/oauth2"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import { isGitHubMember } from "./github-membership"
+import { authRequest, requestLog } from "./logs"
 import { readAuthProxyConfig } from "./proxy-auth-config"
 export const authProxy = readAuthProxyConfig
 
@@ -82,12 +83,20 @@ export const proxyAuth = () => ({
 
 /** Keep GitHub's credential failures distinct from unavailable or malformed profile data. */
 async function githubApi(path: string, token: string): Promise<unknown> {
+  // The sign-in still answers; its wide event says what GitHub did.
+  const failed = (reason: unknown) => {
+    requestLog(authRequest.getStore())?.warn("GitHub API call failed", {
+      github: { path, failure: reason instanceof Error ? reason.message : String(reason) },
+    })
+    return null
+  }
   const response = await fetch(`https://api.github.com/${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
     signal: AbortSignal.timeout(5000),
-  }).catch(() => null)
+  }).catch(failed)
   if (response?.status === 401)
     throw new APIError("UNAUTHORIZED", { message: "GitHub sign-in expired or was revoked. Sign in again to Drop." })
-  if (!response?.ok) return null
-  return response.json().catch(() => null)
+  if (!response) return null
+  if (!response.ok) return failed(`HTTP ${response.status}`)
+  return response.json().catch(failed)
 }

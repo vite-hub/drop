@@ -3,6 +3,7 @@ import { useLogger } from "evlog/nitro/v3"
 import * as v from "valibot"
 import { SkillPatchSchema } from "#shared/schemas"
 import { requireAdmin } from "../../utils/identity"
+import { logAudit } from "../../utils/logs"
 import { findSkill, setSkillEnabled } from "../../utils/skills"
 
 const Params = v.object({ name: v.pipe(v.string(), v.regex(/^[a-z0-9-]{1,64}$/)) })
@@ -17,6 +18,7 @@ export default defineValidatedHandler({
     const { enabled } = await event.req.json()
     await setSkillEnabled(name, enabled, who.userId)
     useLogger(event).set({ skill: { name, enabled } })
+    logAudit(event, who, enabled ? "skill.enable" : "skill.disable", { type: "skill", id: name })
     return { ok: true }
   },
 })

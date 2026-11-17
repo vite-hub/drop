@@ -9,7 +9,7 @@ const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve(
 // Drop modules swapped by their file name, wherever they're imported from.
 const modules: Record<string, string> = {
   identity:
-    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
+    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
   "code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "live-drafts":
@@ -32,9 +32,10 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
 }
 export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
+  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls. An
+  // access token is `dropTest.mcpCaller`'s.
   "vite-hub/auth/mcp":
-    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
+    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }; export const verifyMcpRequest = async () => globalThis.dropTest.mcpCaller ? [undefined, globalThis.dropTest.mcpCaller] : [new Error('invalid token')]",
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
   "vite-hub/env":

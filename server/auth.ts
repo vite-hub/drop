@@ -13,6 +13,7 @@ import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { isGitHubMember } from "./utils/github-membership"
+import { authRequest, logAudit, logDenied, requestLog } from "./utils/logs"
 import { isListedMember } from "./utils/members"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
@@ -21,6 +22,7 @@ import {
   billingConfig,
   checkoutParams,
   leaveTeams,
+  logSubscription,
   teamOptions,
   teamPlans,
   teamsEnabled,
@@ -34,6 +36,22 @@ const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
 
 // Kept out of `defineAuth()`: ViteHub's auth scanner takes minutes on generic type arguments inside it.
 type GitHubToken = Parameters<ReturnType<typeof github>["getUserInfo"]>[0]
+
+/** An account deleted by its owner, or by an admin. */
+function auditDeletion(
+  user: { id: string },
+  context: { context: { session?: { user: { id: string } } | null } } | null,
+  outcome: "success" | "failure",
+) {
+  const by = context?.context.session?.user.id ?? user.id
+  logAudit(
+    authRequest.getStore(),
+    { userId: by, actorKind: "browser" },
+    "account.delete",
+    { type: "user", id: user.id },
+    outcome,
+  )
+}
 
 /**
  * Who can sign in, and how.
@@ -160,7 +178,12 @@ export default defineAuth(({ env, requestOrigin }) => {
               signal: AbortSignal.timeout(3000),
             })
               .then(async (response) => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null))
-              .catch(() => null)
+              .catch((error: unknown) => {
+                requestLog(authRequest.getStore())?.warn("GitHub profile lookup failed", {
+                  github: { profile: error instanceof Error ? error.message : String(error) },
+                })
+                return null
+              })
             const createdAt = profile?.success ? profile.output.created_at : undefined
             const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
             if (Number.isFinite(githubCreatedAt))
@@ -171,11 +194,25 @@ export default defineAuth(({ env, requestOrigin }) => {
       user: {
         // Nobody outside DROP_MEMBERS gets an account.
         create: {
-          before: async (user) =>
-            isListedMember(user) ? { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } } : false,
+          before: async (user) => {
+            if (isListedMember(user)) return { data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }
+            logDenied(authRequest.getStore(), "not-listed")
+            return false
+          },
         },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
-        delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },
+        // The audit is written once the outcome is known: after the account is gone, or when leaving its teams fails.
+        delete: {
+          before: async (user, context) => {
+            try {
+              await leaveTeams(user, context, teamBilling)
+            } catch (error) {
+              auditDeletion(user, context, "failure")
+              throw error
+            }
+          },
+          after: async (user, context) => auditDeletion(user, context, "success"),
+        },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
@@ -187,7 +224,10 @@ export default defineAuth(({ env, requestOrigin }) => {
               .from(users)
               .where(eq(users.id, session.userId))
               .limit(1)
-            if (!person || !isListedMember(person)) return false
+            if (!person || !isListedMember(person)) {
+              logDenied(authRequest.getStore(), "not-listed")
+              return false
+            }
           },
           after: async (session) => {
             await syncRole(session.userId)
@@ -205,12 +245,20 @@ export default defineAuth(({ env, requestOrigin }) => {
               stripeClient: teamBilling.stripeClient,
               stripeWebhookSecret: billing.webhookSecret,
               organization: { enabled: true },
+              onEvent: async (event) => {
+                requestLog(authRequest.getStore())?.set({ stripe: { event: { type: event.type, id: event.id } } })
+              },
               subscription: {
                 enabled: true,
                 plans: teamBilling.plans,
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
+                onSubscriptionCreated: logSubscription("created"),
+                onSubscriptionComplete: logSubscription("completed"),
+                onSubscriptionUpdate: logSubscription("updated"),
+                onSubscriptionCancel: logSubscription("canceling"),
+                onSubscriptionDeleted: logSubscription("deleted"),
               },
             }),
           ]

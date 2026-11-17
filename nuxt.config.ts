@@ -11,6 +11,7 @@ import { ROBOTS_DISALLOW } from "./shared/robots.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
+import { evlogOptions } from "./scripts/logging.ts"
 import { reviewPresence } from "./scripts/review-presence.ts"
 
 declare module "nuxt/schema" {
@@ -272,6 +273,8 @@ export default defineNuxtConfig({
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     release,
+    // Which host this build is for, on every wide event (server/plugins/wide-events.ts).
+    deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
@@ -409,13 +412,7 @@ export default defineNuxtConfig({
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
-    modules: [
-      evlog({
-        env: { service: "drop" },
-        exclude: ["/_drop-ui/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
-        redact: { paths: ["**.key", "**.secret", "**.password"] },
-      }),
-    ],
+    modules: [evlog(evlogOptions(release))],
     cloudflare: {
       wrangler: {
         name: cloudflareTemplate.name,
