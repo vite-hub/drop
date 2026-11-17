@@ -38,7 +38,7 @@ export default defineRealtime({
         : !liveEditable(drop, await identify(event))
           ? "not-editable"
           : null
-    if (refused) requestLog(event)?.set({ realtime: { room: "drafts", refused } })
+    if (refused) requestLog(event)?.set({ realtime: { reason: refused } })
     return !refused
   },
   document: blobDocument(blob),
