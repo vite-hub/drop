@@ -7,6 +7,7 @@ Drop renders only the syntax on this page and the [blocks](blocks.md) it links. 
 | A note, tip, decision, or risk | [an alert](#alerts) |
 | A flow, a sequence, or how parts relate | [a Mermaid diagram](#mermaid) |
 | Where a claim comes from | [a footnote](#footnotes) |
+| An equation or a formula | [LaTeX math](#math) |
 | Code | [a fenced block with its language](#code) |
 | Progress on a list of steps | a task list: `- [x] done`, `- [ ] next` |
 | A screenshot with marks, or a before and after | [an annotated screenshot](#annotated-screenshots) |
@@ -74,6 +75,22 @@ graph LR
 
 Drop draws the diagram on the server. Use one per doc when you can: a doc shows at most 4 diagrams and 8,000 characters of Mermaid. Past that, or when the source is invalid, the diagram shows as its source text, and past the limits the box above the doc says why.
 
+## Math
+
+```md
+Each pair of the $n$ ducks shares one roll, so the bakery bakes
+
+$$
+\binom{n}{2} = \frac{n(n-1)}{2}
+$$
+
+rolls a day.
+```
+
+Write inline math between single `$` signs and display math between `$$` signs, as in LaTeX. A fence with the language `math` is display math too. Drop typesets each formula on the server as MathML, so it's real text that readers can select, copy, and comment on, and a doc without math loads nothing for it. "Copy as Markdown" gives the LaTeX as written.
+
+A `$` before a digit or a space stays text, so `$5 and $10` are prices. To write a dollar sign before a letter, escape it as `\$x`. A formula that doesn't typeset shows its TeX, and the box above the doc says why. [comark-mathml](https://comark-ui.onmax.me/math/)
+
 ## Footnotes
 
 ```md
@@ -138,7 +155,6 @@ Set `title` when the first heading isn't the doc's title. Add `supersedes`, the 
 
 | Written | Shows as | Write instead |
 | --- | --- | --- |
-| `$x^2$` math | its TeX source, in monospace | a code span or a `text` block |
 | `:time[2026-11-02]` | the date as written, never "2 days ago" | the date itself, such as `Nov 2, 2026` |
 | `::bundle` | a problem: it measures build folders, and Drop reads no files ([comark-bundle](https://comark-ui.onmax.me/bundle/)) | a [table](blocks.md#data-tables) or [metrics](blocks.md#metrics) with the sizes |
 | `:rocket:` | an "Unsupported component" box | the emoji itself, when it carries meaning |

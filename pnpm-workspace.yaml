@@ -58,6 +58,10 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
+  # Keep preview hints at the Nuxt project root until the upstream fix is pinned.
+  "@vite-hub/rate-limit@0.0.0-preview-7c1c993": patches/@vite-hub__rate-limit@0.0.0-preview-7c1c993.patch
+  # Keep preview hints at the Nuxt project root until the upstream fix is pinned.
+  "vite-hub@0.0.0-preview-7c1c993": patches/vite-hub@0.0.0-preview-7c1c993.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.
