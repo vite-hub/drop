@@ -112,7 +112,10 @@ Options for any chart: `format` (`number`, `integer`, `compact`, `percent` for 0
 - `chips`: an array of strings or `[label, count]` pairs, as pills, like the two things a customer most needs.
 - `text` (`truncate: true` cuts it to the cell), `date`, `user` (GitHub avatar), `country` (flag from an ISO code), `link`. `suffix` prints another field after a number, small.
 
-**vega** (escape hatch): `{ "type": "vega", "title", "spec": { …Vega-Lite…, "data": { "name": "<dataset>" } } }`.
+**vega** (escape hatch): `{ "type": "vega", "title", "spec": { …Vega-Lite…, "data": { "name": "<dataset>" } } }`. Name the page's colors instead of copying hex values, so the spec follows light and dark mode and the filters' colors:
+
+- A `color`, `fill` or `stroke` encoding on a `list` filter's field, with no `scale.range` or `scheme`, draws each name in its color across the report: `"color": { "field": "store", "type": "nominal" }`.
+- Wherever the spec sets `color`, `fill` or `stroke` (a mark, an encoding's `value`, a gradient stop) or lists a scale's `range`, a name stands for a page color: `fg`, `muted`, `border`, `grid`, `bg`, `soft` from the theme, the tones `good`, `fair`, `warn`, `bad`, `accent`, or a palette index. `"mark": { "type": "rule", "color": "bad" }`, `"scale": { "range": ["good", "warn", "bad"] }`.
 
 ## Filters
 
