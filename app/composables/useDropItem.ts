@@ -4,13 +4,16 @@ import { dropPath } from "#shared/links"
 
 /**
  * What a drop listed on the Drops page can do, the same from a row (DropRow), a card (DropCard) or a line (DropLine):
- * its share and the choices for it, copying its link, and its ⋯ menu. In a team folder (`inTeam`) anyone may move a
+ * its share and the choices for it, copying its link, pinning it, and its ⋯ menu. In a team folder (`inTeam`) anyone may move a
  * teammate's drop to the Trash; `trash` does that.
  */
 export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => boolean; trash: () => void }) {
   const now = useRelativeNow()
   const { copy, copied } = useCopy()
-  const { setShare } = useDropActions()
+  const { setShare, setPinned } = useDropActions()
+  // The Drops page loads your pins (usePinned) alongside your drops, so the menu knows which ones are pinned.
+  const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
+  const pinned = computed(() => drop().pinned || Boolean(pins.value?.some((item) => item.id === drop().id)))
   const moveTo = useMoveDialog()
   const { data: me } = useMe()
   const shared = computed(() => drop().share !== "private")
@@ -66,6 +69,13 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
       linkChoices.value
         ? { label: "Copy link", icon: "i-mingcute-link-line", children: linkChoices.value }
         : { label: "Copy link", icon: "i-mingcute-link-line", onSelect: () => void copyLink("Link copied") },
+      ...(drop().trashedAt
+        ? []
+        : [
+            pinned.value
+              ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: () => void setPinned(drop(), false) }
+              : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: () => void setPinned(drop(), true) },
+          ]),
     ],
     ...(changeable.value
       ? [
@@ -83,5 +93,5 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
         : []),
   ])
 
-  return { shared, theirs, changeable, choices, status, pick, copyLink, copied, linkChoices, menu }
+  return { shared, theirs, changeable, choices, status, pinned, pick, copyLink, copied, linkChoices, menu }
 }

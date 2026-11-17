@@ -139,6 +139,22 @@ export const dropVisits = sqliteTable(
 )
 
 /**
+ * The drops someone pinned, for the Drops page's Pinned view and ⌘K: theirs or anyone's they can open. Pins are
+ * personal; a pin to a drop they can no longer open stays and lists again if it opens to them again.
+ */
+export const dropPins = sqliteTable(
+  "drop_pins",
+  {
+    userId: text("user_id").notNull(),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    at: integer("at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_pins_drop_idx").on(table.dropId)],
+)
+
+/**
  * A drop's views a day, by who viewed it: signed-in people, anonymous visitors, or agents. Every version adds to one
  * count. A trigger on `drop_viewers` counts each viewer once a day.
  */

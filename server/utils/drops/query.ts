@@ -39,7 +39,7 @@ import { resourcesOf } from "../resources"
 import { answerable, quizOf } from "../answers"
 import { viewsOf } from "../views"
 import { dropExcerpt } from "../og"
-import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
+import { dropFiles, dropPins, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
 import type { Identity } from "../identity"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"
@@ -393,6 +393,59 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
 }
 
 /**
+ * The drops you pinned that you can still open, most recently pinned first: yours and other people's, at any depth. A
+ * pin to a drop in the Trash, expired, quarantined, or no longer shared with you doesn't list. Other people's drops say
+ * whose they are, and every drop in a folder says where it sits.
+ */
+export async function listPinned(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const rows = await db
+    .select({ drop: drops, ownerName: user.name, ownerImage: user.image, ownerBanned: user.banned })
+    .from(dropPins)
+    .innerJoin(drops, eq(drops.id, dropPins.dropId))
+    .innerJoin(user, eq(user.id, drops.ownerId))
+    .where(and(eq(dropPins.userId, who.userId), isNull(drops.trashedAt)))
+    .orderBy(desc(dropPins.at))
+    .limit(200)
+  const { days } = expiryPolicy(event)
+  const banned = new Set(rows.filter((row) => row.ownerBanned).map((row) => row.drop.id))
+  const owners = new Map(rows.map((row) => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
+  const nodes = (
+    await resolveRows(
+      rows.map((row) => row.drop),
+      days,
+    )
+  )
+    .map((node) => ({ ...node, ownerBanned: banned.has(node.id) }))
+    .filter((node) => !node.expired && !node.quarantinedAt && permissions(node, who).view)
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  return (await summarize(nodes, days, { ownerId: who.userId })).map((summary) => {
+    const node = byId.get(summary.id)!
+    const path = openableAncestors(node, who, days)
+    return {
+      ...summary,
+      pinned: true,
+      ...(path.length ? { path } : {}),
+      ...(node.ownerId === who.userId || summary.teamFolder ? {} : { owner: owners.get(summary.id)! }),
+    }
+  })
+}
+
+/** Whether `who` pinned the drop. */
+async function isPinned(dropId: string, who: Identity) {
+  const [row] = await db
+    .select({ at: dropPins.at })
+    .from(dropPins)
+    .where(and(eq(dropPins.userId, who.userId), eq(dropPins.dropId, dropId)))
+  return Boolean(row)
+}
+
+/** Pins the drop for `who`, or unpins it. Pinning twice keeps the first pin's place. */
+export async function setPinned(dropId: string, who: Identity, pinned: boolean) {
+  if (pinned) await db.insert(dropPins).values({ userId: who.userId, dropId, at: Date.now() }).onConflictDoNothing()
+  else await db.delete(dropPins).where(and(eq(dropPins.userId, who.userId), eq(dropPins.dropId, dropId)))
+}
+
+/**
  * Other people's drops you can open that match a search: what Shared with me lists, and everything inside the folders
  * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
  * owner, and admins find no one's private drops here. A path shows only the folders you may open.
@@ -566,13 +619,14 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz, gallery] = await Promise.all([
+  const [versions, body, attachments, views, quiz, gallery, pinned] = await Promise.all([
     versionsOf(row),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId) : undefined,
     galleryOf(row, who, days),
+    who && !isAttachment(row) ? isPinned(row.id, who) : false,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -597,6 +651,7 @@ export async function dropDetail(
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
   if (gallery) detail.gallery = gallery
+  if (pinned) detail.pinned = true
   return detail
 }
 

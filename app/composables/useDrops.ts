@@ -50,6 +50,9 @@ const LISTS = [keys.drops, keys.tree]
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
+/** The drops you pinned, yours and others', most recently pinned first (listPinned). */
+export const usePinned = () => useApi("/api/drops", { key: keys.pinned, query: { pinned: "1" }, default: () => [] })
+
 /** Your Trash, top-most nodes only (listDrops). */
 export const useTrash = () => useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
 
@@ -93,6 +96,7 @@ export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
   const { data: tree } = useNuxtData<DropTree>(keys.tree)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
+  const { data: pinnedList } = useNuxtData<DropSummary[]>(keys.pinned)
   /** Changes both lists (LISTS) the same way. */
   const edit = (change: (list: DropSummary[]) => DropSummary[]) => {
     if (cached.value) cached.value = change(cached.value)
@@ -202,6 +206,35 @@ export function useDropActions() {
       return true
     } catch (error) {
       notify.fail("Couldn't rename it", error)
+      return false
+    }
+  }
+
+  /**
+   * Pins the drop to your Pinned view, or unpins it. Optimistic: the drop's page and the Pinned list change at once and
+   * roll back if the server says no. From a control that shows the change itself (the +'s pressed pin), `quiet` skips
+   * the note; from ⌘K or a card's menu, which close, the note says it and offers Undo.
+   */
+  async function setPinned(drop: DropSummary, pinned: boolean, { quiet = false } = {}) {
+    const shown = editDetail(drop.id, (detail) => ({ ...detail, pinned }))
+    const list = pinnedList.value
+    if (list)
+      pinnedList.value = pinned
+        ? [{ ...drop, pinned }, ...list.filter((item) => item.id !== drop.id)]
+        : list.filter((item) => item.id !== drop.id)
+    try {
+      await $fetch(`/api/drops/${drop.id}/pin`, { method: pinned ? "PUT" : "DELETE" })
+      if (!quiet)
+        notify.say(pinned ? "Pinned" : "Unpinned", {
+          icon: pinned ? "i-mingcute-pin-fill" : "i-mingcute-pin-line",
+          action: { label: "Undo", onClick: () => void setPinned(drop, !pinned) },
+        })
+      void refreshNuxtData(keys.pinned)
+      return true
+    } catch (error) {
+      if (shown) editDetail(drop.id, () => shown)
+      if (list) pinnedList.value = list
+      notify.fail(pinned ? "Couldn't pin it" : "Couldn't unpin it", error)
       return false
     }
   }
@@ -384,6 +417,7 @@ export function useDropActions() {
     setShare,
     setLifetime,
     rename,
+    setPinned,
     remove,
     restore,
     deleteForever,

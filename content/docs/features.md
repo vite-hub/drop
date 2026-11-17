@@ -78,12 +78,16 @@ More in [Review a live site](/docs/sites).
 
 ### Search {#search}
 
-Press :kbd[⌘K] (<kbd>Ctrl K</kbd> on Windows and Linux), or **Search** in the sidebar, on any page of Drop while you're signed in. It finds drops by their title, file name, or link, and docs by the words inside their latest version. It searches your drops in every folder, then the ones shared with you. Without words, it lists your latest drops and Drop's pages. It also makes new drops: type *new* for a doc, which opens in the editor, a board, a folder, or a site review, or *upload* for a file. Inside a folder you add to, they go in that folder. On a drop's page it lists what you can do with that drop first, from editing and comments to sharing, moving, and the Trash. The theme and signing out are there too.
+Press :kbd[⌘K] (<kbd>Ctrl K</kbd> on Windows and Linux), or **Search** in the sidebar, on any page of Drop while you're signed in. It finds drops by their title, file name, or link, and docs by the words inside their latest version. It searches your drops in every folder, then the ones shared with you. Without words, it lists your pinned drops, your latest drops, and Drop's pages. It also makes new drops: type *new* for a doc, which opens in the editor, a board, a folder, or a site review, or *upload* for a file. Inside a folder you add to, they go in that folder. On a drop's page it lists what you can do with that drop first, from editing and comments to sharing, moving, and the Trash. The theme and signing out are there too.
 
 ::docs-figure{src="/docs/features/search.webp" alt="The search palette: the word invoice finds the Billing migration doc in Plans, with the matching text" :width="808" :height="488"}
 ::
 
 The search box on the Drops page (<kbd>/</kbd> puts the cursor in it) looks inside every folder too, and a folder's page searches only what's inside it. Agents search with `list_drops` and `query`, and add `folder` to search one folder and everything below it.
+
+### Pinned {#pinned}
+
+**Pinned** is where the Drops page opens: the drops you keep coming back to, yours or anyone's you can open, most recently pinned first. Pin a drop from its :kbd[+], from :kbd[⌘K] while it's open, or from a card's menu, and unpin it the same way. Pins are yours alone; nobody else sees them. Without words, :kbd[⌘K] lists your pins first. A pinned drop that goes to the Trash or stops being shared with you leaves the list, and comes back if it's restored or shared again. Pick **Recent** or **Folders** instead and the page opens there next time.
 
 ### Keyboard shortcuts {#shortcuts}
 

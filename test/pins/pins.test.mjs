@@ -1,0 +1,78 @@
+import assert from "node:assert/strict"
+import { beforeEach, test } from "vite-plus/test"
+import { sql, state, migrate, reset, insertDrop, who } from "../cost/harness.mjs"
+
+const { listPinned, setPinned, dropDetail, findDrop } = await import("../../server/utils/drops.ts")
+
+migrate()
+const mate = { ...who, userId: "mate", name: "Mate", email: "mate@example.com", actorName: "Mate" }
+beforeEach(() => {
+  reset()
+  sql
+    .prepare(
+      "INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')",
+    )
+    .run()
+})
+const titles = async (person) => (await listPinned(person)).map((drop) => drop.title)
+
+test("pins list newest pin first, yours and others' you can open, and say whose they are", async () => {
+  insertDrop("mine")
+  insertDrop("theirs", { owner_id: "mate", visibility: "public" })
+  await setPinned("theirs", who, true)
+  await new Promise((resolve) => setTimeout(resolve, 2))
+  await setPinned("mine", who, true)
+  const list = await listPinned(who)
+  assert.deepEqual(
+    list.map((drop) => drop.title),
+    ["mine", "theirs"],
+  )
+  assert.equal(list[0].owner, undefined)
+  assert.equal(list[1].owner.name, "Mate")
+  assert.ok(list.every((drop) => drop.pinned))
+  // Pins are personal.
+  assert.deepEqual(await titles(mate), [])
+})
+
+test("pinning twice keeps one pin, and unpinning removes it", async () => {
+  insertDrop("doc")
+  await setPinned("doc", who, true)
+  await setPinned("doc", who, true)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_pins").get().n, 1)
+  await setPinned("doc", who, false)
+  assert.deepEqual(await titles(who), [])
+})
+
+test("a pin hides while its drop is in the Trash or no longer shared with you, and comes back after", async () => {
+  insertDrop("shared", { owner_id: "mate", visibility: "public" })
+  await setPinned("shared", who, true)
+  sql.prepare("UPDATE drops SET share = 'private' WHERE id = 'shared'").run()
+  assert.deepEqual(await titles(who), [])
+  sql.prepare("UPDATE drops SET share = 'public' WHERE id = 'shared'").run()
+  assert.deepEqual(await titles(who), ["shared"])
+  sql.prepare("UPDATE drops SET trashed_at = ?, trash_reason = 'deleted' WHERE id = 'shared'").run(Date.now())
+  assert.deepEqual(await titles(who), [])
+})
+
+test("a drop in a folder lists with the folders it sits in", async () => {
+  insertDrop("folder", { kind: "folder", blob_key: null, title: "Plans" })
+  insertDrop("inside", { parent_id: "folder" })
+  await setPinned("inside", who, true)
+  const [drop] = await listPinned(who)
+  assert.deepEqual(
+    drop.path.map((crumb) => crumb.title),
+    ["Plans"],
+  )
+})
+
+test("a drop's detail says whether you pinned it", async () => {
+  state.who = who
+  insertDrop("doc")
+  const before = await dropDetail(await findDrop("doc"), who, "https://drop.example")
+  assert.equal(before.pinned, undefined)
+  await setPinned("doc", who, true)
+  const after = await dropDetail(await findDrop("doc"), who, "https://drop.example")
+  assert.equal(after.pinned, true)
+  const theirs = await dropDetail(await findDrop("doc"), null, "https://drop.example").catch(() => null)
+  assert.equal(theirs?.pinned, undefined)
+})

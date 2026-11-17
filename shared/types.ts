@@ -80,6 +80,8 @@ export interface DropSummary {
   snippet?: string
   /** "Shared with me" and search: whose drop it is, when it isn't yours. */
   owner?: { name: string; image: string | null }
+  /** You pinned it: the Drops page's Pinned view and ⌘K list it. Set on a drop's detail and the Pinned list. */
+  pinned?: boolean
 }
 
 /** What a card on the Drops page shows of a drop: an image's file, a doc's or board's first words, a folder's newest drops. */

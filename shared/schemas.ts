@@ -249,6 +249,7 @@ export const DropsQuerySchema = v.object({
   trash: v.optional(v.string()),
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
+  pinned: v.optional(v.string()),
 })
 
 export const DropTreeQuerySchema = v.object({ open: v.optional(v.pipe(v.string(), v.maxLength(100))) })

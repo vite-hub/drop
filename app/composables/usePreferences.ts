@@ -10,9 +10,13 @@ const year = 60 * 60 * 24 * 365
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
-/** How the Drops page lists your drops: newest first (Recent) or folders first (Folders). */
+/** How the Drops page opens: the drops you pinned (Pinned), yours newest first (Recent), or folders first (Folders). */
 export const useDropsView = () =>
-  useCookie<"recent" | "folders">("drop-drops-view", { default: () => "recent", maxAge: year, sameSite: "lax" })
+  useCookie<"pinned" | "recent" | "folders">("drop-drops-view", {
+    default: () => "pinned",
+    maxAge: year,
+    sameSite: "lax",
+  })
 /** Whether the Drops page shows cards with previews or a list. */
 export const useDropsLayout = () =>
   useCookie<"grid" | "list">("drop-drops-layout", { default: () => "grid", maxAge: year, sameSite: "lax" })
