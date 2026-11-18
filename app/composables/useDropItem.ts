@@ -9,7 +9,7 @@ import { dropPath } from "#shared/links"
  */
 export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => boolean; trash: () => void }) {
   const now = useRelativeNow()
-  const { copy, copied } = useCopy()
+  const { copy } = useCopy()
   const { setShare } = useDropActions()
   const moveTo = useMoveDialog()
   const { data: me } = useMe()
@@ -25,7 +25,7 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
   // The share menu shows the new choice, so picking one doesn't get a note.
   const pick = (next: Share) => next === drop().share || setShare(drop(), next)
 
-  /** The link button shows a check once it copied; from the menu, which closes, `announce` says it in StatusNote. */
+  /** The menu item closes the menu, so `announce` says it in StatusNote; the link button is a DropCopyButton of `link`. */
   const copyLink = (announce?: string) => copy(link.value, { announce })
 
   // Copying never widens a share on its own. A private drop's link button and menu item open the choices instead,
@@ -83,5 +83,5 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
         : []),
   ])
 
-  return { shared, theirs, changeable, choices, status, pick, copyLink, copied, linkChoices, menu }
+  return { shared, theirs, changeable, choices, status, pick, link, copyLink, linkChoices, menu }
 }

@@ -71,6 +71,10 @@ export function useViewerFrame(options: {
   heading?: (id: string, copy: boolean) => void
   /** A button in a Markdown doc's header (#shared/doc-header), or a related drop it lists, by id. */
   docAction?: (action: "markdown" | "download" | "pdf") => void
+  /** The pointer or focus reached the header's Copy, or its folder: load what it will need. */
+  docIntent?: (what: "markdown" | "folder") => void
+  /** The header's own Copy, as it went. */
+  docCopied?: (ok: boolean, error?: string) => void
   openDrop?: (id: string) => void
 }) {
   const {
@@ -342,6 +346,15 @@ export function useViewerFrame(options: {
         return
       case "doc-open":
         if (drop.value.kind === "markdown") options.openDrop?.(message.id)
+        return
+      case "doc-intent":
+        if (drop.value.kind === "markdown") options.docIntent?.("markdown")
+        return
+      case "doc-folder":
+        if (drop.value.kind === "markdown") options.docIntent?.("folder")
+        return
+      case "doc-copied":
+        if (drop.value.kind === "markdown") options.docCopied?.(message.ok, message.error)
         return
       case "pointer":
         return options.presence?.point(message.at)
