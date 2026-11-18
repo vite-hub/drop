@@ -19,6 +19,12 @@ A paragraph to comment on once the zoom is closed.
 A note.
 ::::
 :::
+
+:::screenshot{src="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#16a34a"/></svg>')}" alt="Billing page" title="Billing"}
+::::annotation{x=5 y=5 w=20 h=20}
+Another note.
+::::
+:::
 `
 
 async function open(browser, html) {
@@ -70,7 +76,7 @@ for (const [name, engine] of [
     const browser = await engine.launch()
     try {
       const { page, frame } = await open(browser, html)
-      await frame.locator(".ca-screenshot [data-zoom]").click()
+      await frame.locator(".ca-screenshot [data-zoom]").first().click()
       await frame.locator("dialog.cz-dialog").waitFor()
       assert.equal(await frame.evaluate(() => document.querySelector("dialog.cz-dialog").matches(":modal")), true)
       assert.equal(await hostParent(frame), "dialog", "the layer moves into the zoom's dialog")
@@ -113,6 +119,27 @@ for (const [name, engine] of [
         Math.abs(ink.x - cx) < 6 && Math.abs(ink.y - cy) < 6,
         `the ink sits where it was drawn: ${JSON.stringify(ink)}`,
       )
+
+      // The ink belongs to its screenshot: moving to the next one in the zoom hides it, and coming back shows it again.
+      const inkShown = () =>
+        frame.evaluate(() => {
+          const svg = [...document.querySelectorAll("drop-comments")]
+            .find((h) => h.style.zIndex)
+            .shadowRoot.querySelector(".draft .inkp")
+          return getComputedStyle(svg).display !== "none"
+        })
+      await frame.evaluate(() => {
+        window.zoomed = []
+        document.addEventListener("comark-zoom:change", (e) =>
+          window.zoomed.push((e.detail.item.matches("img") ? e.detail.item : e.detail.item.querySelector("img"))?.alt),
+        )
+      })
+      await page.keyboard.press("ArrowDown")
+      await frame.waitForFunction(() => window.zoomed.at(-1) === "Billing page")
+      assert.equal(await inkShown(), false, "not on the next screenshot")
+      await page.keyboard.press("ArrowUp")
+      await frame.waitForFunction(() => window.zoomed.at(-1) === "Settings page")
+      assert.equal(await inkShown(), true, "back on its own screenshot")
 
       await frame.locator("dialog.cz-dialog").press("Escape")
       await frame.locator("dialog.cz-dialog").waitFor({ state: "detached" })
