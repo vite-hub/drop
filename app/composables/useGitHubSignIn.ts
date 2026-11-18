@@ -1,10 +1,10 @@
 /**
  * GitHub sign-in for the public pages (landing and docs). After signing in, people go back to where the auth
  * guard sent them from (`?redirect=`), only for same-site paths, never a full URL; otherwise to /drops.
+ * `signInHref` is ViteHub's sign-in route (`access.signIn` in server/auth.ts), so the link works before hydration.
  */
 export function useGitHubSignIn() {
   const route = useRoute()
-  const notify = useNotify()
   const { loggedIn, signIn } = useUserSession(useNuxtApp().$auth)
 
   // The session loads client-side; gate on mount so the server and first client render agree.
@@ -24,10 +24,7 @@ export function useGitHubSignIn() {
     }
   })
 
-  async function signInWithGitHub() {
-    const { error } = await signIn.social({ provider: "github", callbackURL: next.value })
-    if (error) notify.fail("Couldn't start GitHub sign-in", error)
-  }
+  const signInHref = computed(() => `/api/auth/sign-in?redirect=${encodeURIComponent(next.value)}`)
 
-  return { signedIn, next, signIn, signInWithGitHub }
+  return { signedIn, next, signIn, signInHref }
 }
