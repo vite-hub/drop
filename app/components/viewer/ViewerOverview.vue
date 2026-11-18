@@ -133,12 +133,11 @@ async function save() {
           v-model="draft"
           aria-label="Description"
           autofocus
-          autoresize
           class="w-full"
           :maxlength="2000"
-          :maxrows="16"
           placeholder="What belongs here, and how to name and write it."
           :rows="4"
+          :ui="{ base: 'field-sizing-content min-h-[calc(4lh+--spacing(3))] max-h-[calc(16lh+--spacing(3))]' }"
           @keydown.meta.enter.prevent="save"
           @keydown.ctrl.enter.prevent="save"
           @keydown.esc.stop="editing = false"

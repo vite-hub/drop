@@ -194,13 +194,11 @@ const edit = (messageId: string, text: string, ids: string[]) =>
               <UTextarea
                 v-model="suggestion"
                 aria-label="Suggested text"
-                autoresize
                 class="min-w-0 flex-1"
-                :maxrows="6"
                 placeholder="Leave empty to delete it"
                 :rows="1"
                 :ui="{
-                  base: 'redline-ins rounded-sm px-1 py-1 text-base leading-relaxed placeholder:text-muted sm:text-sm',
+                  base: 'redline-ins field-sizing-content min-h-[calc(1lh+--spacing(2))] max-h-[calc(6lh+--spacing(2))] rounded-sm px-1 py-1 text-base leading-relaxed placeholder:text-muted sm:text-sm',
                 }"
                 variant="none"
                 @keydown.enter.exact.prevent="send()"

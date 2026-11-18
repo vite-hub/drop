@@ -37,12 +37,11 @@ const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) =>
         >
           <UTextarea
             v-model="state.description"
-            autoresize
             class="w-full"
             :maxlength="2000"
-            :maxrows="10"
             placeholder="Notes from calls, one doc per meeting, named YYYY-MM-DD-topic. Start with who was there, then decisions, then action items."
             :rows="3"
+            :ui="{ base: 'field-sizing-content min-h-[calc(3lh+--spacing(3))] max-h-[calc(10lh+--spacing(3))]' }"
           />
         </UFormField>
         <USwitch
