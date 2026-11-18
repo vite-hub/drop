@@ -263,6 +263,58 @@ for (const [name, layer, datasets, expected] of [
     60_000,
   )
 
+test("named Vega sources preserve parsing and explicit layer references under filters", async () => {
+  const rows = [
+    { day: "31/01/2026", label: "January", team: "Alpha" },
+    { day: "28/02/2026", label: "February", team: "Beta" },
+  ]
+  const names = ["observations", "root", "data_0"]
+  const encoding = { x: { field: "day", type: "temporal" } }
+  const input = {
+    ...report,
+    filters: [{ field: "team", type: "list", count: "observations" }],
+    data: Object.fromEntries(names.map((name) => [name, rows])),
+    views: [
+      {
+        id: "overview",
+        label: "Overview",
+        blocks: names.map((name) => ({
+          type: "vega",
+          title: name,
+          spec: {
+            data: { name, format: { parse: { day: "date:'%d/%m/%Y'" } } },
+            layer: [
+              { mark: "point", encoding },
+              { data: { name }, mark: "text", encoding: { ...encoding, text: { field: "label" } } },
+            ],
+          },
+        })),
+      },
+    ],
+  }
+  writeFileSync(join(dir, "named.json"), JSON.stringify(input))
+  execFileSync("node", [join(skill, "scripts/build.mjs"), "named.json", "named.html"], { cwd: dir, stdio: "pipe" })
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    page.setDefaultTimeout(5000)
+    await page.route("https://cdn.jsdelivr.net/npm/**", (route) => {
+      const key = Object.keys(vega).find((key) => route.request().url().includes(`/npm/${key}/`))
+      return key ? route.fulfill({ contentType: "text/javascript", body: readFileSync(vega[key]) }) : route.abort()
+    })
+    await page.route("https://fonts.googleapis.com/**", (route) => route.abort())
+    await page.goto(`file://${join(dir, "named.html")}#overview?team=Beta`)
+    for (const name of names) {
+      const svg = page.locator(`.rp-chart[aria-label="${name}"][data-state="ok"] svg`)
+      await svg.waitFor()
+      assert.equal(await svg.locator(".mark-symbol.role-mark path").count(), 1, name)
+      assert.deepEqual(await svg.locator(".mark-text.role-mark text").allTextContents(), ["February"], name)
+    }
+  } finally {
+    await browser.close()
+  }
+}, 60_000)
+
 test("paint preprocessing preserves nested records and explicit scale choices", () => {
   const app = readFileSync(join(skill, "assets/app.js"), "utf8")
   const paint = runInNewContext(`${app.slice(app.indexOf("const PALETTE"), app.indexOf("const report"))}

@@ -1294,6 +1294,29 @@ function vegaSpec(block, width) {
   return { ...spec, width: spec.width ?? width, height: spec.height ?? block.height ?? 240 };
 }
 
+function isolateVegaSource(spec, reportKey) {
+  const sources = [];
+  const visit = (node) => {
+    if (node.data?.name) sources.push(node.data);
+    for (const transform of node.transform ?? []) {
+      if (transform.lookup != null && transform.from?.data?.name) sources.push(transform.from.data);
+    }
+    for (const child of node.layer ?? node.concat ?? node.hconcat ?? node.vconcat ?? []) visit(child);
+    if (node.spec) visit(node.spec);
+  };
+  visit(spec);
+  const used = new Set([...Object.keys(spec.datasets ?? {}), ...sources.map((source) => source.name)]);
+  let index = 0;
+  while (used.has(`__report_source_${index}`)) index++;
+  const alias = `__report_source_${index}`;
+  for (const source of sources) {
+    if (source.name === reportKey && (source === spec.data || (!("url" in source) && !("values" in source)))) {
+      source.name = alias;
+    }
+  }
+  return alias;
+}
+
 const tooltip = document.createElement("div");
 tooltip.className = "rp-tip";
 tooltip.hidden = true;
@@ -1332,11 +1355,10 @@ async function drawChart(entry) {
     lite.autosize = { type: "fit-x", contains: "padding" };
     lite.config = { ...config(vars()), ...lite.config };
     const named = raw && lite.data?.name;
-    const placeholder = named ? [{ reportSource: undefined }] : null;
-    if (placeholder) lite.data = { values: placeholder };
+    const alias = named && isolateVegaSource(lite, named);
     const compiled = compile(lite).spec;
     const interactions = raw ? vegaInteractions(lite, compiled) : null;
-    const source = placeholder && compiled.data?.find((dataset) => dataset.values === placeholder);
+    const source = alias && compiled.data?.find((dataset) => dataset.name === alias);
     if (source) source.values = rowsOf(named, interactions.fields, interactions.ranges);
     const targets = chartTargets(block);
     if (targets) clickableSpec(compiled, block, targets);
