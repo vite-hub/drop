@@ -65,7 +65,10 @@ async function open(browser, width) {
       table: box(document.querySelector(".typeset > div[data-width]")),
       outline: outline?.hasAttribute("data-fits") ? box(outline) : null,
       chips: [...document.querySelectorAll(".typeset [data-short] .cp")].map((chip) => chip.getClientRects().length),
-      stacked: getComputedStyle(document.querySelector(".typeset table")).display === "grid",
+      // comark-ui lays a table with prose out as a grid, so it counts as stacked when a row's cells stop sharing a line.
+      stacked:
+        new Set([...document.querySelectorAll(".typeset tbody > tr:first-child > td")].map((cell) => box(cell).top))
+          .size > 1,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
@@ -92,6 +95,12 @@ test(
       // "portal #1596" and each link chip stay on one line.
       assert.deepEqual(new Set(shown.chips), new Set([1]))
       assert.equal(shown.overflow, 0)
+
+      // Narrower, the table still takes its own width on both sides of the text rather than stacking.
+      const laptop = await open(browser, 1480)
+      assert.ok(laptop.table.left < laptop.text.left - 100 && laptop.table.right > laptop.text.right + 100)
+      assert.equal(laptop.stacked, false)
+      assert.equal(laptop.overflow, 0)
 
       const phone = await open(browser, 390)
       assert.equal(phone.stacked, true)

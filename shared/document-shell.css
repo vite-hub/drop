@@ -219,12 +219,14 @@ p.render-error {
 }
 
 /* comark-ui's wide blocks (data-wide: a before/after compare, a Mermaid diagram or a table wider than the text) take
-   the room beside the text column, up to their own width and 72rem, so screenshots read at about twice the size, a
-   diagram's labels keep their size, and a table's columns stop wrapping every few words. The column sits --drop-shift
-   left of the page's middle. Each side gets its own room, 1.5rem clear of the page's left edge and of what covers its
-   right (--drop-right, the viewer's floating panel, and --comark-rail-width, the side outline's column when it needs
-   one), so a block beside the panel grows into the empty space on the left. comark-ui widens a heading right above a
-   compare to match, so it reads as the compare's title. */
+   the room beside the text column, up to their own width, so screenshots read at about twice the size, a diagram's
+   labels keep their size, and a table's columns stop wrapping every few words. A compare or a diagram stops at
+   comark-ui's 72rem; a table can grow to its own width (up to 96em), since Drop leaves --comark-wide-max unset, and
+   stacks its prose under the short columns where the room runs out. The column sits --drop-shift left of the page's
+   middle. Each side gets its own room, 1.5rem clear of the page's left edge and of what covers its right (--drop-right,
+   the viewer's floating panel, and --comark-rail-width, the side outline's column when it needs one), so a block
+   beside the panel grows into the empty space on the left. comark-ui widens a heading right above a compare to match,
+   so it reads as the compare's title. */
 .typeset {
   --comark-wide-start: calc((100vw - var(--drop-shift, 0px) - 100%) / 2 - 1.5rem);
   --comark-wide-end: calc(
