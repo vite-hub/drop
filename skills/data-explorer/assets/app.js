@@ -29,7 +29,8 @@ const views = [...report.views];
 if (report.method || report.intro) views.push({ id: "method", label: "Method", method: true });
 const filters = (report.filters ?? []).map((f) => ({ ...f, type: f.type ?? null }));
 
-const state = { view: views[0].id, filters: {}, scale: {}, q: "" };
+// `ranges` holds the bin a histogram or a binned vega mark was clicked on, as `{ field: [from, to] }`.
+const state = { view: views[0].id, filters: {}, ranges: {}, scale: {}, q: "" };
 const charts = [];
 
 // ---------- helpers
@@ -211,6 +212,10 @@ function rowsOf(name, skip = []) {
     if (value == null || value === "*") continue;
     rows = rows.filter((row) => !(f.field in row) || row[f.field] === value);
   }
+  for (const [f, [from, to]] of Object.entries(state.ranges)) {
+    if ([skip].flat().includes(f)) continue;
+    rows = rows.filter((row) => !(f in row) || (typeof row[f] === "number" && row[f] >= from && row[f] < to));
+  }
   return rows;
 }
 const searched = (rows, fields) => {
@@ -252,6 +257,14 @@ const setFilters = (pairs) => {
   void render();
 };
 const setFilter = (field, value) => setFilters([[field, value]]);
+// Sets the range a bin covers, from its start up to, not including, its end; a second click on the same bin clears it.
+const setRange = (field, range) => {
+  const now = state.ranges[field];
+  if (now?.[0] === range[0] && now?.[1] === range[1]) delete state.ranges[field];
+  else state.ranges[field] = range;
+  writeHash();
+  void render();
+};
 const clickable = (field) => filters.some((f) => f.field === field && kindOf(f) === "list");
 
 // A block keeps every value of a list filter it draws, and fades the ones the filter leaves out, so a click on one bar
@@ -867,9 +880,9 @@ function scatterClick(block) {
   };
 }
 
-// The list filters a click on a bar, line or area chart sets: its series, and its category.
+// The list filters a click on a bar, line, area or vega chart sets: its series, and its category.
 function chartTargets(block) {
-  if (block.type === "vega" || block.chart === "scatter" || block.chart === "histogram") return null;
+  if (block.chart === "scatter" || block.chart === "histogram") return null;
   const series = clickable(block.series) ? block.series : null;
   const x = clickable(block.x) ? block.x : null;
   return series || x ? { series, x } : null;
@@ -877,7 +890,7 @@ function chartTargets(block) {
 
 // The list filters a chart draws whole and fades: a scatter's label and series, any other chart's series and category.
 function chartFields(block) {
-  if (block.type === "vega" || block.chart === "histogram") return [];
+  if (block.chart === "histogram") return [];
   return block.chart === "scatter" ? shown(block.label, block.series) : shown(block.series, block.x);
 }
 
@@ -894,20 +907,21 @@ const fade = (encode = {}, part, test, key = "opacity") => {
   return encode;
 };
 
+const fadeMarks = (list = [], test) => {
+  for (const m of list) {
+    if (m.type === "group") fadeMarks(m.marks, test);
+    else if (!m.name?.endsWith("_voronoi")) m.encode = fade(m.encode, null, test);
+  }
+};
+
 function fadeSpec(spec, block, fields) {
   const on = fields.filter(selected);
   if (!on.length) return;
   const value = (f) => JSON.stringify(state.filters[f]);
-  const rows = on
-    .map((f) => `(datum[${JSON.stringify(f)}] != null && datum[${JSON.stringify(f)}] !== ${value(f)})`)
-    .join(" || ");
-  const marks = (list = []) => {
-    for (const m of list) {
-      if (m.type === "group") marks(m.marks);
-      else if (!m.name?.endsWith("_voronoi")) m.encode = fade(m.encode, null, rows);
-    }
-  };
-  marks(spec.marks);
+  fadeMarks(
+    spec.marks,
+    on.map((f) => `(datum[${JSON.stringify(f)}] != null && datum[${JSON.stringify(f)}] !== ${value(f)})`).join(" || "),
+  );
   const axis = block.horizontal ? "y" : "x";
   if (on.includes(block.x))
     for (const a of spec.axes ?? [])
@@ -934,22 +948,93 @@ function clickableSpec(spec, block, { series, x }) {
   if (x) for (const a of spec.axes ?? []) if (a.scale === axis) a.encode = pointer(a.encode, "labels");
   if (series)
     for (const l of spec.legends ?? []) l.encode = pointer(pointer(l.encode, "symbols"), "labels");
-  const marks = (list = []) => {
-    for (const m of list) {
-      if (m.type === "group") marks(m.marks);
-      else {
-        // Vega-Lite turns picking off for marks without a tooltip, such as a line's name at its end.
-        m.interactive = true;
-        m.encode = { ...m.encode, update: { ...m.encode?.update, cursor: { value: "pointer" } } };
-      }
-    }
-  };
-  marks(spec.marks);
+  pointerMarks(spec.marks);
 }
 
-// What a click on a chart does. A bar, line, area or legend entry filters by its series when that's a list filter's
-// field, and otherwise by its category, as does the category's axis label. Scatter points have their own rule.
-function chartClick(block, spec, view, host) {
+function pointerMarks(list = []) {
+  for (const m of list) {
+    if (m.type === "group") pointerMarks(m.marks);
+    else {
+      // Vega-Lite turns picking off for marks without a tooltip, such as a line's name at its end.
+      m.interactive = true;
+      m.encode = { ...m.encode, update: { ...m.encode?.update, cursor: { value: "pointer" } } };
+    }
+  }
+}
+
+// The bins the compiled spec draws: the field each bins, the names of the fields that hold a bin's start and end, and
+// whether the field is a histogram's log10 of its `x`.
+function binsOf(spec, block) {
+  const bins = [];
+  for (const d of spec.data ?? [])
+    for (const t of d.transform ?? []) {
+      const name = typeof t.field === "string" ? t.field : t.field?.field;
+      if (t.type !== "bin" || !name || t.as?.length !== 2) continue;
+      const log = name === "__log";
+      bins.push({ field: log ? block.x : name, from: t.as[0], to: t.as[1], log });
+    }
+  return bins;
+}
+
+const clean = (v) => Number(v.toPrecision(12));
+
+// Fades every bin outside the range set on its field. A log histogram compares in log10, where a range's bounds come
+// back off by a rounding error, so the bounds take a small margin.
+function fadeBins(spec, bins) {
+  const tests = bins
+    .filter((b) => state.ranges[b.field])
+    .map((b) => {
+      const [from, to] = state.ranges[b.field].map((v) => (b.log ? Math.log10(v) : v));
+      const e = 1e-9 * Math.max(1, Math.abs(from), Math.abs(to));
+      const [a, z] = [`datum[${JSON.stringify(b.from)}]`, `datum[${JSON.stringify(b.to)}]`];
+      return `(isValid(${a}) && (${z} <= ${from + e} || ${a} >= ${to - e}))`;
+    });
+  if (tests.length) fadeMarks(spec.marks, tests.join(" || "));
+}
+
+// Every channel of a Vega-Lite spec, in its layers and concatenated views too, as [channel, definition] pairs.
+function channelsOf(spec, out = []) {
+  if (!spec || typeof spec !== "object") return out;
+  if (spec.encoding) out.push(...Object.entries(spec.encoding));
+  for (const key of ["layer", "hconcat", "vconcat", "concat"]) for (const s of spec[key] ?? []) channelsOf(s, out);
+  return channelsOf(spec.spec, out);
+}
+
+// The fields a vega block's encodings name, so a click on it filters as it would on a chart block: a color, fill,
+// stroke or shape on a list filter's field is its series, and an x or y on one is its category. Binned fields filter
+// by range.
+function vegaShape(block) {
+  const channels = channelsOf(block.spec);
+  const pick = (names) =>
+    channels.find(([c, ref]) => names.includes(c) && ref?.field && !ref.bin && clickable(ref.field))?.[1].field ??
+    null;
+  const x = pick(["x"]);
+  const y = pick(["y"]);
+  return {
+    type: "vega",
+    series: pick(["color", "fill", "stroke", "shape"]),
+    x: x ?? y,
+    horizontal: !x && Boolean(y),
+    binned: channels.filter(([, ref]) => ref?.bin && ref.field).map(([, ref]) => ref.field),
+  };
+}
+
+// What a click on a chart does. A bin filters by its range. A bar, line, area or legend entry filters by its series
+// when that's a list filter's field, and otherwise by its category, as does the category's axis label. Scatter points
+// have their own rule.
+function chartClick(block, spec, view, host, bins) {
+  const marks = markClick(block, spec, view, host);
+  if (!bins.length) return marks;
+  return (event, item) => {
+    const d = item?.datum;
+    const bin = d && bins.find((b) => typeof d[b.from] === "number" && typeof d[b.to] === "number");
+    if (!bin) return marks?.(event, item);
+    const at = (v) => clean(bin.log ? 10 ** v : v);
+    setRange(bin.field, [at(d[bin.from]), at(d[bin.to])]);
+  };
+}
+
+function markClick(block, spec, view, host) {
   if (block.chart === "scatter") {
     const click = scatterClick(block);
     return click
@@ -1116,10 +1201,10 @@ function paintSpec(node, rows, c = vars()) {
   }
 }
 
-function vegaSpec(block, width) {
+function vegaSpec(block, width, skip) {
   const spec = structuredClone(block.spec);
   const named = spec.data?.name;
-  if (named) spec.data = { values: rowsOf(named) };
+  if (named) spec.data = { values: rowsOf(named, skip) };
   paintSpec(spec, named ? data[named] : spec.data?.values);
   return { ...spec, width: spec.width ?? width, height: spec.height ?? block.height ?? 240 };
 }
@@ -1147,22 +1232,31 @@ async function drawChart(entry) {
   const { block, el } = entry;
   const width = Math.max(240, Math.floor(el.clientWidth));
   try {
-    const fields = chartFields(block);
-    const rows = block.type === "vega" ? null : rowsOf(block.data, fields);
+    // A vega block filters like the chart its encodings describe.
+    const shape = block.type === "vega" ? vegaShape(block) : block;
+    const fields = chartFields(shape);
+    // A chart keeps the rows of the list filters it fades and of the range its own bins set.
+    const skip = [...fields, ...(block.chart === "histogram" ? [block.x] : (shape.binned ?? []))];
+    const rows = block.type === "vega" ? null : rowsOf(block.data, skip);
     if (rows && !rows.length) {
       el.replaceChildren(h("p", { class: "rp-empty" }, "No rows for this filter."));
       el.dataset.state = "ok";
       return;
     }
     const lite =
-      block.type === "vega" ? vegaSpec(block, width) : SPECS[block.chart](block, rows, width);
+      block.type === "vega" ? vegaSpec(block, width, skip) : SPECS[block.chart](block, rows, width);
     lite.$schema = "https://vega.github.io/schema/vega-lite/v6.json";
     lite.autosize = { type: "fit-x", contains: "padding" };
     lite.config = { ...config(vars()), ...lite.config };
     const compiled = compile(lite).spec;
-    const targets = chartTargets(block);
-    if (targets) clickableSpec(compiled, block, targets);
-    fadeSpec(compiled, block, fields);
+    const targets = chartTargets(shape);
+    if (targets) clickableSpec(compiled, shape, targets);
+    const bins = binsOf(compiled, block);
+    if (bins.length) {
+      pointerMarks(compiled.marks);
+      fadeBins(compiled, bins);
+    }
+    fadeSpec(compiled, shape, fields);
     entry.view?.finalize();
     const host = h("div", { class: "rp-chart-svg" });
     el.replaceChildren(host);
@@ -1174,7 +1268,7 @@ async function drawChart(entry) {
     });
     await entry.view.runAsync();
     if (block.chart === "scatter" && block.label) await placeLabels(entry.view, block, rows);
-    const click = chartClick(block, compiled, entry.view, host);
+    const click = chartClick(shape, compiled, entry.view, host, bins);
     if (click) entry.view.addEventListener("click", click);
     el.dataset.state = "ok";
   } catch (error) {
@@ -1830,6 +1924,8 @@ function readHash() {
   for (const [k, v] of new URLSearchParams(query ?? "")) {
     if (k === "q") state.q = v;
     const f = filters.find((f) => f.field === k);
+    const range = !f && v.split("..").map(Number);
+    if (range?.length === 2 && range.every(Number.isFinite) && range[0] < range[1]) state.ranges[k] = range;
     if (f)
       state.filters[k] =
         kindOf(f) === "toggle"
@@ -1850,6 +1946,7 @@ function writeHash() {
     if (v !== initial && v != null)
       params.set(f.field, kindOf(f) === "toggle" ? (v ? "1" : "0") : String(v));
   }
+  for (const [f, [from, to]] of Object.entries(state.ranges)) params.set(f, `${from}..${to}`);
   if (state.q) params.set("q", state.q);
   const q = params.toString();
   history.replaceState(null, "", `#${state.view}${q ? `?${q}` : ""}`);
@@ -1857,6 +1954,7 @@ function writeHash() {
 
 function resetFilters() {
   state.q = "";
+  state.ranges = {};
   for (const f of filters)
     state.filters[f.field] =
       kindOf(f) === "tabs"
@@ -1879,10 +1977,22 @@ const toggle = (f) =>
     f.label,
   );
 
+// A range's name in the sidebar: the title of the histogram or vega encoding that bins its field.
+function rangeLabel(field) {
+  const blocks = [...(report.top ?? []), ...views.flatMap((v) => v.blocks ?? []), ...(report.bottom ?? [])];
+  for (const b of blocks) {
+    if (b.chart === "histogram" && b.x === field) return b.xTitle ?? field;
+    const ref = channelsOf(b.spec).find(([, r]) => r?.bin && r.field === field)?.[1];
+    if (ref) return ref.title ?? field;
+  }
+  return field;
+}
+
 function sidebar() {
   const side = filters.filter((f) => kindOf(f) !== "toggle");
   const toggles = filters.filter((f) => kindOf(f) === "toggle");
-  if (!side.length && !toggles.length && !report.search) return null;
+  const ranges = Object.entries(state.ranges);
+  if (!side.length && !toggles.length && !ranges.length && !report.search) return null;
   return h(
     "aside",
     { class: "rp-side" },
@@ -1900,6 +2010,31 @@ function sidebar() {
           oninput: (e) => ((state.q = e.target.value), writeHash(), renderSoon()),
         }),
       ),
+    ranges.map(([f, range]) =>
+      h(
+        "div",
+        { class: "rp-side-group" },
+        h(
+          "div",
+          { class: "rp-side-head" },
+          h("span", {}, rangeLabel(f)),
+          h("button", { onclick: () => setRange(f, range) }, "Clear"),
+        ),
+        h(
+          "ul",
+          {},
+          h(
+            "li",
+            {},
+            h(
+              "button",
+              { class: "is-on", "aria-pressed": "true", onclick: () => setRange(f, range) },
+              h("span", {}, `${fmt(range[0])} – ${fmt(range[1])}`),
+            ),
+          ),
+        ),
+      ),
+    ),
     side.map((f) => {
       const opts = options(f);
       if (kindOf(f) === "tabs" && opts.length > 5)

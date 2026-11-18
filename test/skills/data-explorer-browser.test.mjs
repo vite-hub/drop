@@ -1,6 +1,7 @@
 // A data-explorer page filters on a click anywhere a list filter's value is drawn: a bar, a legend entry, a category's
-// axis label, a line under the pointer, a line's name and a matrix cell. Each click shows in the URL's hash, and the
-// block clicked keeps every value and fades the others.
+// axis label, a line under the pointer, a line's name, a matrix cell and a mark of a raw vega block. A histogram's bin
+// filters by its range. Each click shows in the URL's hash, and the block clicked keeps every value and fades the
+// others.
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -132,6 +133,132 @@ test("a click on a chart, a legend, an axis label or a matrix cell filters the p
     await page.locator(".rp-matrix td.is-click").last().click()
     await page.waitForFunction(() => !location.hash.includes("?"))
     assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+  }
+}, 60_000)
+
+// Hours 0 to 39 fall in 4 bins of 10; the teams take every third issue.
+const issues = Array.from({ length: 40 }, (_, i) => ({ id: `#${i + 1}`, team: Object.keys(teams)[i % 3], hours: i }))
+const spread = {
+  title: "Issue hours",
+  subtitle: "Test data",
+  filters: [{ field: "team", type: "list", label: "Teams", count: "issues" }],
+  data: {
+    issues,
+    byTeam: Object.keys(teams).map((team) => ({ team, count: issues.filter((r) => r.team === team).length })),
+  },
+  views: [
+    {
+      id: "spread",
+      label: "Spread",
+      blocks: [
+        {
+          type: "chart",
+          chart: "histogram",
+          title: "Hours per issue",
+          data: "issues",
+          x: "hours",
+          xTitle: "Hours",
+          bins: 4,
+        },
+        {
+          type: "vega",
+          title: "Issues per team",
+          spec: {
+            data: { name: "byTeam" },
+            mark: "bar",
+            encoding: {
+              x: { field: "team", type: "nominal" },
+              y: { field: "count", type: "quantitative" },
+              color: { field: "team", type: "nominal", legend: null },
+            },
+          },
+        },
+      ],
+    },
+  ],
+  bottom: [
+    {
+      type: "table",
+      style: "rows",
+      title: "Issues",
+      data: "issues",
+      columns: [{ field: "id" }, { field: "team", format: "entity" }, { field: "hours" }],
+    },
+  ],
+}
+
+test("a click on a histogram bin filters by its range, and a click on a vega mark by its list filter", async () => {
+  writeFileSync(join(dir, "spread.json"), JSON.stringify(spread))
+  execFileSync("node", [join(skill, "scripts/build.mjs"), "spread.json", "spread.html"], { cwd: dir, stdio: "pipe" })
+  const browser = await chromium.launch()
+  try {
+    for (const phone of [false, true]) {
+      const page = await browser.newPage(
+        phone
+          ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
+          : { viewport: { width: 1300, height: 1200 } },
+      )
+      page.setDefaultTimeout(5000)
+      const errors = []
+      page.on("pageerror", (error) => errors.push(String(error)))
+      await page.route("https://cdn.jsdelivr.net/npm/**", (route) => {
+        const name = Object.keys(vega).find((key) => route.request().url().includes(`/npm/${key}/`))
+        return name ? route.fulfill({ contentType: "text/javascript", body: readFileSync(vega[name]) }) : route.abort()
+      })
+      await page.route("https://fonts.googleapis.com/**", (route) => route.abort())
+      const chart = (title) =>
+        page
+          .locator("section.rp-block")
+          .filter({ has: page.locator("h3", { hasText: title }) })
+          .locator("svg")
+          .first()
+      const drawn = () =>
+        page.waitForFunction(() => document.querySelectorAll('.rp-chart[data-state="ok"] svg').length === 2)
+      const hash = async () =>
+        new URLSearchParams(decodeURIComponent(await page.evaluate(() => location.hash)).split("?")[1] ?? "")
+      // A bin's label starts with its range under the histogram's `xTitle`.
+      const bin = (range) => chart("Hours per issue").locator(`.role-mark path[aria-label^="Hours: ${range};"]`)
+      const press = (locator) => (phone ? locator.tap() : locator.click())
+      const opacity = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).opacity))
+      const matching = () => page.locator("h3", { hasText: "Issues" }).locator(".rp-muted").textContent()
+
+      await page.goto(`file://${join(dir, "spread.html")}#spread`)
+      await drawn()
+      await press(bin("10 – 20"))
+      await page.waitForFunction(() => location.hash.includes("?"))
+      assert.equal((await hash()).get("hours"), "10..20")
+      await drawn()
+      assert.equal(await matching(), " 10 matching")
+      assert.equal(await chart("Hours per issue").locator(".role-mark path").count(), 4)
+      assert.deepEqual(
+        await Promise.all(["0 – 10", "10 – 20", "20 – 30", "30 – 40"].map((range) => opacity(bin(range)))),
+        [0.2, 1, 0.2, 0.2],
+      )
+      assert.match(await page.locator(".rp-side").textContent(), /Hours\s*Clear\s*10 – 20/)
+      if (phone)
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll")
+      // A second click on the same bin clears it.
+      await press(bin("10 – 20"))
+      await page.waitForFunction(() => !location.hash.includes("?"))
+      await drawn()
+      assert.equal(await matching(), " 40 matching")
+
+      await press(chart("Issues per team").locator('.role-mark path[aria-label*="team: Beta"]'))
+      await page.waitForFunction(() => location.hash.includes("?"))
+      assert.equal((await hash()).get("team"), "Beta")
+      await drawn()
+      assert.equal(await matching(), " 13 matching")
+      const bars = chart("Issues per team").locator(".role-mark path")
+      assert.equal(await bars.count(), 3)
+      assert.equal(await opacity(chart("Issues per team").locator('.role-mark path[aria-label*="team: Alpha"]')), 0.2)
+      assert.equal(await opacity(chart("Issues per team").locator('.role-mark path[aria-label*="team: Beta"]')), 1)
+      await press(chart("Issues per team").locator(".role-axis-label text", { hasText: "Gamma" }))
+      await page.waitForFunction(() => location.hash.includes("team=Gamma"))
+      assert.deepEqual(errors, [])
+      await page.close()
+    }
   } finally {
     await browser.close()
   }
