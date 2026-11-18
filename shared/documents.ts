@@ -16,10 +16,12 @@ export type DocWidth = keyof typeof DOC_WIDTHS
 
 const DOCUMENT_EXTRA_CSS = `
 /* The text moves left only as far as it must to clear the viewer's floating panel (--drop-inset). Once the column
-   can't fit beside it, the column narrows: the panel never covers the text. The outline can set --drop-outline and
-   --drop-shift itself, to keep a column of its own (OUTLINE_SCRIPT); a compare keeps clear of both (document-shell.css). */
+   can't fit beside it, the column narrows: the panel never covers the text. comark-outline's side outline keeps clear
+   of the panel too (--comark-inset-end), and when it needs a column of its own beside wide blocks it sets
+   data-comark-rail, which gives --comark-rail-width; a wide block keeps clear of both (document-shell.css). */
+:root { --comark-inset-end: var(--drop-inset, 0px); }
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
-  --drop-right: calc(var(--drop-inset, 0px) + var(--drop-outline, 0px));
+  --drop-right: var(--drop-inset, 0px);
   --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) + var(--drop-rail, 0px) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
 /* The app's grain (shared/theme.css) on the doc too, so the frame doesn't read as a flat sheet inside the page. The
@@ -160,117 +162,14 @@ const SHEET_TABS_SCRIPT = String.raw`(() => {
 })()`
 
 /**
- * The doc's outline, Docus-style but plain: its h2 and h3 headings in the room right of the text column, the one
- * being read marked. It only shows where it fits beside the column and clear of the viewer's floating panel
- * (--drop-inset). It draws in a shadow root, so comments never take its headings for the doc's own text.
+ * Drop's address keeps the section a reader jumps to from the side outline (comark-outline), so it can be shared from
+ * the address bar. comark-outline scrolls to it; this tells the viewer.
  */
-const OUTLINE_SCRIPT = String.raw`(() => {
-  const headings = [...document.querySelectorAll(".typeset h2, .typeset h3")].filter((heading) => heading.textContent.trim());
-  const main = document.querySelector("main");
-  if (headings.length < 2 || !main) return;
-  const host = document.createElement("drop-outline");
-  const shadow = host.attachShadow({ mode: "open" });
-  shadow.innerHTML = "<style>" +
-    ":host{position:fixed;top:3.5rem;display:none;max-height:calc(100vh - 7rem);overflow-y:auto;font-size:.8125rem;line-height:1.4;scrollbar-width:none}" +
-    ":host([data-fits]){display:block}nav p{margin:0 0 .5rem;color:var(--foreground);font-weight:500}" +
-    "ol{margin:0;padding:0;list-style:none}a{display:block;padding:.25rem 0;color:var(--muted-foreground);text-decoration:none;text-wrap:pretty;transition:color 150ms ease-out}" +
-    "a.sub{padding-left:.75rem}a:hover,a[aria-current]{color:var(--foreground)}@media print{:host{display:none!important}}" +
-    "</style><nav aria-label='On this page'><p>On this page</p><ol></ol></nav>";
-  const list = shadow.querySelector("ol");
-  const links = headings.map((heading) => {
-    const item = document.createElement("li");
-    const link = document.createElement("a");
-    link.href = heading.id ? "#" + heading.id : "#";
-    link.textContent = heading.textContent.trim();
-    if (heading.tagName === "H3") link.className = "sub";
-    link.onclick = (event) => {
-      event.preventDefault();
-      heading.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-      // Drop's address keeps the section, so it can be shared from the address bar.
-      if (heading.id) parent.postMessage({ __drop: true, type: "heading", id: heading.id }, "*");
-    };
-    item.append(link);
-    list.append(item);
-    return link;
-  });
-  document.body.append(host);
-
-  // A compare, or a Mermaid diagram or a table wider than the text, spreads past the text into the room beside it, where
-  // the outline goes. So in a doc with one, the outline keeps a 200px column 4rem right of them, and the text moves left
-  // only as far as that needs (like for the viewer's panel). It only shows while they keep at least the text's width.
-  // A doc with threads keeps them in the column, since comark-comments' cards take that room (document-shell.css), and
-  // so does any doc while review comments sit in the margin (data-drop-rail, ANNOTATOR_SCRIPT).
-  const blocks = [...document.querySelectorAll(".typeset .ca-compare, .typeset .cmm[data-wide], .typeset > div[data-width]")].filter((block) => !block.closest(".cr"));
-  // A diagram's own width is its SVG's; a table's is the width comark-ui estimated from its cells, in em.
-  const own = (block) => block.classList.contains("cmm")
-    ? parseFloat(block.style.getPropertyValue("--cmm-svg"))
-    : parseFloat(block.dataset.width) * parseFloat(getComputedStyle(block).fontSize);
-  const column = 264;
-  const right = "(var(--drop-inset, 0px) + " + column + "px)";
-  function place() {
-    const inset = parseFloat(document.documentElement.style.getPropertyValue("--drop-inset")) || 0;
-    const text = main.getBoundingClientRect().width - 48;
-    const railed = document.documentElement.getAttribute("data-drop-rail") === "open";
-    const wide = railed ? [] : blocks.filter((block) => block.classList.contains("ca-compare") || own(block) > text);
-    if (blocks.length && !wide.length) {
-      document.body.style.removeProperty("--drop-outline");
-      document.body.style.removeProperty("--drop-shift");
-    }
-    if (wide.length) {
-      const body = document.body.style;
-      const keep = (on) => {
-        if (on) {
-          body.setProperty("--drop-outline", column + "px");
-          body.setProperty("--drop-shift", "clamp(0px, calc(2 * " + right + " + 75rem - 100vw), calc" + right + ")");
-        } else {
-          body.removeProperty("--drop-outline");
-          body.removeProperty("--drop-shift");
-        }
-        return on;
-      };
-      // A compare fills whatever room it gets, and a table stacks its prose columns when cramped, so only a diagram's
-      // width decides whether the outline keeps its column.
-      const diagrams = () => wide.reduce((sum, block) => sum + (block.classList.contains("cmm") ? block.getBoundingClientRect().width : 0), 0);
-      let fits = keep(innerWidth - inset - column - 48 >= main.getBoundingClientRect().width);
-      // A diagram's labels matter more than the outline, so the outline goes when its column would shrink a diagram.
-      if (fits) {
-        const beside = diagrams();
-        keep(false);
-        fits = keep(diagrams() <= beside);
-      }
-      host.toggleAttribute("data-fits", fits);
-      const edge = Math.max(...wide.map((block) => block.getBoundingClientRect().right));
-      host.style.left = Math.min(edge + 64, innerWidth - inset - 224) + "px";
-      host.style.width = "200px";
-      return;
-    }
-    // The text ends 1.5rem inside <main>. The outline keeps 4rem clear of it, closing to 2.5rem only when its full
-    // 15rem width needs the room, and never drifts further out on wide screens.
-    const end = main.getBoundingClientRect().right - 24;
-    const space = innerWidth - inset - 24 - end;
-    const gap = Math.min(64, Math.max(40, space - 240));
-    host.toggleAttribute("data-fits", space - gap >= 176);
-    host.style.left = end + gap + "px";
-    host.style.width = Math.min(space - gap, 240) + "px";
-  }
-  function mark() {
-    let current = 0;
-    headings.forEach((heading, index) => { if (heading.getBoundingClientRect().top <= 96) current = index; });
-    links.forEach((link, index) => index === current ? link.setAttribute("aria-current", "location") : link.removeAttribute("aria-current"));
-  }
-  // The column opens without sliding the text over on load.
-  document.body.style.transition = "none";
-  place();
-  void document.body.offsetWidth;
-  document.body.style.transition = "";
-  mark();
-  addEventListener("resize", place);
-  addEventListener("scroll", mark, { passive: true });
-  // The viewer's panel opening or closing sets --drop-inset, and the column slides over .2s (body's padding).
-  // Review comments opening the margin (data-drop-rail) widen the column.
-  new MutationObserver(place).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "data-drop-rail"] });
-  document.body.addEventListener("transitionend", place);
-})()`
+const OUTLINE_HEADING_SCRIPT = String.raw`document.addEventListener("click", (event) => {
+  const link = event.target instanceof Element && event.target.closest(".cto-rail a[href^='#']");
+  const id = link && decodeURIComponent(link.getAttribute("href").slice(1));
+  if (id && document.getElementById(id)) parent.postMessage({ __drop: true, type: "heading", id }, "*");
+})`
 
 /**
  * Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
@@ -313,7 +212,7 @@ export function planDocument(
   const relay = globalThis.location ? ` data-quiz-relay="${escapeHtml(globalThis.location.origin)}"` : ""
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en"${relay} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en"${relay} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_HEADING_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

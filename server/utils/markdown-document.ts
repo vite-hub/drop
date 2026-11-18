@@ -19,6 +19,7 @@ import { loadHighlighter } from "#shared/highlighter"
 import { cachedMarkdown } from "./markdown-cache"
 import { FAVICON_PATH, faviconUrl, linkText } from "#shared/resources"
 import { chipNode } from "comark-chips"
+import outline, { scripts as outlineScripts } from "comark-outline/html"
 import { scripts as propertiesScripts } from "comark-properties/html"
 import { describeTime } from "comark-time"
 import type { DropResource } from "#shared/types"
@@ -78,6 +79,8 @@ export const RENDERER_SCRIPTS = [
   // comark-properties writes a box's dates relative to the reader's clock, and comark-time lets Escape close their
   // tooltips.
   ...propertiesScripts,
+  // comark-outline's side outline marks the section being read and makes way for wide blocks.
+  ...outlineScripts,
 ]
 
 /**
@@ -131,6 +134,16 @@ const renameLegacyProps = (markdown: string) =>
 
 /** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. */
 export const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
+
+/**
+ * The parse a reader's render uses: the same, plus comark-outline's side outline ("On this page") at the end of a doc
+ * with two headings or more. Only here, since the linter and the live editor read the doc's own blocks, and the
+ * outline isn't one.
+ */
+const parseForReaders = createMarkdownParser({
+  plugins: renderPlugins.map((plugin) => (plugin.name === "comark-outline" ? outline({ rail: true }) : plugin)),
+  registerDefaultPlugins: false,
+})
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
@@ -316,7 +329,7 @@ export async function requirePublishableMarkdown(markdown: string): Promise<Mark
  */
 async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
   try {
-    const document = await parseMarkdown(markdown)
+    const document = await parseForReaders(renameLegacyProps(markdown))
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
