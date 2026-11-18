@@ -15,7 +15,7 @@ const signed = (email) => ({ via: "console", request, key: "CONSOLE_TEST", user:
 migrate()
 beforeEach(() => {
   reset()
-  Object.assign(state, { admins: user.email, members: "", githubOrg: "", contentOrigin: "" })
+  Object.assign(state, { admins: user.email, members: "", contentOrigin: "" })
   sql
     .prepare("INSERT INTO user (id, name, email, email_verified, role) VALUES (?, 'Operator', ?, 1, 'member')")
     .run(user.id, user.email)
@@ -44,7 +44,7 @@ test("the pill's Console link shows only to a verified, unbanned admin who is a 
     { ...user, banned: true },
   ])
     assert.equal(await page(person), false)
-  state.githubOrg = "vite-hub"
+  state.members = "github-org:vite-hub"
   assert.equal(await page(user), false, "No GitHub organization grant")
 })
 
@@ -59,17 +59,12 @@ test("content-origin hosts never reach the Console", async () => {
       }
 })
 
-test("access notes describe the configured allowlist, organization and sign-in methods", () => {
-  const open = authAccessLines({ members: false, organization: "", proxied: false, password: false })
-  assert.ok(open.includes("DROP_MEMBERS is off: there is no email allowlist."))
-  assert.ok(open.includes("Sign-in uses GitHub."))
-  const restricted = authAccessLines({ members: true, organization: "vite-hub", proxied: true, password: true }).join(
-    "\n",
-  )
-  assert.match(restricted, /DROP_MEMBERS is on/)
-  assert.match(restricted, /GitHub organization vite-hub/)
-  assert.match(restricted, /oauth2-proxy/)
-  assert.match(restricted, /Email and password/)
+test("access notes describe the sign-in methods", () => {
+  const open = authAccessLines({ proxied: false, password: false })
+  assert.deepEqual(open, ["Sign-in uses GitHub."])
+  const proxied = authAccessLines({ proxied: true, password: true }).join("\n")
+  assert.match(proxied, /oauth2-proxy/)
+  assert.match(proxied, /Email and password/)
 })
 
 test("Console resolves the app account by signed email before synchronizing its role", async () => {

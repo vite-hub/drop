@@ -3,8 +3,8 @@ import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
 import { authFor } from "../utils/identity"
-import { isGitHubMember } from "../utils/github-membership"
 import { authProxy } from "../utils/proxy-auth"
+import { isProxyMember } from "../utils/proxy-auth-config"
 
 /** Establish the same session Drop's browser UI and OAuth consent already use, without a second login. */
 export default defineHandler(async (event) => {
@@ -19,7 +19,7 @@ export default defineHandler(async (event) => {
   }
   const token = event.req.headers.get("x-auth-request-access-token")
   if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
-  if (!(await isGitHubMember(token)))
+  if (!(await isProxyMember(token)))
     throw new HTTPError({
       status: 403,
       statusText: "Active organization membership required.",
