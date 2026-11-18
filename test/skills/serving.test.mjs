@@ -122,20 +122,28 @@ test("pr-evidence serves bundled comark-ui references through discovery and MCP"
   assert.equal(response.result.contents[0].text, expected)
 })
 
-test("pr-evidence's Git plugin links resolve to the served reference files", async () => {
-  const skill = await readFile(new URL("pr-evidence/SKILL.md", root), "utf8")
-  const paths = [
-    "references/annotations.md",
-    "references/comark-ui/references/comments.md",
-    "references/comark-ui/references/diff.md",
-  ]
-  for (const path of paths) {
-    const url = `https://drop.vitehub.dev/.well-known/skills/pr-evidence/${path}`
-    assert.ok(skill.includes(`](${url})`))
-    const response = await get(new URL(url).pathname)
-    assert.equal(response.status, 200)
-    assert.match(response.headers.get("content-type"), /^text\/markdown\b/)
-    assert.ok((await response.text()).trim())
+test("pr-evidence's Git plugin references work even when the served skill is disabled", async () => {
+  const { setSkillEnabled } = await import("../../server/utils/skills.ts")
+  const skillRoot = new URL("pr-evidence/", root)
+  const skill = await readFile(new URL("SKILL.md", skillRoot), "utf8")
+  const links = [...skill.matchAll(/\]\((references\/[^)#]+)(?:#([^)]+))?\)/g)]
+  assert.equal(links.length, 3)
+  try {
+    await setSkillEnabled("pr-evidence", false, "admin")
+    const index = await (await get("/.well-known/skills/index.json")).json()
+    assert.ok(!index.skills.some((item) => item.name === "pr-evidence"))
+    assert.equal((await mcp("skills/get", { uri: "skill://pr-evidence/SKILL.md" })).error.code, -32602)
+    for (const [, path, section] of links) {
+      assert.equal((await get(`/.well-known/skills/pr-evidence/${path}`)).status, 404)
+      const reference = await readFile(new URL(path, skillRoot), "utf8")
+      assert.ok(reference.split("\n").some((line) => line.toLowerCase() === `## ${section}`))
+    }
+  } finally {
+    await setSkillEnabled("pr-evidence", true, "admin")
+  }
+  for (const path of new Set(links.map((link) => link[1]))) {
+    const reference = await readFile(new URL(path, skillRoot), "utf8")
+    assert.equal(await (await get(`/.well-known/skills/pr-evidence/${path}`)).text(), reference)
   }
 })
 

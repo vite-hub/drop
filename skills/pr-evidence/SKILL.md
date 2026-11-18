@@ -37,7 +37,7 @@ Split the change into boards, one per thing a reviewer should notice. Each board
 - a `::diff`, when the code is the point. See [Code changes](#code-changes).
 - inside each screenshot, after its annotations, one sentence on the state it shows, which becomes its caption.
 
-When the change is to copy or a doc, mark it in the text with `:suggestion` and `:comment`, each with its reason as a note, as [the comments reference](references/comark-ui/references/comments.md) shows. If the local file is missing (as in a Git plugin install), use [the hosted comments reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/comark-ui/references/comments.md).
+When the change is to copy or a doc, mark it in the text with `:suggestion` and `:comment`, each with its reason as a note, as [the comments reference](references/review.md#comments) shows.
 
 Leave `color` and `ink` off: the default violet reads on light and dark screenshots alike, and one ink is the point. Each annotation is a side note in the margin above or below the image, `side="top"` or `"bottom"`, whichever is nearer its point. Use `mark="none"` with `to` on the exact spot, so the arrow does the pointing and nothing covers the screen. Set the note off with `at`, a tenth of the image or more from its point, so its arrow sweeps in; a top or bottom note reads away from its point, so give it room on that side. Use `mark="bracket"` for a run of rows or a group, and `circle` or `underline` only when the area itself is the point. Left and right notes only work on a single screenshot; in a compare they fall back to the numbered list.
 
@@ -69,7 +69,7 @@ The message is the heading, with one source excerpt under it.
 ::
 ```
 
-Before writing a mark, read [the annotations reference](references/annotations.md) for the syntax used by the comark-ui version Drop renders with. If the local file is missing, use [the hosted annotations reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/annotations.md).
+Before writing a mark, read [the annotations reference](references/review.md#annotations) for the syntax Drop renders.
 
 Above the first board, write one line with the steps to reach the screen. Each preview URL goes in its screenshot's `href`, not in the text. Beyond the headings and captions, no tables or paragraphs that describe what the images show, and never a doc that explains a change it doesn't show.
 
@@ -77,7 +77,7 @@ The doc shows the change, and nothing the page or the pull request already shows
 
 ### Code changes
 
-A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [the diff reference](references/comark-ui/references/diff.md). If the local file is missing, use [the hosted diff reference](https://drop.vitehub.dev/.well-known/skills/pr-evidence/references/comark-ui/references/diff.md).
+A `::diff` shows one file's lines before and after, the way a review shows a suggested change. Copy the lines from the pull request's diff, a few around the change, and set `line` to where they start in the file, so a reviewer can find them. One diff shows one file: a change that adds a component and uses it is two diffs, the new file first with an empty before block. When the same change repeats across files, show one of them and name the others in the line above it, like "The same change in Forecast, Alerts, and 11 more pages." That line also says what the change does. The syntax is in [the diff reference](references/review.md#diff).
 
 ## Publish
 
