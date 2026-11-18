@@ -415,7 +415,7 @@ test("an open thread is written in where it is: over its margin card, else besid
   }
 }, 30_000)
 
-test("a saved area is a soft line of ViteHub's comment blue, full blue while its thread is open, as is the one drawn", async () => {
+test("a saved area is a soft grey line, firmer while its thread is open, and the one drawn is ViteHub's comment blue", async () => {
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, 1440)
@@ -430,27 +430,29 @@ test("a saved area is a soft line of ViteHub's comment blue, full blue while its
         drawing.dataset.slot = "comment-mark-area"
         drawing.dataset.draft = "true"
         root.querySelector(".draft").appendChild(drawing)
-        // ViteHub's comment blue (--vh-comment-mark in @vite-hub/ui/comment-marks.css), whole and at half strength.
-        const mark = getComputedStyle(root.host).getPropertyValue("--vh-comment-mark").trim()
+        // ViteHub's comment blue and ink (--vh-comment-mark and --vh-comment-ink in @vite-hub/ui/comment-marks.css).
+        const host = getComputedStyle(root.host)
         const probe = document.createElement("i")
         document.body.appendChild(probe)
-        probe.style.color = mark
-        const blue = getComputedStyle(probe).color
-        probe.style.color = `color-mix(in oklab, ${mark} 50%, transparent)`
-        const half = getComputedStyle(probe).color
+        const resolve = (color) => {
+          probe.style.color = color
+          return getComputedStyle(probe).color
+        }
+        const ink = host.getPropertyValue("--vh-comment-ink").trim()
         const result = {
           area: style(root.querySelector('[data-slot="comment-mark-area"][data-for="c8"]')),
           draft: style(drawing),
-          blue,
-          half,
+          blue: resolve(host.getPropertyValue("--vh-comment-mark").trim()),
+          soft: resolve(`color-mix(in oklab, ${ink} 22%, transparent)`),
+          firm: resolve(`color-mix(in oklab, ${ink} 45%, transparent)`),
         }
         probe.remove()
         drawing.remove()
         return result
       })
     const saved = await look()
-    // Half-strength blue with no fill: it shows on a light page and a dark one, and covers nothing.
-    assert.equal(saved.area.border, saved.half)
+    // A faint line of the ink with no fill: it shows on a light page and a dark one, and covers nothing.
+    assert.equal(saved.area.border, saved.soft)
     assert.equal(saved.area.width, "1px")
     assert.equal(saved.area.fill, "rgba(0, 0, 0, 0)")
     assert.equal(saved.draft.border, saved.blue)
@@ -466,14 +468,14 @@ test("a saved area is a soft line of ViteHub's comment blue, full blue while its
       return area.dataset.active === "true" && !area.getAnimations().length
     })
     const focused = await look()
-    assert.equal(focused.area.border, focused.blue)
-    assert.notEqual(focused.area.fill, "rgba(0, 0, 0, 0)", "the open thread's area takes a faint tint")
+    assert.equal(focused.area.border, focused.firm)
+    assert.equal(focused.area.fill, "rgba(0, 0, 0, 0)")
   } finally {
     await browser.close()
   }
 }, 30_000)
 
-test("the margin's quotes take ViteHub's comment blue, as its areas do, on light and dark docs", async () => {
+test("the margin's quotes take ViteHub's comment blue, on light and dark docs", async () => {
   const browser = await chromium.launch()
   try {
     for (const dark of [false, true]) {
