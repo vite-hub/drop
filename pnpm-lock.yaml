@@ -52,6 +52,7 @@ overrides:
   '@vite-hub/content>comark-ui': https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96
   better-auth: 1.7.15
   '@better-auth/oauth-provider': 1.7.15
+  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda
   vue: 3.5.44
   devalue@5: ^5.9.4
   nitro: 3.0.261103-rc
@@ -201,26 +202,26 @@ importers:
         specifier: 1.7.15
         version: 1.7.15(drizzle-kit@1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(postgres@3.4.9)(sql.js@1.15.1)(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7)))(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(postgres@3.4.9)(sql.js@1.15.1)(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.5)(vue@3.5.44(typescript@6.0.3))
       comark-chips:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-comments:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
       comark-linter:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-linter@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-linter@755ebda929bfb0d4ac41313aa06c2122c6c10b96(02ce254d61cf0fbbaf5841412212b18c)
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-linter@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-linter@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(7e2ae8043256204e804104b4f6915189)
       comark-outline:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-properties:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-time:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-ui:
-        specifier: https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96
-        version: https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
+        specifier: https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e
+        version: https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
       confbox:
         specifier: ^0.3.1
         version: 0.3.1
@@ -5234,8 +5235,8 @@ packages:
   colortranslator@5.0.0:
     resolution: {integrity: sha512-Z3UPUKasUVDFCDYAjP2fmlVRf1jFHJv1izAmPjiOa0OCIw1W7iC8PZ2GsoDa8uZv+mKyWopxxStT9q05+27h7w==}
 
-  comark-annotate@https://pkg.pr.new/onmax/comark-ui/comark-annotate@755ebda:
-    resolution: {integrity: sha512-cFr8rNbs1l1UydZDZQdX4+jNKWuARtiwwyImsIiQQFNnS/K+ieb5bybotkPMj7Q52rj6HgGBn/nXaSvzRTd1dg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-annotate@755ebda}
+  comark-annotate@https://pkg.pr.new/onmax/comark-ui/comark-annotate@12bb0ba:
+    resolution: {integrity: sha512-HlAXmTsH+Bko6QcNw6LMhNNv+WWWCj3NylQ0B4OaF2h/o0WKlEoEQvCzy+zwqXuxylePZBau5FyZmLj5W8IZBg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-annotate@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     hasBin: true
@@ -5247,8 +5248,8 @@ packages:
       '@napi-rs/canvas':
         optional: true
 
-  comark-badge@https://pkg.pr.new/onmax/comark-ui/comark-badge@755ebda:
-    resolution: {integrity: sha512-+8WNzcnFCc3fA+X96+mmUw0I1bbXOImAgt35XDdxHGtjyW9kcpLYObvzryYdWAMaCwmYmEzvB7ly3Z6PZuJOWw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-badge@755ebda}
+  comark-badge@https://pkg.pr.new/onmax/comark-ui/comark-badge@12bb0ba:
+    resolution: {integrity: sha512-jd9FJCWNZVqG3PW1xd4Cn9MVEnRuULj6IKZnYP3YTXv0u72YfvzPTCEVDCB4JmXDxP1XTD1DJ9kOLaoqUOyfZg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-badge@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5267,8 +5268,8 @@ packages:
       vue:
         optional: true
 
-  comark-bundle@https://pkg.pr.new/onmax/comark-ui/comark-bundle@755ebda:
-    resolution: {integrity: sha512-pGez/M+4u+1nnRsAtZ84ASy0Bt9hpAss+Tz+WzckZRjvuyav7RE97GEs05aRzXV3stuCe81MgfhFqpCdzhGUYw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-bundle@755ebda}
+  comark-bundle@https://pkg.pr.new/onmax/comark-ui/comark-bundle@12bb0ba:
+    resolution: {integrity: sha512-HAZJYJTU/L6RPYKI2ODN8b06yTAqxmzoyX5sVIqyP04quGbNk8MR6O47TPjMxdtLsJLnYDrTI+ZzlQ7fLPOZUw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-bundle@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5287,8 +5288,8 @@ packages:
       vue:
         optional: true
 
-  comark-cards@https://pkg.pr.new/onmax/comark-ui/comark-cards@755ebda:
-    resolution: {integrity: sha512-GbjIi0XKKMY7f4p57e6O6NDmA+s8/W0iHW70+xNQC3rOdj6XCwEbSfz3VJa1EZlVxM4viHDDrdw9UN7SxpaVfQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cards@755ebda}
+  comark-cards@https://pkg.pr.new/onmax/comark-ui/comark-cards@12bb0ba:
+    resolution: {integrity: sha512-uqcaAZ/otr6jYsRoymx+YFTlk+NV3U+FMcEFqwQTATtgirqwy2JozVMFauUcrwcnNSSs3tp0WBJNf20AzAMkIQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cards@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5307,8 +5308,8 @@ packages:
       vue:
         optional: true
 
-  comark-carousel@https://pkg.pr.new/onmax/comark-ui/comark-carousel@755ebda:
-    resolution: {integrity: sha512-++Cyj/V+So6N5evvjQ1VGSioCkrjGmLAQi5y3+rAZmhLHxLwhq0rsDBdEfeKKlv4+MRznnSlFLg5njESm5NwaA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-carousel@755ebda}
+  comark-carousel@https://pkg.pr.new/onmax/comark-ui/comark-carousel@12bb0ba:
+    resolution: {integrity: sha512-sjN26QrldSCkI63YS3RPSUpZyc4yowL4PLw7axPzNsYQCFwV8F7kiu2I3Cnj+Lmgvs4AKVgc+i61xbQYi64RFw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-carousel@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5327,8 +5328,8 @@ packages:
       vue:
         optional: true
 
-  comark-cast@https://pkg.pr.new/onmax/comark-ui/comark-cast@755ebda:
-    resolution: {integrity: sha512-/mK1XLqPzW4W4LMip98pMr/DwkM2U3dHhLvmwjMP3FP5Yb/09xSuvU2N7oCbBjz/klgYPzrqsBBPW9aq9E6djw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cast@755ebda}
+  comark-cast@https://pkg.pr.new/onmax/comark-ui/comark-cast@12bb0ba:
+    resolution: {integrity: sha512-5wOMS8URqGv+7vgeepRKE0BI8UHTSDfh355u96o8axQ6bx0rLpIi9X/BAe2BCZvYp46VV4+OTLDMupraMKvvAQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cast@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5347,8 +5348,8 @@ packages:
       vue:
         optional: true
 
-  comark-charts@https://pkg.pr.new/onmax/comark-ui/comark-charts@755ebda:
-    resolution: {integrity: sha512-0C0NLUXIeodCi541R4B258RMlkqY7+G9PO92vweE2SCMOP8+3OhHNAWZPiv8dafH/l65P+/u4csMP/m+NVdPsQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-charts@755ebda}
+  comark-charts@https://pkg.pr.new/onmax/comark-ui/comark-charts@12bb0ba:
+    resolution: {integrity: sha512-fYy2FfuUyZWnmW9wxdyIHgwneQFqwfAw4zICnCWvYSvcXxPhkg7oVaCey8gA/Bq5r1vbDp2tOtS9t3/h7Vi7VQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-charts@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5391,8 +5392,8 @@ packages:
       vue:
         optional: true
 
-  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda:
-    resolution: {integrity: sha512-xnUPMvKn8kukR3Is9T3YIWno845QBg1HB+VCFv9b9M2HARGFQzmK2YBB95MXDIuXonHty88HCWI7zF8zTfcq8Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda}
+  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba:
+    resolution: {integrity: sha512-JfOKwZCl/YhY89H8wklDtPmctzTilJb69DtU8Xynx0RAozjRIvF6De1b3TiGhAMW4RSMM+YQwNqkbeKackhjvA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5411,8 +5412,8 @@ packages:
       vue:
         optional: true
 
-  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-xnUPMvKn8kukR3Is9T3YIWno845QBg1HB+VCFv9b9M2HARGFQzmK2YBB95MXDIuXonHty88HCWI7zF8zTfcq8Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-JfOKwZCl/YhY89H8wklDtPmctzTilJb69DtU8Xynx0RAozjRIvF6De1b3TiGhAMW4RSMM+YQwNqkbeKackhjvA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5431,15 +5432,15 @@ packages:
       vue:
         optional: true
 
-  comark-cjk@https://pkg.pr.new/onmax/comark-ui/comark-cjk@755ebda:
-    resolution: {integrity: sha512-l9y+dHGS4kTaCh514ai5JCcM5Y0CMTHGUFm/c79KS3kU3bSOEP90KlT2b9lEC+QTgekzyHNQSqCWRxIpBSBfRQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cjk@755ebda}
+  comark-cjk@https://pkg.pr.new/onmax/comark-ui/comark-cjk@12bb0ba:
+    resolution: {integrity: sha512-l9y+dHGS4kTaCh514ai5JCcM5Y0CMTHGUFm/c79KS3kU3bSOEP90KlT2b9lEC+QTgekzyHNQSqCWRxIpBSBfRQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-cjk@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
       comark: ^0.9.0
 
-  comark-code-notes@https://pkg.pr.new/onmax/comark-ui/comark-code-notes@755ebda:
-    resolution: {integrity: sha512-0azG+POMsrNNjORZTWuNta44su2JmqkuBAtENquJvLvXku3ur8kWVoKneP5DbTK8VeXQseMGFiYKh5FTlnH7LQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-code-notes@755ebda}
+  comark-code-notes@https://pkg.pr.new/onmax/comark-ui/comark-code-notes@12bb0ba:
+    resolution: {integrity: sha512-hnbr+QHS2Nej21OobHifHcmJEqfZThD3L2Jw2ksnu+pbehta51SD4/9YO1nf/qefiSS5mMrlk35LpwKTumUy0A==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-code-notes@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5458,8 +5459,8 @@ packages:
       vue:
         optional: true
 
-  comark-code@https://pkg.pr.new/onmax/comark-ui/comark-code@755ebda:
-    resolution: {integrity: sha512-QRPqE5OaJyKTkwOl0S03Ml7pVjOflGcNMSP90NkjHBO5AM/rOrbYxbg7ia1wD2rZIhxzaKhC+wv2tlGBDrV43Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-code@755ebda}
+  comark-code@https://pkg.pr.new/onmax/comark-ui/comark-code@12bb0ba:
+    resolution: {integrity: sha512-TSmqdZZ+cv0ncVeXZ2lFAmcBdMdOp+wFtjuuUmHlBQV4Kcq80D2Kol/usn3uGSeBlwG3QFfEr+3M4uPxxhr3JA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-code@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5478,8 +5479,8 @@ packages:
       vue:
         optional: true
 
-  comark-colors@https://pkg.pr.new/onmax/comark-ui/comark-colors@755ebda:
-    resolution: {integrity: sha512-AQVBJpANEXZYBwe/XNnyO23J+m2/RDXIxbvsRfceRvKs5CTQtPoSl1vs7FJTyRJH0KOHKSQaEwkeqCsHYapmrw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-colors@755ebda}
+  comark-colors@https://pkg.pr.new/onmax/comark-ui/comark-colors@12bb0ba:
+    resolution: {integrity: sha512-tmKcCo+4Qy85wlHPsexwOAFSRgrkP7r++AqFd70mAJGbS6iK2XFnzpQ6utQ3V02bpMx4+ksIbEH1tcrzZNbMdQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-colors@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5498,8 +5499,8 @@ packages:
       vue:
         optional: true
 
-  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda:
-    resolution: {integrity: sha512-GxNx7+b2hDEIafTe+VMxpk5mguwxYHnVhiPWBXvQK3rxNCcEydt0kUu7dG5pzb9FcX463ozuUlLDy3UVVg9I6w==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda}
+  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba:
+    resolution: {integrity: sha512-P4050J1WB5JZl7avLYw8A/xeg0l5rymoKe4RN8Jlt9bKVzv+mp4jkLgHV56dID1M7GDKvk5xnjlbaB6CM0d0MA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5509,8 +5510,8 @@ packages:
       '@comark/html':
         optional: true
 
-  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-GxNx7+b2hDEIafTe+VMxpk5mguwxYHnVhiPWBXvQK3rxNCcEydt0kUu7dG5pzb9FcX463ozuUlLDy3UVVg9I6w==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-P4050J1WB5JZl7avLYw8A/xeg0l5rymoKe4RN8Jlt9bKVzv+mp4jkLgHV56dID1M7GDKvk5xnjlbaB6CM0d0MA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5532,42 +5533,22 @@ packages:
       unstorage:
         optional: true
 
-  comark-critic@https://pkg.pr.new/onmax/comark-ui/comark-critic@755ebda:
-    resolution: {integrity: sha512-12MxOFQwQ5Zb+M5XecPLqzbAgUXq0dLUO+Gvl8QR1QSzV5oK3mLGZeGfW2nImxPSU3m8lMK2BKf8RYGH5E8pJg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-critic@755ebda}
+  comark-critic@https://pkg.pr.new/onmax/comark-ui/comark-critic@12bb0ba:
+    resolution: {integrity: sha512-87urcFmMNyQvXAk5PSoumQDTZaKOFI+82gqqS/Av6JOyWR/vASrSOxRRnka1x3iBD14biHPYMHd/5lsa4FMBDw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-critic@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
       comark: ^0.9.0
 
-  comark-deflist@https://pkg.pr.new/onmax/comark-ui/comark-deflist@755ebda:
-    resolution: {integrity: sha512-osrJoms/KxIsj+s8MPDzkhhrQM/Ro/GMONd+s8fV+Xcxp5ifd0gweT+KLClbZEOCAHQc9WXrkXPTZ2FKiAoQww==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-deflist@755ebda}
+  comark-deflist@https://pkg.pr.new/onmax/comark-ui/comark-deflist@12bb0ba:
+    resolution: {integrity: sha512-osrJoms/KxIsj+s8MPDzkhhrQM/Ro/GMONd+s8fV+Xcxp5ifd0gweT+KLClbZEOCAHQc9WXrkXPTZ2FKiAoQww==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-deflist@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
       comark: ^0.9.0
 
-  comark-details@https://pkg.pr.new/onmax/comark-ui/comark-details@755ebda:
-    resolution: {integrity: sha512-rAweBVq8lA94V3brLpoZbzW3OzjKH3jxmxb2T88cnN2eP3kJeZwzUaF8jodF7TFqpDnLL7li1MYvAdOzGpZ2KA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-details@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@comark/html': ^0.9.0
-      comark: ^0.9.0
-      react: '>=18'
-      svelte: '>=5'
-      vue: 3.5.44
-    peerDependenciesMeta:
-      '@comark/html':
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vue:
-        optional: true
-
-  comark-diagrams@https://pkg.pr.new/onmax/comark-ui/comark-diagrams@755ebda:
-    resolution: {integrity: sha512-W6uIENaBrVBLdxALhw4G8YhdnN/848vu+xOdW9vz+MAcYL9UHmgxoszc52CeMgKPvrmjhQcqJoQ9ktE1M2MHhg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-diagrams@755ebda}
+  comark-details@https://pkg.pr.new/onmax/comark-ui/comark-details@12bb0ba:
+    resolution: {integrity: sha512-BZ3ZN46QYoKv/ilVaXwglvwG90oeVnPADOFBQVhHUQ9MS8jO0b+ZM90HL78I6YpcO01GI9eDTT2hVuGLjlOCgQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-details@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5586,19 +5567,8 @@ packages:
       vue:
         optional: true
 
-  comark-diff@https://pkg.pr.new/onmax/comark-ui/comark-diff@755ebda:
-    resolution: {integrity: sha512-BynAzRebRRhTEaGD8h1VURdYM3XVJUHg9komNhDM7pDeyO1IaM/rmcCqQHWVqByaT1lnhHbq1JKwQXuuUw0+uA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-diff@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@comark/html': ^0.9.0
-      comark: ^0.9.0
-    peerDependenciesMeta:
-      '@comark/html':
-        optional: true
-
-  comark-embed@https://pkg.pr.new/onmax/comark-ui/comark-embed@755ebda:
-    resolution: {integrity: sha512-KyVia+vgQeR05fnB7P1mxPSOjsAKiimobDsyKZDMxfV/fq3YM9Bj5WO6MulOL/Dnc1H6tV1bGSLvtzMWKkAz+A==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-embed@755ebda}
+  comark-diagrams@https://pkg.pr.new/onmax/comark-ui/comark-diagrams@12bb0ba:
+    resolution: {integrity: sha512-2EkucLjou9Zo+ld1rCt2M2EtzKtTzaA0odTMsSYm9D/6En/SxRQITl4KdQOMUp1AfkdsyyrP641SKaK1PpktFw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-diagrams@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5617,8 +5587,19 @@ packages:
       vue:
         optional: true
 
-  comark-fields@https://pkg.pr.new/onmax/comark-ui/comark-fields@755ebda:
-    resolution: {integrity: sha512-gvdUsELR/DkAqQbG05qz3kcNXsuNmPMitY/zW1ix76OvCKaaG9eFfqX8adtZT4r4HE/BIG5lKqiZ4Vo2G0Q1sw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-fields@755ebda}
+  comark-diff@https://pkg.pr.new/onmax/comark-ui/comark-diff@12bb0ba:
+    resolution: {integrity: sha512-k4VAjcZnaDJGpT25WfEkBlItYyHzKokVVbECGkH83KREwfCI0SL1bTDcPZA5A6/74l04mFLhox+niLyEUoNhOw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-diff@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@comark/html': ^0.9.0
+      comark: ^0.9.0
+    peerDependenciesMeta:
+      '@comark/html':
+        optional: true
+
+  comark-embed@https://pkg.pr.new/onmax/comark-ui/comark-embed@12bb0ba:
+    resolution: {integrity: sha512-RKxsH3z/qe+trultgtljXRcgG4r/uErSGJxFL/6SfWyAAQGoMJO0K0nrmFF8AUUM5IJx4IPgXIRZnc4HEKCmcw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-embed@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5637,15 +5618,8 @@ packages:
       vue:
         optional: true
 
-  comark-figure@https://pkg.pr.new/onmax/comark-ui/comark-figure@755ebda:
-    resolution: {integrity: sha512-ZEvKSBKCgooejMhD98OZjjlAzH9DnTvl9x/j/QqtvtWlLTTQj5CVj5pawCqnQT56aT+YCXOeN5t1hnFvZBBiWw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-figure@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      comark: ^0.9.0
-
-  comark-file-tree@https://pkg.pr.new/onmax/comark-ui/comark-file-tree@755ebda:
-    resolution: {integrity: sha512-d6mzkNZsud7rtFkDE0d2q+RBI8x29/mJ9kYaKclDSTNEej1gPk8t5pHxsEqZfVV+bBI+NXjYKsk4zOmTTFHaFA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-file-tree@755ebda}
+  comark-fields@https://pkg.pr.new/onmax/comark-ui/comark-fields@12bb0ba:
+    resolution: {integrity: sha512-Swbg9lkAwNBTqxFwqtirOfE6xec56D16pUOgcVngQpjdan4pTqqPm4cg6lDVyXz0smAoAp6kffGFcNV/t3YAEg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-fields@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5664,35 +5638,15 @@ packages:
       vue:
         optional: true
 
-  comark-footnotes@https://pkg.pr.new/onmax/comark-ui/comark-footnotes@755ebda:
-    resolution: {integrity: sha512-mVpj1Eh+OBjKgnBWUYpvoLMLJrV/PedgLkbaGRxqAmzC0yFVtXnzneI61c9qt1hoFmv+yXwirk7N81aPsWbA7Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-footnotes@755ebda}
+  comark-figure@https://pkg.pr.new/onmax/comark-ui/comark-figure@12bb0ba:
+    resolution: {integrity: sha512-ZEvKSBKCgooejMhD98OZjjlAzH9DnTvl9x/j/QqtvtWlLTTQj5CVj5pawCqnQT56aT+YCXOeN5t1hnFvZBBiWw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-figure@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
       comark: ^0.9.0
 
-  comark-git-graph@https://pkg.pr.new/onmax/comark-ui/comark-git-graph@755ebda:
-    resolution: {integrity: sha512-cd4tarFxdzCFsraxGB4RBLuTAVM9qP24lzWOVE+YWVeGwdIttL5pFBscygWAH1zWDkG6QWGdQbJQJoD9d7KACQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-git-graph@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@comark/html': ^0.9.0
-      comark: ^0.9.0
-      react: '>=18'
-      svelte: '>=5'
-      vue: 3.5.44
-    peerDependenciesMeta:
-      '@comark/html':
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vue:
-        optional: true
-
-  comark-github@https://pkg.pr.new/onmax/comark-ui/comark-github@755ebda:
-    resolution: {integrity: sha512-COphGj8zmhnumnpEZtG+72xU7OfdJYGJBdvxIlX1j1HE/a+lFetKQo4ogp+4mCDtAoTPLzvfr5B1IMKrVtCXkA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-github@755ebda}
+  comark-file-tree@https://pkg.pr.new/onmax/comark-ui/comark-file-tree@12bb0ba:
+    resolution: {integrity: sha512-Co/XOrG2tI48PNghE10ppCB7saeiD3LVfT5IT1gKrTK/X9ksAv/kbRbPOOX7z0MPCPeed514XGVzwl24xRxGiw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-file-tree@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5711,8 +5665,15 @@ packages:
       vue:
         optional: true
 
-  comark-icon@https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda:
-    resolution: {integrity: sha512-SYqp2xOGiofUDOrkNqymX8Nl2E7KbjepYDQ4U/EkOXz+DbHqHocMuK9NbzJa8eAtrfM7wyi5qrDmdcKCQM4XZw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda}
+  comark-footnotes@https://pkg.pr.new/onmax/comark-ui/comark-footnotes@12bb0ba:
+    resolution: {integrity: sha512-mVpj1Eh+OBjKgnBWUYpvoLMLJrV/PedgLkbaGRxqAmzC0yFVtXnzneI61c9qt1hoFmv+yXwirk7N81aPsWbA7Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-footnotes@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      comark: ^0.9.0
+
+  comark-git-graph@https://pkg.pr.new/onmax/comark-ui/comark-git-graph@12bb0ba:
+    resolution: {integrity: sha512-+FYVbeU/RSjh6YPZdvGfXp04VSNAoLc+xN9UAmFaALRH8x2fKUyILl8FRVE5tAjY7rvI5H5FIpLNcxGsg7rgvg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-git-graph@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5731,22 +5692,8 @@ packages:
       vue:
         optional: true
 
-  comark-include@https://pkg.pr.new/onmax/comark-ui/comark-include@755ebda:
-    resolution: {integrity: sha512-A+Nd8xLrXgBG5gV7V7hoEbtN/sHsAyrWZgNsbq/MT0N/NpygMJ9Q0eYHDN2f4XlJSts93GqE9Z7yiF/Za2Vh3Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-include@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      comark: ^0.9.0
-
-  comark-keys@https://pkg.pr.new/onmax/comark-ui/comark-keys@755ebda:
-    resolution: {integrity: sha512-NMlbQtueUARuCTsvrTxbODgDHlMFrnppwYtQyHDXvjE/z32tHLA4kRstF0C74LfREfCqXttYc161aiXRKNgD3w==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-keys@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      comark: ^0.9.0
-
-  comark-links@https://pkg.pr.new/onmax/comark-ui/comark-links@755ebda:
-    resolution: {integrity: sha512-5DpbWIhFBhkDxG3LzzLnFjYzf9yQSwAgR2WXsSgI9kL11nV0+oAnjBGlmWDLvCpVtWqRACnqJ7nNntcJY3GoUQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-links@755ebda}
+  comark-github@https://pkg.pr.new/onmax/comark-ui/comark-github@12bb0ba:
+    resolution: {integrity: sha512-J3NHcMHaKd5z1haGIKP9C+sAalLszJJyBcNp3P2om0ROng0TRKGUSiC3M3Cy29ryxUPKJiecrrrUCV7iCHQnhg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-github@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5765,8 +5712,62 @@ packages:
       vue:
         optional: true
 
-  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-MjpUdmCr36T41vp2V6D/NylDOaYLPg8KTdLAzfQr8nousKW7ODlPBWebhaAKw28pkfsincSIUsbns4gWv71Umw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-linter@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-icon@https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba:
+    resolution: {integrity: sha512-SYqp2xOGiofUDOrkNqymX8Nl2E7KbjepYDQ4U/EkOXz+DbHqHocMuK9NbzJa8eAtrfM7wyi5qrDmdcKCQM4XZw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@comark/html': ^0.9.0
+      comark: ^0.9.0
+      react: '>=18'
+      svelte: '>=5'
+      vue: 3.5.44
+    peerDependenciesMeta:
+      '@comark/html':
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
+  comark-include@https://pkg.pr.new/onmax/comark-ui/comark-include@12bb0ba:
+    resolution: {integrity: sha512-A+Nd8xLrXgBG5gV7V7hoEbtN/sHsAyrWZgNsbq/MT0N/NpygMJ9Q0eYHDN2f4XlJSts93GqE9Z7yiF/Za2Vh3Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-include@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      comark: ^0.9.0
+
+  comark-keys@https://pkg.pr.new/onmax/comark-ui/comark-keys@12bb0ba:
+    resolution: {integrity: sha512-NMlbQtueUARuCTsvrTxbODgDHlMFrnppwYtQyHDXvjE/z32tHLA4kRstF0C74LfREfCqXttYc161aiXRKNgD3w==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-keys@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      comark: ^0.9.0
+
+  comark-links@https://pkg.pr.new/onmax/comark-ui/comark-links@12bb0ba:
+    resolution: {integrity: sha512-tnzF89rQW5NIcOUMBFGTpdqWU8S64YyBpyWI7SdpjrDq4jTSa2CkbT+V4eSmRJZ5Q0kHp0BTewZy2Uev250zJg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-links@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@comark/html': ^0.9.0
+      comark: ^0.9.0
+      react: '>=18'
+      svelte: '>=5'
+      vue: 3.5.44
+    peerDependenciesMeta:
+      '@comark/html':
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
+  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-nJLIzjvgXKOTNa8YIDPMk+ulzX46tmYr8mqjFWN8Pb9U6Up9oxYy1LoG4KticGwaJo4GS9dZ8sMSwhMgvvBYLQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-linter@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     hasBin: true
@@ -5780,8 +5781,8 @@ packages:
       vite-doctor:
         optional: true
 
-  comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@755ebda:
-    resolution: {integrity: sha512-kKZVmkgI+i+YGJnFrPnTFfllEIgKrbdx8a/Fm3QYFPc+IcXeXc/pE2+xlU5HpjyiJi2aPjeM6eFDEtNXLLjosA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-magic-move@755ebda}
+  comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@12bb0ba:
+    resolution: {integrity: sha512-HfgX4umCeoK+0yeqtzwdX1NXkzJV8EQRYUVHRwqkUTeup0l1Vsh13w7DVwJ3hanf44qsMTOz1LytXucVy0fisQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-magic-move@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5800,8 +5801,8 @@ packages:
       vue:
         optional: true
 
-  comark-mark@https://pkg.pr.new/onmax/comark-ui/comark-mark@755ebda:
-    resolution: {integrity: sha512-ByFlD12GjJlPuhI5q6Ln611sZ49Tjs6ymOorDHvtU1p/BZb1U34J4PGH+b1AVFGRE4OATU3/Ne4tWq2MPqmGjw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-mark@755ebda}
+  comark-mark@https://pkg.pr.new/onmax/comark-ui/comark-mark@12bb0ba:
+    resolution: {integrity: sha512-7YQZym1pZR1LXFpMxjw0yKr9ZqMq2mamyl2q1HxOrUqXsZ7brnWu33uxPTkLLgl/mB34tB9bL2/Y0glAuLZVRQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-mark@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5820,8 +5821,8 @@ packages:
       vue:
         optional: true
 
-  comark-mathml@https://pkg.pr.new/onmax/comark-ui/comark-mathml@755ebda:
-    resolution: {integrity: sha512-PilMFuquZe85OU+lRWT6MQsSz3PlVRwT0u5o+HGd1XA/zTJSk76U2ZegHtiHGzb5dJXkc+uG7za7F0CtBeHRSA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-mathml@755ebda}
+  comark-mathml@https://pkg.pr.new/onmax/comark-ui/comark-mathml@12bb0ba:
+    resolution: {integrity: sha512-nV4uLm421Gu8BjWvvFiA0WT28MjrmKNfg7mifW3uHOkg/BcO+3Uw3xNPO+qKu2b9/mj4to3DbJwiO3dPSnR13Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-mathml@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5843,8 +5844,8 @@ packages:
       vue:
         optional: true
 
-  comark-media@https://pkg.pr.new/onmax/comark-ui/comark-media@755ebda:
-    resolution: {integrity: sha512-lKkfU3pBnZn/7TpJZSIi0EqA2+ghjR0WQZVCucbEBxUwYg4aKfV+QGPRsudyYBfhRCzwNu0CNm2B9eA0iQYYgg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-media@755ebda}
+  comark-media@https://pkg.pr.new/onmax/comark-ui/comark-media@12bb0ba:
+    resolution: {integrity: sha512-ghSI/1qF14EWlHp6Z3iG+BjCIf/5nRdNUo+1a+TQ9e7TJDWvd1HAFGeZ5JO+tQ0lNIqQWOn2/jsjnQ68sD3Tew==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-media@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5863,8 +5864,8 @@ packages:
       vue:
         optional: true
 
-  comark-metrics@https://pkg.pr.new/onmax/comark-ui/comark-metrics@755ebda:
-    resolution: {integrity: sha512-SqEkpUrzNm9iRU5iSrmDSNyg7Uo9s7NZ8N3jGTAl+bWzlaE8jR7mXyrdcqTQgOkF+45zUjzwI7M8OsHCyqlazA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-metrics@755ebda}
+  comark-metrics@https://pkg.pr.new/onmax/comark-ui/comark-metrics@12bb0ba:
+    resolution: {integrity: sha512-ZCXWJuTi2qh8NfEdajX9+3gZxd2OP4jpkU4mBP2F5v6//oefwsWkRsTXGj+1g/XF0+pdVOU/XF0u8Z7V4FGAwQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-metrics@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5883,8 +5884,8 @@ packages:
       vue:
         optional: true
 
-  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda:
-    resolution: {integrity: sha512-ghqmc1A5cx4aaGfsjJJV4zUtV4FB7M9afZd8RiKOm0YP7N4fM8+hZ0h32TrrQ4/lpZOTsIg9sRkTKjANRqOTPw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda}
+  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba:
+    resolution: {integrity: sha512-/5fQ48eICYmFco3VmZdaFZ9jK1mQ2Z03Vgz8UzmIJKtKjGoJzmazGZ9vqQfoJhq83rXL2maQO6Uufo9VyiO54Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5903,8 +5904,8 @@ packages:
       vue:
         optional: true
 
-  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-ghqmc1A5cx4aaGfsjJJV4zUtV4FB7M9afZd8RiKOm0YP7N4fM8+hZ0h32TrrQ4/lpZOTsIg9sRkTKjANRqOTPw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-/5fQ48eICYmFco3VmZdaFZ9jK1mQ2Z03Vgz8UzmIJKtKjGoJzmazGZ9vqQfoJhq83rXL2maQO6Uufo9VyiO54Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5945,8 +5946,8 @@ packages:
       vue:
         optional: true
 
-  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda:
-    resolution: {integrity: sha512-OjJYujWbAWevXmyETy0NzktAiUBNTzblPSYg+LGswrc6sFHcxIMm9fx627lxQCtVLRjk0MRJnitzjGoR7hZPfg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda}
+  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba:
+    resolution: {integrity: sha512-gNFa46J06GGTXyWeZssZCjUpoL5yyBIXpWbO/Qq/5AEpRXA3CPe0DVpRY08CBMcyPnTwnO6DDAM8s6ucMlFAaw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5965,8 +5966,8 @@ packages:
       vue:
         optional: true
 
-  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-OjJYujWbAWevXmyETy0NzktAiUBNTzblPSYg+LGswrc6sFHcxIMm9fx627lxQCtVLRjk0MRJnitzjGoR7hZPfg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-gNFa46J06GGTXyWeZssZCjUpoL5yyBIXpWbO/Qq/5AEpRXA3CPe0DVpRY08CBMcyPnTwnO6DDAM8s6ucMlFAaw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -5985,8 +5986,8 @@ packages:
       vue:
         optional: true
 
-  comark-qr@https://pkg.pr.new/onmax/comark-ui/comark-qr@755ebda:
-    resolution: {integrity: sha512-hkU908y5GAjGclhKl0fyt44QiSRFb574c46yyGcNmJD15t4GmJCFvtVpyik62Kg9WNIXwKjaAYwr/Z7pAqKMoQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-qr@755ebda}
+  comark-qr@https://pkg.pr.new/onmax/comark-ui/comark-qr@12bb0ba:
+    resolution: {integrity: sha512-qdfV+LWRSCQwvoNvco9OuPXRcMLpnRlPEOvkP1QfDoV1EvUfEQAFsN4zRwIzWj0gBdfAuT3onn4u1ayHxWp5oQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-qr@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6005,8 +6006,8 @@ packages:
       vue:
         optional: true
 
-  comark-quiz@https://pkg.pr.new/onmax/comark-ui/comark-quiz@755ebda:
-    resolution: {integrity: sha512-icbp88WdMrT9JWxXgF+QNlM1lGV8Te7rRJ8gSdhaZtT4Kat/oBqUADrfw2WwYCFDxJsquysUNxXpa9v8Va4RjQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-quiz@755ebda}
+  comark-quiz@https://pkg.pr.new/onmax/comark-ui/comark-quiz@12bb0ba:
+    resolution: {integrity: sha512-hZxcmRuGCt2vjZPx60N9QVh9ZudtGL517+12yjfJ799G2VbsV6lvsf43xJdSjLOXCn22TE40T/U03NaKGeZEIA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-quiz@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6016,35 +6017,15 @@ packages:
       '@comark/html':
         optional: true
 
-  comark-reading-time@https://pkg.pr.new/onmax/comark-ui/comark-reading-time@755ebda:
-    resolution: {integrity: sha512-s/dzAJM2DyTJqlnaD/OZY1W16yA0QUxB2ocyg4LLradIIkOYWY46Yrh9WVh2wONlHLxc+dUEFFETZBShV+ubIw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-reading-time@755ebda}
+  comark-reading-time@https://pkg.pr.new/onmax/comark-ui/comark-reading-time@12bb0ba:
+    resolution: {integrity: sha512-s/dzAJM2DyTJqlnaD/OZY1W16yA0QUxB2ocyg4LLradIIkOYWY46Yrh9WVh2wONlHLxc+dUEFFETZBShV+ubIw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-reading-time@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
       comark: ^0.9.0
 
-  comark-sources@https://pkg.pr.new/onmax/comark-ui/comark-sources@755ebda:
-    resolution: {integrity: sha512-epEAU5H7CiZ8d+/p9m7+3U3odK32RZ0kgIM2+XckunSNUs1hy+Y6MTNLI+oOZmj48AEg5+Ir0W1ZSk2gCK5pMQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-sources@755ebda}
-    version: 0.13.0
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@comark/html': ^0.9.0
-      comark: ^0.9.0
-      react: '>=18'
-      svelte: '>=5'
-      vue: 3.5.44
-    peerDependenciesMeta:
-      '@comark/html':
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vue:
-        optional: true
-
-  comark-steps@https://pkg.pr.new/onmax/comark-ui/comark-steps@755ebda:
-    resolution: {integrity: sha512-umsoP3hAfQlG9jVAYRp8xW01piF/zMGhKljXP8FEhv5SkJkktfmF4zmg1jXkz3EjayiGiWZq+Bdzr+8L+Cy0Dg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-steps@755ebda}
+  comark-sources@https://pkg.pr.new/onmax/comark-ui/comark-sources@12bb0ba:
+    resolution: {integrity: sha512-blO+rr1Oh2i9vnPNlSmg5aNICBoAMSt2h14o+mJrlJd2Wfevq261Fixy8GlEs62VVCApewhsP+aDhcqmMsILPQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-sources@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6063,8 +6044,8 @@ packages:
       vue:
         optional: true
 
-  comark-table@https://pkg.pr.new/onmax/comark-ui/comark-table@755ebda:
-    resolution: {integrity: sha512-KxmlC7vkLVTBQ0L4ShMdm34aGOyUzESHhoGmi6wKaisQJLoSkmWY6oJ7GDQx5COwfjWXTOODYsPzFa054aGdXQ==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-table@755ebda}
+  comark-steps@https://pkg.pr.new/onmax/comark-ui/comark-steps@12bb0ba:
+    resolution: {integrity: sha512-PZ1CXtf5xSCbeX7HVHL+g8L1y2usY+GFb04QrBjqqcxngSELc7ZIiTZMaGULympbR5Ka9ky9PXtStny7f8FdjA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-steps@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6083,8 +6064,28 @@ packages:
       vue:
         optional: true
 
-  comark-tabs@https://pkg.pr.new/onmax/comark-ui/comark-tabs@755ebda:
-    resolution: {integrity: sha512-6MPMwuSiJSWtKVoG9n2dGKTRq3sDb86hQsWw7Kh5u2HnPavcL7W/v1BMJxszD3H1hAZvOJLvcobnGcvoE44zEg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-tabs@755ebda}
+  comark-table@https://pkg.pr.new/onmax/comark-ui/comark-table@12bb0ba:
+    resolution: {integrity: sha512-Cs5XdL2L84KJBwCjoM6AMoV+WFugyWJN4om4Tp5/+1BSfrgK/VWxe6BXb2KbAKssdlk6fpCOlFGiufgxR5hgpg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-table@12bb0ba}
+    version: 0.13.0
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@comark/html': ^0.9.0
+      comark: ^0.9.0
+      react: '>=18'
+      svelte: '>=5'
+      vue: 3.5.44
+    peerDependenciesMeta:
+      '@comark/html':
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+
+  comark-tabs@https://pkg.pr.new/onmax/comark-ui/comark-tabs@12bb0ba:
+    resolution: {integrity: sha512-MYh47wW/Y3vQr3AcDcJ3klekxm35aBp11Yl687R978RtXMz5g9cUqAW2qLOc3wcyNmiujvcyh7+3Bm2LXsAf6Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-tabs@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6103,8 +6104,8 @@ packages:
       vue:
         optional: true
 
-  comark-tests@https://pkg.pr.new/onmax/comark-ui/comark-tests@755ebda:
-    resolution: {integrity: sha512-qRwkiXOMhX4OdepjXU/vmjP5dC0LcSh79PerU5DlQo9iCEPseAtT+ckLBqNHHEFkwthUHIlykYus6iiYLY6mIA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-tests@755ebda}
+  comark-tests@https://pkg.pr.new/onmax/comark-ui/comark-tests@12bb0ba:
+    resolution: {integrity: sha512-jlzotoTBOltsjJ/0ea9h/PKQ/c2x4Fvy/ZhgDHIeDyHqp8V78BfOdb+/ao73ArZ1hNJy9RW9xozRzx9qk5Zf0Q==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-tests@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6123,8 +6124,8 @@ packages:
       vue:
         optional: true
 
-  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda:
-    resolution: {integrity: sha512-CRkFZEgVCFVIB3IrwtSWotj4cBxeb2d9KKtVp1sf+DMIvUDfFXkjBYhU4+CP+KAFogyQB79WJE5LL7iSzq1Z0A==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda}
+  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba:
+    resolution: {integrity: sha512-Hbf53Y2oBJWfOr9ywn8qMSqZa5RvBuBI3TaT8jD0u8IDbBOQA6cC1ijw4ZOmtsGOQlZ+Mjx+Nk1nqvV2XdVw+g==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6143,8 +6144,8 @@ packages:
       vue:
         optional: true
 
-  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-CRkFZEgVCFVIB3IrwtSWotj4cBxeb2d9KKtVp1sf+DMIvUDfFXkjBYhU4+CP+KAFogyQB79WJE5LL7iSzq1Z0A==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-Hbf53Y2oBJWfOr9ywn8qMSqZa5RvBuBI3TaT8jD0u8IDbBOQA6cC1ijw4ZOmtsGOQlZ+Mjx+Nk1nqvV2XdVw+g==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6163,8 +6164,8 @@ packages:
       vue:
         optional: true
 
-  comark-ui@https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96:
-    resolution: {integrity: sha512-ZRlVgK4eAGtZo3pGXq3AbmlkJvpcCL1c2IbosEfS1H3SvI7XGBiIbD8FjgC2WUkygIH7gCFKGaVGtzQCwp8yZg==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96}
+  comark-ui@https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e:
+    resolution: {integrity: sha512-1lLeaaMd5sZ8ED2NhandS7vyd9SAcrB94EY8ahTN835Ib3CzSrNpbNMezXQ0nj0ZE2ULHP5/653PGL1YvmnBpw==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6207,8 +6208,8 @@ packages:
       vue:
         optional: true
 
-  comark-xref@https://pkg.pr.new/onmax/comark-ui/comark-xref@755ebda:
-    resolution: {integrity: sha512-VgVSyO0JdiqcG2zl4Ne106lr29FuSz1bXWiYNKa79YJuEfjvpETal2/f8K13VAS88VOvaj6enXqDcBpxRUIqLA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-xref@755ebda}
+  comark-xref@https://pkg.pr.new/onmax/comark-ui/comark-xref@12bb0ba:
+    resolution: {integrity: sha512-VgVSyO0JdiqcG2zl4Ne106lr29FuSz1bXWiYNKa79YJuEfjvpETal2/f8K13VAS88VOvaj6enXqDcBpxRUIqLA==, tarball: https://pkg.pr.new/onmax/comark-ui/comark-xref@12bb0ba}
     version: 0.13.0
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -14256,7 +14257,7 @@ snapshots:
       birpc: 4.2.0
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       comark-content: 0.5.1(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)(unstorage@1.17.6(@vercel/functions@3.10.3(@aws-sdk/credential-provider-web-identity@3.972.82)(ws@8.22.0))(aws4fetch@1.0.20)(db0@0.4.1)(ioredis@5.11.1(supports-color@10.2.2)))
-      comark-ui: https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
+      comark-ui: https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
       diff: 9.0.0
       nostics: 1.4.0
       yaml: 2.9.1
@@ -15462,11 +15463,11 @@ snapshots:
 
   colortranslator@5.0.0: {}
 
-  comark-annotate@https://pkg.pr.new/onmax/comark-ui/comark-annotate@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-annotate@https://pkg.pr.new/onmax/comark-ui/comark-annotate@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-carousel: https://pkg.pr.new/onmax/comark-ui/comark-carousel@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-carousel: https://pkg.pr.new/onmax/comark-ui/comark-carousel@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@napi-rs/canvas': 1.1.1
@@ -15475,7 +15476,7 @@ snapshots:
       - svelte
       - vue
 
-  comark-badge@https://pkg.pr.new/onmax/comark-ui/comark-badge@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-badge@https://pkg.pr.new/onmax/comark-ui/comark-badge@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15483,7 +15484,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-bundle@https://pkg.pr.new/onmax/comark-ui/comark-bundle@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-bundle@https://pkg.pr.new/onmax/comark-ui/comark-bundle@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15491,16 +15492,16 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-cards@https://pkg.pr.new/onmax/comark-ui/comark-cards@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-cards@https://pkg.pr.new/onmax/comark-ui/comark-cards@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-carousel@https://pkg.pr.new/onmax/comark-ui/comark-carousel@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-carousel@https://pkg.pr.new/onmax/comark-ui/comark-carousel@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
@@ -15509,7 +15510,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-cast@https://pkg.pr.new/onmax/comark-ui/comark-cast@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-cast@https://pkg.pr.new/onmax/comark-ui/comark-cast@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15517,10 +15518,10 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-charts@https://pkg.pr.new/onmax/comark-ui/comark-charts@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-charts@https://pkg.pr.new/onmax/comark-ui/comark-charts@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-annotate: https://pkg.pr.new/onmax/comark-ui/comark-annotate@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-annotate: https://pkg.pr.new/onmax/comark-ui/comark-annotate@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       d3-sankey: 0.12.3
       flint-chart: 0.5.1(vega-lite@6.5.0(vega@6.4.0))(vega@6.4.0)
       vega: 6.4.0
@@ -15542,7 +15543,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15550,7 +15551,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-chips@https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15558,7 +15559,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-cjk@https://pkg.pr.new/onmax/comark-ui/comark-cjk@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(markdown-it@15.0.3):
+  comark-cjk@https://pkg.pr.new/onmax/comark-ui/comark-cjk@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(markdown-it@15.0.3):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       markdown-it-cjk-friendly: 3.0.0(markdown-it@15.0.3)
@@ -15566,7 +15567,7 @@ snapshots:
       - '@types/markdown-it'
       - markdown-it
 
-  comark-code-notes@https://pkg.pr.new/onmax/comark-ui/comark-code-notes@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-code-notes@https://pkg.pr.new/onmax/comark-ui/comark-code-notes@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15574,16 +15575,16 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-code@https://pkg.pr.new/onmax/comark-ui/comark-code@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-code@https://pkg.pr.new/onmax/comark-ui/comark-code@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-colors@https://pkg.pr.new/onmax/comark-ui/comark-colors@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-colors@https://pkg.pr.new/onmax/comark-ui/comark-colors@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15591,13 +15592,13 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-comments@https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15619,38 +15620,24 @@ snapshots:
       - rangi
       - shiki
 
-  comark-critic@https://pkg.pr.new/onmax/comark-ui/comark-critic@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-critic@https://pkg.pr.new/onmax/comark-ui/comark-critic@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-deflist@https://pkg.pr.new/onmax/comark-ui/comark-deflist@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-deflist@https://pkg.pr.new/onmax/comark-ui/comark-deflist@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-details@https://pkg.pr.new/onmax/comark-ui/comark-details@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-details@https://pkg.pr.new/onmax/comark-ui/comark-details@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-diagrams@https://pkg.pr.new/onmax/comark-ui/comark-diagrams@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-    optionalDependencies:
-      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      react: 19.3.1
-      vue: 3.5.44(typescript@6.0.3)
-
-  comark-diff@https://pkg.pr.new/onmax/comark-ui/comark-diff@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-    optionalDependencies:
-      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-
-  comark-embed@https://pkg.pr.new/onmax/comark-ui/comark-embed@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-diagrams@https://pkg.pr.new/onmax/comark-ui/comark-diagrams@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15658,7 +15645,13 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-fields@https://pkg.pr.new/onmax/comark-ui/comark-fields@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-diff@https://pkg.pr.new/onmax/comark-ui/comark-diff@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+    optionalDependencies:
+      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+
+  comark-embed@https://pkg.pr.new/onmax/comark-ui/comark-embed@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15666,24 +15659,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-figure@https://pkg.pr.new/onmax/comark-ui/comark-figure@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-
-  comark-file-tree@https://pkg.pr.new/onmax/comark-ui/comark-file-tree@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-    optionalDependencies:
-      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      react: 19.3.1
-      vue: 3.5.44(typescript@6.0.3)
-
-  comark-footnotes@https://pkg.pr.new/onmax/comark-ui/comark-footnotes@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-
-  comark-git-graph@https://pkg.pr.new/onmax/comark-ui/comark-git-graph@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-fields@https://pkg.pr.new/onmax/comark-ui/comark-fields@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15691,7 +15667,24 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-github@https://pkg.pr.new/onmax/comark-ui/comark-github@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-figure@https://pkg.pr.new/onmax/comark-ui/comark-figure@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+
+  comark-file-tree@https://pkg.pr.new/onmax/comark-ui/comark-file-tree@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+    optionalDependencies:
+      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      react: 19.3.1
+      vue: 3.5.44(typescript@6.0.3)
+
+  comark-footnotes@https://pkg.pr.new/onmax/comark-ui/comark-footnotes@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+
+  comark-git-graph@https://pkg.pr.new/onmax/comark-ui/comark-git-graph@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15699,7 +15692,15 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-icon@https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-github@https://pkg.pr.new/onmax/comark-ui/comark-github@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+    optionalDependencies:
+      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      react: 19.3.1
+      vue: 3.5.44(typescript@6.0.3)
+
+  comark-icon@https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       '@iconify/types': 2.0.0
       '@iconify/utils': 3.1.7
@@ -15709,15 +15710,15 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-include@https://pkg.pr.new/onmax/comark-ui/comark-include@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-include@https://pkg.pr.new/onmax/comark-ui/comark-include@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-keys@https://pkg.pr.new/onmax/comark-ui/comark-keys@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-keys@https://pkg.pr.new/onmax/comark-ui/comark-keys@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-links@https://pkg.pr.new/onmax/comark-ui/comark-links@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-links@https://pkg.pr.new/onmax/comark-ui/comark-links@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15725,14 +15726,14 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@755ebda929bfb0d4ac41313aa06c2122c6c10b96(02ce254d61cf0fbbaf5841412212b18c):
+  comark-linter@https://pkg.pr.new/onmax/comark-ui/comark-linter@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(7e2ae8043256204e804104b4f6915189):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
-      comark-ui: https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
+      comark-ui: https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3))
       vite-doctor: 0.1.1(@voidzero-dev/vite-plus-core@1.3.0(@types/node@25.9.9)(@volar/typescript@2.4.28)(@vue/language-core@3.3.13)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(typescript@6.0.3)(vue-tsc@3.3.13(typescript@6.0.3))(yaml@2.9.1))(chokidar@5.0.0)(dotenv@17.4.2)(giget@3.3.1)(jiti@2.7.0)(magicast@0.5.5)(nuxt-nightly@5.0.0-2610292252-da55a91)(supports-color@10.2.2)
 
-  comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-magic-move@https://pkg.pr.new/onmax/comark-ui/comark-magic-move@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15740,7 +15741,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-mark@https://pkg.pr.new/onmax/comark-ui/comark-mark@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-mark@https://pkg.pr.new/onmax/comark-ui/comark-mark@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15748,7 +15749,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-mathml@https://pkg.pr.new/onmax/comark-ui/comark-mathml@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-mathml@https://pkg.pr.new/onmax/comark-ui/comark-mathml@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       temml: 0.14.0
@@ -15758,7 +15759,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-media@https://pkg.pr.new/onmax/comark-ui/comark-media@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-media@https://pkg.pr.new/onmax/comark-ui/comark-media@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15766,7 +15767,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-metrics@https://pkg.pr.new/onmax/comark-ui/comark-metrics@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-metrics@https://pkg.pr.new/onmax/comark-ui/comark-metrics@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15774,7 +15775,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15782,7 +15783,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-outline@https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15798,25 +15799,25 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-properties@https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-qr@https://pkg.pr.new/onmax/comark-ui/comark-qr@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-qr@https://pkg.pr.new/onmax/comark-ui/comark-qr@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
       uqr: 0.1.3
@@ -15825,25 +15826,17 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-quiz@https://pkg.pr.new/onmax/comark-ui/comark-quiz@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-quiz@https://pkg.pr.new/onmax/comark-ui/comark-quiz@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-reading-time@https://pkg.pr.new/onmax/comark-ui/comark-reading-time@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-reading-time@https://pkg.pr.new/onmax/comark-ui/comark-reading-time@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
-  comark-sources@https://pkg.pr.new/onmax/comark-ui/comark-sources@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-    optionalDependencies:
-      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      react: 19.3.1
-      vue: 3.5.44(typescript@6.0.3)
-
-  comark-steps@https://pkg.pr.new/onmax/comark-ui/comark-steps@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-sources@https://pkg.pr.new/onmax/comark-ui/comark-sources@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15851,7 +15844,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-table@https://pkg.pr.new/onmax/comark-ui/comark-table@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-steps@https://pkg.pr.new/onmax/comark-ui/comark-steps@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15859,16 +15852,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-tabs@https://pkg.pr.new/onmax/comark-ui/comark-tabs@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
-    dependencies:
-      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-    optionalDependencies:
-      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      react: 19.3.1
-      vue: 3.5.44(typescript@6.0.3)
-
-  comark-tests@https://pkg.pr.new/onmax/comark-ui/comark-tests@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-table@https://pkg.pr.new/onmax/comark-ui/comark-table@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15876,7 +15860,16 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-tabs@https://pkg.pr.new/onmax/comark-ui/comark-tabs@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+    optionalDependencies:
+      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      react: 19.3.1
+      vue: 3.5.44(typescript@6.0.3)
+
+  comark-tests@https://pkg.pr.new/onmax/comark-ui/comark-tests@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15884,7 +15877,7 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
+  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
     optionalDependencies:
@@ -15892,56 +15885,64 @@ snapshots:
       react: 19.3.1
       vue: 3.5.44(typescript@6.0.3)
 
-  comark-ui@https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3)):
+  comark-time@https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
-      comark-annotate: https://pkg.pr.new/onmax/comark-ui/comark-annotate@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-badge: https://pkg.pr.new/onmax/comark-ui/comark-badge@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-bundle: https://pkg.pr.new/onmax/comark-ui/comark-bundle@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-cards: https://pkg.pr.new/onmax/comark-ui/comark-cards@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-carousel: https://pkg.pr.new/onmax/comark-ui/comark-carousel@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-cast: https://pkg.pr.new/onmax/comark-ui/comark-cast@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-charts: https://pkg.pr.new/onmax/comark-ui/comark-charts@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-chips: https://pkg.pr.new/onmax/comark-ui/comark-chips@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-cjk: https://pkg.pr.new/onmax/comark-ui/comark-cjk@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(markdown-it@15.0.3)
-      comark-code: https://pkg.pr.new/onmax/comark-ui/comark-code@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-code-notes: https://pkg.pr.new/onmax/comark-ui/comark-code-notes@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-colors: https://pkg.pr.new/onmax/comark-ui/comark-colors@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-comments: https://pkg.pr.new/onmax/comark-ui/comark-comments@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-critic: https://pkg.pr.new/onmax/comark-ui/comark-critic@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-deflist: https://pkg.pr.new/onmax/comark-ui/comark-deflist@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-details: https://pkg.pr.new/onmax/comark-ui/comark-details@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-diagrams: https://pkg.pr.new/onmax/comark-ui/comark-diagrams@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-diff: https://pkg.pr.new/onmax/comark-ui/comark-diff@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-embed: https://pkg.pr.new/onmax/comark-ui/comark-embed@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-fields: https://pkg.pr.new/onmax/comark-ui/comark-fields@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-figure: https://pkg.pr.new/onmax/comark-ui/comark-figure@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-file-tree: https://pkg.pr.new/onmax/comark-ui/comark-file-tree@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-footnotes: https://pkg.pr.new/onmax/comark-ui/comark-footnotes@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-git-graph: https://pkg.pr.new/onmax/comark-ui/comark-git-graph@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-github: https://pkg.pr.new/onmax/comark-ui/comark-github@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-include: https://pkg.pr.new/onmax/comark-ui/comark-include@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-keys: https://pkg.pr.new/onmax/comark-ui/comark-keys@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-links: https://pkg.pr.new/onmax/comark-ui/comark-links@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-magic-move: https://pkg.pr.new/onmax/comark-ui/comark-magic-move@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-mark: https://pkg.pr.new/onmax/comark-ui/comark-mark@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-mathml: https://pkg.pr.new/onmax/comark-ui/comark-mathml@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-media: https://pkg.pr.new/onmax/comark-ui/comark-media@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-metrics: https://pkg.pr.new/onmax/comark-ui/comark-metrics@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-outline: https://pkg.pr.new/onmax/comark-ui/comark-outline@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+    optionalDependencies:
+      '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      react: 19.3.1
+      vue: 3.5.44(typescript@6.0.3)
+
+  comark-ui@https://pkg.pr.new/onmax/comark-ui/comark-ui@12bb0ba3e71b2373da2e51fd2576ef03a79bab8e(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/extension-image@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4)))(@tiptap/extension-list@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/extension-table@3.31.4(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(@tiptap/starter-kit@3.31.4)(@tiptap/vue-3@3.31.4(@floating-ui/dom@1.8.0)(@tiptap/core@3.31.4(@tiptap/pm@3.31.4))(@tiptap/pm@3.31.4)(vue@3.5.44(typescript@6.0.3)))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(markdown-it@15.0.3)(react@19.3.1)(shiki@4.5.0)(vue@3.5.44(typescript@6.0.3)):
+    dependencies:
+      comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
+      comark-annotate: https://pkg.pr.new/onmax/comark-ui/comark-annotate@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-badge: https://pkg.pr.new/onmax/comark-ui/comark-badge@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-bundle: https://pkg.pr.new/onmax/comark-ui/comark-bundle@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-cards: https://pkg.pr.new/onmax/comark-ui/comark-cards@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-carousel: https://pkg.pr.new/onmax/comark-ui/comark-carousel@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-cast: https://pkg.pr.new/onmax/comark-ui/comark-cast@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-charts: https://pkg.pr.new/onmax/comark-ui/comark-charts@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(@napi-rs/canvas@1.1.1)(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-chips: https://pkg.pr.new/onmax/comark-ui/comark-chips@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-cjk: https://pkg.pr.new/onmax/comark-ui/comark-cjk@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(markdown-it@15.0.3)
+      comark-code: https://pkg.pr.new/onmax/comark-ui/comark-code@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-code-notes: https://pkg.pr.new/onmax/comark-ui/comark-code-notes@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-colors: https://pkg.pr.new/onmax/comark-ui/comark-colors@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-comments: https://pkg.pr.new/onmax/comark-ui/comark-comments@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-critic: https://pkg.pr.new/onmax/comark-ui/comark-critic@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-deflist: https://pkg.pr.new/onmax/comark-ui/comark-deflist@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-details: https://pkg.pr.new/onmax/comark-ui/comark-details@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-diagrams: https://pkg.pr.new/onmax/comark-ui/comark-diagrams@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-diff: https://pkg.pr.new/onmax/comark-ui/comark-diff@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-embed: https://pkg.pr.new/onmax/comark-ui/comark-embed@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-fields: https://pkg.pr.new/onmax/comark-ui/comark-fields@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-figure: https://pkg.pr.new/onmax/comark-ui/comark-figure@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-file-tree: https://pkg.pr.new/onmax/comark-ui/comark-file-tree@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-footnotes: https://pkg.pr.new/onmax/comark-ui/comark-footnotes@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-git-graph: https://pkg.pr.new/onmax/comark-ui/comark-git-graph@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-github: https://pkg.pr.new/onmax/comark-ui/comark-github@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-icon: https://pkg.pr.new/onmax/comark-ui/comark-icon@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-include: https://pkg.pr.new/onmax/comark-ui/comark-include@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-keys: https://pkg.pr.new/onmax/comark-ui/comark-keys@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-links: https://pkg.pr.new/onmax/comark-ui/comark-links@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-magic-move: https://pkg.pr.new/onmax/comark-ui/comark-magic-move@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-mark: https://pkg.pr.new/onmax/comark-ui/comark-mark@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-mathml: https://pkg.pr.new/onmax/comark-ui/comark-mathml@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(katex@0.19.1)(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-media: https://pkg.pr.new/onmax/comark-ui/comark-media@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-metrics: https://pkg.pr.new/onmax/comark-ui/comark-metrics@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-outline: https://pkg.pr.new/onmax/comark-ui/comark-outline@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
       comark-pele: 1.1.0(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-properties: https://pkg.pr.new/onmax/comark-ui/comark-properties@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-qr: https://pkg.pr.new/onmax/comark-ui/comark-qr@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-quiz: https://pkg.pr.new/onmax/comark-ui/comark-quiz@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-reading-time: https://pkg.pr.new/onmax/comark-ui/comark-reading-time@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
-      comark-sources: https://pkg.pr.new/onmax/comark-ui/comark-sources@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-steps: https://pkg.pr.new/onmax/comark-ui/comark-steps@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-table: https://pkg.pr.new/onmax/comark-ui/comark-table@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-tabs: https://pkg.pr.new/onmax/comark-ui/comark-tabs@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-tests: https://pkg.pr.new/onmax/comark-ui/comark-tests@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
-      comark-xref: https://pkg.pr.new/onmax/comark-ui/comark-xref@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-properties: https://pkg.pr.new/onmax/comark-ui/comark-properties@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-qr: https://pkg.pr.new/onmax/comark-ui/comark-qr@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-quiz: https://pkg.pr.new/onmax/comark-ui/comark-quiz@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-reading-time: https://pkg.pr.new/onmax/comark-ui/comark-reading-time@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
+      comark-sources: https://pkg.pr.new/onmax/comark-ui/comark-sources@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-steps: https://pkg.pr.new/onmax/comark-ui/comark-steps@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-table: https://pkg.pr.new/onmax/comark-ui/comark-table@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-tabs: https://pkg.pr.new/onmax/comark-ui/comark-tabs@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-tests: https://pkg.pr.new/onmax/comark-ui/comark-tests@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-time: https://pkg.pr.new/onmax/comark-ui/comark-time@12bb0ba(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
+      comark-xref: https://pkg.pr.new/onmax/comark-ui/comark-xref@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))
       comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda(@comark/html@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0))(react@19.3.1)(vue@3.5.44(typescript@6.0.3))
     optionalDependencies:
       '@comark/html': 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
@@ -15966,7 +15967,7 @@ snapshots:
       - markdown-it
       - plotly.js
 
-  comark-xref@https://pkg.pr.new/onmax/comark-ui/comark-xref@755ebda(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
+  comark-xref@https://pkg.pr.new/onmax/comark-ui/comark-xref@12bb0ba(comark@0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)):
     dependencies:
       comark: 0.9.0(beautiful-mermaid@1.1.3)(katex@0.19.1)(shiki@4.5.0)
 
