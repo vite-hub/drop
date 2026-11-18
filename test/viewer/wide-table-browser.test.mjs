@@ -56,10 +56,10 @@ async function open(browser, width) {
   await page.goto("https://drop.test/")
   await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
   const frame = page.frames()[1]
-  await frame.waitForFunction(() => document.querySelector("drop-outline")?.hasAttribute("data-fits") !== undefined)
+  await frame.waitForFunction(() => window.__comarkOutline, null, { polling: 100 })
   return frame.evaluate(() => {
     const box = (node) => node.getBoundingClientRect()
-    const outline = document.querySelector("drop-outline")
+    const outline = document.querySelector(".cto-rail")
     return {
       text: box(document.querySelector(".typeset > p")),
       table: box(document.querySelector(".typeset > div[data-width]")),

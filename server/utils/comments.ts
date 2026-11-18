@@ -10,6 +10,7 @@ import type {
   CommentUser,
 } from "vite-hub/comments"
 import { knownAgent } from "#shared/agents"
+import { decodeInk } from "#shared/ink"
 import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database"
 import type { CommentAgent, CommentAttachment, CommentReply, DropComment } from "#shared/types"
@@ -77,7 +78,8 @@ async function commentList(row: Commented): Promise<CommentList> {
  * What a thread keeps in `metadata`: the drop it was written on, and its anchor as Drop's viewers draw it. `kind`:
  * `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of a page, `page` is the
  * whole page. `ox`/`oy`/`ow`/`oh` are thousandths of the anchor's box. `suggestion` holds a suggested edit's words.
- * `at` is the second of a video's frame an `image` comment is on, and `pdfPage` the number of a PDF's page.
+ * `at` is the second of a video's frame an `image` comment is on, and `pdfPage` the number of a PDF's page. `ink`
+ * holds the Marker's strokes on an `area` as encodeInk writes them: Comments keeps only flat values.
  * `elementX`/`elementY` place a site review pin on the element `label` names, in thousandths of its box.
  */
 const CommentMeta = v.object({
@@ -92,6 +94,7 @@ const CommentMeta = v.object({
   suggestion: v.optional(v.nullable(v.string()), null),
   at: v.optional(v.nullable(v.number()), null),
   pdfPage: v.optional(v.nullable(v.number()), null),
+  ink: v.optional(v.nullable(v.string()), null),
   label: v.nullable(v.string()),
   page: v.nullable(v.string()),
   elementX: v.nullable(v.number()),
@@ -225,6 +228,7 @@ export function toComment(
     suggestion: meta.suggestion,
     at: meta.at,
     pdfPage: meta.pdfPage,
+    ink: decodeInk(meta.ink),
     label: meta.label,
     page: meta.page,
     body: first?.body ?? "",
@@ -330,7 +334,7 @@ export async function addThread(
   },
   list?: CommentList,
 ): Promise<DropThread> {
-  const meta: CommentMeta = { suggestion: null, at: null, pdfPage: null, dropId: row.id, ...input.fields }
+  const meta: CommentMeta = { suggestion: null, at: null, pdfPage: null, ink: null, dropId: row.id, ...input.fields }
   const [error, thread] = await comments.create({
     subject: (list ?? (await commentList(row))).subject,
     anchor: anchorOf(meta),

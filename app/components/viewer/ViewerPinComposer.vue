@@ -4,6 +4,7 @@
 // The words and pictures are the review draft's, so they follow the reader to other text they select. A picture can
 // still come in: the one the frame takes of a tooltip under an area, or one pasted or dropped into the box.
 // Comment or Suggest is picked before it opens (the selection bar, C or E); a suggestion gets the full composer.
+// The bubble around it is the frame (DropViewer), so the field draws none and the bubble shows the focus.
 import { CommentComposer, type CommentComposerSubmit } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 
@@ -55,6 +56,7 @@ defineExpose({
       :autofocus="false"
       :busy="busy"
       :error="error || draft.images.problem.value"
+      frame="none"
       :guard="false"
       layout="row"
       placeholder="Comment, ↵ to send"

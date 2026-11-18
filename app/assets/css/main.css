@@ -20,8 +20,6 @@
   --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  /* A copy button's check (`animate-icon-in`), one timing for every one of them. */
-  --animate-icon-in: icon-in 300ms var(--ease-out);
 }
 
 /*
@@ -287,14 +285,6 @@ body {
     transform: translateY(4px) scale(0.97);
   }
 }
-/* An icon that swaps for its done state (copy to check): it grows out of a blur, so the swap reads as a change. */
-@keyframes icon-in {
-  from {
-    opacity: 0;
-    transform: scale(0.3);
-    filter: blur(3px);
-  }
-}
 @keyframes blink {
   50% {
     opacity: 0;
@@ -370,11 +360,6 @@ body {
     }
   }
   @keyframes pop-in {
-    from {
-      opacity: 0;
-    }
-  }
-  @keyframes icon-in {
     from {
       opacity: 0;
     }

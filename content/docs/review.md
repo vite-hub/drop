@@ -127,7 +127,7 @@ The Marker draws on a snapshot of the page and sends it as one comment. Press :k
 | Size | :kbd[[] :kbd[]] | Four sizes for each tool. |
 | Undo | :kbd[⌘Z] | Takes back the last stroke or label. |
 
-**Done** (:kbd[Enter], or :kbd[⌘Enter] while you type a label) opens the comment with the snapshot and your strokes attached, and the words under them quoted. The note is optional. The comment points at the part of the page you marked, and agents read the marked words and the image with `read_drop`. :kbd[Esc] or **Cancel** throws the snapshot away.
+**Done** (:kbd[Enter], or :kbd[⌘Enter] while you type a label) opens the comment with the snapshot and your strokes attached, and the words under them quoted. The note is optional. The comment points at the part of the page you marked, and your strokes stay drawn there for everyone who opens the page. Agents read the marked words and the image with `read_drop`. :kbd[Esc] or **Cancel** throws the snapshot away.
 
 ## Sharing {#sharing}
 

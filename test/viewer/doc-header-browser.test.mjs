@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
-import { chromium } from "playwright"
+import { chromium, firefox } from "playwright"
 import { test } from "vite-plus/test"
-import { previewSandbox } from "../../app/utils/feedback.ts"
+import { frameAllow, previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
 
 const { withDocProperties, renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
@@ -13,7 +13,6 @@ const HEADER = {
     { id: "download", label: "Download original", kbd: "D" },
     { id: "pdf", label: "Export as PDF" },
   ],
-  copied: false,
   facts: [
     {
       icon: "views",
@@ -25,6 +24,18 @@ const HEADER = {
       ],
     },
     { icon: "file", label: "File", value: "plan.md", detail: "Markdown · 14.2 KB" },
+    {
+      icon: "person",
+      label: "Dropped by",
+      value: "Max",
+      who: {
+        name: "Max",
+        image: null,
+        agent: { label: "Claude Code", logo: "https://drop.test/agents/claude.svg" },
+        tip: "via Executor · claude-opus-5-5 · high reasoning",
+      },
+    },
+    { icon: "folder", label: "Folder", value: "Plans", folder: "fold01" },
   ],
   related: [
     {
@@ -45,6 +56,22 @@ const HEADER = {
 }
 
 // A Markdown doc with a front matter box in the viewer's frame, as DropViewer renders one without a content origin.
+const FOLDER = {
+  id: "fold01",
+  title: "Plans",
+  items: [
+    {
+      id: "new001",
+      title: "Launch checklist",
+      icon: "doc",
+      at: "2 hr. ago",
+      tip: "Nov 17, 2026, 9:00 AM",
+      current: false,
+    },
+    { id: "this01", title: "Plan", icon: "doc", at: "1 day ago", tip: "Nov 16, 2026, 9:00 AM", current: true },
+  ],
+}
+
 async function open(browser) {
   const source = "---\nstatus: Ready\n---\n\n# Plan\n\nLaunch on November 18.\n"
   const { html } = await renderMarkdownCached("doc-header.md", async () => source)
@@ -53,13 +80,17 @@ async function open(browser) {
     updatedAt: Date.UTC(2026, 10, 16),
   })
   const escaped = planDocument("markdown", source, false, body).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
-  const page = await browser.newPage()
+  // Firefox needs no permission to write in a click, and Playwright's Firefox grants none.
+  const context = await browser.newContext(
+    browser.browserType().name() === "chromium" ? { permissions: ["clipboard-read", "clipboard-write"] } : {},
+  )
+  const page = await context.newPage()
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
     if (url.hostname !== "drop.test" || url.pathname !== "/") return route.abort()
     return route.fulfill({
       contentType: "text/html; charset=utf-8",
-      body: `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+      body: `<iframe sandbox="${previewSandbox("markdown")}" allow="${frameAllow("markdown")}" srcdoc="${escaped}"></iframe>
         <script>window.posts = []; addEventListener("message", (e) => { if (e.data?.__drop) window.posts.push(e.data); });
           window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
     })
@@ -102,31 +133,104 @@ test(
       assert.match(await facts.innerText(), /Views\s+38 views\s+21\s+17/)
       assert.equal(await facts.locator(".drop-fact-part").first().getAttribute("title"), "21 by people signed in")
 
-      // Copy is the button; its arrow's menu holds the rest, and Escape closes the menu without reaching Drop.
-      await frame.getByRole("button", { name: "Copy as Markdown" }).click()
-      await frame.getByRole("button", { name: "More ways to save this doc" }).click()
+      // "Dropped by": the person, then the agent, with the rest on hover.
+      const who = facts.locator(".drop-who")
+      assert.match(await who.innerText(), /Max\s*\u00b7\s*Claude Code/)
+      assert.equal(await who.getAttribute("title"), "via Executor \u00b7 claude-opus-5-5 \u00b7 high reasoning")
+
+      // The folder opens a list of its drops, asked for when the pointer reaches it, this doc marked and focused.
+      const folder = frame.getByRole("button", { name: "Plans" })
+      await folder.hover()
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-folder"))
+      await page.evaluate((folder) => window.tell({ type: "doc-folder-items", folder }), FOLDER)
+      await folder.click()
+      const list = frame.locator("drop-folder-menu")
+      await list.locator("button").first().waitFor()
+      assert.equal(await list.evaluate((el) => el.matches(":popover-open")), true)
+      await frame.locator('.drop-folder[aria-expanded="true"]').waitFor()
+      await list.locator('button[aria-current="page"]:focus').waitFor()
+      await page.keyboard.press("ArrowUp")
+      assert.match(await frame.evaluate(() => document.activeElement.textContent), /Launch checklist/)
+      await page.keyboard.press("Escape")
+      assert.equal(await list.evaluate((el) => el.matches(":popover-open")), false)
+      assert.equal(await frame.evaluate(() => document.activeElement.textContent), "Plans", "focus goes back")
+      await folder.click()
+      await list.getByRole("button", { name: /Launch checklist/ }).click()
+      await list.getByRole("button", { name: "Open folder" }).evaluate((el) => el.click())
+
+      // The doc moves to another folder while the header stays: the list and Open folder follow the new folder, and a
+      // late answer for the old one is ignored.
+      const moved = {
+        ...HEADER,
+        facts: HEADER.facts.map((f) => (f.folder ? { ...f, value: "Ideas", folder: "fold02" } : f)),
+      }
+      const asked = await page.evaluate(() => window.posts.filter((m) => m.type === "doc-folder").length)
+      await page.evaluate((header) => window.tell(header), moved)
+      const ideas = frame.getByRole("button", { name: "Ideas" })
+      await ideas.hover()
+      await page.waitForFunction((n) => window.posts.filter((m) => m.type === "doc-folder").length > n, asked)
+      await page.evaluate((folder) => window.tell({ type: "doc-folder-items", folder }), FOLDER)
+      await ideas.click()
+      await list.locator("p").waitFor()
+      assert.equal(await list.getByRole("button", { name: "Open folder" }).count(), 0, "the old folder's rows are gone")
+      const IDEAS = { ...FOLDER, id: "fold02", title: "Ideas" }
+      await page.evaluate((folder) => window.tell({ type: "doc-folder-items", folder }), IDEAS)
+      await list.getByRole("button", { name: "Open folder" }).evaluate((el) => el.click())
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-open" && m.id === "fold02"))
+      await page.evaluate((header) => window.tell(header), HEADER)
+
+      // Copy asks for the Markdown when the pointer reaches it, and writes it in the click. The button stays the
+      // same element through another header, so the press can't be lost and focus stays.
+      const copy = frame.getByRole("button", { name: "Copy as Markdown" })
+      await copy.evaluate((el) => (el.dataset.same = "1"))
+      await page.evaluate((header) => window.tell(header), HEADER)
+      assert.equal(await copy.getAttribute("data-same"), "1")
+      await copy.hover()
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-intent"))
+      await page.evaluate(() => window.tell({ type: "doc-markdown", text: "# Plan\n" }))
+      await copy.click()
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-copied"))
+      assert.deepEqual(await page.evaluate(() => window.posts.find((m) => m.type === "doc-copied")), {
+        __drop: true,
+        type: "doc-copied",
+        ok: true,
+      })
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "# Plan\n")
+      assert.equal(await copy.getAttribute("data-copied"), "")
+      assert.equal(await copy.innerText(), "Copy", "the label stays")
+      assert.equal(await frame.locator(".drop-note").textContent(), "Markdown copied")
+      await copy.locator(":scope:not([data-copied])").waitFor({ timeout: 3000 })
+
+      // The arrow's menu is a popover; Escape closes it without reaching Drop.
+      const arrow = frame.getByRole("button", { name: "More ways to save this doc" })
+      await arrow.click()
       await frame.getByRole("menuitem", { name: /Export as PDF/ }).waitFor()
-      await frame.locator("body").press("Escape")
-      assert.equal(
-        await frame.getByRole("button", { name: "More ways to save this doc" }).getAttribute("aria-expanded"),
-        "false",
-      )
-      await frame.getByRole("button", { name: "More ways to save this doc" }).click()
+      // The popover's toggle event, which sets it and moves focus in, comes a task later.
+      await frame.locator('[aria-label="More ways to save this doc"][aria-expanded="true"]').waitFor()
+      await frame.locator("#drop-doc-menu button:focus").waitFor()
+      await page.keyboard.press("ArrowDown")
+      assert.match(await frame.evaluate(() => document.activeElement.textContent), /Download original/)
+      await page.keyboard.press("Escape")
+      // The popover's toggle event, which sets it, comes a task later.
+      await frame.locator('[aria-label="More ways to save this doc"][aria-expanded="false"]').waitFor()
+      await arrow.click()
       await frame.getByRole("menuitem", { name: /Download original/ }).click()
       await frame.getByRole("link", { name: "Before and after" }).click()
-      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-open"))
+      await page.waitForFunction(() => window.posts.filter((m) => m.type === "doc-open").length === 4)
       assert.deepEqual(
-        (await docPosts(page)).map((m) => m.action ?? m.id),
-        ["markdown", "download", "abc123"],
+        (await docPosts(page))
+          .filter((m) => m.type === "doc-open" || m.type === "doc-action")
+          .map((m) => m.action ?? m.id),
+        ["new001", "fold01", "fold02", "download", "abc123"],
       )
       assert.equal(
         (await page.evaluate(() => window.posts)).some((m) => m.type === "key" && m.key === "Escape"),
         false,
       )
 
-      // Copied, as the viewer says; and a second header replaces the first rather than adding to it.
-      await page.evaluate((header) => window.tell({ ...header, copied: true }), HEADER)
-      await frame.getByRole("button", { name: "Copy as Markdown" }).getByText("Copied").waitFor()
+      // A copy the viewer made (its shortcut) shows on the button too; a second header doesn't add links again.
+      await page.evaluate(() => window.tell({ type: "doc-copied" }))
+      assert.equal(await copy.getAttribute("data-copied"), "")
       assert.equal(await frame.locator('dl.cfm > div[data-key="links"] dd a').count(), 3)
 
       // Paper gets the doc, not the buttons.
@@ -140,3 +244,49 @@ test(
     }
   },
 )
+
+test("Copy says so in the frame when the Markdown doesn't load", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser)
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const copy = frame.getByRole("button", { name: "Copy as Markdown" })
+    await copy.click()
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-intent"))
+    assert.equal(await copy.getAttribute("aria-busy"), "true")
+    await page.evaluate(() => window.tell({ type: "doc-markdown", text: null }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-copied"))
+    const result = await page.evaluate(() => window.posts.find((m) => m.type === "doc-copied"))
+    assert.equal(result.ok, false)
+    assert.match(result.error, /didn't load/)
+    const note = frame.locator(".drop-note")
+    assert.equal(await note.textContent(), "Couldn't copy")
+    assert.ok((await note.boundingBox()).width > 40, "the failure shows, not only to screen readers")
+    assert.equal(await copy.getAttribute("data-copied"), null)
+  } finally {
+    await browser.close()
+  }
+})
+
+// Firefox 159 failed to copy in production (Drop comment #12): the frame writes in Firefox too, and says when it can't.
+test("Copy writes from the frame in Firefox", { timeout: 30000 }, async () => {
+  const browser = await firefox.launch()
+  try {
+    const { page, frame } = await open(browser)
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const copy = frame.getByRole("button", { name: "Copy as Markdown" })
+    await copy.hover()
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-intent"))
+    await page.evaluate(() => window.tell({ type: "doc-markdown", text: "# Plan\n" }))
+    await copy.click()
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-copied"))
+    assert.deepEqual(await page.evaluate(() => window.posts.find((m) => m.type === "doc-copied")), {
+      __drop: true,
+      type: "doc-copied",
+      ok: true,
+    })
+    assert.equal(await copy.getAttribute("data-copied"), "")
+  } finally {
+    await browser.close()
+  }
+})

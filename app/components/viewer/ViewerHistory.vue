@@ -2,16 +2,15 @@
 // A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
 // published it, and the comments written on it. A version shows what it changed (ViewerDiff) in place of the document;
 // `selected` is the one showing. Each one's link stays on that version, while the doc's link follows the latest.
+import { RelativeTime } from "vite-hub/ui"
 import { agentLabel } from "#shared/agent"
 import { dropPath } from "#shared/links"
 import type { DropComment, DropDetail, DropVersion } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; comments: DropComment[]; selected?: number }>()
 const emit = defineEmits<{ open: [version: DropVersion] }>()
-const { copy, copied } = useCopy()
 const origin = useRequestURL().origin
-const copyLink = (version: DropVersion) =>
-  copy(`${origin}${dropPath(props.drop, version.version)}`, { key: `v${version.version}` })
+const versionLink = (version: DropVersion) => `${origin}${dropPath(props.drop, version.version)}`
 
 // Comments come up to the version being viewed (listComments), so later versions have none to count here.
 function talk(version: DropVersion) {
@@ -52,7 +51,9 @@ function talk(version: DropVersion) {
             version.note ?? "First version"
           }}</span>
           <span class="block text-xs text-muted"
-            >{{ version.actorName }} · <TimeAgo :at="version.createdAt" /><template v-if="talk(version)">
+            >{{ version.actorName }} · <RelativeTime format="short" :at="version.createdAt" /><template
+              v-if="talk(version)"
+            >
               · {{ talk(version) }}</template
             ></span
           >
@@ -67,15 +68,12 @@ function talk(version: DropVersion) {
         <UIcon class="mt-1 size-4 shrink-0 text-dimmed group-hover:text-highlighted" name="i-mingcute-right-line" />
       </button>
       <UTooltip :text="`Copy link to v${version.version}`">
-        <UButton
+        <DropCopyButton
           :aria-label="`Copy link to v${version.version}`"
           class="absolute top-1.5 right-1.5 motion-safe:transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:focus-visible:opacity-100"
-          color="neutral"
-          :icon="copied(`v${version.version}`) ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-          :ui="{ leadingIcon: copied(`v${version.version}`) ? 'animate-icon-in' : undefined }"
+          icon="i-mingcute-link-line"
           size="xs"
-          variant="ghost"
-          @click="copyLink(version)"
+          :value="versionLink(version)"
         />
       </UTooltip>
     </li>

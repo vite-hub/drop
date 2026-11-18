@@ -5,8 +5,10 @@ import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
+import { MAX_INK_POINTS, MAX_INK_STROKES } from "./schemas"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
 import MARKS_CSS from "@vite-hub/ui/comment-marks.css?raw"
+import { commentLeaveMs } from "vite-hub/ui/headless"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
@@ -405,6 +407,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
     '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
+    // A Marker comment draws its strokes over its area, and its box only while its thread is open.
+    '[data-slot="comment-mark-area"][data-ink]:not([data-active]){border-color:transparent;background:none;box-shadow:none;outline-color:transparent}.inkp.done{opacity:.4}' +
     // The spot a point comment is being written on.
     '.dp{position:absolute;scale:var(--vh-comment-zoom,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--vh-comment-mark);box-shadow:0 0 0 2px var(--vh-comment-surface),0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
@@ -434,7 +438,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.rail .cr-entry{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}' +
     '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}' +
     '</style>';
-  shadow.innerHTML = STYLE + RAIL_STYLE + LAYERS;
+  // While Comark's zoom holds this layer (see onZoom), the page's own marks, which sit at page coordinates, stay hidden
+  // behind it as they were behind the top layer; the tool's layer, hover outlines, and rulers are fixed and work on it.
+  // Ink kept from a Marker session on the zoom (.zink) is drawn at viewport coordinates and shows only there.
+  const ZOOMED_STYLE = '<style>:host([data-zoomed]) :is(.marks,.leave,.pcs),:host([data-zoomed]) .draft>:not(.zink),:host(:not([data-zoomed])) .zink{display:none}</style>';
+  shadow.innerHTML = STYLE + RAIL_STYLE + ZOOMED_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
   const leave = shadow.appendChild(Object.assign(document.createElement("div"), { className: "leave" }));
 
@@ -588,6 +596,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
     parentEl.appendChild(box);
     return box;
+  }
+  /**
+   * A Marker comment's strokes, over its area at page coordinates. They were saved in pixels of the area as drawn, so
+   * they stretch with it when the anchor reflows, and their tips scale with its narrower side.
+   */
+  function drawInk(parentEl, box, m, left, top, width, height) {
+    const sx = width / m.ink.w, sy = height / m.ink.h, k = Math.min(sx, sy);
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("class", m.resolved ? "inkp done" : "inkp");
+    svg.style.left = left + "px"; svg.style.top = top + "px";
+    for (const s of m.ink.strokes) drawStroke(Object.assign({}, s, { width: s.width * k, points: s.points.map(([x, y]) => [x * sx, y * sy]) }), svg);
+    box.dataset.ink = "";
+    parentEl.appendChild(svg);
   }
 
   // Comark's zoom (comark-zoom) shows a copy of an item, such as an annotated screenshot, with a layer over the copy.
@@ -904,7 +925,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
-        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, m);
+        if (m.ow || m.oh) {
+          const w = (m.ow / 1000) * b.width, h = (m.oh / 1000) * b.height, box = areaBox(into, x, y, w, h, m);
+          if (m.ink) drawInk(into, box, m, x, y, w, h);
+        }
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
@@ -1522,11 +1546,14 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (left[0]) { left[0].dispatchEvent(new PointerEvent("pointerout", { ...init, bubbles: true })); left[0].dispatchEvent(new MouseEvent("mouseout", { ...init, bubbles: true })); }
     for (const el of left) { el.dispatchEvent(new PointerEvent("pointerleave", init)); el.dispatchEvent(new MouseEvent("mouseleave", init)); }
   }
+  function openLayer() {
+    try { return document.querySelector(":popover-open, dialog:modal"); } catch { return null; }
+  }
   // A modal dialog sits above the page, Drop's layer included, and makes the rest inert: under a tool, the layer goes in it.
   function modalShadow() {
     let modal = null;
     try { modal = document.querySelector("dialog:modal"); } catch {}
-    if (!modal) return null;
+    if (!modal || modal.contains(host)) return null;
     const inner = document.createElement("drop-comments");
     inner.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;";
     inner.attachShadow({ mode: "open" }).innerHTML = STYLE;
@@ -1784,6 +1811,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
     return out && out.size <= MAX_BYTES ? out : null;
   }
+  // The strokes as the comment keeps them, for the page to draw: pixels from the corner of the area as the page will
+  // place it (its thousandths of the anchor, rounded), to a tenth of a pixel. Past the limits, the comment keeps its
+  // box and its picture only.
+  function inkOf(list, left, top, width, height) {
+    const at = (p) => [Math.round((p[0] - left) * 10) / 10, Math.round((p[1] - top) * 10) / 10];
+    const strokes = list.map((s) => {
+      const points = s.tool === "arrow" ? [s.points[0], s.points[s.points.length - 1]] : s.points;
+      return Object.assign({ tool: s.tool, color: s.color, width: s.width, points: points.map(at) }, s.straight ? { straight: true } : {}, s.tool === "text" ? { text: s.text } : {});
+    });
+    const count = strokes.reduce((sum, s) => sum + s.points.length, 0);
+    if (strokes.length > ${MAX_INK_STROKES} || count > ${MAX_INK_POINTS}) return undefined;
+    return { w: Math.max(1, width), h: Math.max(1, height), strokes };
+  }
   async function finishMark() {
     if (tool === "mark") commitLabel();
     if (tool !== "mark" || !strokes.length || finishing) return;
@@ -1807,8 +1847,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
     draft.innerHTML = ""; drawn = null;
     const kept = document.createElementNS(SVG, "svg");
-    kept.setAttribute("class", "inkp");
-    for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + scrollX, y + scrollY]) }), kept);
+    const onZoomed = host.hasAttribute("data-zoomed");
+    kept.setAttribute("class", onZoomed ? "inkp zink" : "inkp");
+    const shift = onZoomed ? [0, 0] : [scrollX, scrollY];
+    for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + shift[0], y + shift[1]]) }), kept);
+    // Ink kept on the zoom belongs to the screenshot it was drawn on, and shows only while that one is zoomed.
+    if (onZoomed && zoom) kept.zoomOf = zoom.item;
     draft.appendChild(kept);
     // Done waits for the picture, so it shows the page as frozen, before the hold and the hover look end.
     let marked = null;
@@ -1817,7 +1861,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (session !== markSession || tool !== "mark") return;
     finishing = false;
     const n = ++shots;
-    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, shot: n });
+    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
     post({ type: "area-shot", shot: n, image: marked });
   }
 
@@ -1953,19 +1997,30 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (pins) leave.replaceChildren();
     for (const ghost of ghosts) {
       leave.appendChild(ghost);
-      setTimeout(() => ghost.remove(), 180);
+      setTimeout(() => ghost.remove(), ${commentLeaveMs});
     }
   }
   addEventListener("scroll", () => { if (tool !== "browse" || view.rulers) redraw(); }, { capture: true, passive: true });
   drawRulers();
 
+  // Comark's zoom is a modal <dialog>, which makes the rest of the page inert, this layer included. While it's open the
+  // layer lives in the dialog, so a tool still takes the pointer over the zoom, and it returns to the page on close.
+  // The dialog is already gone by then (comark-zoom removes it rather than closing it), with the layer in it.
   const onZoom = (e) => {
     zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item && e.detail.copyOf ? e.detail : null;
+    const dialog = zoom && zoom.dialog;
+    if (dialog && host.parentNode !== dialog) { host.setAttribute("data-zoomed", ""); dialog.appendChild(host); }
+    for (const ink of draft.querySelectorAll(".zink")) ink.style.display = zoom && ink.zoomOf === zoom.item ? "" : "none";
     render();
   };
   document.addEventListener("comark-zoom:open", onZoom);
   document.addEventListener("comark-zoom:change", onZoom);
-  document.addEventListener("comark-zoom:close", () => { zoom = null; render(); });
+  document.addEventListener("comark-zoom:close", () => {
+    zoom = null;
+    host.removeAttribute("data-zoomed");
+    if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
+    render();
+  });
 
   // Paper is light and takes no pins: a dark doc prints in its light colors, and comments stay on screen. Any print of
   // the frame does this, the reader's own Ctrl+P too.
@@ -2065,8 +2120,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     post({ type: "key", key: "Escape" });
   }, true);
   window.addEventListener("keydown", (e) => {
-    // Escape the page used itself, to close its own dialog or menu, stays in the page.
-    if (e.key === "Escape" && !e.defaultPrevented) post({ type: "key", key: "Escape" });
+    // Escape the page used itself, to close its own dialog or menu, stays in the page. A native popover or modal dialog
+    // takes it after this listener, so one that's open counts as the page's too.
+    if (e.key === "Escape" && !e.defaultPrevented && !openLayer()) post({ type: "key", key: "Escape" });
     // Drop's tool shortcuts, for when the page has focus. Never while typing, and never once the page used the key.
     const t = e.target;
     const typing = t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
