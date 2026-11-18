@@ -1,3 +1,5 @@
+import { nextPath } from "#shared/sign-in"
+
 /**
  * GitHub sign-in for the public pages (landing and docs). After signing in, people go back to where the auth
  * guard sent them from (`?redirect=`), only for same-site paths, never a full URL; otherwise to /drops.
@@ -12,17 +14,7 @@ export function useGitHubSignIn() {
   const signedIn = computed(() => mounted.value && loggedIn.value)
 
   const appOrigin = useRequestURL().origin
-  const next = computed(() => {
-    const value = textValue(route.query.redirect)
-    if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/drops"
-    try {
-      const resolved = new URL(value, appOrigin)
-      if (resolved.origin !== appOrigin) return "/drops"
-      return `${resolved.pathname}${resolved.search}${resolved.hash}`
-    } catch {
-      return "/drops"
-    }
-  })
+  const next = computed(() => nextPath(textValue(route.query.redirect), appOrigin))
 
   async function signInWithGitHub() {
     const { error } = await signIn.social({ provider: "github", callbackURL: next.value })

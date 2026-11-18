@@ -1,3 +1,5 @@
+import { signInPath } from "./sign-in"
+
 /** Recovery guidance never depends on the hidden content or its owner's identity. */
 export function contentUnavailable(
   status: number,
@@ -6,7 +8,7 @@ export function contentUnavailable(
   waitingForReview = false,
   authProxy = false,
 ) {
-  const signIn = `/signin?redirect=${encodeURIComponent(path)}`
+  const signIn = signInPath(path)
   if (status >= 500 || status === 429)
     return {
       title: status === 429 ? "Too many requests." : "Could not open this content.",
@@ -37,14 +39,22 @@ export function contentUnavailable(
       email,
       action: { label: "My drops", to: "/drops" },
     }
+  if (email)
+    return {
+      title: "This content isn't available to your account.",
+      description:
+        "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account.",
+      email,
+      action: { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
+    }
+  // Most people who land here signed out were sent a team link they can open: lead with signing in. A private, team or
+  // deleted drop all answer the same 404, so the words fit each and tell nobody which one this is.
   return {
-    title: email ? "This content isn't available to your account." : "This drop isn't available",
-    // Most people who land here were sent a team link, not someone who connected an agent: say what to do first.
-    description: email
-      ? "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account."
-      : "This link may be private or deleted. If it was shared with you or your team, sign in to check access.",
-    email: email ?? null,
-    action: { label: email ? "Use another account" : "Sign in with GitHub", to: signIn },
+    title: `Sign in to open this ${path.startsWith("/f/") ? "file" : "drop"}`,
+    description:
+      "If it was shared with you or your team, it opens once you sign in. Otherwise it may be private or deleted.",
+    email: null,
+    action: { label: "Sign in with GitHub", to: signIn },
   }
 }
 

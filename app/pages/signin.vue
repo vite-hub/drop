@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { signInPath } from "#shared/sign-in"
+
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
 // Both requests at once: the page waits for the slower one, not the two in turn.
@@ -15,8 +17,9 @@ async function connect() {
   try {
     if (method.value?.proxy) {
       // One navigation: oauth2-proxy clears its cookie, then starts a fresh login. Signing out over fetch first
-      // let the session refetch start a second login that overwrote this one's CSRF cookie.
-      const start = `/oauth2/start?rd=${encodeURIComponent(next.value)}`
+      // let the session refetch start a second login that overwrote this one's CSRF cookie. It comes back through
+      // /signin/start, a path the proxy guards, so Drop's session exists before a drop's open link (`/d/`) loads.
+      const start = `/oauth2/start?rd=${encodeURIComponent(signInPath(next.value))}`
       await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
       return
     }
