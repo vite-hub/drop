@@ -58,6 +58,8 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
+  # Preserve full-link filters and Console admission until vitehub#4762 lands.
+  "@vite-hub/comments@0.0.0-preview-fb731b2": patches/@vite-hub__comments@0.0.0-preview-fb731b2.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.

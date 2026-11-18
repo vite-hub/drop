@@ -1,0 +1,51 @@
+--- a/dist/page-D4-6It3w.js
++++ b/dist/page-D4-6It3w.js
+@@ -17,6 +17,7 @@
+ * presence rooms belong to a page key.
+ */
+ function normalizeCommentPage(path) {
++	if (/^https?:\/\//i.test(path)) path = URL.parse(path)?.pathname ?? path;
+ 	let pathname = path.split(/[?#]/, 1)[0] ?? "";
+ 	if (!pathname.startsWith("/")) pathname = `/${pathname}`;
+ 	pathname = pathname.replace(/\/{2,}/g, "/");
+--- a/dist/operations-sn9GIefx.js
++++ b/dist/operations-sn9GIefx.js
+@@ -529,7 +529,7 @@
+ 	id: v.pipe(v.string(), v.minLength(1), v.maxLength(500)),
+ 	kind: subjectKind
+ });
+-const page = v.pipe(v.string(), v.check(isPagePath, "A page is an app path that starts with one \"/\", such as \"/pricing\", without \"?\" or \"#\"."));
++const page = v.pipe(v.string(), v.transform((value) => /^https?:\/\//i.test(value) ? (URL.parse(value)?.pathname ?? value) : value), v.check(isPagePath, "A page is an app path that starts with one \"/\", such as \"/pricing\", without \"?\" or \"#\"."));
+ const cursor = v.strictObject({
+ 	id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
+ 	updatedAt: v.number()
+@@ -563,7 +563,7 @@
+ 	const development = runtime.development ?? context.development === true;
+ 	return {
+ 		...runtime.identify ? {
+-			gate: { development },
++			gate: { development, console: true },
+ 			user: context.event === void 0 ? null : await runtime.identify(context.event)
+ 		} : {
+ 			gate: {
+--- a/dist/service-CkR5TjkR.js
++++ b/dist/service-CkR5TjkR.js
+@@ -74,6 +74,7 @@
+ 	const subject = context.subject ?? context.thread?.subject;
+ 	const full = {
+ 		...context,
++		...gate.console === true ? { console: true } : {},
+ 		user: context.user ? { ...context.user } : null,
+ 		...subject ? { subject } : {}
+ 	};
+--- a/dist/define-CcYcUlDS.d.ts
++++ b/dist/define-CcYcUlDS.d.ts
+@@ -30,6 +30,8 @@
+   github?: CommentsGitHubAccess;
+ };
+ interface CommentsAuthorizeContext {
++  /** The Console admitted this call to Comments. Never set by the overlay. */
++  console?: boolean;
+   /** The signed-in user, including application fields such as `role`, or null. */
+   user: CommentsUser | null;
+   /** The Agent Actor when an agent acts for `user`. */

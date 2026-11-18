@@ -135,7 +135,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
           }
         : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
-    rateLimit: true,
+    rateLimit: { driver: "memory" },
     schedule: { runtime: { driver: "process" } },
     // Live editing rooms stay in this one process and save their drafts to .data/blob.
     realtime: { driver: "memory" },

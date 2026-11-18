@@ -1,4 +1,4 @@
-import { and, eq, type SQL, sql } from "drizzle-orm"
+import { and, count, desc, eq, like, or, type SQL, sql } from "drizzle-orm"
 import { log } from "evlog"
 import { HTTPError } from "h3"
 import * as v from "valibot"
@@ -286,6 +286,33 @@ export async function listComments(row: Commented, who: Identity | null) {
   const { threads, attachments } = await threadsFor(row)
   const named = await mentionedIn(threads)
   return threads.sort((a, b) => a.n - b.n).map((thread) => toComment(thread, who, attachments, named))
+}
+
+/**
+ * The open threads people left with the ViteHub Comments toolbar on a drop's own pages in Drop, per page, most first.
+ * The toolbar keys a thread by its pathname (`page` subject): `/d/<id>`, `/d/<id>/<slug>` with any slug or app path
+ * under it, and `/drops/<id>`. One count on the exported schema's subject index: `comments.list` would read every
+ * page thread and its messages.
+ */
+export async function toolbarThreadsOn(dropId: string): Promise<{ page: string; open: number }[]> {
+  const threads = commentsSchema.vitehubCommentThreads
+  const open = count()
+  return db
+    .select({ page: threads.subjectId, open })
+    .from(threads)
+    .where(
+      and(
+        eq(threads.subjectKind, "page"),
+        or(
+          eq(threads.subjectId, `/d/${dropId}`),
+          like(threads.subjectId, `/d/${dropId}/%`),
+          eq(threads.subjectId, `/drops/${dropId}`),
+        ),
+        eq(threads.status, "open"),
+      ),
+    )
+    .groupBy(threads.subjectId)
+    .orderBy(desc(open), threads.subjectId)
 }
 
 /** Starts a thread on `row`'s list, on its version. `attachments` are the ids of images already stored for it. */
