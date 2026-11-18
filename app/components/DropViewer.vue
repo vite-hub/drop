@@ -914,6 +914,7 @@ const copyMarkdown = (announce?: string) =>
 const copyFeedback = () =>
   copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
 // Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
+// It steps aside while they comment, so the comment actions keep the pill to one row.
 const awaiting = computed(() => awaitingAnswer(comments.value))
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
 const copyPrompt = () =>
@@ -1723,25 +1724,27 @@ watch(
                 @list="toggleComments"
                 @page="commentOnPage"
                 @pins="toggleOverlay('pins')"
-              />
-              <UTooltip
-                v-if="awaiting.length && !lightbox"
-                :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
               >
-                <UButton
-                  aria-label="Copy prompt for your agent"
-                  class="[animation:pop-in_200ms_var(--ease-out)]"
-                  color="neutral"
-                  :disabled="loadingScreenshots"
-                  :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-                  size="xs"
-                  :ui="{ leadingIcon: copied('prompt') ? 'animate-icon-in' : undefined }"
-                  variant="ghost"
-                  @click="copyPrompt"
-                >
-                  <span class="hidden sm:inline">Copy prompt</span>
-                </UButton>
-              </UTooltip>
+                <template v-if="awaiting.length && !lightbox && !commentMode" #tools>
+                  <UTooltip
+                    :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
+                  >
+                    <UButton
+                      aria-label="Copy prompt for your agent"
+                      class="[animation:pop-in_200ms_var(--ease-out)]"
+                      color="neutral"
+                      :disabled="loadingScreenshots"
+                      :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                      size="xs"
+                      :ui="{ leadingIcon: copied('prompt') ? 'animate-icon-in' : undefined }"
+                      variant="ghost"
+                      @click="copyPrompt"
+                    >
+                      <span class="hidden sm:inline">Copy prompt</span>
+                    </UButton>
+                  </UTooltip>
+                </template>
+              </ViewerCommentsSegment>
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
             <template v-if="!editing && presence.people.value.length">
