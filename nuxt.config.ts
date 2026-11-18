@@ -47,7 +47,7 @@ const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
 
 // D1's HTTP driver works from every host. The account, API token, and database id are read at runtime.
 const d1 = (fallback: string) => ({
-  driver: "d1" as const,
+  driver: "cloudflare" as const,
   databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
   databaseId: env({ source: env.source("CLOUDFLARE_D1_DATABASE_ID") }),
   cloudflare: { http: true },
@@ -72,7 +72,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     // Stateless Browser Run actions only (code-image screenshots): no Playwright, no page sessions.
     browser: true,
     database: {
-      driver: "d1",
+      driver: "cloudflare",
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
       // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
       databaseId:
@@ -89,12 +89,12 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     rateLimit: true,
     schedule: true,
     // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/utils/live-drafts.ts).
-    realtime: { authority: "cloudflare" },
+    realtime: { driver: "cloudflare" },
   },
   // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
   vercel: {
     host: "vercel",
-    blob: { ...files, driver: "vercel-blob", access: "private" },
+    blob: { ...files, driver: "vercel", access: "private" },
     database: d1("vitehub-drop-vercel"),
     // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
     schedule: { cron: { cleanup: "0 0 * * *" } },
@@ -138,7 +138,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     rateLimit: true,
     schedule: { runtime: { driver: "process" } },
     // Live editing rooms stay in this one process and save their drafts to .data/blob.
-    realtime: { authority: "memory" },
+    realtime: { driver: "memory" },
   },
 }
 
@@ -177,6 +177,10 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
+    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
+    observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
