@@ -1,4 +1,4 @@
-import type { DropComment, DropDetail } from "#shared/types"
+import type { DropComment, DropDetail, SiteReviewItem } from "#shared/types"
 import { suggestionLine } from "#shared/suggestion"
 import { writtenBy } from "#shared/agents"
 
@@ -52,15 +52,26 @@ const images = (item: Pick<DropComment, "attachments">, url: string, indent = " 
     ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
     : ""
 
+type Screenshot = Pick<NonNullable<SiteReviewItem["screenshot"]>, "url">
+type Screenshots = ReadonlyMap<string, Screenshot | null>
+
+function siteAnchor(comment: DropComment, screenshot: Screenshot | null, url: string) {
+  const { label, ox, oy, ow, oh } = comment
+  const element = label ? `\n   Element \`${label}\`` : ""
+  const box = `\n   Box ${pct(ox)}–${pct(ox + ow)} across, ${pct(oy)}–${pct(oy + oh)} down the ${screenshot ? "screenshot" : "viewport"}`
+  const image = screenshot ? `\n   Screenshot: ${new URL(screenshot.url, url).href}` : ""
+  return `${element}${box}${image}`
+}
+
 /** Comments as a numbered Markdown list: what each points at, its words, its replies, and its images. */
-const commentList = (comments: DropComment[], url: string, version: number) =>
+const commentList = (comments: DropComment[], url: string, version: number, screenshots?: Screenshots) =>
   comments
-    .map((comment) =>
-      `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
-        /^/,
-        `${comment.n}. `,
-      ),
-    )
+    .map((comment) => {
+      const anchor =
+        screenshots && comment.kind !== "page" ? siteAnchor(comment, screenshots.get(comment.id) ?? null, url) : ""
+      const summary = anchor && !comment.quote ? "Site annotation" : target(comment)
+      return `${comment.n}. ${summary}${comment.page ? ` (${comment.page})` : ""}${anchor}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`
+    })
     .join("\n")
 
 /** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
@@ -69,18 +80,28 @@ export function feedbackMarkdown(title: string, url: string, comments: DropComme
   return `## Feedback on "${title}"\n\n${url}\n\n${commentList(open, url, version) || "No open comments."}\n\nDrop a new version that addresses these.`
 }
 
-/** What the agent does about the comments, in the words of Drop's MCP tools, which differ for a site or a board. */
-function nextStep(drop: Pick<DropDetail, "id" | "kind">, comments: DropComment[]) {
+type PromptDrop = Pick<DropDetail, "id" | "kind" | "title" | "version" | "isOwner">
+
+function nextStep(drop: PromptDrop, comments: DropComment[]) {
   const numbers = comments.map((comment) => comment.n).join(", ")
-  const read = `Call read_drop for drop ${drop.id} on Drop's MCP server: it has each comment's anchor, thread, and images.`
+  const read = `If you have Drop's MCP server, call read_drop for drop ${drop.id} for the current threads and anchors.`
+  const fallback =
+    "If you lack access or a tool is unavailable, prepare the proposed changes or answers for me instead."
   if (drop.kind === "site")
-    return `${read} Fix the site, then reply to each comment with what you changed and resolve: true.`
+    return `${read} Fix the site or answer the question, then use reply with resolve: true only if authorized to resolve the thread and the feedback has been addressed. If you can reply but not resolve, omit resolve. ${fallback}`
+  if (!drop.isOwner)
+    return `${read} For edits, prepare the proposed changes for me to review. For questions, reply without requesting resolution if you can comment, or give me the answers directly.`
   if (drop.kind === "board")
-    return `${read} Change the board with edit_board, then reply to each comment with what you changed and resolve: true.`
-  const accept = comments.some((comment) => comment.suggestion !== null)
-    ? " Accept the suggestions that are right as written with accept_suggestion, one call each, before anything else."
-    : ""
-  return `${read}${accept} Publish the next version with previous "${drop.id}", a note saying what changed, and resolves [${numbers}]. Where words are the answer, reply in the comment's thread.`
+    return `${read} If the board needs changes, use edit_board. Use reply with resolve: true for each thread you've addressed, describing the change or giving the answer. ${fallback}`
+  if (drop.kind === "link")
+    return `${read} If the link needs changing, use update_drop with url for its address or description for its note. Use reply with resolve: true for each thread you've addressed, describing the change or giving the answer. ${fallback}`
+  if (drop.kind === "folder")
+    return `${read} Prepare proposed folder changes for me to review. For questions, use reply if you can comment, or give me the answers directly.`
+  const accept =
+    drop.kind === "markdown" && comments.some((comment) => comment.suggestion !== null)
+      ? " First use accept_suggestion for suggestions that are right as written, one call each; it publishes and resolves that thread. If nothing remains, do not publish again."
+      : ""
+  return `${read}${accept} Only if edits are still needed, publish the next version from the latest content with previous "${drop.id}" and a note saying what changed. Include in resolves only the still-open comments addressed by that publish from [${numbers}]. Where words are the answer, use reply in the comment's thread instead. ${fallback}`
 }
 
 /**
@@ -88,10 +109,11 @@ function nextStep(drop: Pick<DropDetail, "id" | "kind">, comments: DropComment[]
  * start without Drop, and the tool calls that resolve them where it has Drop's MCP server.
  */
 export function promptMarkdown(
-  drop: Pick<DropDetail, "id" | "kind" | "title" | "version">,
+  drop: PromptDrop,
   url: string,
   comments: DropComment[],
+  screenshots: Screenshots = new Map(),
 ) {
   const count = comments.length === 1 ? "a comment" : `${comments.length} comments`
-  return `I left ${count} on "${drop.title}" in Drop. Resolve ${comments.length === 1 ? "it" : "them"}.\n\n${url}\n\n${commentList(comments, url, drop.version)}\n\n${nextStep(drop, comments)}`
+  return `I left ${count} on "${drop.title}" in Drop. Resolve ${comments.length === 1 ? "it" : "them"}.\n\n${url}\n\n${commentList(comments, url, drop.version, drop.kind === "site" ? screenshots : undefined)}\n\n${nextStep(drop, comments)}`
 }

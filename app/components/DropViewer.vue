@@ -915,7 +915,9 @@ const copyFeedback = () =>
   copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
 // Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
 const awaiting = computed(() => awaitingAnswer(comments.value))
-const copyPrompt = () => copy(promptMarkdown(drop.value, link.value, awaiting.value), { key: "prompt" })
+const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
+const copyPrompt = () =>
+  copy(promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value), { key: "prompt" })
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1730,6 +1732,7 @@ watch(
                   aria-label="Copy prompt for your agent"
                   class="[animation:pop-in_200ms_var(--ease-out)]"
                   color="neutral"
+                  :disabled="loadingScreenshots"
                   :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
                   size="xs"
                   :ui="{ leadingIcon: copied('prompt') ? 'animate-icon-in' : undefined }"

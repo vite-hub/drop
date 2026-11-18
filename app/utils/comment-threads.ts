@@ -82,13 +82,12 @@ export function needsLook({ resolved, resolvedAt, replies }: DropComment) {
 }
 
 /**
- * The threads waiting on someone for this reader: open, and the last word in them is the reader's own, not an agent's
- * writing for them. A comment they started, or a reply they left on someone else's.
+ * Threads the agent can read and resolve as open, where the last word is the reader's own, not an agent's.
  */
 export function awaitingAnswer(comments: DropComment[]) {
   return comments
     .filter((comment) => {
-      if (!needsLook(comment)) return false
+      if (comment.resolved) return false
       const last = comment.replies.at(-1) ?? comment
       return last.mine && !last.agent
     })

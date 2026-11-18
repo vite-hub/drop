@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { awaitingAnswer } from "../../app/utils/comment-threads.ts"
+import { awaitingAnswer, needsLook } from "../../app/utils/comment-threads.ts"
 import { feedbackMarkdown, promptMarkdown } from "../../app/utils/feedback.ts"
 
 test("copied image-only feedback includes fetchable comment and reply images", () => {
@@ -95,6 +95,12 @@ const reply = (fields) => ({
 })
 
 test("the prompt waits on open threads where the reader spoke last, not an agent writing for them", () => {
+  const resolvedWithFollowUp = thread(7, {
+    resolved: true,
+    resolvedAt: 1,
+    replies: [reply({ mine: true, body: "Not yet" })],
+  })
+  assert.equal(needsLook(resolvedWithFollowUp), true)
   const waiting = awaitingAnswer([
     thread(3),
     thread(1, { resolved: true, resolvedAt: 1 }),
@@ -102,17 +108,17 @@ test("the prompt waits on open threads where the reader spoke last, not an agent
     thread(4, { replies: [reply({ body: "Fixed in v2" })] }),
     thread(5, { mine: false }),
     thread(6, { agent: { name: "Claude", image: null } }),
-    thread(7, { resolved: true, resolvedAt: 1, replies: [reply({ mine: true, body: "Not yet" })] }),
+    resolvedWithFollowUp,
   ])
   assert.deepEqual(
     waiting.map((comment) => comment.n),
-    [2, 3, 7],
+    [2, 3],
   )
 })
 
 test("the prompt counts the comments, quotes them, and names the MCP calls for the drop's kind", () => {
   const url = "https://drop.test/d/abc/plan"
-  const doc = promptMarkdown({ id: "abc", kind: "markdown", title: "Plan", version: 2 }, url, [
+  const doc = promptMarkdown({ id: "abc", kind: "markdown", title: "Plan", version: 2, isOwner: true }, url, [
     thread(1, { kind: "text", quote: "twelve", suggestion: "fifteen" }),
     thread(4, { body: "Shorter intro" }),
   ])
@@ -123,10 +129,66 @@ test("the prompt counts the comments, quotes them, and names the MCP calls for t
   assert.match(doc, /4\. The whole page\n {3}Shorter intro \(Ada, on v1\)/)
   assert.match(doc, /read_drop for drop abc/)
   assert.match(doc, /accept_suggestion/)
-  assert.match(doc, /previous "abc".*resolves \[1, 4\]/)
+  assert.match(doc, /Only if edits are still needed, publish.*previous "abc"/)
+  assert.match(doc, /resolves only the still-open comments addressed by that publish from \[1, 4\]/)
+})
 
-  const site = promptMarkdown({ id: "s1", kind: "site", title: "Shop", version: 1 }, url, [thread(2)])
-  assert.match(site, /^I left a comment on "Shop" in Drop\. Resolve it\./)
-  assert.match(site, /Fix the site, then reply to each comment with what you changed and resolve: true\./)
-  assert.doesNotMatch(site, /accept_suggestion|resolves \[/)
+test("accepting the only suggestion does not call for another publish", () => {
+  const doc = promptMarkdown(
+    { id: "abc", kind: "markdown", title: "Plan", version: 2, isOwner: true },
+    "https://drop.test/d/abc",
+    [thread(1, { kind: "text", quote: "twelve", suggestion: "fifteen" })],
+  )
+  assert.match(doc, /accept_suggestion.*publishes and resolves/)
+  assert.match(doc, /If nothing remains, do not publish again/)
+})
+
+test("the copied site prompt includes the screenshot and element box even with a quote", () => {
+  const site = promptMarkdown(
+    { id: "s1", kind: "site", title: "Shop", version: 1, isOwner: false },
+    "https://drop.test/d/s1",
+    [
+      thread(2, {
+        id: "site-thread",
+        kind: "image",
+        selector: "body > img",
+        label: ".price",
+        quote: "$10",
+        page: "https://shop.test/cart",
+        ox: 100,
+        oy: 200,
+        ow: 400,
+        oh: 100,
+      }),
+    ],
+    new Map([["site-thread", { url: "/f/screen.png" }]]),
+  )
+  assert.match(site, /2\. > \$10 \(https:\/\/shop\.test\/cart\)/)
+  assert.match(site, /Element `\.price`/)
+  assert.match(site, /Box 10%–50% across, 20%–30% down the screenshot/)
+  assert.match(site, /Screenshot: https:\/\/drop\.test\/f\/screen\.png/)
+  assert.match(site, /reply.*resolve: true.*if authorized/)
+  assert.doesNotMatch(site, /accept_suggestion|previous /)
+})
+
+test("link updates are in place rather than publishing a version", () => {
+  const url = "https://drop.test/d/abc"
+  const drop = { id: "abc", title: "Plan", version: 1 }
+  const link = promptMarkdown({ ...drop, kind: "link", isOwner: true }, url, [thread(1)])
+  assert.match(link, /update_drop.*url/)
+  assert.match(link, /reply/)
+  assert.doesNotMatch(link, /previous /)
+})
+
+test("reviewers get a handoff without write access", () => {
+  const url = "https://drop.test/d/abc"
+  const drop = { id: "abc", title: "Plan", version: 1 }
+  for (const kind of ["markdown", "board", "link"]) {
+    const prompt = promptMarkdown({ ...drop, kind, isOwner: false }, url, [thread(1, { suggestion: "fifteen" })])
+    assert.match(prompt, /prepare the proposed changes for me to review/)
+    assert.match(prompt, /reply without requesting resolution/)
+    assert.doesNotMatch(prompt, /accept_suggestion|edit_board|update_drop|previous |resolve: true/)
+  }
+  const board = promptMarkdown({ ...drop, kind: "board", isOwner: true }, url, [thread(1)])
+  assert.match(board, /edit_board.*reply.*resolve: true/)
 })
