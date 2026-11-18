@@ -1010,6 +1010,12 @@ watch(
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
 const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
+// Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
+// It steps aside while they comment, so the comment actions keep the pill to one row.
+const awaiting = computed(() => awaitingAnswer(comments.value))
+const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
+const copyPrompt = () =>
+  copy(promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value), { key: "prompt" })
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1806,7 +1812,26 @@ watch(
                 @list="toggleComments"
                 @page="commentOnPage"
                 @pins="toggleOverlay('pins')"
-              />
+              >
+                <template v-if="awaiting.length && !lightbox && !commentMode" #tools>
+                  <UTooltip
+                    :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
+                  >
+                    <UButton
+                      aria-label="Copy prompt for your agent"
+                      class="[animation:pop-in_200ms_var(--ease-out)]"
+                      color="neutral"
+                      :disabled="loadingScreenshots"
+                      :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                      size="xs"
+                      variant="ghost"
+                      @click="copyPrompt"
+                    >
+                      <span class="hidden sm:inline">Copy prompt</span>
+                    </UButton>
+                  </UTooltip>
+                </template>
+              </ViewerCommentsSegment>
             </template>
             <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
             <template v-if="!editing && presence.people.value.length">
