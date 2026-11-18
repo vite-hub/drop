@@ -26,6 +26,11 @@ Seven need you.
 Three wait on Morten.
 `
 
+const metrics = `| Summary | Status | Average response time (milliseconds) | Successful requests per second | Peak memory usage (megabytes) | Average disk throughput (megabytes) |
+| --- | --- | --- | --- | --- | --- |
+| The deployment finished and handled the expected number of requests. | The metrics were collected and are ready for review. | 123 | 456 | 789 | 912 |
+`
+
 // Vitest empties CSS imports, including ?raw, so the frame gets the document's actual styles here.
 const styles = (
   await Promise.all(
@@ -130,13 +135,9 @@ test.each([
   { name: "Chromium", browserType: chromium },
   { name: "Firefox", browserType: firefox },
 ])("folded prose stays readable at 630px in $name", { timeout: 30000 }, async ({ browserType }) => {
-  const markdown = `| Summary | Status | Average response time (milliseconds) | Successful requests per second | Peak memory usage (megabytes) | Average disk throughput (megabytes) |
-| --- | --- | --- | --- | --- | --- |
-| The deployment finished and handled the expected number of requests. | The metrics were collected and are ready for review. | 123 | 456 | 789 | 12 |
-`
   const browser = await browserType.launch()
   try {
-    const frame = await openFrame(browser, 630, "folded-metrics.md", markdown)
+    const frame = await openFrame(browser, 630, "folded-metrics.md", metrics)
     const cells = await frame.locator("tbody > tr > td").evaluateAll((nodes) =>
       nodes.map((node) => {
         const { left, right, top, width } = node.getBoundingClientRect()
@@ -149,6 +150,34 @@ test.each([
     assert.ok(summary.right <= numeric.left && status.right <= numeric.left, "prose stays within its track")
     const overflow = await frame.locator("html").evaluate((root) => root.scrollWidth - root.clientWidth)
     assert.equal(overflow, 0, "the page does not scroll horizontally")
+  } finally {
+    await browser.close()
+  }
+})
+
+test("printing a folded table to A5 preserves the last column", { timeout: 30000 }, async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const { html } = await renderMarkdownCached("print-metrics.md", async () => metrics)
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.route("**/*", (route) => route.abort())
+    await page.setContent(
+      planDocument("markdown", metrics, false, html).replace("</head>", `<style>${styles}</style></head>`),
+    )
+    const bytes = await page.pdf({ format: "A5" })
+    const loading = getDocument({ data: new Uint8Array(bytes) })
+    try {
+      const pdf = await loading.promise
+      const content = await Promise.all(
+        Array.from({ length: pdf.numPages }, async (_, index) => (await pdf.getPage(index + 1)).getTextContent()),
+      )
+      const text = content.flatMap(({ items }) => items.map((item) => item.str ?? "")).join(" ")
+      assert.match(text, /Average\s+disk\s+throughput\s+\(megabytes\)/)
+      assert.match(text, /\b912\b/)
+    } finally {
+      await loading.destroy()
+    }
   } finally {
     await browser.close()
   }

@@ -1,20 +1,21 @@
 import { defineHandler } from "h3"
 
 /**
- * Every docs page as Markdown, for agents: at its path plus `.md` (/docs/agents.md), or at its own path for a request
- * that prefers `text/markdown` to HTML. It's the page's own server render, converted, so it never drifts from
- * what people read, and it passes the same gates. Links to other docs pages point at their `.md`.
+ * Every docs page as Markdown, for agents, at its path plus `.md` (/docs/agents.md). ViteHub Content (`seo.markdown`,
+ * server/content.ts) answers the page's own path with it too, for a request that prefers `text/markdown` or comes from
+ * an AI fetcher. It's the page's own server render, converted, so it never drifts from what people read, and it passes
+ * the same gates. Links to other docs pages point at their `.md`.
+ *
+ * Middleware, not a route: a route can't match `/docs/**` plus `.md`. Content's `pages: true` would convert the docs
+ * too, but it skips pages that answer `X-Robots-Tag: noindex`, which every page does while `seoIndex` is off.
  */
 export default defineHandler(async (event) => {
   if (!["GET", "HEAD"].includes(event.req.method)) return
   const { pathname } = event.url
-  const accept = event.req.headers.get("accept") ?? ""
-  const suffixed = pathname.endsWith(".md")
-  if (!suffixed && !(accept.includes("text/markdown") && (await import("../../shared/accept")).prefersMarkdown(accept)))
-    return
+  if (!pathname.endsWith(".md")) return
   // Loaded lazily: middleware lands in the Worker's entry module, which may only export handlers.
   const { DOCS_PAGES } = await import("#shared/utils/docs")
-  const path = suffixed ? pathname.slice(0, -".md".length) : pathname.replace(/(.)\/$/, "$1")
+  const path = pathname.slice(0, -".md".length)
   if (!DOCS_PAGES.some((page) => page.to === path)) return
   const { appFetch } = await import("../utils/app-fetch")
   const response = await appFetch(event, path, { accept: "text/html" })
@@ -34,6 +35,6 @@ export default defineHandler(async (event) => {
     filter: { exclude: ["figure", "button", "nav", "svg"] },
   })
   return new Response(event.req.method === "HEAD" ? null : `${markdown}\n`, {
-    headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "public, max-age=300", Vary: "Accept" },
+    headers: { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "public, max-age=300" },
   })
 })
