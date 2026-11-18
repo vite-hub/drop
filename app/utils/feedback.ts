@@ -1,4 +1,4 @@
-import type { DropComment } from "#shared/types"
+import type { DropComment, DropDetail } from "#shared/types"
 import { suggestionLine } from "#shared/suggestion"
 import { writtenBy } from "#shared/agents"
 
@@ -52,14 +52,46 @@ const images = (item: Pick<DropComment, "attachments">, url: string, indent = " 
     ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
     : ""
 
+/** Comments as a numbered Markdown list: what each points at, its words, its replies, and its images. */
+const commentList = (comments: DropComment[], url: string, version: number) =>
+  comments
+    .map((comment) =>
+      `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
+        /^/,
+        `${comment.n}. `,
+      ),
+    )
+    .join("\n")
+
 /** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
   const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
-  const lines = open.map((comment) =>
-    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
-      /^/,
-      `${comment.n}. `,
-    ),
-  )
-  return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
+  return `## Feedback on "${title}"\n\n${url}\n\n${commentList(open, url, version) || "No open comments."}\n\nDrop a new version that addresses these.`
+}
+
+/** What the agent does about the comments, in the words of Drop's MCP tools, which differ for a site or a board. */
+function nextStep(drop: Pick<DropDetail, "id" | "kind">, comments: DropComment[]) {
+  const numbers = comments.map((comment) => comment.n).join(", ")
+  const read = `Call read_drop for drop ${drop.id} on Drop's MCP server: it has each comment's anchor, thread, and images.`
+  if (drop.kind === "site")
+    return `${read} Fix the site, then reply to each comment with what you changed and resolve: true.`
+  if (drop.kind === "board")
+    return `${read} Change the board with edit_board, then reply to each comment with what you changed and resolve: true.`
+  const accept = comments.some((comment) => comment.suggestion !== null)
+    ? " Accept the suggestions that are right as written with accept_suggestion, one call each, before anything else."
+    : ""
+  return `${read}${accept} Publish the next version with previous "${drop.id}", a note saying what changed, and resolves [${numbers}]. Where words are the answer, reply in the comment's thread.`
+}
+
+/**
+ * A prompt that hands an agent the comments this reader is waiting on (`awaitingAnswer`), with their words, so it can
+ * start without Drop, and the tool calls that resolve them where it has Drop's MCP server.
+ */
+export function promptMarkdown(
+  drop: Pick<DropDetail, "id" | "kind" | "title" | "version">,
+  url: string,
+  comments: DropComment[],
+) {
+  const count = comments.length === 1 ? "a comment" : `${comments.length} comments`
+  return `I left ${count} on "${drop.title}" in Drop. Resolve ${comments.length === 1 ? "it" : "them"}.\n\n${url}\n\n${commentList(comments, url, drop.version)}\n\n${nextStep(drop, comments)}`
 }
