@@ -70,11 +70,10 @@ const preset = comarkUi({
  */
 export const RENDERER_SCRIPTS = [
   mermaidScript,
-  (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
-    /<script>([\s\S]*)<\/script>/,
-  )![1]!,
-  // comark-properties rewrites a frontmatter date in the reader's locale.
-  (
+  ...scriptsOf(await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })),
+  // comark-properties keeps a frontmatter date relative to the reader's clock, and comark-time lets Escape close its
+  // tooltip.
+  ...scriptsOf(
     await renderHtmlFromDocument(
       {
         nodes: [
@@ -86,9 +85,13 @@ export const RENDERER_SCRIPTS = [
         ],
       },
       { components: preset.components },
-    )
-  ).match(/<script>([\s\S]*)<\/script>/)![1]!,
+    ),
+  ),
 ]
+
+function scriptsOf(html: string): string[] {
+  return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, script]) => script!)
+}
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
