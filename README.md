@@ -49,14 +49,17 @@ claude plugin marketplace add vite-hub/drop
 claude plugin install drop@drop
 ```
 
+Before using Drop tools, open `/mcp` in Claude Code, select the Drop plugin server, and authenticate in your browser.
+
 In Codex:
 
 ```sh
 codex plugin marketplace add vite-hub/drop
 codex plugin add drop@drop
+codex mcp login drop
 ```
 
-The first tool call opens Drop in your browser so you can sign in. The plugin connects to drop.vitehub.dev; for a Drop you host, add its `/mcp` as step 2 above says.
+Finish signing in through the browser before using Drop tools. The plugin connects to drop.vitehub.dev; for a Drop you host, add its `/mcp` as step 2 above says.
 
 ## Install the skills
 

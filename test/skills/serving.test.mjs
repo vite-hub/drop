@@ -122,6 +122,23 @@ test("pr-evidence serves bundled comark-ui references through discovery and MCP"
   assert.equal(response.result.contents[0].text, expected)
 })
 
+test("pr-evidence's Git plugin links resolve to the served reference files", async () => {
+  const skill = await readFile(new URL("pr-evidence/SKILL.md", root), "utf8")
+  const paths = [
+    "references/annotations.md",
+    "references/comark-ui/references/comments.md",
+    "references/comark-ui/references/diff.md",
+  ]
+  for (const path of paths) {
+    const url = `https://drop.vitehub.dev/.well-known/skills/pr-evidence/${path}`
+    assert.ok(skill.includes(`](${url})`))
+    const response = await get(new URL(url).pathname)
+    assert.equal(response.status, 200)
+    assert.match(response.headers.get("content-type"), /^text\/markdown\b/)
+    assert.ok((await response.text()).trim())
+  }
+})
+
 test("bundled Comark UI skills serve every file and archive through discovery and MCP without upstream requests", async () => {
   const fetch = vi.fn(() => {
     throw new Error("Serving bundled skills must not fetch upstream")
