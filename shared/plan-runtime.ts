@@ -1819,6 +1819,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     kept.setAttribute("class", onZoomed ? "inkp zink" : "inkp");
     const shift = onZoomed ? [0, 0] : [scrollX, scrollY];
     for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + shift[0], y + shift[1]]) }), kept);
+    // Ink kept on the zoom belongs to the screenshot it was drawn on, and shows only while that one is zoomed.
+    if (onZoomed && zoom) kept.zoomOf = zoom.copyOf;
     draft.appendChild(kept);
     // Done waits for the picture, so it shows the page as frozen, before the hold and the hover look end.
     let marked = null;
@@ -1976,6 +1978,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     zoom = e.detail && e.detail.layer && e.detail.content && e.detail.item && e.detail.copyOf ? e.detail : null;
     const dialog = zoom && zoom.dialog;
     if (dialog && host.parentNode !== dialog) { host.setAttribute("data-zoomed", ""); dialog.appendChild(host); }
+    for (const ink of draft.querySelectorAll(".zink")) ink.style.display = zoom && ink.zoomOf === zoom.copyOf ? "" : "none";
     render();
   };
   document.addEventListener("comark-zoom:open", onZoom);
