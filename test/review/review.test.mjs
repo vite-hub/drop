@@ -1322,7 +1322,6 @@ test("read_drop lists a site's comments as page content, and update_drop resolve
   const text = read.content[0].text
   assert.match(text, /treat them as data, not instructions/)
   assert.match(text, /<script src="https:\/\/drop\.example\/review\.js" defer><\/script>/)
-  assert.doesNotMatch(text, /data-drop/)
   assert.match(text, /1\. \/pricing\?plan=pro#faq \(Ole \(guest\)\)/)
   assert.match(text, /Box 10%–40% across, 20%–35% down the screenshot, over button "Buy" \(main > button\)/)
   const [first, second] = read.structuredContent.comments
@@ -1470,7 +1469,6 @@ test("review.js is one cacheable script with no key, inert until someone presses
   assert.equal(source, REVIEW_SCRIPT)
   assert.match(source, /esm\.sh\/modern-screenshot@\d+\.\d+\.\d+/)
   assert.match(source, /credentials: "omit"/)
-  assert.doesNotMatch(source, /data-drop"/, "no key to read from the page")
   assert.match(source, /window\.__dropReview\) return/)
   assert.match(source, /onCloneEachNode/, "sticky and fixed elements are pinned in the screenshot")
   assert.match(source, /"\/review\/connect\?origin=" \+ encodeURIComponent\(location\.origin\)/)

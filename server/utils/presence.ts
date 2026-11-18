@@ -77,7 +77,7 @@ async function resolve(event: H3Event, request: Request, now: number): Promise<M
   const [who, drop] = await Promise.all([identify(event), findDrop(id, event)])
   if (who?.actorKind !== "browser" || !drop) return null
   // The members-only gate lets this path through (0.2.members-only.ts), so it checks membership here.
-  if (membersOnly() && !(await isMember(who.userId))) return null
+  if (membersOnly() && !(await isMember(who.userId, event))) return null
   return { who, drop, origin: null }
 }
 

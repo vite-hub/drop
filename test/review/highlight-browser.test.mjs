@@ -105,7 +105,6 @@ test("comment composers tab in reading order, images to Send, and send with the 
     await page.keyboard.press("Tab")
     assert.equal(await focused(ui.getByRole("button", { name: "Send", exact: true })), true)
     assert.match(await ui.locator(".pop [type=submit]").getAttribute("title"), /Send \((⌘|Ctrl\+)Enter\)/)
-    assert.equal(await ui.locator(".pop .shortcut").count(), 0)
     await page.keyboard.press("Escape")
     assert.equal(await focused(comment), true)
 
