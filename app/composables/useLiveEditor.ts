@@ -1,7 +1,7 @@
 import { promiseTimeout } from "@vueuse/core"
 import * as v from "valibot"
 import { draftOf } from "#shared/draft-paths"
-import type { DropDetail, DropSummary } from "#shared/types"
+import type { DropDetail, DropSummary, Viewer } from "#shared/types"
 import type { LiveRoom } from "~/composables/live-room"
 
 // What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
@@ -33,6 +33,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const editor = computed(() => room.value?.editor.value)
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.value?.people.value ?? [])
+  const { data: me } = useNuxtData<Viewer | null>(keys.me)
 
   // The room admits only people who may edit, and only on the latest version's draft (server/realtime/drafts.ts). A
   // version published from elsewhere (an agent, Accept on a suggestion) leaves this editor on an older draft, and once
@@ -132,7 +133,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         import("~/composables/live-room"),
         $fetch<{ documentId: string }>(`/api/drops/${drop.value.id}/edit`, { method: "POST" }),
       ])
-      room.value ??= scope.run(() => useLiveRoom(documentId))
+      room.value ??= scope.run(() => useLiveRoom(documentId, () => me.value))
       if (room.value) {
         room.value.edited.value = false
         room.value.unsaved.value = false
@@ -199,11 +200,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         return
       }
       const awareness = realtime.value?.provider.value?.awareness
-      const me = people.value.find((person) => person.clientId === awareness?.clientID)
       awareness?.setLocalStateField("published", {
         id: next.id,
         version: next.version,
-        name: me?.name ?? "Someone",
+        name: me.value?.name ?? "Someone",
       } satisfies Published)
       notify.done(`Published v${next.version}`)
       // A new version adds bytes and a write, so the plan usage moves too.
