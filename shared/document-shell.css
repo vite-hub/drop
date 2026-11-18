@@ -245,6 +245,21 @@ p.render-error {
   --comark-wide-end: 0px;
 }
 
+@media screen and (min-width: 64rem) {
+  .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) {
+    display: block;
+    position: static;
+    width: auto !important;
+    max-height: none;
+    margin: 1.5rem 0;
+  }
+
+  .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) > ul {
+    overflow: visible;
+    mask-image: none;
+  }
+}
+
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.
    The backdrop still fills the frame. */
 .cz-dialog {

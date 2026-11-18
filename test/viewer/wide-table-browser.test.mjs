@@ -57,13 +57,17 @@ async function open(browser, width) {
   await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
   const frame = page.frames()[1]
   await frame.waitForFunction(() => window.__comarkOutline, null, { polling: 100 })
+  await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   return frame.evaluate(() => {
     const box = (node) => node.getBoundingClientRect()
     const outline = document.querySelector(".cto-rail")
     return {
       text: box(document.querySelector(".typeset > p")),
-      table: box(document.querySelector(".typeset > div[data-width]")),
-      outline: outline?.hasAttribute("data-fits") ? box(outline) : null,
+      table: box(document.querySelector(".typeset > [data-wide]:has(> table)")),
+      outline: outline?.getClientRects().length ? box(outline) : null,
+      outlineLinks: [...(outline?.querySelectorAll("a[href^='#']") ?? [])].filter(
+        (link) => link.getClientRects().length,
+      ).length,
       chips: [...document.querySelectorAll(".typeset [data-short] .cp")].map((chip) => chip.getClientRects().length),
       // comark-ui lays a table with prose out as a grid, so it counts as stacked when a row's cells stop sharing a line.
       stacked:
@@ -99,6 +103,8 @@ test(
       // Narrower, the table still takes its own width on both sides of the text rather than stacking.
       const laptop = await open(browser, 1480)
       assert.ok(laptop.table.left < laptop.text.left - 100 && laptop.table.right > laptop.text.right + 100)
+      assert.ok(laptop.outlineLinks >= 2, "the section links are visible when the rail cannot fit")
+      assert.ok(laptop.outline.left >= laptop.table.right || laptop.outline.top >= laptop.table.bottom)
       assert.equal(laptop.stacked, false)
       assert.equal(laptop.overflow, 0)
 
