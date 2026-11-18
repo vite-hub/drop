@@ -17,5 +17,7 @@ function failed() {
 </script>
 
 <template>
-  <CopyButton v-bind="$attrs" :duration="COPY_MS" :value="value" @error="failed" />
+  <CopyButton v-bind="$attrs" :duration="COPY_MS" :value="value" @error="failed">
+    <template v-if="$slots.default" #default><slot /></template>
+  </CopyButton>
 </template>

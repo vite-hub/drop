@@ -1014,8 +1014,7 @@ const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.v
 // It steps aside while they comment, so the comment actions keep the pill to one row.
 const awaiting = computed(() => awaitingAnswer(comments.value))
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const copyPrompt = () =>
-  copy(promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value), { key: "prompt" })
+const prompt = () => promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1817,18 +1816,18 @@ watch(
                   <UTooltip
                     :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
                   >
-                    <UButton
+                    <DropCopyButton
                       aria-label="Copy prompt for your agent"
                       class="[animation:pop-in_200ms_var(--ease-out)]"
                       color="neutral"
                       :disabled="loadingScreenshots"
-                      :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                      icon="i-mingcute-copy-2-line"
                       size="xs"
+                      :value="prompt"
                       variant="ghost"
-                      @click="copyPrompt"
                     >
                       <span class="hidden sm:inline">Copy prompt</span>
-                    </UButton>
+                    </DropCopyButton>
                   </UTooltip>
                 </template>
               </ViewerCommentsSegment>
