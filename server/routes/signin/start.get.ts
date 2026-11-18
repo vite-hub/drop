@@ -1,8 +1,12 @@
 import { defineHandler, redirect } from "h3"
+import * as v from "valibot"
 import { nextPath } from "#shared/sign-in"
 import { authFor, identify } from "../../utils/identity"
 import { logError } from "../../utils/logs"
 import { authProxy } from "../../utils/proxy-auth"
+
+/** Better Auth's answer to a social sign-in: the provider's authorize address. */
+const Started = v.object({ url: v.string() })
 
 /**
  * Signs in and goes back to `?redirect=`, in one step, for links that can't run the sign-in page's script (a drop that
@@ -22,10 +26,10 @@ export default defineHandler(async (event) => {
       logError(event, error, { auth: { signIn: "start failed" } })
       return null
     })
-  const url = response?.ok ? ((await response.json()) as { url?: unknown }).url : undefined
-  if (!response || typeof url !== "string") return redirect(page, 302)
+  const started = response?.ok ? v.safeParse(Started, await response.json().catch(() => null)) : null
+  if (!response || !started?.success) return redirect(page, 302)
   // The OAuth state cookie goes with the redirect, or GitHub's callback can't match it.
   for (const cookie of response.headers.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
   event.res.headers.set("Cache-Control", "private, no-store")
-  return redirect(url, 302)
+  return redirect(started.output.url, 302)
 })
