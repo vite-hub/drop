@@ -11,6 +11,7 @@ import { db, schema } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
+import { authRequest, logAudit, requestLog } from "./utils/logs"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import {
@@ -18,6 +19,7 @@ import {
   billingConfig,
   checkoutParams,
   leaveTeams,
+  logSubscription,
   teamOptions,
   teamPlans,
   teamsEnabled,
@@ -29,6 +31,22 @@ import { TIERS } from "#shared/quotas"
 
 // The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
+
+/** An account deleted by its owner, or by an admin. */
+function auditDeletion(
+  user: { id: string },
+  context: { context: { session?: { user: { id: string } } | null } } | null,
+  outcome: "success" | "failure",
+) {
+  const by = context?.context.session?.user.id ?? user.id
+  logAudit(
+    authRequest.getStore(),
+    { userId: by, actorKind: "browser" },
+    "account.delete",
+    { type: "user", id: user.id },
+    outcome,
+  )
+}
 
 /**
  * Who can sign in, and how.
@@ -144,7 +162,12 @@ export default defineAuth(({ env, requestOrigin }) => {
               signal: AbortSignal.timeout(3000),
             })
               .then(async (response) => (response.ok ? v.safeParse(GitHubProfile, await response.json()) : null))
-              .catch(() => null)
+              .catch((error: unknown) => {
+                requestLog(authRequest.getStore())?.warn("GitHub profile lookup failed", {
+                  github: { profile: error instanceof Error ? error.message : String(error) },
+                })
+                return null
+              })
             const createdAt = profile?.success ? profile.output.created_at : undefined
             const githubCreatedAt = createdAt ? Date.parse(createdAt) : NaN
             if (Number.isFinite(githubCreatedAt))
@@ -155,7 +178,18 @@ export default defineAuth(({ env, requestOrigin }) => {
       user: {
         create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
         // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
-        delete: { before: (user, context) => leaveTeams(user, context, teamBilling) },
+        // The audit is written once the outcome is known: after the account is gone, or when leaving its teams fails.
+        delete: {
+          before: async (user, context) => {
+            try {
+              await leaveTeams(user, context, teamBilling)
+            } catch (error) {
+              auditDeletion(user, context, "failure")
+              throw error
+            }
+          },
+          after: async (user, context) => auditDeletion(user, context, "success"),
+        },
       },
       // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
@@ -176,12 +210,20 @@ export default defineAuth(({ env, requestOrigin }) => {
               stripeClient: teamBilling.stripeClient,
               stripeWebhookSecret: billing.webhookSecret,
               organization: { enabled: true },
+              onEvent: async (event) => {
+                requestLog(authRequest.getStore())?.set({ stripe: { event: { type: event.type, id: event.id } } })
+              },
               subscription: {
                 enabled: true,
                 plans: teamBilling.plans,
                 // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
+                onSubscriptionCreated: logSubscription("created"),
+                onSubscriptionComplete: logSubscription("completed"),
+                onSubscriptionUpdate: logSubscription("updated"),
+                onSubscriptionCancel: logSubscription("canceling"),
+                onSubscriptionDeleted: logSubscription("deleted"),
               },
             }),
           ]

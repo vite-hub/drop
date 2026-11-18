@@ -1,5 +1,4 @@
-import { and, eq, type SQL, sql } from "drizzle-orm"
-import { log } from "evlog"
+import { and, count, desc, eq, like, or, type SQL, sql } from "drizzle-orm"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import type {
@@ -19,6 +18,7 @@ import { commentCleanup, drops } from "../databases/default/index"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
+import { background } from "./logs"
 
 /**
  * Drop's comments are ViteHub Comments threads (server/comments.ts). A thread's first message is the comment, the rest
@@ -125,11 +125,13 @@ function anchorOf(meta: Omit<CommentMeta, "dropId">): CommentAnchor {
     : { kind: "element", selector, x: meta.ox, y: meta.oy }
 }
 
-/** A Comments error as an HTTP error: bad input is the caller's, anything else Drop's. */
+/**
+ * A Comments error as an HTTP error: bad input is the caller's, anything else Drop's. Thrown, it reaches the request's
+ * wide event with the Comments error as its cause.
+ */
 function commentsFailure(error: Error & { code: string }) {
   if (error.code === "COMMENTS_INVALID_INPUT")
     return new HTTPError({ status: 400, statusText: error.message, cause: error })
-  log.error({ action: "comments", code: error.code, error: error.message })
   return new HTTPError({ status: 503, statusText: "Comments are temporarily unavailable.", cause: error })
 }
 
@@ -286,6 +288,33 @@ export async function listComments(row: Commented, who: Identity | null) {
   const { threads, attachments } = await threadsFor(row)
   const named = await mentionedIn(threads)
   return threads.sort((a, b) => a.n - b.n).map((thread) => toComment(thread, who, attachments, named))
+}
+
+/**
+ * The open threads people left with the ViteHub Comments toolbar on a drop's own pages in Drop, per page, most first.
+ * The toolbar keys a thread by its pathname (`page` subject): `/d/<id>`, `/d/<id>/<slug>` with any slug or app path
+ * under it, and `/drops/<id>`. One count on the exported schema's subject index: `comments.list` would read every
+ * page thread and its messages.
+ */
+export async function toolbarThreadsOn(dropId: string): Promise<{ page: string; open: number }[]> {
+  const threads = commentsSchema.vitehubCommentThreads
+  const open = count()
+  return db
+    .select({ page: threads.subjectId, open })
+    .from(threads)
+    .where(
+      and(
+        eq(threads.subjectKind, "page"),
+        or(
+          eq(threads.subjectId, `/d/${dropId}`),
+          like(threads.subjectId, `/d/${dropId}/%`),
+          eq(threads.subjectId, `/drops/${dropId}`),
+        ),
+        eq(threads.status, "open"),
+      ),
+    )
+    .groupBy(threads.subjectId)
+    .orderBy(desc(open), threads.subjectId)
 }
 
 /** Starts a thread on `row`'s list, on its version. `attachments` are the ids of images already stored for it. */
@@ -450,7 +479,7 @@ export async function drainCommentCleanup() {
       await removeQueuedComments(item)
       await db.delete(commentCleanup).where(eq(commentCleanup.dropId, item.dropId))
     } catch (error) {
-      log.error({ action: "comment-cleanup", drop: item.dropId, error: String(error) })
+      background.error({ action: "comment-cleanup", drop: item.dropId, error: String(error) })
     }
   }
 }

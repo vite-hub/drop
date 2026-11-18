@@ -1,6 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
 import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob, detectContentType } from "vite-hub/blob"
@@ -16,6 +15,7 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { MAX_KEEP_REASON } from "#shared/expiry"
 import { shareReviewFor } from "../trust"
 import type { Identity } from "../identity"
+import { background, logDrop } from "../logs"
 import { requireKeepSlot, withDropQuota } from "../quotas"
 import { expiryPolicy } from "../expiry"
 import { touchFolder, uniqueSlug } from "../nodes"
@@ -95,7 +95,7 @@ async function queueBlobCleanup(keys: string[]) {
         .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })))
         .onConflictDoNothing()
   } catch (error) {
-    log.error({ action: "blob-cleanup-queue", error: String(error) })
+    background.error({ action: "blob-cleanup-queue", error: String(error) })
   }
 }
 
@@ -116,13 +116,13 @@ export async function deleteBlobKeys(keys: string[]) {
   try {
     await Promise.all(unique.map(deleteMarkdownCache))
   } catch (error) {
-    log.error({ action: "markdown-cache-cleanup", error: String(error) })
+    background.error({ action: "markdown-cache-cleanup", error: String(error) })
     await queueBlobCleanup(unique)
     return
   }
   const [error] = await blob.delete(unique)
   if (error) {
-    log.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
+    background.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
     await queueBlobCleanup(unique)
     return
   }
@@ -237,7 +237,7 @@ export async function createDocDrop(
   // Before anything is stored, so a doc Comark can't render right leaves no file and no version behind.
   const warnings =
     kind === "markdown" && text !== undefined
-      ? await (await import("../markdown-document")).requirePublishableMarkdown(text)
+      ? await (await import("../markdown-document")).requirePublishableMarkdown(text, event)
       : []
 
   return withDropQuota(
@@ -421,6 +421,7 @@ export async function createDocDrop(
       // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
       // internal-only on vite-hub/vitehub's feat/forge-primitive branch today, and on a token that may write to the
       // owner's repo (a GitHub App install, or a wider scope on GitHub sign-in).
+      logDrop(event, row, { change: "publish" })
       return Object.assign(row, { warnings })
     },
   )
@@ -712,6 +713,7 @@ export async function publishApp(
           await deleteBlobKeys(old.filter((file) => !kept.includes(file)).map((file) => file.blobKey))
           await refreshLatest(next.id)
         }
+        logDrop(event, next, { change: "publish" })
         return Object.assign(next, { warnings: appLinkIssues(linkedText(encoded), paths), paths })
       } catch (error) {
         if (!committedPublish) {

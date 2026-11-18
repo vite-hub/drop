@@ -11,6 +11,7 @@ import { ROBOTS_DISALLOW } from "./shared/robots.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
+import { evlogOptions } from "./scripts/logging.ts"
 import { reviewPresence } from "./scripts/review-presence.ts"
 
 declare module "nuxt/schema" {
@@ -135,7 +136,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
           }
         : d1("vitehub-drop-vps"),
     kv: { driver: "fs-lite", base: ".data/kv" },
-    rateLimit: true,
+    rateLimit: { driver: "memory" },
     schedule: { runtime: { driver: "process" } },
     // Live editing rooms stay in this one process and save their drafts to .data/blob.
     realtime: { driver: "memory" },
@@ -177,6 +178,10 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
+    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
+    observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
@@ -275,6 +280,8 @@ export default defineNuxtConfig({
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     release,
+    // Which host this build is for, on every wide event (server/plugins/wide-events.ts).
+    deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
@@ -412,13 +419,7 @@ export default defineNuxtConfig({
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
-    modules: [
-      evlog({
-        env: { service: "drop" },
-        exclude: ["/_drop-ui/**", "/_fonts/**", "/vendor/**", "/favicon.svg", "/__nuxt_error"],
-        redact: { paths: ["**.key", "**.secret", "**.password"] },
-      }),
-    ],
+    modules: [evlog(evlogOptions(release))],
     cloudflare: {
       wrangler: {
         name: cloudflareTemplate.name,

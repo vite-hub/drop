@@ -7,6 +7,7 @@ import { defaultShare, isPublic, type Share } from "#shared/share"
 import { drops } from "../databases/default/index"
 import { type DropRow, findDropByRef, lifetimeFields, type LifetimeInput, permissions } from "./drops"
 import type { Identity } from "./identity"
+import { logDrop } from "./logs"
 import { depthOf, heightOf, touchFolder, uniqueSlug } from "./nodes"
 import { requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields, sharePolicy } from "./share"
@@ -155,6 +156,7 @@ export async function createFolder(
       resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(parent ? [touchFolder(parent.id, now)] : [])])
+    logDrop(event, row, { change: "create" })
     return row
   })
 }

@@ -106,14 +106,29 @@ Shortening the window applies to existing drops at once.
 | Setting or page | What it does |
 | --- | --- |
 | `DROP_SHARE_APPROVAL=true` | A member's public links wait until an admin approves that member on `/admin/review`. On a team Drop, a waiting link still reaches the team. Admins skip the wait, and links shared before you turn it on stay shared. |
-| `/report` | Anyone reports a shared link. Admins see reports on `/admin/reports` and dismiss them, quarantine the drop, or ban its owner, which takes down all their drops. Each report logs a high-severity event; Drop sends no email. |
+| `/report` | Anyone reports a shared link. Admins see reports on `/admin/reports` and dismiss them, quarantine the drop, or ban its owner, which takes down all their drops. Each report logs an audit event; Drop sends no email. |
 | `DROP_ABUSE_EMAIL` | Adds a public contact address to the abuse page. |
 
 Before you open your Drop to the public, adapt `app/pages/terms.vue`, `acceptable-use.vue`, and `abuse.vue` to your jurisdiction, with a DMCA contact if you need one. Drops and their files are kept out of search engines.
 
 ## Logs {#logs}
 
-Drop writes one structured [evlog](https://www.evlog.dev) event per request: who called, which agent, what it did, and why it failed. MCP tool calls, purges from the Trash, and abuse reports land there too. On Cloudflare they're in Workers Logs; elsewhere, in the host's log output.
+Drop writes one structured [evlog](https://www.evlog.dev) event per request: who called, which agent, what it did, and why it failed. On Cloudflare they're in Workers Logs; elsewhere, in the host's log output.
+
+| Field | What it holds |
+| --- | --- |
+| `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
+| `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
+| `auth.denied` | Why Drop refused a session: `banned` or `not-member`. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
+| `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
+| `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
+
+**Kept events.** Every event is kept today. Failures, requests slower than a second, and audits are kept even if you lower the sampling rate.
+
+**Left out.** The health check and static files write no event. Upload URLs and password reset links lose their token, and IP addresses are masked.
+
+**The hourly cleanup** writes one event a run, `schedule: "cleanup"`, with what each step did, how long it took, and the steps that failed.
 
 ## Database and migrations {#database}
 

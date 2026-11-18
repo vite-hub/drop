@@ -90,9 +90,14 @@ export default defineComments({
     return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), identity: who }
   },
 
-  async authorize({ user, action, thread, subject }) {
+  async authorize({ user, action, thread, subject, console: admitted }) {
+    const on = subject ?? thread?.subject
+    // Page threads are about Drop's own interface, and only its admins may touch them. For a Console call, which carries
+    // no Drop session, the Console's admission to its Comments section is that admin gate, as site-comments.ts's role
+    // check is for Drop's MCP. Drop and site threads keep the drop's sharing.
+    if (admitted === true && on?.kind !== "drop" && on?.kind !== "site") return true
     const who = identityIn(user)
-    const can = await allowed(subject ?? thread?.subject, who)
+    const can = await allowed(on, who)
     if (action === "read") return can.view
     if (action === "write") return can.comment
     // As in Drop: its author or the drop's managers resolve a thread, and only managers delete other people's words.

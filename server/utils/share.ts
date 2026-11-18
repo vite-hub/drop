@@ -70,7 +70,7 @@ function nextStep(share: Share, mode: DropMode) {
 export async function closePublicLinks(at: Date) {
   const { mode } = sharePolicy()
   // A team folder is never private: on a personal Drop too, it goes back to its team.
-  await db
+  const closed = await db
     .update(drops)
     .set({
       share: mode === "team" ? "team" : sql`CASE WHEN ${drops.teamFolder} = 1 THEN 'team' ELSE 'private' END`,
@@ -84,4 +84,6 @@ export async function closePublicLinks(at: Date) {
         lte(drops.publicUntil, at.getTime()),
       ),
     )
+    .returning({ id: drops.id })
+  return { closed: closed.length }
 }
