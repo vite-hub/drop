@@ -82,7 +82,7 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
     return new Response(null, {
       status: 302,
       headers: {
-        Location: signInPath(`${path}${event.url.search}`),
+        Location: signInPath(`${path}${event.url.search}`, { proxy: authProxy().enabled }),
         "Set-Cookie": `${TRIED_COOKIE}=1; Path=/; Max-Age=60; SameSite=Lax${event.url.protocol === "https:" ? "; Secure" : ""}`,
         "Cache-Control": "private, no-store",
       },

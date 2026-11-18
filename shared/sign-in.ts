@@ -6,19 +6,25 @@ export function nextPath(value: string | null | undefined, origin: string) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/drops"
   try {
     const resolved = new URL(value, origin)
-    if (resolved.origin !== origin) return "/drops"
-    return `${resolved.pathname}${resolved.search}${resolved.hash}`
+    const path = `${resolved.pathname}${resolved.search}${resolved.hash}`
+    // `/a/..//elsewhere.example` stays on this origin as a URL, but its path starts `//`, another host to a browser.
+    return resolved.origin === origin && !path.startsWith("//") ? path : "/drops"
   } catch {
     return "/drops"
   }
 }
 
 /**
- * Signs in and comes back to `path` in one step (server/routes/signin/start.get.ts). Behind an auth proxy it is a path
- * the proxy guards, so its session turns into Drop's before the redirect; `/d/` links are open to everyone and never
- * would.
+ * Signs in and comes back to `path` in one step (server/routes/signin/start.get.ts). `choose`: someone pressed Sign in,
+ * so GitHub lets them pick the account; a drop that sends a returning browser by itself tries the one already signed in.
+ * Behind an auth proxy it starts a fresh proxy login, whose token may have been revoked since, and comes back through
+ * /signin/start, a path the proxy guards, so its session turns into Drop's before the redirect; `/d/` links are open to
+ * everyone and never would.
  */
-export const signInPath = (path: string) => `/signin/start?redirect=${encodeURIComponent(path)}`
+export function signInPath(path: string, { proxy = false, choose = false } = {}) {
+  const start = `/signin/start?redirect=${encodeURIComponent(path)}${choose && !proxy ? "&choose=1" : ""}`
+  return proxy ? `/oauth2/start?rd=${encodeURIComponent(start)}` : start
+}
 
 /**
  * Set while someone is signed in on this browser (the dashboard layout), cleared when they sign out (useSignOut). It

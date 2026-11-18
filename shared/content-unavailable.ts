@@ -8,7 +8,7 @@ export function contentUnavailable(
   waitingForReview = false,
   authProxy = false,
 ) {
-  const signIn = signInPath(path)
+  const signIn = signInPath(path, { proxy: authProxy, choose: true })
   if (status >= 500 || status === 429)
     return {
       title: status === 429 ? "Too many requests." : "Could not open this content.",

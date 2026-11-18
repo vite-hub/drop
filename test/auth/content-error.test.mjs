@@ -18,7 +18,8 @@ test("signed-out content errors lead with sign-in, which comes back to the origi
   assert.equal(response.status, 404)
   assert.match(html, /<h1[^>]*>Sign in to open this drop<\/h1>/)
   assert.match(html, /Sign in with GitHub/)
-  assert.ok(html.includes(`href="/signin/start?redirect=${encodeURIComponent(path)}"`))
+  // Pressing it lets GitHub offer every account (`choose`).
+  assert.ok(html.includes(`href="/signin/start?redirect=${encodeURIComponent(path)}&amp;choose=1"`))
   assert.doesNotMatch(html, /Internal details must not appear/)
   // A pasted link unfurls as Drop's card, not as the error.
   assert.match(html, /<meta property="og:image" content="https:\/\/drop\.example\/og\.png">/)
@@ -61,7 +62,12 @@ test("behind the auth proxy, signed-in content errors don't send people back thr
     const html = await (await render(404, { email: "member@example.test" })).text()
     assert.doesNotMatch(html, /Use another account|\/signin/)
     assert.equal(html.match(/href="\/drops"/g)?.length, 1)
-    assert.match(await (await render(404)).text(), /Sign in with GitHub/)
+    // Signed out, a fresh proxy login, whose token may have been revoked, then the guarded hop that makes Drop's session.
+    const start = `/oauth2/start?rd=${encodeURIComponent(`/signin/start?redirect=${encodeURIComponent(path)}`)}`
+    const signedOut = await (await render(404)).text()
+    assert.match(signedOut, /Sign in with GitHub/)
+    assert.ok(signedOut.includes(`href="${start}"`))
+    assert.equal((await render(404, null, undefined, "drop-returning=1")).headers.get("location"), start)
   } finally {
     Object.assign(state, { authProxy: false, members: "" })
   }
@@ -87,6 +93,15 @@ test("sign-in comes back only to a path on this Drop", async () => {
   const { nextPath } = await import("../../shared/sign-in.ts")
   const origin = "https://drop.example"
   assert.equal(nextPath(`${path}?v=2#c-1`, origin), `${path}?v=2#c-1`)
-  for (const away of [null, "", "https://elsewhere.example/", "//elsewhere.example/", "/\\elsewhere.example", "d/x"])
+  for (const away of [
+    null,
+    "",
+    "https://elsewhere.example/",
+    "//elsewhere.example/",
+    "/\\elsewhere.example",
+    "d/x",
+    // Same origin as a URL, but its path starts `//` once `..` resolves.
+    "/a/..//elsewhere.example/",
+  ])
     assert.equal(nextPath(away, origin), "/drops")
 })
