@@ -217,17 +217,16 @@ p.render-error {
   }
 }
 
-/* comark-ui's wide blocks (data-wide: a before/after compare, a Mermaid diagram wider than the text) take the room
-   beside the text column, up to their own width and 72rem, so screenshots read at about twice the size and a diagram's
-   labels keep their size. They center on the column, which sits --drop-shift left of the page's middle, and keep 1.5rem
-   clear of the page's left edge and of what covers its right: the viewer's floating panel and the outline's column
-   (--drop-right). OUTLINE_SCRIPT moves the text and the outline aside for them. comark-ui widens a heading right above
-   a compare to match, so it reads as the compare's title. */
+/* comark-ui's wide blocks (data-wide: a before/after compare, a Mermaid diagram or a table wider than the text) take
+   the room beside the text column, up to their own width and 72rem, so screenshots read at about twice the size, a
+   diagram's labels keep their size, and a table's columns stop wrapping every few words. The column sits --drop-shift
+   left of the page's middle. Each side gets its own room, 1.5rem clear of the page's left edge and of what covers its
+   right (--drop-right: the viewer's floating panel and the outline's column), so a block beside the panel grows into
+   the empty space on the left. OUTLINE_SCRIPT moves the text and the outline aside for them. comark-ui widens a
+   heading right above a compare to match, so it reads as the compare's title. */
 .typeset {
-  --comark-wide-start: calc(
-    (min(100vw - 2 * var(--drop-right, 0px) + var(--drop-shift, 0px), 100vw - var(--drop-shift, 0px)) - 3rem - 100%) / 2
-  );
-  --comark-wide-end: var(--comark-wide-start);
+  --comark-wide-start: calc((100vw - var(--drop-shift, 0px) - 100%) / 2 - 1.5rem);
+  --comark-wide-end: calc((100vw + var(--drop-shift, 0px) - 100%) / 2 - var(--drop-right, 0px) - 1.5rem);
   /* The doc keeps the page's system font rather than the app's Geist, and Drop paints the app's grain on the whole
      frame (DOCUMENT_EXTRA_CSS), not again on the text. */
   --comark-font: var(--font-body);
@@ -238,6 +237,7 @@ p.render-error {
    heading, and a wide diagram stay in the column. */
 :is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) {
   --comark-wide-start: 0px;
+  --comark-wide-end: 0px;
 }
 
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.

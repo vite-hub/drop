@@ -553,7 +553,7 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     commentsPost(route("paper", { kind: "area", selector: "main", ox: 0, oy: 0, pdfPage: 2, body: "x" })),
     { statusText: "A PDF's page takes a spot or an area." },
   )
-  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 0, body: "x" })))
+  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 0, body: "x" })), { status: 400 })
   await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 2, at: 4, body: "x" })), {
     statusText: "A comment is on a frame or a page, not both.",
   })
@@ -740,7 +740,7 @@ test("a comment on the whole page points at nothing in it, and agents read it as
   assert.equal(added.kind, "page")
   await assert.rejects(
     commentsPost(route(doc.id, { kind: "page", selector: "p", ox: 0, oy: 0, body: "Pointing at a paragraph" })),
-    "a page comment can't carry an anchor",
+    { statusText: "A comment on the whole page points at nothing in it." },
   )
 
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }

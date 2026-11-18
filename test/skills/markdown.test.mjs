@@ -228,3 +228,13 @@ test("local HTTP Drop addresses use ::drop as the documented fallback for HTTPS-
   assert.match(html, /<a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Demo<\/a>/)
   assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
 })
+
+test("documented Graphviz fences render a diagram rather than falling back to source", async () => {
+  const { html } = await renderMarkdownCached(
+    "diagram-upgrade.md",
+    async () => "```dot\ndigraph { agent -> drop }\n```",
+  )
+  assert.match(html, /class="cdg/)
+  assert.match(html, /<svg/)
+  assert.doesNotMatch(html, /render-error|data-error/)
+})

@@ -68,7 +68,13 @@ useHeadSafe({
       : [],
 })
 // A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
-onMounted(() => drop.data.value && $fetch(`/api/drops/${drop.data.value.id}/visit`, { method: "POST" }).catch(() => {}))
+onMounted(() => {
+  const id = drop.data.value?.id
+  if (id)
+    $fetch(`/api/drops/${id}/visit`, { method: "POST" }).catch((error: unknown) =>
+      reportClientError("visit", error, { drop: id }),
+    )
+})
 const waiting = computed(() => waitingForReview(drop.error.value))
 const here = useHerePath()
 </script>

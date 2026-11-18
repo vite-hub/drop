@@ -38,7 +38,7 @@ export default defineConsoleAuthorize(async (context) => {
     case "page": {
       const parsed = v.safeParse(Operator, context.user)
       if (!parsed.success || parsed.output.banned || roleOf(parsed.output) !== "admin") return false
-      return isMember(parsed.output.id)
+      return isMember(parsed.output.id, context.request)
     }
     default:
       // An open Console on a development server.

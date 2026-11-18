@@ -113,3 +113,28 @@ test("cache hits do not read source or render again, and deletion removes the re
   await deleteMarkdownCache("doc.md")
   assert.equal(state.entries.size, 0)
 })
+
+test.each(["0.12.2+drop.22", "0.12.2+drop.23"])(
+  "tables cached under %s gain width metadata on their first read",
+  async (integrity) => {
+    const source =
+      "| PR | Summary | Next step |\n|---|---|---|\n| #1596 | Each user keeps their own column layout in every table | Show when the layout differs from the default and add a reset button |"
+    state.entries.set(KEY, {
+      integrity,
+      mtime: Date.now(),
+      value: { title: "Untitled document", html: "<table><tr><td>#1596</td></tr></table>", source },
+    })
+    let reads = 0
+    const next = await renderMarkdownCached("doc.md", async () => {
+      reads++
+      return source
+    })
+    assert.equal(reads, 1)
+    assert.match(next.html, /data-width=/)
+    assert.equal(calls.writes.length, 1)
+    const hit = await renderMarkdownCached("doc.md", () => {
+      throw new Error("the upgraded table should be cached")
+    })
+    assert.equal(hit.html, next.html)
+  },
+)

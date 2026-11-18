@@ -1084,10 +1084,43 @@ const SPECS = {
   histogram: histogramSpec,
 };
 
+// A raw spec takes the page's colors by name, so it follows the theme and the filters' colors without copied hex
+// values: a theme color (`fg`, `muted`, `border`, `grid`, `bg`, `soft`), a tone (`good`, `fair`, `warn`, `bad`,
+// `accent`) or a palette index, wherever it sets `color`, `fill` or `stroke` or lists a scale's `range`. A color, fill
+// or stroke on a list filter's field without a range of its own gives each name its color across the report.
+const PAINT = ["color", "fill", "stroke"];
+function paintSpec(node, rows, c = vars()) {
+  const named = (v) =>
+    typeof v === "number" ? PALETTE[v % PALETTE.length] : typeof v === "string" ? (c[v] ?? TONES[v] ?? v) : v;
+  if (Array.isArray(node)) return node.forEach((n) => paintSpec(n, rows, c));
+  if (!node || typeof node !== "object") return;
+  for (const [key, v] of Object.entries(node)) {
+    if (PAINT.includes(key) && (typeof v === "string" || typeof v === "number")) node[key] = named(v);
+    if (PAINT.includes(key) && v && typeof v === "object" && !Array.isArray(v)) {
+      for (const ref of [v, ...[v.condition ?? []].flat()]) {
+        if ("value" in ref) ref.value = named(ref.value);
+        if (Array.isArray(ref.scale?.range)) ref.scale.range = ref.scale.range.map(named);
+        else if (COLORS[ref.field] && ref.scale !== null && !ref.scale?.range && !ref.scale?.scheme) {
+          const present = new Set(rows?.map((r) => r[ref.field]));
+          const keys = [...COLORS[ref.field].keys()].filter((k) => !rows || present.has(k));
+          if (keys.length) ref.scale = { ...ref.scale, domain: keys, range: keys.map((k) => COLORS[ref.field].get(k)) };
+        }
+      }
+    }
+    // Selection brushes carry paints, but parameter values remain literal records.
+    if (key === "params" && Array.isArray(v)) {
+      for (const param of v) paintSpec(param?.select?.mark, rows, c);
+    }
+    // Data records and expression/metadata payloads are literals, not paint definitions.
+    if (!["data", "datasets", "transform", "params", "usermeta"].includes(key)) paintSpec(v, rows, c);
+  }
+}
+
 function vegaSpec(block, width) {
   const spec = structuredClone(block.spec);
   const named = spec.data?.name;
   if (named) spec.data = { values: rowsOf(named) };
+  paintSpec(spec, named ? data[named] : spec.data?.values);
   return { ...spec, width: spec.width ?? width, height: spec.height ?? block.height ?? 240 };
 }
 

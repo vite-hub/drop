@@ -162,7 +162,7 @@ export interface DropDetail extends DropSummary {
   html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
-  /** An app's text files keyed by path: all of them, or only its pages when its origin serves the rest (contentGrant). */
+  /** An app's text files keyed by path, unless its origin serves them all (contentGrant): the frame reads pages there. */
   files?: Record<string, string>
   /** Apps: each file's size in bytes, keyed by path. */
   sizes?: Record<string, number>

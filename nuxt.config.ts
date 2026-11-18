@@ -177,6 +177,10 @@ export default defineNuxtConfig({
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
+    // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
+    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
+    observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
@@ -202,11 +206,11 @@ export default defineNuxtConfig({
           mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
           // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
           publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
-          // Only active members of this GitHub organization may sign in, open shared links, or use MCP.
-          // Emails of the only people who may sign in, open shared links, or use MCP, comma-separated; admins always may.
-          // Verified by any sign-in method, like DROP_ADMINS. Empty lets anyone in.
-          members: env({ secret: true, source: env.source("DROP_MEMBERS"), default: "" }),
-          githubOrg: env({ source: env.source("DROP_GITHUB_ORG"), default: "" }),
+          // The only people who may sign in, open shared links, or use MCP: ViteHub Auth's VITEHUB_MEMBERS, such as
+          // `github:22072217,ada@example.com,@acme.com,github-org:acme`. Admins always may. Empty lets anyone in. Drop
+          // reads it only to know whether it is members-only, and for oauth2-proxy's organization.
+          // This Auth-owned setting only accepts VITEHUB_MEMBERS, without a VITEHUB_DROP_MEMBERS alias.
+          members: env({ secret: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }), default: "" }),
           // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
