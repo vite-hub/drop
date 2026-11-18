@@ -902,7 +902,7 @@ const docHeader = computed<DocHeader | null>(() => {
     ...(views ? [viewsFact(views)] : []),
     { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
     { icon: "person", label: "Dropped by", value: droppedBy.value.name, who: droppedBy.value },
-    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: Boolean(me.value) }] : []),
+    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: docFolder.value?.id }] : []),
   ]
   const origin = import.meta.client ? location.origin : ""
   const listed = new Set((d.resources ?? []).map((resource) => resource.url))

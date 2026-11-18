@@ -437,7 +437,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '</style>';
   // While Comark's zoom holds this layer (see onZoom), the page's own marks, which sit at page coordinates, stay hidden
   // behind it as they were behind the top layer; the tool's layer, hover outlines, and rulers are fixed and work on it.
-  const ZOOMED_STYLE = '<style>:host([data-zoomed]) :is(.marks,.draft,.leave,.pcs){display:none}</style>';
+  // Ink kept from a Marker session on the zoom (.zink) is drawn at viewport coordinates and shows only there.
+  const ZOOMED_STYLE = '<style>:host([data-zoomed]) :is(.marks,.leave,.pcs),:host([data-zoomed]) .draft>:not(.zink),:host(:not([data-zoomed])) .zink{display:none}</style>';
   shadow.innerHTML = STYLE + RAIL_STYLE + ZOOMED_STYLE + LAYERS;
   const marks = shadow.querySelector(".marks"), draft = shadow.querySelector(".draft");
   const leave = shadow.appendChild(Object.assign(document.createElement("div"), { className: "leave" }));
@@ -1814,8 +1815,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
     draft.innerHTML = ""; drawn = null;
     const kept = document.createElementNS(SVG, "svg");
-    kept.setAttribute("class", "inkp");
-    for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + scrollX, y + scrollY]) }), kept);
+    const onZoomed = host.hasAttribute("data-zoomed");
+    kept.setAttribute("class", onZoomed ? "inkp zink" : "inkp");
+    const shift = onZoomed ? [0, 0] : [scrollX, scrollY];
+    for (const s of list) drawStroke(Object.assign({}, s, { points: s.points.map(([x, y]) => [x + shift[0], y + shift[1]]) }), kept);
     draft.appendChild(kept);
     // Done waits for the picture, so it shows the page as frozen, before the hold and the hover look end.
     let marked = null;

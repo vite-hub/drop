@@ -30,8 +30,8 @@ export type DocHeaderFact = {
   parts?: { icon: "person" | "anonymous" | "agent"; n: number; tip: string }[]
   /** Who, drawn in place of the value. */
   who?: DocHeaderWho
-  /** The folder the doc is in: the value opens a list of its drops (DocHeaderFolderItem), asked for on hover. */
-  folder?: boolean
+  /** The id of the folder the doc is in: the value opens a list of its drops (DocHeaderFolderItem), asked for on hover. */
+  folder?: string
 }
 export type DocHeader = {
   actions: DocHeaderAction[]
@@ -320,7 +320,9 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
   new ResizeObserver(place).observe(box);
 
   // The folder's drops, asked for when the pointer or focus reaches the folder, and again after they've changed.
-  let folderAsked = false, folderTrigger = null, folderData = null;
+  // The list belongs to one folder: when the doc moves, what was loaded for the old one is dropped, and a late answer
+  // for it is ignored.
+  let folderAsked = false, folderTrigger = null, folderData = null, folderId = null;
   const askFolder = () => { if (!folderAsked) { folderAsked = true; post({ type: "doc-folder" }); } };
   function renderFolder() {
     const data = folderData;
@@ -370,7 +372,11 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     for (const fact of list) {
       const dd = el("dd");
       if (fact.who && typeof fact.who.name === "string") dd.append(whoNode(fact.who));
-      else if (fact.folder) {
+      else if (typeof fact.folder === "string") {
+        if (fact.folder !== folderId) {
+          folderId = fact.folder; folderData = null; folderAsked = false; renderFolder();
+          if (folderMenu.matches(":popover-open")) askFolder();
+        }
         folderTrigger = el("button", { type: "button", className: "drop-folder" }, el("span", {}, fact.value), icon("chevron"));
         folderTrigger.setAttribute("aria-haspopup", "true");
         folderTrigger.setAttribute("aria-expanded", "false");
@@ -448,6 +454,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     // A copy the viewer made, by its shortcut or its menu.
     if (m.type === "doc-copied") return showCopied();
     if (m.type === "doc-folder-items") {
+      if (m.folder && m.folder.id !== folderId) return;
       folderData = m.folder && Array.isArray(m.folder.items) ? m.folder : null;
       if (!folderData) folderAsked = false;
       return renderFolder();

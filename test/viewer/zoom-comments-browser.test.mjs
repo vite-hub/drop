@@ -81,7 +81,39 @@ for (const [name, engine] of [
       assert.equal(onShot.kind, "image", "the area anchors to the screenshot, not to whatever the dialog covers")
       assert.equal(onShot.label, "Settings page")
 
+      // Marker ink drawn on the zoom stays over the screenshot while the comment is written, in Browse, as it does on
+      // the page; the page's own drafts stay hidden behind the zoom.
+      await page.evaluate(() => (posts.length = 0))
+      await page.evaluate(() =>
+        send({ type: "tool", tool: "mark", pen: { tool: "marker", color: "#ec4899", width: 14 } }),
+      )
+      await frame.waitForFunction(() =>
+        [...document.querySelectorAll("drop-comments")]
+          .find((h) => h.style.zIndex)
+          .shadowRoot.querySelector(".draw.mark"),
+      )
+      const cx = zoomed.x + zoomed.width / 2,
+        cy = zoomed.y + zoomed.height / 2
+      await page.mouse.move(cx - 40, cy)
+      await page.mouse.down()
+      await page.mouse.move(cx + 40, cy, { steps: 10 })
+      await page.mouse.up()
+      await page.evaluate(() => send({ type: "mark", do: "done" }))
+      await page.waitForFunction(() => posts.some((m) => m.type === "area"), null, { timeout: 10_000 })
       await setTool(page, "browse")
+      const ink = await frame.evaluate(() => {
+        const svg = [...document.querySelectorAll("drop-comments")]
+          .find((h) => h.style.zIndex)
+          .shadowRoot.querySelector(".draft .inkp")
+        const box = svg.querySelector("path").getBoundingClientRect()
+        return { display: getComputedStyle(svg).display, x: box.x + box.width / 2, y: box.y + box.height / 2 }
+      })
+      assert.notEqual(ink.display, "none", "the kept ink shows on the zoom")
+      assert.ok(
+        Math.abs(ink.x - cx) < 6 && Math.abs(ink.y - cy) < 6,
+        `the ink sits where it was drawn: ${JSON.stringify(ink)}`,
+      )
+
       await frame.locator("dialog.cz-dialog").press("Escape")
       await frame.locator("dialog.cz-dialog").waitFor({ state: "detached" })
       assert.equal(await hostParent(frame), "html", "the layer returns to the page")

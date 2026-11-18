@@ -35,7 +35,7 @@ const HEADER = {
         tip: "via Executor · claude-opus-5-5 · high reasoning",
       },
     },
-    { icon: "folder", label: "Folder", value: "Plans", folder: true },
+    { icon: "folder", label: "Folder", value: "Plans", folder: "fold01" },
   ],
   related: [
     {
@@ -158,6 +158,27 @@ test(
       await list.getByRole("button", { name: /Launch checklist/ }).click()
       await list.getByRole("button", { name: "Open folder" }).evaluate((el) => el.click())
 
+      // The doc moves to another folder while the header stays: the list and Open folder follow the new folder, and a
+      // late answer for the old one is ignored.
+      const moved = {
+        ...HEADER,
+        facts: HEADER.facts.map((f) => (f.folder ? { ...f, value: "Ideas", folder: "fold02" } : f)),
+      }
+      const asked = await page.evaluate(() => window.posts.filter((m) => m.type === "doc-folder").length)
+      await page.evaluate((header) => window.tell(header), moved)
+      const ideas = frame.getByRole("button", { name: "Ideas" })
+      await ideas.hover()
+      await page.waitForFunction((n) => window.posts.filter((m) => m.type === "doc-folder").length > n, asked)
+      await page.evaluate((folder) => window.tell({ type: "doc-folder-items", folder }), FOLDER)
+      await ideas.click()
+      await list.locator("p").waitFor()
+      assert.equal(await list.getByRole("button", { name: "Open folder" }).count(), 0, "the old folder's rows are gone")
+      const IDEAS = { ...FOLDER, id: "fold02", title: "Ideas" }
+      await page.evaluate((folder) => window.tell({ type: "doc-folder-items", folder }), IDEAS)
+      await list.getByRole("button", { name: "Open folder" }).evaluate((el) => el.click())
+      await page.waitForFunction(() => window.posts.some((m) => m.type === "doc-open" && m.id === "fold02"))
+      await page.evaluate((header) => window.tell(header), HEADER)
+
       // Copy asks for the Markdown when the pointer reaches it, and writes it in the click. The button stays the
       // same element through another header, so the press can't be lost and focus stays.
       const copy = frame.getByRole("button", { name: "Copy as Markdown" })
@@ -195,12 +216,12 @@ test(
       await arrow.click()
       await frame.getByRole("menuitem", { name: /Download original/ }).click()
       await frame.getByRole("link", { name: "Before and after" }).click()
-      await page.waitForFunction(() => window.posts.filter((m) => m.type === "doc-open").length === 3)
+      await page.waitForFunction(() => window.posts.filter((m) => m.type === "doc-open").length === 4)
       assert.deepEqual(
         (await docPosts(page))
           .filter((m) => m.type === "doc-open" || m.type === "doc-action")
           .map((m) => m.action ?? m.id),
-        ["new001", "fold01", "download", "abc123"],
+        ["new001", "fold01", "fold02", "download", "abc123"],
       )
       assert.equal(
         (await page.evaluate(() => window.posts)).some((m) => m.type === "key" && m.key === "Escape"),
