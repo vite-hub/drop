@@ -364,6 +364,53 @@ test("named Vega sources preserve parsing, shared references and independent sou
   }
 }, 60_000)
 
+test("bare Vega references and lookups bind to report rows regardless of inline layer order", async () => {
+  const { compile } = await import(from.resolve("vega-lite"))
+  const { View, parse } = await import(from.resolve("vega"))
+  const app = readFileSync(join(skill, "assets/app.js"), "utf8")
+  const start = app.indexOf("function isolateVegaSource")
+  const isolate = runInNewContext(`${app.slice(start, app.indexOf("const tooltip", start))}
+    isolateVegaSource`)
+  const reportKey = "observations"
+  const encoding = { text: { field: "label" } }
+  const reportLayer = { data: { name: reportKey }, mark: "text", encoding }
+  const inlineLayer = { data: { name: reportKey, values: [{ label: "Inline" }] }, mark: "text", encoding }
+  const lookupLayer = {
+    data: { values: [{ team: "Beta" }] },
+    transform: [{ lookup: "team", from: { data: { name: reportKey }, key: "team", fields: ["label"] } }],
+    mark: "text",
+    encoding,
+  }
+  for (const [layers, expected] of [
+    [
+      [reportLayer, inlineLayer],
+      ["February", "February", "Inline", "February"],
+    ],
+    [
+      [inlineLayer, reportLayer],
+      ["February", "Inline", "February", "February"],
+    ],
+  ]) {
+    const spec = structuredClone({
+      data: { name: reportKey },
+      layer: [{ mark: "text", encoding }, ...layers, lookupLayer],
+    })
+    const alias = isolate(spec, reportKey)
+    const compiled = compile(spec).spec
+    compiled.data.find((dataset) => dataset.name === alias).values = [{ team: "Beta", label: "February" }]
+    const view = new View(parse(compiled), { renderer: "none" })
+    try {
+      const svg = await view.toSVG()
+      assert.deepEqual(
+        Array.from(svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g), (match) => match[1]),
+        expected,
+      )
+    } finally {
+      view.finalize()
+    }
+  }
+})
+
 test("paint preprocessing preserves nested records and explicit scale choices", () => {
   const app = readFileSync(join(skill, "assets/app.js"), "utf8")
   const paint = runInNewContext(`${app.slice(app.indexOf("const PALETTE"), app.indexOf("const report"))}

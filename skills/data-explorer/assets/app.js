@@ -1306,17 +1306,14 @@ function isolateVegaSource(spec, reportKey) {
   };
   visit(spec);
   const local = new Set(Object.keys(spec.datasets ?? {}));
-  for (const source of sources) {
-    if (source !== spec.data && ["url", "values", "sequence", "sphere", "graticule"].some((key) => key in source)) {
-      local.add(source.name);
-    }
-  }
   const used = new Set([...local, ...sources.map((source) => source.name)]);
   let index = 0;
   while (used.has(`__report_source_${index}`)) index++;
   const alias = `__report_source_${index}`;
   for (const source of sources) {
-    if (source.name === reportKey && (source === spec.data || !local.has(reportKey))) {
+    if (source.name !== reportKey) continue;
+    const declaresData = ["url", "values", "sequence", "sphere", "graticule"].some((key) => key in source);
+    if (source === spec.data || (!local.has(reportKey) && !declaresData)) {
       source.name = alias;
     }
   }
