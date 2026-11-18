@@ -415,7 +415,7 @@ test("an open thread is written in where it is: over its margin card, else besid
   }
 }, 30_000)
 
-test("a saved area is a soft grey line of the ink, firmer while its thread is open, and the one drawn is ViteHub's comment blue", async () => {
+test("a saved area is a 1px grey line with no fill, firmer while its thread is open, and the one drawn is ViteHub's comment blue", async () => {
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, 1440)
@@ -430,14 +430,17 @@ test("a saved area is a soft grey line of the ink, firmer while its thread is op
         drawing.dataset.slot = "comment-mark-area"
         drawing.dataset.draft = "true"
         root.querySelector(".draft").appendChild(drawing)
-        // ViteHub's comment blue (--vh-comment-mark in @vite-hub/ui/comment-marks.css), and its ink (--vh-comment-ink)
-        // at the strengths of a saved area (22%) and of the open thread's area (45%).
+        // ViteHub's comment blue (--vh-comment-mark in @vite-hub/ui/comment-marks.css) for the one being drawn, and its
+        // ink (the page's text color) at 22% and 45% for saved areas (Drop comment #1).
+        const color = (value) => {
+          probe.style.color = value
+          return getComputedStyle(probe).color
+        }
+        const probe = document.createElement("i")
+        document.body.appendChild(probe)
         const host = getComputedStyle(root.host)
         const mark = host.getPropertyValue("--vh-comment-mark").trim()
         const ink = host.getPropertyValue("--vh-comment-ink").trim()
-        const probe = document.createElement("i")
-        document.body.appendChild(probe)
-        const color = (value) => ((probe.style.color = value), getComputedStyle(probe).color)
         const result = {
           area: style(root.querySelector('[data-slot="comment-mark-area"][data-for="c8"]')),
           draft: style(drawing),
@@ -450,7 +453,7 @@ test("a saved area is a soft grey line of the ink, firmer while its thread is op
         return result
       })
     const saved = await look()
-    // A soft line of the ink with no fill: it shows on a light page and a dark one, and covers nothing.
+    // A soft grey line with no fill: it shows on a light page and a dark one, and covers nothing.
     assert.equal(saved.area.border, saved.soft)
     assert.equal(saved.area.width, "1px")
     assert.equal(saved.area.fill, "rgba(0, 0, 0, 0)")
@@ -467,8 +470,9 @@ test("a saved area is a soft grey line of the ink, firmer while its thread is op
       return area.dataset.active === "true" && !area.getAnimations().length
     })
     const focused = await look()
-    assert.equal(focused.area.border, focused.firm)
+    assert.equal(focused.area.border, focused.firm, "the open thread's area is a firmer grey, not blue")
     assert.equal(focused.area.width, "1px")
+    assert.equal(focused.area.fill, "rgba(0, 0, 0, 0)")
   } finally {
     await browser.close()
   }

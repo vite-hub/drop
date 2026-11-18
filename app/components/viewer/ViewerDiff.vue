@@ -5,8 +5,13 @@
 import { diffHunks, diffLines } from "#shared/line-diff"
 import type { DropDetail, DropVersion } from "#shared/types"
 
-const props = defineProps<{ version: DropVersion; previous: DropVersion | null; copied?: boolean }>()
-const emit = defineEmits<{ close: []; copyLink: [] }>()
+const props = defineProps<{
+  version: DropVersion
+  previous: DropVersion | null
+  /** The drop's link with these changes showing, for the copy button. */
+  link: string
+}>()
+const emit = defineEmits<{ close: [] }>()
 const versionTo = useVersionTo()
 const id = computed(() => injectDrop()!.drop.data.value!.id)
 
@@ -78,15 +83,12 @@ const counts = computed(() => ({
         variant="ghost"
       />
       <UTooltip text="Copy link to these changes">
-        <UButton
+        <DropCopyButton
           aria-label="Copy link to these changes"
           class="shrink-0"
-          color="neutral"
-          :icon="copied ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-          :ui="{ leadingIcon: copied ? 'animate-icon-in' : undefined }"
+          icon="i-mingcute-link-line"
           size="xs"
-          variant="ghost"
-          @click="emit('copyLink')"
+          :value="link"
         />
       </UTooltip>
     </div>

@@ -186,6 +186,9 @@ export default defineNuxtConfig({
     // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
     auth: true,
+    // The review dock shows who's here (ViewerPresence, from Drop's presence rooms), so the comments toolbar on Drop's
+    // own pages leaves out its faces and cursors; with both, a reader saw the same person twice.
+    comments: { overlay: { presence: false } },
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
       server: {

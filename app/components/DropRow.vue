@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RelativeTime } from "vite-hub/ui"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 import { daysUntil, purgesAt } from "#shared/expiry"
@@ -18,7 +19,7 @@ const trashed = computed(() => drop.trashedAt !== null)
 const now = useRelativeNow()
 const purgeDays = computed(() => (drop.trashedAt === null ? 0 : daysUntil(purgesAt(drop.trashedAt), now.value)))
 const folder = computed(() => drop.kind === "folder")
-const { shared, changeable, choices, status, pick, copyLink, copied, linkChoices, menu } = useDropItem(() => drop, {
+const { shared, changeable, choices, status, pick, link, linkChoices, menu } = useDropItem(() => drop, {
   inTeam: () => inTeam,
   trash: () => emit("delete"),
 })
@@ -68,15 +69,15 @@ const detail = computed(() => {
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <template v-if="folder"
-          >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+          >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
         <!-- A site review or a link holds no file: its address says more than "0 B". -->
         <template v-else-if="drop.kind === 'site' || drop.kind === 'link'"
-          >{{ detail }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+          >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
         <template v-else
           ><span class="hidden sm:inline">{{ detail }} · </span>{{ formatBytes(drop.size)
-          }}<span class="md:hidden"> · <TimeAgo :at="drop.updatedAt" /></span
+          }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
       </p>
       <!-- A search that matched the doc's text, not its name: the words around the match. -->
@@ -95,7 +96,9 @@ const detail = computed(() => {
         <AgentIcon class="size-3.5" :kind="drop.actorKind" :name="drop.actorName" />
         <span class="truncate">{{ drop.actorName }}</span>
       </span>
-      <span class="mt-0.5 block text-xs text-muted tabular-nums"><TimeAgo :at="drop.updatedAt" /></span>
+      <span class="mt-0.5 block text-xs text-muted tabular-nums"
+        ><RelativeTime format="short" :at="drop.updatedAt"
+      /></span>
     </div>
     <div v-if="trashed" class="hidden min-w-0 md:block">
       <span class="block text-sm text-highlighted">{{ drop.trashReason === "expired" ? "Expired" : "Deleted" }}</span>
@@ -159,15 +162,12 @@ const detail = computed(() => {
           variant="ghost"
         />
       </DeferredMenu>
-      <UButton
+      <DropCopyButton
         v-else
         aria-label="Copy link"
         class="hidden sm:inline-flex"
-        color="neutral"
-        :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-        :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
-        variant="ghost"
-        @click="copyLink()"
+        icon="i-mingcute-link-line"
+        :value="link"
       />
       <DeferredMenu :items="menu" :content="{ align: 'end' }">
         <UButton
