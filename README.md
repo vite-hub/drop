@@ -40,6 +40,24 @@
    The first time it connects, Drop opens in your browser so you can sign in. [The agents page](https://drop.vitehub.dev/agents) has the setup for Codex, Cursor, VS Code, and other clients, and `npx add-mcp https://drop.vitehub.dev/mcp` works for most.
 3. Ask your agent to drop a plan. It answers with the review link.
 
+## Install the plugin
+
+The Drop plugin adds the MCP server and every skill below in one step. In Claude Code:
+
+```sh
+claude plugin marketplace add vite-hub/drop
+claude plugin install drop@drop
+```
+
+In Codex:
+
+```sh
+codex plugin marketplace add vite-hub/drop
+codex plugin add drop@drop
+```
+
+The first tool call opens Drop in your browser so you can sign in. The plugin connects to drop.vitehub.dev; for a Drop you host, add its `/mcp` as step 2 above says.
+
 ## Install the skills
 
 **data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.

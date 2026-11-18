@@ -10,6 +10,10 @@ description: Agents reach Drop over MCP. They sign in through your browser once;
 
 Signed in, the Agents page lists the clients you've connected, and disconnecting one revokes its access.
 
+### Claude Code and Codex plugin {#plugin}
+
+For drop.vitehub.dev, the Drop plugin adds the server and the [skills](#skill) in one step. In Claude Code, run `claude plugin marketplace add vite-hub/drop`, then `claude plugin install drop@drop`. In Codex, run `codex plugin marketplace add vite-hub/drop`, then `codex plugin add drop@drop`. The plugin's manifests are `.claude-plugin/` and `.codex-plugin/` in Drop's repository.
+
 ## How sign-in works {#sign-in}
 
 Drop is an OAuth 2.1 authorization server for its own MCP endpoint. When a client first connects:
