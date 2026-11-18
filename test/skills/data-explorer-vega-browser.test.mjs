@@ -263,7 +263,7 @@ for (const [name, layer, datasets, expected] of [
     60_000,
   )
 
-test("named Vega sources preserve parsing and explicit layer references under filters", async () => {
+test("named Vega sources preserve parsing, shared references and independent sources under filters", async () => {
   const rows = [
     { day: "31/01/2026", label: "January", team: "Alpha" },
     { day: "28/02/2026", label: "February", team: "Beta" },
@@ -278,17 +278,58 @@ test("named Vega sources preserve parsing and explicit layer references under fi
       {
         id: "overview",
         label: "Overview",
-        blocks: names.map((name) => ({
-          type: "vega",
-          title: name,
-          spec: {
-            data: { name, format: { parse: { day: "date:'%d/%m/%Y'" } } },
-            layer: [
-              { mark: "point", encoding },
-              { data: { name }, mark: "text", encoding: { ...encoding, text: { field: "label" } } },
-            ],
+        blocks: [
+          ...names.map((name) => ({
+            type: "vega",
+            title: name,
+            spec: {
+              data: { name, format: { parse: { day: "date:'%d/%m/%Y'" } } },
+              layer: [
+                { mark: "point", encoding },
+                { data: { name }, mark: "text", encoding: { ...encoding, text: { field: "label" } } },
+              ],
+            },
+          })),
+          {
+            type: "vega",
+            title: "Local dataset",
+            spec: {
+              data: { name: "observations" },
+              datasets: { observations: [{ team: "Beta", note: "Local" }] },
+              layer: [
+                { mark: "text", encoding: { text: { field: "label" } } },
+                { data: { name: "observations" }, mark: "text", encoding: { text: { field: "note" } } },
+                {
+                  transform: [
+                    {
+                      lookup: "team",
+                      from: { data: { name: "observations" }, key: "team", fields: ["note"] },
+                      as: ["match"],
+                    },
+                    { calculate: "'Lookup: ' + datum.match", as: "result" },
+                  ],
+                  mark: "text",
+                  encoding: { text: { field: "result" } },
+                },
+              ],
+            },
           },
-        })),
+          {
+            type: "vega",
+            title: "Generated dataset",
+            spec: {
+              data: { name: "observations" },
+              layer: [
+                { mark: "text", encoding: { text: { field: "label" } } },
+                {
+                  data: { name: "observations", sequence: { start: 1, stop: 3 } },
+                  mark: "text",
+                  encoding: { text: { field: "data", type: "nominal" } },
+                },
+              ],
+            },
+          },
+        ],
       },
     ],
   }
@@ -309,6 +350,14 @@ test("named Vega sources preserve parsing and explicit layer references under fi
       await svg.waitFor()
       assert.equal(await svg.locator(".mark-symbol.role-mark path").count(), 1, name)
       assert.deepEqual(await svg.locator(".mark-text.role-mark text").allTextContents(), ["February"], name)
+    }
+    for (const [title, labels] of [
+      ["Local dataset", ["February", "Local", "Lookup: Local"]],
+      ["Generated dataset", ["February", "1", "2"]],
+    ]) {
+      const svg = page.locator(`.rp-chart[aria-label="${title}"][data-state="ok"] svg`)
+      await svg.waitFor()
+      assert.deepEqual(await svg.locator(".mark-text.role-mark text").allTextContents(), labels, title)
     }
   } finally {
     await browser.close()
