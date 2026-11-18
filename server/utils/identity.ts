@@ -97,7 +97,6 @@ async function verify(event: H3Event): Promise<Identity | null> {
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (bearerFrom(event.req.headers)) return fromAccessToken(event)
-  // A failed lookup answers as signed out, and the wide event keeps why.
   const session = await authFor(event)
     .api.getSession({ headers: event.req.headers })
     .catch((error: unknown) => {

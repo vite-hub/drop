@@ -3,18 +3,14 @@ import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event } from "h3"
 import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs"
 
-// Drop's own identity module, with Better Auth's session lookup answering for the test.
+// Drop's own identity module, with Better Auth's session lookup answering for the test (test/stubs.ts `authApi`).
 const session = { current: null }
-vi.mock("vite-hub/auth/server", () => ({
-  useAuth: () => ({
-    api: {
-      getSession: async () => {
-        if (session.current instanceof Error) throw session.current
-        return session.current
-      },
-    },
-  }),
-}))
+state.authApi = {
+  getSession: async () => {
+    if (session.current instanceof Error) throw session.current
+    return session.current
+  },
+}
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ deployment: { host: "vps" } }) }))
 
 const { evlogOptions } = await import("../../scripts/logging.ts")
@@ -210,6 +206,11 @@ test("a refused or failed session says why on the event, and the request is stil
   assert.equal(failed.event.level, "error")
   assert.equal(failed.event.error.message, "D1 is unavailable")
   assert.equal(failed.event.auth.session, "failed")
+
+  // A GitHub membership outage still answers 503, not signed out.
+  session.current = Object.assign(new Error("GitHub is down"), { body: { code: "AUTH_GITHUB_UNAVAILABLE" } })
+  const outage = await request("/api/me", identify)
+  assert.equal(outage.failure.status, 503)
 })
 
 test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed", async () => {

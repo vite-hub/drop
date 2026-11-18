@@ -119,7 +119,7 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | --- | --- |
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
-| `auth.denied` | Why a sign-in or session was refused: `banned`, `not-member`, or `not-listed`. |
+| `auth.denied` | Why Drop refused a session: `banned` or `not-member`. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
 | `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
