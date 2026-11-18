@@ -20,7 +20,8 @@ async function open(browser) {
   await page.route("**/*", (route) =>
     new URL(route.request().url()).hostname === "drop.test"
       ? route.fulfill({
-          contentType: "text/html",
+          // UTF-8, as Drop serves its pages: comark-outline's inline script has U+2028 line breaks.
+          contentType: "text/html; charset=utf-8",
           body: `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}" style="width:1380px;height:780px;border:0"></iframe>
             <script>window.posts = []; addEventListener("message", (e) => { if (e.data?.__drop) window.posts.push(e.data); });
               window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,

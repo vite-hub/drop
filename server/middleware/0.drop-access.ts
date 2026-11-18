@@ -82,6 +82,12 @@ export default defineHandler(async (event) => {
   }
   // A pinned `?v=` renders: the page checks that the version exists.
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
+  // Let Content answer negotiable documents before the viewer's redirect and HTML HEAD shortcuts.
+  if (drop.kind === "markdown" || drop.kind === "html") {
+    const { acceptsMarkdown } = await import("vite-hub/content/markdown")
+    const { headers } = event.req
+    if (acceptsMarkdown(headers.get("accept")) || AI_FETCHER.test(headers.get("user-agent") ?? "")) return
+  }
   // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue). Redirecting here saves rendering a page only
   // to send that redirect, as `/d/<link>` without its slug did.
   if (event.url.pathname !== to) return redirect(to + event.url.search)

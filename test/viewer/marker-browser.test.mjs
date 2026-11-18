@@ -483,7 +483,15 @@ test("a sent Marker comment keeps its strokes on the page, over its area, where 
     // Drop sends the comment back as a marker once it's saved, and clears the draft.
     await page.evaluate(() => tell({ type: "tool", tool: "browse" }))
     await page.evaluate(() => tell({ type: "clear-area" }))
-    const { image, rect, shot, type, __drop, quote, ...anchor } = area
+    const anchor = {
+      selector: area.selector,
+      label: area.label,
+      ox: area.ox,
+      oy: area.oy,
+      ow: area.ow,
+      oh: area.oh,
+      ink: area.ink,
+    }
     await page.evaluate(
       (anchor) =>
         tell({

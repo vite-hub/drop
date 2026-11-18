@@ -2,7 +2,7 @@ import * as v from "valibot"
 import { type Ink, InkSchema } from "./schemas"
 
 /** The most characters one comment metadata field holds in ViteHub Comments. */
-export const MAX_INK_CHARS = 4000
+const MAX_INK_CHARS = 4000
 
 type Point = [number, number]
 

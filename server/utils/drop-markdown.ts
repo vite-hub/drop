@@ -41,9 +41,11 @@ export async function dropMarkdownResponse(event: H3Event, key: string) {
   )
   const drop =
     target &&
-    (await read<DropDetail>(`/api/drops/${target.id}${target.version === target.latest ? "" : `?v=${target.version}`}`))
+    (await read<DropDetail>(
+      `/api/drops/${target.id}${pinned || target.version !== target.latest ? `?v=${target.version}` : ""}`,
+    ))
   const markdown = drop && (await dropMarkdown(drop, event.url.origin))
-  if (!markdown) throw new HTTPError({ status: 404, statusText: "Not found" })
+  if (markdown === null) throw new HTTPError({ status: 404, statusText: "Not found" })
   return new Response(event.req.method === "HEAD" ? null : markdown, {
     headers: {
       "Content-Type": "text/markdown; charset=utf-8",

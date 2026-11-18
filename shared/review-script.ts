@@ -428,12 +428,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     pin.style.background = "oklch(.5 .13 " + (Math.abs(hash) % 360) + ")";
     pin.style.color = "#fff";
   }
+  // "now", "5m ago", "3h ago", "yesterday", "2d ago" for a week, then the date, in English like the rest of Drop.
+  const relative = new Intl.RelativeTimeFormat("en", { style: "narrow", numeric: "auto" });
   function ago(at) {
     const s = Math.max(0, (Date.now() - at) / 1000);
-    if (s < 60) return "now";
-    if (s < 3600) return Math.floor(s / 60) + "m";
-    if (s < 86400) return Math.floor(s / 3600) + "h";
-    if (s < 604800) return Math.floor(s / 86400) + "d";
+    if (s < 60) return relative.format(0, "second");
+    if (s < 3600) return relative.format(-Math.floor(s / 60), "minute");
+    if (s < 86400) return relative.format(-Math.floor(s / 3600), "hour");
+    if (s < 604800) return relative.format(-Math.floor(s / 86400), "day");
     return new Date(at).toLocaleDateString();
   }
   function el(tag, className, text) {

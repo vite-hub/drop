@@ -43,6 +43,8 @@ overrides:
   "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@244143f6149a2b96c0273b9d273b687cf4d90985
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@244143f6149a2b96c0273b9d273b687cf4d90985
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@244143f6149a2b96c0273b9d273b687cf4d90985
+  # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy and its patches apply to it.
+  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
@@ -58,6 +60,7 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
+  "@vite-hub/content@0.0.0-preview-244143f": patches/@vite-hub__content@0.0.0-preview-244143f.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.
@@ -66,11 +69,6 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.7.0: patches/nuxt-security@2.7.0.patch
-  # UTextarea's autoresize shrank the box to its minimum rows on every keystroke to measure it, which flashed the
-  # overlay scrollbar of a comment past maxrows. Measures a hidden copy instead (nuxt/ui#7267). Also scrolls to the
-  # bottom when typing at the end, so a new line isn't left on the bottom edge; native textareas stop short of the
-  # padding, so keep this part after #7267 ships.
-  "@nuxt/ui@4.11.0": patches/@nuxt__ui@4.11.0.patch
   # A refresh copied the approving browser session's id into the new access token even after that session expired,
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.

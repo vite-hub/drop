@@ -6,6 +6,8 @@ export type DropRow = typeof drops.$inferSelect & {
   /** An earlier version (`?v=`): the drop as it is now. The row's own fields are that version's, sharing and life aside. */
   head?: typeof drops.$inferSelect
   ownerBanned?: boolean
+  /** The owner's name and picture, when the query that found the drop joined them (findOne). */
+  ownerProfile?: { name: string; image: string | null }
   expired?: boolean
   raw?: typeof drops.$inferSelect
   ancestors?: (typeof drops.$inferSelect)[]
