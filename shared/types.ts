@@ -2,6 +2,7 @@
 import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
+import type { Ink } from "./schemas"
 import type { DropMode, Share } from "./share"
 
 export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board", "link"] as const
@@ -254,6 +255,8 @@ export interface DropComment {
   at: number | null
   /** On a PDF's page: its number, from 1. `ox`/`oy`/`ow`/`oh` are then thousandths of the page. */
   pdfPage: number | null
+  /** From the Marker: its strokes, which the page draws over the area. */
+  ink: Ink | null
   label: string | null
   page: string | null
   body: string
