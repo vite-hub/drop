@@ -245,6 +245,37 @@ p.render-error {
   --comark-wide-end: 0px;
 }
 
+:is(.typeset, .typeset > .cr) > div:is([data-width], [data-fit])[data-fold][data-cols] > table > * > tr > [data-row] {
+  min-width: calc(8em * var(--_ty-side, 1));
+  overflow-wrap: anywhere;
+}
+
+@container (max-width: 31.99em) {
+  :is(.typeset, .typeset > .cr) > div[data-width][data-cols] > table[data-drop-scroll-table] {
+    display: table;
+    width: max-content;
+    min-width: 100%;
+
+    & > :is(thead, tbody, tfoot),
+    & > * > tr {
+      display: revert;
+    }
+
+    & > thead > tr {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip-path: none;
+    }
+
+    & > * > tr > :is(th, td) {
+      padding: 0.65em 0.75em;
+      white-space: nowrap;
+    }
+  }
+}
+
 @media screen and (min-width: 64rem) {
   .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) {
     display: block;

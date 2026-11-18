@@ -9,6 +9,21 @@ const { COMPONENT_TAGS, lintMarkdown, parseMarkdown, renderMarkdownCached } =
 migrate()
 beforeEach(reset)
 
+test("wide tables of IDs scroll on phones, but tables with prose can still become cards", async () => {
+  const markdown = `| Task ID | Trace ID | Started | Finished | Status |
+| --- | --- | --- | --- | --- |
+| 01ARBZ3NDEKTSV4RRFFQ69G5F1 | 01ARBZ3NDEKTSV4RRFFQ69G5F2 | 2026-11-18T19:00:00Z | 2026-11-18T19:01:00Z | Done |
+`
+  const dense = await renderMarkdownCached("dense-table.md", async () => markdown)
+  assert.match(dense.html, /<table role="table" data-drop-scroll-table="">/)
+
+  const prose = await renderMarkdownCached("prose-table.md", async () =>
+    markdown.replace("Done", "The deployment has finished and the metrics are ready to review."),
+  )
+  assert.match(prose.html, /<table role="table">/)
+  assert.doesNotMatch(prose.html, /<table[^>]*data-drop-scroll-table/)
+})
+
 // The examples draw icons from the Iconify API and a diagram on Kroki; answer both here, so the test needs no network.
 const network = globalThis.fetch
 beforeAll(() => {

@@ -126,6 +126,54 @@ test(
   },
 )
 
+test("folded prose does not overlap a numeric column at 630px", { timeout: 30000 }, async () => {
+  const markdown = `| Summary | Status | Average response time (milliseconds) | Successful requests per second | Peak memory usage (megabytes) | Average disk throughput (megabytes) |
+| --- | --- | --- | --- | --- | --- |
+| The deployment finished and handled the expected number of requests. | The metrics were collected and are ready for review. | 123 | 456 | 789 | 12 |
+`
+  const browser = await chromium.launch()
+  try {
+    const frame = await openFrame(browser, 630, "folded-metrics.md", markdown)
+    const cells = await frame.locator("tbody > tr > td").evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const { left, right, top } = node.getBoundingClientRect()
+        return { left, right, top }
+      }),
+    )
+    const [summary, status, numeric] = cells
+    assert.ok(status.top > summary.top, "the prose is folded")
+    assert.ok(summary.right <= numeric.left && status.right <= numeric.left, "prose stays within its track")
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a dense ID table keeps visible headings and scrolls on phones", { timeout: 30000 }, async () => {
+  const markdown = `| Task ID | Trace ID | Started | Finished | Status |
+| --- | --- | --- | --- | --- |
+| 01ARBZ3NDEKTSV4RRFFQ69G5F1 | 01ARBZ3NDEKTSV4RRFFQ69G5F2 | 2026-11-18T19:00:00Z | 2026-11-18T19:01:00Z | Done |
+`
+  const browser = await chromium.launch()
+  try {
+    const frame = await openFrame(browser, 390, "task-traces.md", markdown)
+    const layout = await frame.locator("[data-wide]:has(> table)").evaluate((wrapper) => {
+      const header = wrapper.querySelector("thead > tr")
+      return {
+        clipped: getComputedStyle(header).clipPath !== "none",
+        headerHeight: header.getBoundingClientRect().height,
+        tableOverflow: wrapper.scrollWidth - wrapper.clientWidth,
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    assert.equal(layout.clipped, false)
+    assert.ok(layout.headerHeight > 1)
+    assert.ok(layout.tableOverflow > 0)
+    assert.equal(layout.pageOverflow, 0)
+  } finally {
+    await browser.close()
+  }
+})
+
 test("zooming an annotated stacked chart preserves the bar clip paths", { timeout: 30000 }, async () => {
   const markdown = `::chart{type="stacked" horizontal}
 | week | ale | wine |
