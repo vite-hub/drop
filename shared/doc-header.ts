@@ -10,7 +10,6 @@
 // Copy writes the clipboard here, in the click that asked for it: the frame has the click's activation, and the
 // viewer's Markdown arrives ahead of it ("doc-intent" on hover or focus, answered with "doc-markdown"). Before it has
 // arrived, the write takes a promise of it. A frame without the Clipboard API asks the viewer to copy instead.
-import ICON_SWAP_CSS from "@vite-hub/ui/icon-swap.css?raw"
 
 type DocHeaderAction = { id: "markdown" | "download" | "pdf"; label: string; kbd?: string }
 /** A person with the agent that acted for them: "[avatar] Max · [logo] Claude Code", the rest on hover. */
@@ -156,7 +155,13 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
 }
 @media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop { transition: none; } }
 @media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop { display: none !important; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
-${ICON_SWAP_CSS.replace(/\/\*[\s\S]*?\*\//g, "")}
+/* Copy's two icons share one cell and cross-fade with a short blur, as vite-hub/ui's swapIcon does. The frame runs no
+   module of ours, so it draws the fade in CSS. */
+[data-slot="copy-button-icon"] { display: grid; place-items: center; }
+[data-slot="copy-button-icon"] > * { display: flex; grid-area: 1 / 1; transition: opacity 150ms ease-out, filter 150ms ease-out; }
+[data-slot="copy-button-icon"] > [data-icon="check"], [data-copied] [data-slot="copy-button-icon"] > [data-icon="copy"] { opacity: 0; filter: blur(3px); }
+[data-copied] [data-slot="copy-button-icon"] > [data-icon="check"] { opacity: 1; filter: none; }
+@media (prefers-reduced-motion: reduce) { [data-slot="copy-button-icon"] > * { filter: none; } }
 `
 
 /** How long Copy shows its check, as Drop's other copy buttons (COPY_MS in app/composables/usePreferences.ts). */
