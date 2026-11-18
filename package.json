@@ -57,7 +57,7 @@
     "@vite-hub/auth": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@fb731b2f91a8c608f349adf478c3e419459264b7",
     "@vite-hub/blob": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@fb731b2f91a8c608f349adf478c3e419459264b7",
     "@vite-hub/browser": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@fb731b2f91a8c608f349adf478c3e419459264b7",
-    "@vite-hub/comments": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@7c1c9932e9965a32f70017e65a9db9a22796c59b",
+    "@vite-hub/comments": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fb731b2f91a8c608f349adf478c3e419459264b7",
     "@vite-hub/content": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@fb731b2f91a8c608f349adf478c3e419459264b7",
     "@vite-hub/database": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@fb731b2f91a8c608f349adf478c3e419459264b7",
     "@vite-hub/kv": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@fb731b2f91a8c608f349adf478c3e419459264b7",

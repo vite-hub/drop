@@ -14,7 +14,7 @@ overrides:
   "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@fb731b2f91a8c608f349adf478c3e419459264b7
   "@vite-hub/cms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cms@fb731b2f91a8c608f349adf478c3e419459264b7
   "@vite-hub/codemods": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/codemods@fb731b2f91a8c608f349adf478c3e419459264b7
-  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@7c1c9932e9965a32f70017e65a9db9a22796c59b
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@fb731b2f91a8c608f349adf478c3e419459264b7
   "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@fb731b2f91a8c608f349adf478c3e419459264b7
   "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@fb731b2f91a8c608f349adf478c3e419459264b7
   "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@fb731b2f91a8c608f349adf478c3e419459264b7
@@ -58,6 +58,8 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
+  # Preserve full-link filters and Console admission until vitehub#4762 lands.
+  "@vite-hub/comments@0.0.0-preview-fb731b2": patches/@vite-hub__comments@0.0.0-preview-fb731b2.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.

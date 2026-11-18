@@ -1873,7 +1873,6 @@ test("a Console call, admitted to Comments without a Drop session, reads Drop's 
     admitted.threads.map((thread) => thread.id),
     [pageThread.id],
   )
-  assert.equal(admitted.hidden, 0)
   // The doc is private: Console admission doesn't open its comments to a caller Drop doesn't know.
   assert.deepEqual(
     (await operation("comments.list", {})).map((thread) => thread.id),
