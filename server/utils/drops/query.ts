@@ -577,7 +577,8 @@ export async function dropDetail(
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId, event) : undefined,
     galleryOf(row, who, days),
-    row.ownerProfile ?? ownerProfileOf(row.ownerId),
+    // Whose it is, for signed-in readers only: a public link doesn't name the person who shared it.
+    who ? (row.ownerProfile ?? ownerProfileOf(row.ownerId)) : null,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)

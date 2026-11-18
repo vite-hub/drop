@@ -382,6 +382,7 @@ test("an agent files its work in a folder, reads it, and moves a drop out", asyn
   assert.deepEqual(detail.owner, { name: "Owner", image: null }, "the doc header says whose it is")
   state.who = null
   const visitor = await detailHandler(request(`/api/drops/${inner.id}`, { id: inner.id }))
+  assert.equal(visitor.owner, undefined, "a public link doesn't name whose it is")
   assert.deepEqual(
     visitor.children.map((child) => child.id),
     [shot.id],
