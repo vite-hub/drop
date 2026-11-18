@@ -13,10 +13,10 @@ const request = (path, method = "GET") =>
 migrate()
 beforeEach(() => {
   reset()
-  state.githubOrg = "acme"
+  state.members = "github-org:acme"
 })
 afterEach(() => {
-  state.githubOrg = ""
+  state.members = ""
 })
 
 // review.js on a site sends no Drop session, only its review token, which each route checks (server/utils/review.ts).

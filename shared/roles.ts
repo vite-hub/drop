@@ -13,7 +13,7 @@ export const ROLE_SUMMARY: Record<Role, string> = {
 
 export const isRole = (value: string): value is Role => ROLES.some((role) => role === value)
 
-/** The emails a list such as `DROP_ADMINS` or `DROP_MEMBERS` names: comma- or space-separated, compared without case. */
+/** The emails a list such as `DROP_ADMINS` names: comma- or space-separated, compared without case. */
 const emails = (value: string) =>
   value
     .split(/[\s,]+/)
