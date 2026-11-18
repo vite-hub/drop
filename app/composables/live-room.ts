@@ -3,15 +3,22 @@ import { createEditorCodec } from "comark-ui/editor"
 import { Editor } from "@tiptap/vue-3"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { LIVE_EDITOR_KIT } from "#shared/live-editor"
+import type { Viewer } from "#shared/types"
 
 /**
  * The live editor's room and its Tiptap editor: Yjs, ProseMirror, and the code highlighter. useLiveEditor imports this
  * only when someone opens the editor, so readers never download it. Run inside an effect scope: leaving the scope
  * leaves the room.
  */
-export function useLiveRoom(documentId: Ref<string | undefined>) {
+export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewer | null | undefined) {
   const realtime = useRealtimeTiptap("drafts", documentId, {
     enabled: () => Boolean(documentId.value),
+    // Drop's own viewer from /api/me. Realtime's default reads the Better Auth session, which Drop never loads outside
+    // sign-in, so this person's own face said "Anonymous" (the server names them to everyone else).
+    identity: () => {
+      const viewer = me()
+      return viewer && { id: viewer.id, name: viewer.name, email: viewer.email, image: viewer.image ?? undefined }
+    },
     // The room's schema (server/utils/live-editor.ts).
     editor: createEditorCodec({ kit: LIVE_EDITOR_KIT }),
     // A lighter selection tint than the default.
