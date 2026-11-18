@@ -3,6 +3,7 @@ import { CommentPatchSchema } from "#shared/schemas"
 import { findThread, setResolved, wroteThread } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 /** Resolve or reopen: the drop's managers, or the comment's author. */
@@ -16,6 +17,7 @@ export default defineValidatedHandler({
       throw new HTTPError({ status: 404, statusText: "No comment with that id." })
     const { resolved } = await event.req.json()
     await setResolved(thread, resolved, who)
+    logDrop(event, drop, { change: resolved ? "resolve" : "reopen" })
     return { ok: true }
   },
 })

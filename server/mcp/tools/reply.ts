@@ -6,6 +6,7 @@ import { addReply, findCommentByNumber, setResolved, wroteThread } from "../../u
 import { permissions } from "../../utils/drops"
 import { findDropOrSite, mayResolveSite } from "../../utils/review"
 import { requireIdentity } from "../../utils/identity"
+import { logDrop } from "../../utils/logs"
 
 export default defineMcpTool({
   name: "reply",
@@ -44,6 +45,7 @@ export default defineMcpTool({
     const reply = await addReply(thread, who, text)
     const resolved = Boolean(resolve) && thread.status === "open"
     if (resolved) await setResolved(thread, true, who)
+    logDrop(event, drop, { change: resolved ? "reply-resolve" : "reply" })
     return {
       content: [{ type: "text" as const, text: `Replied to #${n}${resolved ? " and resolved it" : ""}.` }],
       structuredContent: { comment: n, reply, ...(resolve ? { resolved } : {}) },

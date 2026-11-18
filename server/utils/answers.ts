@@ -1,12 +1,13 @@
 import { sql } from "drizzle-orm"
 import { decodeHTMLAttribute } from "entities"
-import { log } from "evlog"
 import * as v from "valibot"
 import { db } from "vite-hub/database"
 import { MAX_QUIZ_BLOCKS, QUIZ_KINDS, type QuizAnswerRequest, type QuizKind } from "#shared/quiz"
 import type { DropQuiz, QuizAnswer, QuizResult } from "#shared/types"
+import type { H3Event } from "h3"
 import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
+import { logError } from "./logs"
 
 // What signed-in readers answered to a Markdown doc's questions, polls, and recall cards (#shared/quiz): one row per
 // person and block, keyed on the doc's stable id so answers carry across versions, with the first answer kept beside
@@ -208,7 +209,7 @@ export async function quizResults(
 }
 
 /** The reader's side of a doc's blocks, for its page: their answers, and results for the ones they answered. */
-export async function quizOf(row: Pick<DropRow, "id">, userId: string): Promise<DropQuiz> {
+export async function quizOf(row: Pick<DropRow, "id">, userId: string, event?: H3Event): Promise<DropQuiz> {
   const link = row.id
   try {
     const [mine, results] = await Promise.all([answersOf(link, userId), quizResults(link, { answeredBy: userId })])
@@ -218,7 +219,7 @@ export async function quizOf(row: Pick<DropRow, "id">, userId: string): Promise<
     }
   } catch (error) {
     // The page still opens, and an answer still saves.
-    log.error({ action: "drop-answers", error: String(error) })
+    logError(event, error, { action: "drop-answers" })
     return { answers: {}, results: {} }
   }
 }

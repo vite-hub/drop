@@ -10,6 +10,7 @@ import { type DropRow, findDrop, lifetimeFields, permissions, restoreDrop, toSum
 import { expiryPolicy, renewDrop } from "./expiry"
 import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
+import { logDrop } from "./logs"
 import { linkAddress } from "./link-items"
 import { isAttachment, itemCounts, parentNode, resolveNode, rootOf, uniqueSlug } from "./nodes"
 import { requireKeepSlot } from "./quotas"
@@ -109,6 +110,9 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   // In a folder, the share it ends up with depends on the folders above: read it back.
   if (drop.parentId && Object.keys(share).length) drop = (await findDrop(drop.id, event)) ?? drop
   else drop = { ...drop, ...change, raw: { ...own, ...change } }
+  const fields = Object.keys(body)
+  const only = fields.length === 1 && body.trashed !== undefined
+  logDrop(event, drop, { change: only ? (body.trashed ? "trash" : "restore") : "update", fields })
   const summary = toSummary({ ...drop, ...title, ...renewed, ...trashed }, undefined, days)
   // A folder says how much it holds, as it does in lists.
   return drop.kind === "folder" ? { ...summary, items: (await itemCounts([drop.id])).get(drop.id) ?? 0 } : summary

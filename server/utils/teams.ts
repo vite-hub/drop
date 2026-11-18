@@ -10,6 +10,7 @@ import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
 import { drops, member, organization, subscription } from "../databases/default/index"
 import type { DropRow } from "./drops/types"
+import { authRequest, logAudit, requestLog } from "./logs"
 
 // Teams on a personal Drop. A team is a Better Auth organization: its members, their roles, and invitations live there.
 // What a team shares lives in its team folders (`drops.team_id`), which reach the team's members only. A team folder on a
@@ -255,6 +256,27 @@ async function holdMemberLimit(team: string) {
   return limit
 }
 
+interface BilledSubscription {
+  id: string
+  referenceId: string
+  plan: string
+  status?: string | null
+  seats?: number | null
+}
+
+/**
+ * A Stripe webhook's outcome for a team's subscription, on the webhook request's wide event. One webhook may call two
+ * of these (a cancellation, then the update it is): `changes` lists both, and the audit names the first.
+ */
+export const logSubscription = (change: string) => async (data: { subscription: BilledSubscription }) => {
+  const event = authRequest.getStore()
+  const { id, referenceId: team, plan, status, seats } = data.subscription
+  requestLog(event)?.set({ stripe: { subscription: { id, team, plan, status, seats, changes: [change] } } })
+  if (!event || event.context.billingAudited) return
+  event.context.billingAudited = true
+  logAudit(event, "stripe", `billing.${change}`, { type: "team", id: team })
+}
+
 /**
  * Drop's options for Better Auth's organization plugin (server/auth.ts). It asks for the limit before it adds someone or
  * sends an invitation. Pending invitations count as seats, so a free team can't invite past its free members.
@@ -339,6 +361,10 @@ export async function leaveTeams(user: User, context: GenericEndpointContext | n
       })
     throw error
   }
-  for (const { membership, team, others } of left)
+  const outcome: { left: string[]; deleted: string[] } = { left: [], deleted: [] }
+  for (const { membership, team, others } of left) {
     if (others.length) await hooks.afterRemoveMember?.({ member: membership, user, organization: team })
+    outcome[others.length ? "left" : "deleted"].push(team.id)
+  }
+  requestLog(authRequest.getStore())?.set({ teams: outcome })
 }

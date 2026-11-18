@@ -338,13 +338,24 @@ test("the hourly schedule indexes text docs published before search, once each",
   insertDrop("pic", { visibility: "private", kind: "image", blob_key: "pic.png", filename: "pic.png" })
   assert.deepEqual(await listDrops(owner, undefined, { query: "llama" }), [])
 
-  assert.equal(await indexMissingTexts(), 2, "the image has no text to index")
+  assert.deepEqual(await indexMissingTexts(), { indexed: 2 }, "the image has no text to index")
   assert.equal(textOf("lost"), "", "a missing file indexes as empty, so it isn't retried")
   assert.deepEqual(
     (await listDrops(owner, undefined, { query: "llama" })).map((drop) => drop.id),
     ["old"],
   )
-  assert.equal(await indexMissingTexts(), 0)
+  assert.deepEqual(await indexMissingTexts(), { indexed: 0 })
+})
+
+test("a doc whose file can't be read stays unindexed, and the next run indexes it", async () => {
+  insertDrop("flaky", { visibility: "private", title: "Flaky plan" })
+  const file = objects.get("flaky.md")
+  objects.set("flaky.md", { ...file, body: { arrayBuffer: () => Promise.reject(new Error("read reset")) } })
+  const first = await indexMissingTexts()
+  assert.deepEqual(first, { indexed: 0, failed: [{ drop: "flaky", error: "read reset" }] })
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM drop_texts WHERE drop_id = 'flaky'").get().n, 0)
+  objects.set("flaky.md", file)
+  assert.deepEqual(await indexMissingTexts(), { indexed: 1 })
 })
 
 test("a long search word becomes a LIKE pattern D1 accepts, at most 50 bytes, cut on whole characters and escapes", () => {

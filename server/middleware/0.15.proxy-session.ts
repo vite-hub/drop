@@ -3,6 +3,7 @@ import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
 import { authFor } from "../utils/identity"
+import { requestLog } from "../utils/logs"
 import { authProxy } from "../utils/proxy-auth"
 import { isProxyMember } from "../utils/proxy-auth-config"
 
@@ -26,7 +27,13 @@ export default defineHandler(async (event) => {
       data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
     })
   const auth = authFor(event)
-  const current = await auth.api.getSession({ headers: event.req.headers }).catch(() => null)
+  // A failed lookup signs in again through the proxy; the wide event keeps why.
+  const current = await auth.api.getSession({ headers: event.req.headers }).catch((error: unknown) => {
+    requestLog(event)?.warn("Session lookup failed", {
+      auth: { session: error instanceof Error ? error.message : String(error) },
+    })
+    return null
+  })
   if (current) {
     const [github] = await db
       .select({ token: account.accessToken })
