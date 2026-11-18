@@ -30,7 +30,11 @@ const item =
 
 <template>
   <!-- Comments, the eye, and Copy prompt act on the same comments, so they share one track inside the pill. -->
-  <div class="comment-track flex shrink-0 items-center gap-0.5 rounded-lg" role="group" aria-label="Comments">
+  <div
+    class="comment-track @max-3xl/review-dock:contents flex shrink-0 items-center gap-0.5 rounded-lg"
+    role="group"
+    aria-label="Comments"
+  >
     <UTooltip
       :text="on ? 'Stop commenting' : canUseMode ? 'Comment on the page' : 'Show comments'"
       :kbds="['C']"

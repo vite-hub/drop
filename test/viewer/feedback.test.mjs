@@ -160,12 +160,17 @@ test("the copied site prompt includes the screenshot and element box even with a
         ow: 400,
         oh: 100,
       }),
+      thread(3, { id: "small-box", kind: "image", ox: 100, oy: 200, ow: 3, oh: 4 }),
     ],
-    new Map([["site-thread", { url: "/f/screen.png" }]]),
+    new Map([
+      ["site-thread", { url: "/f/screen.png" }],
+      ["small-box", { url: "/f/small-box.png" }],
+    ]),
   )
   assert.match(site, /2\. > \$10 \(https:\/\/shop\.test\/cart\)/)
   assert.match(site, /Element `\.price`/)
   assert.match(site, /Box 10%–50% across, 20%–30% down the screenshot/)
+  assert.match(site, /Box 10%–10\.3% across, 20%–20\.4% down the screenshot/)
   assert.match(site, /Screenshot: https:\/\/drop\.test\/f\/screen\.png/)
   assert.match(site, /reply.*resolve: true.*if authorized/)
   assert.doesNotMatch(site, /accept_suggestion|previous /)

@@ -35,6 +35,7 @@ export const frameAllow = (kind: string) =>
 const PRESENT_ALLOW = "fullscreen; display-capture; screen-wake-lock"
 
 const pct = (n: number) => `${(n / 10).toFixed(0)}%`
+const sitePct = (coordinate: number) => `${coordinate / 10}%`
 
 /** What a comment points at: its quote, the page, or an element and where on it. */
 function target(comment: DropComment) {
@@ -58,7 +59,7 @@ type Screenshots = ReadonlyMap<string, Screenshot | null>
 function siteAnchor(comment: DropComment, screenshot: Screenshot | null, url: string) {
   const { label, ox, oy, ow, oh } = comment
   const element = label ? `\n   Element \`${label}\`` : ""
-  const box = `\n   Box ${pct(ox)}–${pct(ox + ow)} across, ${pct(oy)}–${pct(oy + oh)} down the ${screenshot ? "screenshot" : "viewport"}`
+  const box = `\n   Box ${sitePct(ox)}–${sitePct(ox + ow)} across, ${sitePct(oy)}–${sitePct(oy + oh)} down the ${screenshot ? "screenshot" : "viewport"}`
   const image = screenshot ? `\n   Screenshot: ${new URL(screenshot.url, url).href}` : ""
   return `${element}${box}${image}`
 }
