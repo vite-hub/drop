@@ -29,8 +29,8 @@ const views = [...report.views];
 if (report.method || report.intro) views.push({ id: "method", label: "Method", method: true });
 const filters = (report.filters ?? []).map((f) => ({ ...f, type: f.type ?? null }));
 
-// `ranges` holds the bin a histogram or a binned vega mark was clicked on, as `{ field: [from, to] }`.
-const state = { view: views[0].id, filters: {}, ranges: {}, scale: {}, q: "" };
+// `ranges` holds `[from, to, inclusiveEnd]` in the field's original units.
+const state = { view: views[0].id, filters: {}, ranges: Object.create(null), scale: {}, q: "" };
 const charts = [];
 
 // ---------- helpers
@@ -200,10 +200,11 @@ function countsFor(f, ignoreFilters = false) {
   return counts;
 }
 
-function rowsOf(name, skip = []) {
+function rowsOf(name, skipList = [], skipRanges = []) {
   let rows = data[name] ?? [];
+  const keepList = [skipList].flat();
   for (const f of filters) {
-    if ([skip].flat().includes(f.field)) continue;
+    if (keepList.includes(f.field)) continue;
     const value = state.filters[f.field];
     if (kindOf(f) === "toggle") {
       if (!value) rows = rows.filter((row) => !row[f.field]);
@@ -212,9 +213,12 @@ function rowsOf(name, skip = []) {
     if (value == null || value === "*") continue;
     rows = rows.filter((row) => !(f.field in row) || row[f.field] === value);
   }
-  for (const [f, [from, to]] of Object.entries(state.ranges)) {
-    if ([skip].flat().includes(f)) continue;
-    rows = rows.filter((row) => !(f in row) || (typeof row[f] === "number" && row[f] >= from && row[f] < to));
+  for (const [field, [from, to, inclusiveEnd]] of Object.entries(state.ranges)) {
+    if (skipRanges.includes(field)) continue;
+    rows = rows.filter((row) => {
+      const value = row[field];
+      return !(field in row) || (typeof value === "number" && value >= from && (value < to || (inclusiveEnd && value === to)));
+    });
   }
   return rows;
 }
@@ -257,10 +261,10 @@ const setFilters = (pairs) => {
   void render();
 };
 const setFilter = (field, value) => setFilters([[field, value]]);
-// Sets the range a bin covers, from its start up to, not including, its end; a second click on the same bin clears it.
+// A second click on the same bin clears it.
 const setRange = (field, range) => {
   const now = state.ranges[field];
-  if (now?.[0] === range[0] && now?.[1] === range[1]) delete state.ranges[field];
+  if (now && range.every((value, index) => now[index] === value)) delete state.ranges[field];
   else state.ranges[field] = range;
   writeHash();
   void render();
@@ -933,17 +937,19 @@ function fadeSpec(spec, block, fields) {
     }
 }
 
+const pointer = (encode = {}, part, name) => ({
+  ...encode,
+  [part]: {
+    ...encode[part],
+    ...(name ? { name } : {}),
+    interactive: true,
+    update: { ...encode[part]?.update, cursor: { value: "pointer" } },
+  },
+});
+
 // Vega leaves axes and legends out of picking, so the compiled spec turns on the category's labels and the series'
 // legend, and every mark takes clicks and shows a pointer.
 function clickableSpec(spec, block, { series, x }) {
-  const pointer = (encode = {}, part) => ({
-    ...encode,
-    [part]: {
-      ...encode[part],
-      interactive: true,
-      update: { ...encode[part]?.update, cursor: { value: "pointer" } },
-    },
-  });
   const axis = block.horizontal ? "y" : "x";
   if (x) for (const a of spec.axes ?? []) if (a.scale === axis) a.encode = pointer(a.encode, "labels");
   if (series)
@@ -954,42 +960,59 @@ function clickableSpec(spec, block, { series, x }) {
 function pointerMarks(list = []) {
   for (const m of list) {
     if (m.type === "group") pointerMarks(m.marks);
-    else {
-      // Vega-Lite turns picking off for marks without a tooltip, such as a line's name at its end.
-      m.interactive = true;
-      m.encode = { ...m.encode, update: { ...m.encode?.update, cursor: { value: "pointer" } } };
-    }
+    else pointerMark(m);
   }
+}
+
+function pointerMark(mark) {
+  mark.interactive = true;
+  mark.encode = { ...mark.encode, update: { ...mark.encode?.update, cursor: { value: "pointer" } } };
 }
 
 // The bins the compiled spec draws: the field each bins, the names of the fields that hold a bin's start and end, and
 // whether the field is a histogram's log10 of its `x`.
-function binsOf(spec, block) {
+function binsOf(spec, logField) {
   const bins = [];
   for (const d of spec.data ?? [])
     for (const t of d.transform ?? []) {
       const name = typeof t.field === "string" ? t.field : t.field?.field;
       if (t.type !== "bin" || !name || t.as?.length !== 2) continue;
-      const log = name === "__log";
-      bins.push({ field: log ? block.x : name, from: t.as[0], to: t.as[1], log });
+      const log = logField != null && name === "__log";
+      bins.push({ field: log ? logField : name, from: t.as[0], to: t.as[1], signal: t.signal, log });
     }
   return bins;
 }
 
-const clean = (v) => Number(v.toPrecision(12));
+const datumField = (field) => `datum[${JSON.stringify(field)}]`;
 
-// Fades every bin outside the range set on its field. A log histogram compares in log10, where a range's bounds come
-// back off by a rounding error, so the bounds take a small margin.
-function fadeBins(spec, bins) {
-  const tests = bins
-    .filter((b) => state.ranges[b.field])
-    .map((b) => {
-      const [from, to] = state.ranges[b.field].map((v) => (b.log ? Math.log10(v) : v));
-      const e = 1e-9 * Math.max(1, Math.abs(from), Math.abs(to));
-      const [a, z] = [`datum[${JSON.stringify(b.from)}]`, `datum[${JSON.stringify(b.to)}]`];
-      return `(isValid(${a}) && (${z} <= ${from + e} || ${a} >= ${to - e}))`;
-    });
-  if (tests.length) fadeMarks(spec.marks, tests.join(" || "));
+function binFadeTest(bin) {
+  const range = state.ranges[bin.field];
+  if (!range) return null;
+  const [from, to] = range;
+  if (bin.log && to <= 0) return "true";
+  const start = datumField(bin.from);
+  const end = datumField(bin.to);
+  if (!bin.log) return `${end} <= ${from} || ${start} >= ${to}`;
+  const width = `(${end} - ${start})`;
+  const margin = (bound) => `min(${width} * 1e-7, ${1e-12 * Math.max(1, Math.abs(bound))})`;
+  const upper = Math.log10(to);
+  const lower = from > 0 ? Math.log10(from) : null;
+  return [lower == null ? null : `${end} <= ${lower} + ${margin(lower)}`, `${start} >= ${upper} - ${margin(upper)}`]
+    .filter(Boolean).join(" || ");
+}
+
+function clickBin(bin, datum, view) {
+  const start = datum?.[bin.from];
+  const end = datum?.[bin.to];
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+  const at = (value) => bin.log ? 10 ** value : value;
+  const from = at(start);
+  const to = at(end);
+  if (Number.isFinite(from) && Number.isFinite(to) && from < to) {
+    const extent = bin.signal ? view.signal(bin.signal) : null;
+    const inclusiveEnd = extent != null && end > extent.stop - extent.step / 2;
+    setRange(bin.field, [from, to, inclusiveEnd]);
+  }
 }
 
 // Every channel of a Vega-Lite spec, in its layers and concatenated views too, as [channel, definition] pairs.
@@ -1000,40 +1023,98 @@ function channelsOf(spec, out = []) {
   return channelsOf(spec.spec, out);
 }
 
-// The fields a vega block's encodings name, so a click on it filters as it would on a chart block: a color, fill,
-// stroke or shape on a list filter's field is its series, and an x or y on one is its category. Binned fields filter
-// by range.
-function vegaShape(block) {
-  const channels = channelsOf(block.spec);
-  const pick = (names) =>
-    channels.find(([c, ref]) => names.includes(c) && ref?.field && !ref.bin && clickable(ref.field))?.[1].field ??
-    null;
-  const x = pick(["x"]);
-  const y = pick(["y"]);
+function vegaInteractions(lite, compiled) {
+  const channels = channelsOf(lite);
+  const listFields = new Set(channels.filter(([, ref]) => !ref?.bin && clickable(ref?.field)).map(([, ref]) => ref.field));
+  const binFields = new Set(channels.filter(([, ref]) => ref?.bin).map(([, ref]) => ref.field));
+  const bins = binsOf(compiled).filter((bin) => binFields.has(bin.field));
+  const fields = new Set();
+  const ranges = new Set();
+  const scaleFields = new Map();
+  const marks = new Map();
+  const guides = new Map();
+  const groups = [compiled];
+
+  for (const group of groups) {
+    for (const mark of group.marks ?? []) {
+      if (mark.type === "group") {
+        groups.push(mark);
+        continue;
+      }
+      if (!mark.name || mark.name.endsWith("_voronoi")) continue;
+      const encode = mark.encode?.update ?? {};
+      const refs = (...names) => names.map((name) => encode[name]).filter(Boolean);
+      const x = refs("x", "xc", "x2");
+      const y = refs("y", "yc", "y2");
+      const series = refs("fill", "stroke", "shape");
+      const firstList = (positions) => positions.find((ref) => listFields.has(ref.field));
+      const category = firstList(x) ?? firstList(y);
+      const candidates = [...x, ...y, ...series];
+      const targets = [...new Set([...series, category].map((ref) => ref?.field).filter((field) => listFields.has(field)))];
+      const boundBins = candidates.map((ref) => bins.filter((bin) => ref.field === bin.from || ref.field === bin.to));
+      const bin = boundBins.find((matches) => matches.length === 1)?.[0];
+
+      for (const ref of candidates) {
+        for (const rule of [ref].flat()) {
+          if (typeof rule.scale !== "string" || rule.field == null) continue;
+          const supported = !Array.isArray(ref) && (series.includes(ref) || ref === category) && listFields.has(rule.field);
+          if (!scaleFields.has(rule.scale)) scaleFields.set(rule.scale, new Set());
+          scaleFields.get(rule.scale).add(supported ? rule.field : null);
+        }
+      }
+      if (!targets.length && !bin) continue;
+      targets.forEach((field) => fields.add(field));
+      if (bin) ranges.add(bin.field);
+      marks.set(mark.name, { targets, bin });
+      const tests = targets.filter(selected).map((field) => {
+        const ref = datumField(field);
+        return `${ref} != null && ${ref} !== ${JSON.stringify(state.filters[field])}`;
+      });
+      if (bin) tests.push(binFadeTest(bin));
+      const test = tests.filter(Boolean).map((expr) => `(${expr})`).join(" || ");
+      if (test) mark.encode = fade(mark.encode, null, test);
+      pointerMark(mark);
+    }
+  }
+
+  const bindGuide = (guide, parts, scales, opacity) => {
+    const bound = new Set(scales.flatMap((scale) => [...(scaleFields.get(scale) ?? [null])]));
+    const [field] = bound;
+    if (bound.size !== 1 || field == null) return;
+    for (const part of parts) {
+      const name = `report_guide_${guides.size}`;
+      guides.set(name, field);
+      guide.encode = pointer(guide.encode, part, name);
+      if (selected(field))
+        guide.encode = fade(guide.encode, part, `datum.value !== ${JSON.stringify(state.filters[field])}`, opacity);
+    }
+  };
+  for (const group of groups) {
+    for (const axis of group.axes ?? [])
+      if (axis.labels !== false) bindGuide(axis, ["labels"], [axis.scale], "fillOpacity");
+    for (const legend of group.legends ?? [])
+      bindGuide(legend, ["symbols", "labels"],
+        ["fill", "stroke", "shape", "size", "opacity", "strokeDash", "strokeWidth"].map((channel) => legend[channel]).filter(Boolean));
+  }
+
   return {
-    type: "vega",
-    series: pick(["color", "fill", "stroke", "shape"]),
-    x: x ?? y,
-    horizontal: !x && Boolean(y),
-    binned: channels.filter(([, ref]) => ref?.bin && ref.field).map(([, ref]) => ref.field),
+    fields: [...fields],
+    ranges: [...ranges],
+    click: (view, item) => {
+      const name = item?.mark?.name;
+      if (guides.has(name)) return setFilter(guides.get(name), item.datum.value);
+      const binding = marks.get(name);
+      if (!binding) return;
+      if (binding.bin) return clickBin(binding.bin, item.datum, view);
+      const field = binding.targets.find((target) => item.datum?.[target] != null);
+      if (field != null) setFilter(field, item.datum[field]);
+    },
   };
 }
 
-// What a click on a chart does. A bin filters by its range. A bar, line, area or legend entry filters by its series
+// A bar, line, area or legend entry filters by its series
 // when that's a list filter's field, and otherwise by its category, as does the category's axis label. Scatter points
 // have their own rule.
-function chartClick(block, spec, view, host, bins) {
-  const marks = markClick(block, spec, view, host);
-  if (!bins.length) return marks;
-  return (event, item) => {
-    const d = item?.datum;
-    const bin = d && bins.find((b) => typeof d[b.from] === "number" && typeof d[b.to] === "number");
-    if (!bin) return marks?.(event, item);
-    const at = (v) => clean(bin.log ? 10 ** v : v);
-    setRange(bin.field, [at(d[bin.from]), at(d[bin.to])]);
-  };
-}
-
 function markClick(block, spec, view, host) {
   if (block.chart === "scatter") {
     const click = scatterClick(block);
@@ -1134,8 +1215,10 @@ async function placeLabels(view, block, rows) {
   await view.data("labels_left", of("left")).data("labels_right", of("right")).runAsync();
 }
 
+const histogramLog = (block) => state.scale[block.__id] === "log" || block.logX;
+
 function histogramSpec(block, rows, width) {
-  const log = state.scale[block.__id] === "log" || block.logX;
+  const log = histogramLog(block);
   const source = log
     ? rows.filter((r) => r[block.x] > 0).map((r) => ({ ...r, __log: Math.log10(r[block.x]) }))
     : rows;
@@ -1201,10 +1284,9 @@ function paintSpec(node, rows, c = vars()) {
   }
 }
 
-function vegaSpec(block, width, skip) {
+function vegaSpec(block, width) {
   const spec = structuredClone(block.spec);
   const named = spec.data?.name;
-  if (named) spec.data = { values: rowsOf(named, skip) };
   paintSpec(spec, named ? data[named] : spec.data?.values);
   return { ...spec, width: spec.width ?? width, height: spec.height ?? block.height ?? 240 };
 }
@@ -1232,31 +1314,34 @@ async function drawChart(entry) {
   const { block, el } = entry;
   const width = Math.max(240, Math.floor(el.clientWidth));
   try {
-    // A vega block filters like the chart its encodings describe.
-    const shape = block.type === "vega" ? vegaShape(block) : block;
-    const fields = chartFields(shape);
-    // A chart keeps the rows of the list filters it fades and of the range its own bins set.
-    const skip = [...fields, ...(block.chart === "histogram" ? [block.x] : (shape.binned ?? []))];
-    const rows = block.type === "vega" ? null : rowsOf(block.data, skip);
+    const raw = block.type === "vega";
+    const fields = chartFields(block);
+    const histogram = block.chart === "histogram";
+    const rows = raw ? null : rowsOf(block.data, fields, histogram ? [block.x] : []);
     if (rows && !rows.length) {
       el.replaceChildren(h("p", { class: "rp-empty" }, "No rows for this filter."));
       el.dataset.state = "ok";
       return;
     }
     const lite =
-      block.type === "vega" ? vegaSpec(block, width, skip) : SPECS[block.chart](block, rows, width);
+      raw ? vegaSpec(block, width) : SPECS[block.chart](block, rows, width);
     lite.$schema = "https://vega.github.io/schema/vega-lite/v6.json";
     lite.autosize = { type: "fit-x", contains: "padding" };
     lite.config = { ...config(vars()), ...lite.config };
     const compiled = compile(lite).spec;
-    const targets = chartTargets(shape);
-    if (targets) clickableSpec(compiled, shape, targets);
-    const bins = binsOf(compiled, block);
-    if (bins.length) {
+    const interactions = raw ? vegaInteractions(lite, compiled) : null;
+    const named = raw && lite.data?.name;
+    const source = named && compiled.data?.find((dataset) => dataset.name === named);
+    if (source) source.values = rowsOf(named, interactions.fields, interactions.ranges);
+    const targets = chartTargets(block);
+    if (targets) clickableSpec(compiled, block, targets);
+    const bin = histogram ? binsOf(compiled, histogramLog(block) ? block.x : null)[0] : null;
+    if (bin) {
       pointerMarks(compiled.marks);
-      fadeBins(compiled, bins);
+      const test = binFadeTest(bin);
+      if (test) fadeMarks(compiled.marks, test);
     }
-    fadeSpec(compiled, shape, fields);
+    fadeSpec(compiled, block, fields);
     entry.view?.finalize();
     const host = h("div", { class: "rp-chart-svg" });
     el.replaceChildren(host);
@@ -1268,7 +1353,10 @@ async function drawChart(entry) {
     });
     await entry.view.runAsync();
     if (block.chart === "scatter" && block.label) await placeLabels(entry.view, block, rows);
-    const click = chartClick(shape, compiled, entry.view, host, bins);
+    const view = entry.view;
+    const click = interactions ? (_, item) => interactions.click(view, item)
+      : bin ? (_, item) => { if (item?.mark?.role === "mark") clickBin(bin, item.datum, view); }
+      : markClick(block, compiled, view, host);
     if (click) entry.view.addEventListener("click", click);
     el.dataset.state = "ok";
   } catch (error) {
@@ -1917,15 +2005,27 @@ function blockEl(block, id) {
 
 const root = document.getElementById("report");
 
+let rangePrefix = "range:";
+while (filters.some((filter) => filter.field.startsWith(rangePrefix))) rangePrefix += ":";
+
 function readHash() {
   resetFilters();
   const [view, query] = location.hash.slice(1).split("?");
   if (views.some((v) => v.id === view)) state.view = view;
   for (const [k, v] of new URLSearchParams(query ?? "")) {
+    if (k.startsWith(rangePrefix)) {
+      const match = /^(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)\.\.(-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)(\])?$/i.exec(v);
+      if (match) {
+        const [, lower, upper, inclusive] = match;
+        const from = Number(lower);
+        const to = Number(upper);
+        if (Number.isFinite(from) && Number.isFinite(to) && from < to)
+          state.ranges[k.slice(rangePrefix.length)] = [from, to, Boolean(inclusive)];
+      }
+      continue;
+    }
     if (k === "q") state.q = v;
     const f = filters.find((f) => f.field === k);
-    const range = !f && v.split("..").map(Number);
-    if (range?.length === 2 && range.every(Number.isFinite) && range[0] < range[1]) state.ranges[k] = range;
     if (f)
       state.filters[k] =
         kindOf(f) === "toggle"
@@ -1946,7 +2046,8 @@ function writeHash() {
     if (v !== initial && v != null)
       params.set(f.field, kindOf(f) === "toggle" ? (v ? "1" : "0") : String(v));
   }
-  for (const [f, [from, to]] of Object.entries(state.ranges)) params.set(f, `${from}..${to}`);
+  for (const [field, [from, to, inclusiveEnd]] of Object.entries(state.ranges))
+    params.set(`${rangePrefix}${field}`, `${from}..${to}${inclusiveEnd ? "]" : ""}`);
   if (state.q) params.set("q", state.q);
   const q = params.toString();
   history.replaceState(null, "", `#${state.view}${q ? `?${q}` : ""}`);
@@ -1954,7 +2055,7 @@ function writeHash() {
 
 function resetFilters() {
   state.q = "";
-  state.ranges = {};
+  state.ranges = Object.create(null);
   for (const f of filters)
     state.filters[f.field] =
       kindOf(f) === "tabs"

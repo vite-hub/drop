@@ -138,8 +138,8 @@ test("a click on a chart, a legend, an axis label or a matrix cell filters the p
   }
 }, 60_000)
 
-// Hours 0 to 39 fall in 4 bins of 10; the teams take every third issue.
-const issues = Array.from({ length: 40 }, (_, i) => ({ id: `#${i + 1}`, team: Object.keys(teams)[i % 3], hours: i }))
+// Hours 0 to 40 fall in 4 bins of 10; the last bin includes 40.
+const issues = Array.from({ length: 41 }, (_, i) => ({ id: `#${i + 1}`, team: Object.keys(teams)[i % 3], hours: i }))
 const spread = {
   title: "Issue hours",
   subtitle: "Test data",
@@ -161,6 +161,7 @@ const spread = {
           x: "hours",
           xTitle: "Hours",
           bins: 4,
+          logToggle: true,
         },
         {
           type: "vega",
@@ -216,8 +217,7 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
           .first()
       const drawn = () =>
         page.waitForFunction(() => document.querySelectorAll('.rp-chart[data-state="ok"] svg').length === 2)
-      const hash = async () =>
-        new URLSearchParams(decodeURIComponent(await page.evaluate(() => location.hash)).split("?")[1] ?? "")
+      const hash = async () => new URLSearchParams((await page.evaluate(() => location.hash)).split("?")[1])
       // A bin's label starts with its range under the histogram's `xTitle`.
       const bin = (range) => chart("Hours per issue").locator(`.role-mark path[aria-label^="Hours: ${range};"]`)
       const press = (locator) => (phone ? locator.tap() : locator.click())
@@ -228,7 +228,7 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       await drawn()
       await press(bin("10 – 20"))
       await page.waitForFunction(() => location.hash.includes("?"))
-      assert.equal((await hash()).get("hours"), "10..20")
+      assert.equal((await hash()).get("range:hours"), "10..20")
       await drawn()
       assert.equal(await matching(), " 10 matching")
       assert.equal(await chart("Hours per issue").locator(".role-mark path").count(), 4)
@@ -243,13 +243,33 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       await press(bin("10 – 20"))
       await page.waitForFunction(() => !location.hash.includes("?"))
       await drawn()
-      assert.equal(await matching(), " 40 matching")
+      assert.equal(await matching(), " 41 matching")
+
+      await press(bin("30 – 40"))
+      await drawn()
+      assert.equal((await hash()).get("range:hours"), "30..40]")
+      assert.equal(await matching(), " 11 matching")
+      await page.reload()
+      await drawn()
+      assert.equal(await matching(), " 11 matching")
+
+      await press(bin("0 – 10"))
+      await drawn()
+      await press(page.getByRole("button", { name: "Log", exact: true }))
+      await drawn()
+      assert.equal(await matching(), " 10 matching")
+      const logBins = await chart("Hours per issue")
+        .locator(".role-mark path")
+        .evaluateAll((paths) => paths.map((path) => Number(getComputedStyle(path).opacity)))
+      assert.ok(logBins.includes(1) && logBins.includes(0.2))
+      await press(page.getByRole("button", { name: "Clear", exact: true }))
+      await drawn()
 
       await press(chart("Issues per team").locator('.role-mark path[aria-label*="team: Beta"]'))
       await page.waitForFunction(() => location.hash.includes("?"))
       assert.equal((await hash()).get("team"), "Beta")
       await drawn()
-      assert.equal(await matching(), " 13 matching")
+      assert.equal(await matching(), " 14 matching")
       const bars = chart("Issues per team").locator(".role-mark path")
       assert.equal(await bars.count(), 3)
       assert.equal(await opacity(chart("Issues per team").locator('.role-mark path[aria-label*="team: Alpha"]')), 0.2)
@@ -259,6 +279,74 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       assert.deepEqual(errors, [])
       await page.close()
     }
+  } finally {
+    await browser.close()
+  }
+}, 60_000)
+
+test("Vega legends, axes and marks filter by their own encoding", async () => {
+  const fixture = structuredClone(spread)
+  fixture.filters.push({ field: "status", type: "list", colors: false })
+  fixture.data.issues.forEach((issue, index) => (issue.status = index % 2 ? "Open" : "Done"))
+  const nominal = (field) => ({ field, type: "nominal" })
+  fixture.views[0].blocks = [
+    {
+      type: "vega",
+      title: "Points",
+      spec: {
+        data: { name: "issues" },
+        mark: "point",
+        encoding: {
+          x: nominal("team"),
+          y: { field: "hours", type: "quantitative" },
+          color: nominal("team"),
+          shape: nominal("status"),
+        },
+      },
+    },
+    {
+      type: "vega",
+      title: "Independent axes",
+      spec: {
+        data: { name: "issues" },
+        resolve: { scale: { x: "independent" } },
+        layer: ["team", "status"].map((field) => ({
+          mark: "bar",
+          encoding: { x: nominal(field), y: { aggregate: "count", type: "quantitative" } },
+        })),
+      },
+    },
+  ]
+  writeFileSync(join(dir, "guides.json"), JSON.stringify(fixture))
+  execFileSync("node", [join(skill, "scripts/build.mjs"), "guides.json", "guides.html"], { cwd: dir, stdio: "pipe" })
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1300, height: 1400 } })
+    page.setDefaultTimeout(5000)
+    await page.route("https://cdn.jsdelivr.net/npm/**", (route) => {
+      const name = Object.keys(vega).find((key) => route.request().url().includes(`/npm/${key}/`))
+      return name ? route.fulfill({ contentType: "text/javascript", body: readFileSync(vega[name]) }) : route.abort()
+    })
+    await page.route("https://fonts.googleapis.com/**", (route) => route.abort())
+    const chart = (title) => page.locator(`.rp-chart[aria-label="${title}"][data-state="ok"] svg`)
+    const opacity = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).opacity))
+    const hash = async () => new URLSearchParams((await page.evaluate(() => location.hash)).split("?")[1])
+    const points = chart("Points")
+    const axes = chart("Independent axes")
+    await page.goto(`file://${join(dir, "guides.html")}#spread`)
+    await points.locator(".role-legend-label text", { hasText: "Open" }).click()
+    await page.waitForFunction(() => location.hash.includes("status=Open"))
+    assert.deepEqual(Object.fromEntries(await hash()), { status: "Open" })
+    assert.equal(await opacity(points.locator(".role-legend-label text", { hasText: "Done" })), 0.2)
+    assert.equal(await opacity(points.locator(".role-legend-label text", { hasText: "Beta" })), 1)
+
+    await axes.locator('.role-mark path[aria-label^="status: Done;"]').click()
+    await page.waitForFunction(() => location.hash.includes("status=Done"))
+    await axes.locator(".role-axis-label text", { hasText: "Open" }).click()
+    await page.waitForFunction(() => location.hash.includes("status=Open"))
+    await axes.locator(".role-axis-label text", { hasText: "Beta" }).click()
+    await page.waitForFunction(() => location.hash.includes("team=Beta"))
+    assert.deepEqual(Object.fromEntries(await hash()), { status: "Open", team: "Beta" })
   } finally {
     await browser.close()
   }
