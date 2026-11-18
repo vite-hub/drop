@@ -28,7 +28,7 @@ diff --git a/dist/markdown-negotiation-TAdMpgTK.js b/dist/markdown-negotiation-T
  }
  /**
  * Whether an `Accept` header asks for Markdown before HTML: `text/markdown` with a quality at least that of
-@@ -96,10 +96,9 @@
+@@ -96,10 +96,10 @@
  */
  function acceptsMarkdown(accept) {
  	const entries = parseAccept(accept);
@@ -38,11 +38,12 @@ diff --git a/dist/markdown-negotiation-TAdMpgTK.js b/dist/markdown-negotiation-T
 -	return html === 0 && acceptQuality(entries, "text/markdown") > 0;
 +	const html = preferredRange(entries, "text/html");
 +	const markdown = preferredRange(entries, "text/markdown");
++	if (!entries.some((entry) => entry.type === "text/markdown")) return html.q === 0 && markdown.q > 0;
 +	return markdown.q > 0 && (markdown.q > html.q || markdown.q === html.q && markdown.index < html.index);
  }
  /** The links that the Markdown 404 body lists for the files that `seo` serves. */
  function contentMarkdownErrorLinks(seo) {
-@@ -365,7 +364,7 @@
+@@ -365,7 +365,7 @@
  				headers
  			});
  			else {

@@ -149,6 +149,20 @@ test("the pinned Markdown location still identifies v1 after publishing v2", asy
   assert.equal(await (await send("/d/public/public.md")).text(), "second")
 })
 
+test("wildcard clients keep the share viewer redirect and HTML HEAD", async () => {
+  insertDrop("public", { kind: "markdown", share: "public" })
+  const send = markdownApp(["# Original\n"])
+  for (const accept of ["text/*, text/html", "text/html;q=0.8, */*;q=1"]) {
+    const bare = await send("/d/public", "GET", { accept })
+    assert.equal(bare.status, 302)
+    assert.equal(bare.headers.get("location"), "/d/public/public")
+    const canonical = await send("/d/public/public", "HEAD", { accept })
+    assert.equal(canonical.status, 200)
+    assert.match(canonical.headers.get("content-type"), /^text\/html/)
+    assert.equal(await canonical.text(), "")
+  }
+})
+
 test("empty published Markdown is a successful representation at both URLs", async () => {
   insertDrop("public", { kind: "markdown", share: "public" })
   const send = markdownApp([""])

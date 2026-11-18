@@ -70,3 +70,15 @@ test("Content negotiates the docs copy using client order at equal quality", asy
     assert.match(await response.text(), /^# Agents\n/)
   }
 })
+
+test("Content keeps docs in HTML when only a wildcard matches Markdown and HTML is acceptable", async () => {
+  for (const [accept, contentType] of [
+    ["text/html;q=0.8, */*;q=1", "text/html"],
+    ["text/*, text/html", "text/html"],
+    ["text/html;q=0, text/*", "text/markdown; charset=utf-8"],
+    ["text/html;q=0, text/markdown;q=0, text/*", "text/html"],
+  ]) {
+    const response = await app.fetch(new Request("https://drop.example/docs/agents", { headers: { accept } }))
+    assert.equal(response.headers.get("content-type"), contentType, accept)
+  }
+})
