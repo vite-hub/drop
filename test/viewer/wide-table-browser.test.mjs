@@ -36,9 +36,9 @@ const styles = (
 ).join("\n")
 
 // The doc in the viewer's frame, filling a window of the given width.
-async function open(browser, width) {
-  const { html } = await renderMarkdownCached("wide-table.md", async () => source)
-  const escaped = planDocument("markdown", source, false, html)
+async function openFrame(browser, width, key, markdown) {
+  const { html } = await renderMarkdownCached(key, async () => markdown)
+  const escaped = planDocument("markdown", markdown, false, html)
     .replace("</head>", `<style>${styles}</style></head>`)
     .replaceAll("&", "&amp;")
     .replaceAll('"', "&quot;")
@@ -55,7 +55,11 @@ async function open(browser, width) {
   })
   await page.goto("https://drop.test/")
   await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
-  const frame = page.frames()[1]
+  return page.frames()[1]
+}
+
+async function open(browser, width, key = "wide-table.md", markdown = source) {
+  const frame = await openFrame(browser, width, key, markdown)
   await frame.waitForFunction(() => window.__comarkOutline, null, { polling: 100 })
   await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   return frame.evaluate(() => {
@@ -108,6 +112,11 @@ test(
       assert.equal(laptop.stacked, false)
       assert.equal(laptop.overflow, 0)
 
+      const longHeading = source.replace("2. Needs product input", "VeryLongGeneratedWorkflowIdentifier".repeat(6))
+      const wrapped = await open(browser, 1480, "wide-table-long-heading.md", longHeading)
+      assert.ok(wrapped.outlineLinks >= 2)
+      assert.equal(wrapped.overflow, 0)
+
       const phone = await open(browser, 390)
       assert.equal(phone.stacked, true)
       assert.equal(phone.overflow, 0)
@@ -116,3 +125,34 @@ test(
     }
   },
 )
+
+test("zooming an annotated stacked chart preserves the bar clip paths", { timeout: 30000 }, async () => {
+  const markdown = `::chart{type="stacked" horizontal}
+| week | ale | wine |
+| --- | --: | --: |
+| 1 | 4 | 2 |
+| 2 | 6 | 1 |
+
+:::annotation{at="2" mark="circle"}
+The fleet came in.
+:::
+::
+`
+  const browser = await chromium.launch()
+  try {
+    const frame = await openFrame(browser, 1000, "stacked-chart.md", markdown)
+    await frame.locator("[data-zoom]:has(svg clipPath)").first().click()
+    const chart = frame.locator(".cz-dialog[open] svg:has(clipPath)").first()
+    await chart.waitFor()
+    const clips = await chart.evaluate((svg) => {
+      const ids = new Set([...svg.querySelectorAll("clipPath[id]")].map((clip) => clip.id))
+      return [...svg.querySelectorAll("[clip-path]")].map((node) => {
+        const id = /^url\(#(.+)\)$/.exec(node.getAttribute("clip-path"))?.[1]
+        return ids.has(id) && document.getElementById(id)?.closest("svg") === svg
+      })
+    })
+    assert.ok(clips.length > 0 && clips.every(Boolean), "zoomed bars reference clip paths in the zoomed chart")
+  } finally {
+    await browser.close()
+  }
+})

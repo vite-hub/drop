@@ -256,6 +256,7 @@ p.render-error {
 
   .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) > ul {
     overflow: visible;
+    overflow-wrap: anywhere;
     mask-image: none;
   }
 }
