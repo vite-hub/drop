@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { chromium } from "playwright"
+import { chromium, firefox } from "playwright"
 import { test } from "vite-plus/test"
 import { previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
@@ -126,23 +126,29 @@ test(
   },
 )
 
-test("folded prose does not overlap a numeric column at 630px", { timeout: 30000 }, async () => {
+test.each([
+  { name: "Chromium", browserType: chromium },
+  { name: "Firefox", browserType: firefox },
+])("folded prose stays readable at 630px in $name", { timeout: 30000 }, async ({ browserType }) => {
   const markdown = `| Summary | Status | Average response time (milliseconds) | Successful requests per second | Peak memory usage (megabytes) | Average disk throughput (megabytes) |
 | --- | --- | --- | --- | --- | --- |
 | The deployment finished and handled the expected number of requests. | The metrics were collected and are ready for review. | 123 | 456 | 789 | 12 |
 `
-  const browser = await chromium.launch()
+  const browser = await browserType.launch()
   try {
     const frame = await openFrame(browser, 630, "folded-metrics.md", markdown)
     const cells = await frame.locator("tbody > tr > td").evaluateAll((nodes) =>
       nodes.map((node) => {
-        const { left, right, top } = node.getBoundingClientRect()
-        return { left, right, top }
+        const { left, right, top, width } = node.getBoundingClientRect()
+        return { left, right, top, width }
       }),
     )
     const [summary, status, numeric] = cells
     assert.ok(status.top > summary.top, "the prose is folded")
+    assert.ok(summary.width >= 140 && status.width >= 140, "folded prose has room for several words per line")
     assert.ok(summary.right <= numeric.left && status.right <= numeric.left, "prose stays within its track")
+    const overflow = await frame.locator("html").evaluate((root) => root.scrollWidth - root.clientWidth)
+    assert.equal(overflow, 0, "the page does not scroll horizontally")
   } finally {
     await browser.close()
   }

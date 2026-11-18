@@ -250,6 +250,50 @@ p.render-error {
   overflow-wrap: anywhere;
 }
 
+/* The preview pin encodes the folded column count and prose position in data-stack. Give that track, not the
+   individual prose cells, a minimum so the wrapper scrolls when the metrics cannot fit beside it. */
+:is(.typeset, .typeset > .cr) > div[data-stack] {
+  --drop-prose-track: minmax(12em, 1fr);
+
+  &[data-stack$="-1"] {
+    --drop-track-1: var(--drop-prose-track);
+  }
+  &[data-stack$="-2"] {
+    --drop-track-2: var(--drop-prose-track);
+  }
+  &[data-stack$="-3"] {
+    --drop-track-3: var(--drop-prose-track);
+  }
+  &[data-stack$="-4"] {
+    --drop-track-4: var(--drop-prose-track);
+  }
+  &[data-stack$="-5"] {
+    --drop-track-5: var(--drop-prose-track);
+  }
+  &[data-stack$="-6"] {
+    --drop-track-6: var(--drop-prose-track);
+  }
+
+  &[data-stack^="2-"] {
+    --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content);
+  }
+  &[data-stack^="3-"] {
+    --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content);
+  }
+  &[data-stack^="4-"] {
+    --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+      var(--drop-track-4, min-content);
+  }
+  &[data-stack^="5-"] {
+    --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+      var(--drop-track-4, min-content) var(--drop-track-5, min-content);
+  }
+  &[data-stack^="6-"] {
+    --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+      var(--drop-track-4, min-content) var(--drop-track-5, min-content) var(--drop-track-6, min-content);
+  }
+}
+
 @container (max-width: 31.99em) {
   :is(.typeset, .typeset > .cr) > div[data-width][data-cols] > table[data-drop-scroll-table] {
     display: table;
