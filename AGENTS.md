@@ -11,3 +11,13 @@ These come from bugs that passed the existing tests and were found after merge. 
 - **Database columns or migrations** (`server/databases/`): add a new migration; never edit one that has shipped. Upgrade a database whose earlier migrations are already recorded, then run a lookup that uses the new field. For the Cloudflare deployment, check that the new migration is in D1's ledger before checking that lookup on the deployed Worker. (drop#28 edited an applied `0000_init.sql`; drop#72 deployed a migration D1 never applied, and every lookup returned 500.)
 - **Review toolbar events or comment anchoring**: open a real popover or tooltip on the reviewed page, then start a comment, through both the reviewed-site script and an HTML drop's frame. Check that the popover stays open while you write and that the saved comment is still reachable after it closes. (drop#36 closed Portal's Bookmarks popover on Comment; drop#45 closed a prototype tooltip across the iframe and anchored the comment to the whole page.)
 - **Prototype labels or canvas zoom**: use long names and two-line notes, at fit-to-canvas and at a lower zoom. Check for clipped text, alignment with the item below, and overlap with neighbours. (drop#124 truncated names, visible in its own screenshots; drop#125 misaligned wider labels.)
+
+## Browser support
+
+**The support floor** is the latest two Chrome and Firefox releases plus the current and previous Safari major (27.2 and 27.1 as of November 2026). It's the same floor as comark-ui's.
+
+- **Use a feature directly** when [webstatus.dev](https://webstatus.dev) shows it in every browser of the floor, with no feature check or fallback.
+- **When a browser of the floor lacks it** and the page still works without it, use it under `@supports`, with no fallback.
+- **When the page breaks without it**, keep the JavaScript, or load a polyfill behind a feature check from bundled app code. Never inline one in the frame scripts (`shared/plan-runtime.ts`, `shared/doc-header.ts`, `shared/review-script.ts`) and never load one from a CDN.
+- **Dates** need no library: format with `Intl`. Temporal waits until stable Safari ships it; then load `temporal-polyfill/global` through a dynamic import.
+- **In plain-DOM code**, prefer `popover` with `popovertarget`, `<dialog>` with `showModal()`, `<details>`, and CSS anchor positioning to hand-written Escape, outside-click, focus and placement code. Vue overlays stay on Nuxt UI.
