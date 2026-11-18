@@ -227,7 +227,9 @@ p.render-error {
    compare to match, so it reads as the compare's title. */
 .typeset {
   --comark-wide-start: calc((100vw - var(--drop-shift, 0px) - 100%) / 2 - 1.5rem);
-  --comark-wide-end: calc((100vw + var(--drop-shift, 0px) - 100%) / 2 - var(--drop-right, 0px) - var(--comark-rail-width, 0px) - 1.5rem);
+  --comark-wide-end: calc(
+    (100vw + var(--drop-shift, 0px) - 100%) / 2 - var(--drop-right, 0px) - var(--comark-rail-width, 0px) - 1.5rem
+  );
   /* The doc keeps the page's system font rather than the app's Geist, and Drop paints the app's grain on the whole
      frame (DOCUMENT_EXTRA_CSS), not again on the text. */
   --comark-font: var(--font-body);
