@@ -1033,23 +1033,26 @@ function vegaInteractions(lite, compiled) {
   const scaleFields = new Map();
   const marks = new Map();
   const guides = new Map();
-  const groups = [compiled];
+  const groups = [{ group: compiled, position: [] }];
 
-  for (const group of groups) {
+  for (const { group, position } of groups) {
     for (const mark of group.marks ?? []) {
-      if (mark.type === "group") {
-        groups.push(mark);
-        continue;
-      }
-      if (!mark.name || mark.name.endsWith("_voronoi")) continue;
       const encode = mark.encode?.update ?? {};
       const refs = (...names) => names.map((name) => encode[name]).filter(Boolean);
       const x = refs("x", "xc", "x2");
       const y = refs("y", "yc", "y2");
+      if (mark.type === "group") {
+        const groupby = mark.from?.facet?.groupby;
+        const moved = (refs) => refs.filter((ref) => ref.scale && groupby?.includes(ref.field));
+        groups.push({ group: mark, position: groupby ? [moved(x), moved(y)] : position });
+        continue;
+      }
+      if (!mark.name || mark.name.endsWith("_voronoi")) continue;
       const series = refs("fill", "stroke", "shape");
       const firstList = (positions) => positions.find((ref) => listFields.has(ref.field));
-      const category = firstList(x) ?? firstList(y);
-      const candidates = [...x, ...y, ...series];
+      const [groupX = [], groupY = []] = position;
+      const category = firstList([...x, ...groupX]) ?? firstList([...y, ...groupY]);
+      const candidates = [...x, ...groupX, ...y, ...groupY, ...series];
       const targets = [...new Set([...series, category].map((ref) => ref?.field).filter((field) => listFields.has(field)))];
       const boundBins = candidates.map((ref) => bins.filter((bin) => ref.field === bin.from || ref.field === bin.to));
       const bin = boundBins.find((matches) => matches.length === 1)?.[0];
@@ -1057,7 +1060,7 @@ function vegaInteractions(lite, compiled) {
       for (const ref of candidates) {
         for (const rule of [ref].flat()) {
           if (typeof rule.scale !== "string" || rule.field == null) continue;
-          const supported = !Array.isArray(ref) && (series.includes(ref) || ref === category) && listFields.has(rule.field);
+          const supported = !Array.isArray(ref) && (series.includes(ref) || rule.field === category?.field) && listFields.has(rule.field);
           if (!scaleFields.has(rule.scale)) scaleFields.set(rule.scale, new Set());
           scaleFields.get(rule.scale).add(supported ? rule.field : null);
         }
@@ -1089,7 +1092,7 @@ function vegaInteractions(lite, compiled) {
         guide.encode = fade(guide.encode, part, `datum.value !== ${JSON.stringify(state.filters[field])}`, opacity);
     }
   };
-  for (const group of groups) {
+  for (const { group } of groups) {
     for (const axis of group.axes ?? [])
       if (axis.labels !== false) bindGuide(axis, ["labels"], [axis.scale], "fillOpacity");
     for (const legend of group.legends ?? [])
@@ -1328,10 +1331,12 @@ async function drawChart(entry) {
     lite.$schema = "https://vega.github.io/schema/vega-lite/v6.json";
     lite.autosize = { type: "fit-x", contains: "padding" };
     lite.config = { ...config(vars()), ...lite.config };
+    const named = raw && lite.data?.name;
+    const placeholder = named ? [{ reportSource: undefined }] : null;
+    if (placeholder) lite.data = { values: placeholder };
     const compiled = compile(lite).spec;
     const interactions = raw ? vegaInteractions(lite, compiled) : null;
-    const named = raw && lite.data?.name;
-    const source = named && compiled.data?.find((dataset) => dataset.name === named);
+    const source = placeholder && compiled.data?.find((dataset) => dataset.values === placeholder);
     if (source) source.values = rowsOf(named, interactions.fields, interactions.ranges);
     const targets = chartTargets(block);
     if (targets) clickableSpec(compiled, block, targets);

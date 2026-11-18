@@ -191,11 +191,18 @@ const spread = {
 }
 
 test("a click on a histogram bin filters by its range, and a click on a vega mark by its list filter", async () => {
-  writeFileSync(join(dir, "spread.json"), JSON.stringify(spread))
-  execFileSync("node", [join(skill, "scripts/build.mjs"), "spread.json", "spread.html"], { cwd: dir, stdio: "pipe" })
   const browser = await chromium.launch()
   try {
     for (const phone of [false, true]) {
+      const dataset = phone ? "root" : "data_0"
+      const fixture = structuredClone(spread)
+      fixture.data[dataset] = fixture.data.byTeam
+      fixture.views[0].blocks[1].spec.data.name = dataset
+      writeFileSync(join(dir, "spread.json"), JSON.stringify(fixture))
+      execFileSync("node", [join(skill, "scripts/build.mjs"), "spread.json", "spread.html"], {
+        cwd: dir,
+        stdio: "pipe",
+      })
       const page = await browser.newPage(
         phone
           ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }
