@@ -34,6 +34,9 @@ function serverLogged(failure: v.InferOutput<typeof Failure>, status: number) {
   )
 }
 
+// ViteHub keeps 300 characters of a field's string.
+const text = (value?: string) => value?.slice(0, 300)
+
 /**
  * A reporter that hands `send` each failure worth knowing about. It skips what the server logged itself and what isn't
  * a failure: an aborted request, an offline browser, a page that's leaving (its requests fail as it goes). `send` is
@@ -54,8 +57,7 @@ export function createClientErrorReporter(
       parsed.response?.headers.get("cf-ray") ??
       parsed.response?.headers.get("x-request-id") ??
       undefined
-    // ViteHub takes flat values only, and keeps 300 characters of a string.
-    const text = (value?: string) => value?.slice(0, 300)
+    // ViteHub takes flat values only.
     const flat = Object.fromEntries(
       Object.entries({
         status: status ?? fields.status,
