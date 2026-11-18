@@ -770,7 +770,7 @@ function download() {
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as agents get it (server/middleware/0.09.drop-markdown.ts). Only Markdown docs: an HTML page's
+// The version on screen, as agents get it (server/routes/d/[link]/[slug].md.get.ts). Only Markdown docs: an HTML page's
 // Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 

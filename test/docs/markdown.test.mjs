@@ -45,9 +45,10 @@ codex mcp add drop
 - An *app*
 `,
   )
+  // The page's own path stays HTML here: ViteHub Content answers `Accept: text/markdown` with this copy.
   const asked = await app.fetch(
     new Request("https://drop.example/docs/agents", { headers: { accept: "text/markdown" } }),
   )
-  assert.match(await asked.text(), /^# Agents/)
+  assert.equal(asked.headers.get("content-type"), "text/html")
   assert.equal((await app.fetch(new Request("https://drop.example/docs/nope.md"))).status, 404)
 })

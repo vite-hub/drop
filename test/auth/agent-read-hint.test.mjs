@@ -70,3 +70,18 @@ test("public and signed-in team reads keep passing through to the page", async (
   assert.equal(response.status, 200)
   assert.equal(await response.text(), "browser page")
 })
+
+test("a share link's .md copy passes the same gate, then its route answers without a redirect", async () => {
+  insertDrop("public", { share: "public" })
+  const headers = { accept: "*/*" }
+  for (const path of ["/d/public.md", "/d/public/any-slug.md"]) {
+    const response = await request(path, headers)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), "browser page")
+  }
+  for (const path of ["/d/private.md", "/d/missing/slug.md"]) {
+    const response = await request(path, headers)
+    assert.equal(response.status, 404)
+    assert.match(await response.text(), /read_drop MCP tool/)
+  }
+})

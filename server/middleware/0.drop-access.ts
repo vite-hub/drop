@@ -25,7 +25,11 @@ export default defineHandler(async (event) => {
   }
   // `/d/<link>`, the address the page settles on, `/d/<link>/<slug>`, and a page of an app under it,
   // `/d/<link>/<slug>/guide/setup`.
-  const page = event.url.pathname.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
+  // The Markdown copy of a share link, `/d/<link>.md` or `/d/<link>/<slug>.md`, passes the same gate, then its route
+  // answers (server/routes/d).
+  const markdown = /^\/d\/[^/]+(?:\/[^/]+)?\.md$/.test(event.url.pathname)
+  const path = markdown ? event.url.pathname.slice(0, -".md".length) : event.url.pathname
+  const page = path.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
   if (!page) return
   const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([
     import("../utils/drops"),
@@ -60,6 +64,7 @@ export default defineHandler(async (event) => {
     throw notFound()
   }
   event.res.headers.set("Cache-Control", "private, no-store")
+  if (markdown) return
   const { dropPath, slugify } = await import("../../shared/links")
   const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
   // A path under the link is a page of the app: the link opens it as `?path=`, where the viewer keeps an app's address
