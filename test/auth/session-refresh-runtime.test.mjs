@@ -36,13 +36,18 @@ test.skipIf(!origin || !database)(
     const { id, slug } = await created.json()
     // Six days in, the next request is due to extend the session.
     const aged = Date.now() + day
+    const missing = crypto.randomUUID()
 
-    // Opening a drop and an API call both read the session on the server, not through /api/auth/get-session.
-    for (const path of [`/d/${id}/${slug}`, "/api/me"]) {
+    for (const [path, status] of [
+      [`/d/${id}/${slug}`, 200],
+      ["/api/me", 200],
+      [`/d/${missing}`, 404],
+      [`/api/drops/${missing}`, 404],
+    ]) {
       db.prepare("UPDATE session SET expires_at = ? WHERE user_id = ?").run(aged, userId)
       const response = await fetch(new URL(path, origin), { headers: { origin, cookie }, redirect: "manual" })
       await response.body?.cancel()
-      assert.equal(response.status, 200, path)
+      assert.equal(response.status, status, path)
       const { expires_at: expiresAt } = db.prepare("SELECT expires_at FROM session WHERE user_id = ?").get(userId)
       assert.ok(expiresAt > aged + 5 * day, `${path} extends the session in the database`)
       const renewed = response.headers.getSetCookie().find((value) => /session_token=/.test(value))

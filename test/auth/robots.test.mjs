@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { H3Event } from "h3"
 import { test, vi } from "vite-plus/test"
 
 vi.mock("nitro", () => ({ definePlugin: (plugin) => plugin }))
@@ -19,7 +20,7 @@ test("share links stay crawlable so crawlers see their noindex header", () => {
   for (const path of ["/d/abc/before-after", "/d/abc/before-after.md", "/f/00000000-0000-4000-8000-000000000001.png"]) {
     assert.ok(!blocks(rules, path), path)
     const response = new Response("bytes")
-    onResponse(response, { req: new Request(`https://drop.example${path}`) })
+    onResponse(response, new H3Event(new Request(`https://drop.example${path}`)))
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow", path)
   }
 })

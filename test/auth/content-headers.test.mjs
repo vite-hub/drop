@@ -1,17 +1,21 @@
 import assert from "node:assert/strict"
 import { test, vi } from "vite-plus/test"
+import { H3, H3Event, HTTPError, HTTPResponse } from "h3"
+import { state } from "../cost/harness.mjs"
 
 vi.mock("nitro", () => ({ definePlugin: (plugin) => plugin }))
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ seoIndex: false }) }))
 
 const { default: contentHeaders } = await import("../../server/plugins/content-headers.ts")
+const { default: contentError } = await import("../../server/handlers/content-error.ts")
+const { sessionOf } = await import("../../server/utils/identity.ts")
 let onResponse
 await contentHeaders({ hooks: { hook: (_name, fn) => (onResponse = fn) } })
 
 const key = "00000000-0000-4000-8000-000000000001"
 function respond(path, init = {}) {
   const response = new Response(init.status === 304 ? null : "bytes", init)
-  onResponse(response, { req: new Request(`https://drop.example${path}`) })
+  onResponse(response, new H3Event(new Request(`https://drop.example${path}`)))
   return response.headers.get("cache-control")
 }
 
@@ -48,4 +52,41 @@ test("an answer that sets a cookie is never kept, whatever it was cached for", (
   assert.equal(respond("/llms.txt", session("public, max-age=300")), "private, no-store")
   assert.equal(respond("/_nuxt/app.js", session("public, max-age=31536000, immutable")), "private, no-store")
   assert.equal(respond(`/f/${key}.png`, session("private, no-cache", { ETag: '"abc"' })), "private, no-store")
+})
+
+test("session renewal reaches the final response, including HTML, JSON and plain-text misses", async () => {
+  const renewal = "session_token=renewed; Path=/; Max-Age=604800; HttpOnly"
+  const replacement = "session_token=replacement; Path=/; HttpOnly"
+  const authApi = state.authApi
+  state.authApi = {
+    getSession: async ({ returnHeaders }) => {
+      assert.equal(returnHeaders, true)
+      return { headers: new Headers({ "Set-Cookie": renewal }), response: null }
+    },
+  }
+  try {
+    const app = new H3({ onError: contentError, onResponse }).use(async (event) => {
+      await sessionOf(event)
+      event.context.dropIdentity = Promise.resolve(null)
+    })
+    app.get("/d/missing", () => {
+      throw new HTTPError({ status: 404 })
+    })
+    app.get("/api/drops/missing", () => {
+      throw new HTTPError({ status: 404 })
+    })
+    app.get("/d/plain", () => new HTTPResponse("Not found", { status: 404 }))
+    app.get("/api/me", (event) => {
+      event.res.headers.append("Set-Cookie", replacement)
+      return { ok: true }
+    })
+    for (const path of ["/d/missing", "/api/drops/missing", "/d/plain", "/api/me"]) {
+      const response = await app.fetch(new Request(`https://drop.example${path}`))
+      assert.equal(response.status, path === "/api/me" ? 200 : 404, path)
+      assert.deepEqual(response.headers.getSetCookie(), path === "/api/me" ? [renewal, replacement] : [renewal], path)
+      assert.equal(response.headers.get("cache-control"), "private, no-store", path)
+    }
+  } finally {
+    state.authApi = authApi
+  }
 })

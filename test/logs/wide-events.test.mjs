@@ -8,7 +8,7 @@ const session = { current: null }
 state.authApi = {
   getSession: async () => {
     if (session.current instanceof Error) throw session.current
-    return session.current
+    return { headers: new Headers(), response: session.current }
   },
 }
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ deployment: { host: "vps" } }) }))

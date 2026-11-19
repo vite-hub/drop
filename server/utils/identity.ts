@@ -20,6 +20,7 @@ declare module "h3" {
     /** On a page render's own API call (useApi), the page's request: same visitor, same cookie, already identified. */
     dropPage?: H3Event
     dropAccessChecked?: boolean
+    dropSessionCookies?: string[]
   }
 }
 
@@ -69,14 +70,16 @@ export const authFor = (event: H3Event) => useAuth(event)
 /**
  * The browser's session, with its cookie kept in step. Once a day Better Auth extends a session: it writes the new expiry
  * to the database and sends a fresh cookie on the call's own response. A server-side call drops that response, so
- * without this the cookie lapsed a week after sign-in while the database still said the session was live.
+ * without this the cookie lapsed a week after sign-in while the database still said the session was live. Keep the
+ * cookies for the final response hook, since an error handler can replace the response and its headers.
  */
 export async function sessionOf(event: H3Event) {
   const { headers, response } = await authFor(event).api.getSession({
     headers: event.req.headers,
     returnHeaders: true,
   })
-  for (const cookie of headers.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
+  const cookies = headers.getSetCookie()
+  if (cookies.length) (event.context.dropSessionCookies ??= []).push(...cookies)
   return response
 }
 

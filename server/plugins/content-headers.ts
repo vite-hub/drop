@@ -33,6 +33,12 @@ export default definePlugin((app) => {
       const indexed = useRuntimeConfig().seoIndex && isIndexedPath(path)
       if (!file && !indexed && !response.headers.has("X-Robots-Tag")) response.headers.set("X-Robots-Tag", "noindex")
     }
+    const sessionCookies = event.context.dropSessionCookies
+    if (sessionCookies?.length) {
+      const responseCookies = response.headers.getSetCookie()
+      response.headers.delete("Set-Cookie")
+      for (const cookie of [...sessionCookies, ...responseCookies]) response.headers.append("Set-Cookie", cookie)
+    }
     // An answer that sets a cookie belongs to whoever it signs in, whatever its path: the auth proxy's middleware
     // (../middleware/0.15.proxy-session.ts) adds one to any request. A shared cache would replay it to the next reader.
     if (response.headers.has("Set-Cookie")) response.headers.set("Cache-Control", "private, no-store")
