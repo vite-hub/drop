@@ -219,15 +219,6 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
 export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
 
 /**
- * Whether a comment's page, as `reviewPage` keeps it, is `page` with or without a query or hash. A `page` ending in a
- * slash covers every page under it, so a preview's root address covers that whole preview.
- */
-export function onPage(commentPage: string | null, page: string) {
-  if (commentPage === null || !commentPage.startsWith(page)) return false
-  return page.endsWith("/") || /^(?:[?#]|$)/.test(commentPage.slice(page.length))
-}
-
-/**
  * Who may resolve or reopen a thread on a site review: its author, guests included, and anyone signed in who may
  * comment on the site, with their agents. The people reviewing a site and the agents fixing it close each other's
  * comments once they're fixed; otherwise fixed comments stay pinned to the page until the site's owner comes by.
