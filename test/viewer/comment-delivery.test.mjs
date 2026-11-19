@@ -20,11 +20,11 @@ test("a comment on its way says nothing at first, then a muted 'Waiting to send'
     assert.equal(deliveryLine(pending({ status, why: "Busy" }), written, written + 5_000)?.state, "waiting")
 })
 
-test("a 401 asks the reader to sign in, at once", () => {
+test("a 401 asks the reader to sign in, at once, or to discard it", () => {
   assert.deepEqual(deliveryLine(pending({ status: 401, why: "Sign in again." }), written, written), {
     state: "sign-in",
     text: "Sign in to send",
-    actions: ["sign-in"],
+    actions: ["sign-in", "discard"],
   })
 })
 

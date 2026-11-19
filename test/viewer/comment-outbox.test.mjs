@@ -420,3 +420,60 @@ test("a guest's comment says nobody's name", { timeout: 10_000 }, async () => {
   await vi.waitFor(() => assert.equal(state.list.value[0]?.id, "c1"), { timeout: 5_000 })
   assert.equal("as" in fetches[0].body, false)
 })
+
+test(
+  "a waiting comment's and reply's images show from the browser, and their addresses go once they land",
+  { timeout: 10_000 },
+  async () => {
+    const made = []
+    const revoked = []
+    vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      made.push(blob)
+      return `blob:local/${made.length}`
+    })
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => void revoked.push(url))
+    let online = false
+    answer = (url, body) => {
+      if (!online) return offline()
+      return url === "/api/drops/doc/comments" ? comment("c1", body.body, body.requestId) : reply("r1", body.body)
+    }
+    const { state } = open()
+    const shot = new File(["png"], "screenshot.png", { type: "image/png" })
+    const pasted = new File(["gif"], "pasted.gif", { type: "image/gif" })
+
+    const parent = await state.addComment(place, "The chart is cut off", [shot])
+    await state.addReply(parent.value.id, "Here it is on mobile", [pasted])
+    const [waiting] = state.list.value
+    assert.deepEqual(
+      waiting.attachments.map((file) => [file.filename, file.contentType, file.size, file.url]),
+      [["screenshot.png", "image/png", 3, "blob:local/1"]],
+    )
+    assert.deepEqual(
+      waiting.replies[0].attachments.map((file) => [file.filename, file.url]),
+      [["pasted.gif", "blob:local/2"]],
+    )
+    // The list is computed again on every change; each image keeps the one address.
+    state.comments.data.value = []
+    assert.equal(state.list.value[0].attachments[0].url, "blob:local/1")
+    assert.equal(made.length, 2)
+    assert.deepEqual(revoked, [])
+
+    online = true
+    await vi.waitFor(() => assert.equal(app.entries.value.length, 0), { timeout: 5_000 })
+    await vi.waitFor(() => assert.deepEqual(revoked.toSorted(), ["blob:local/1", "blob:local/2"]))
+    vi.restoreAllMocks()
+  },
+)
+
+test("a waiting image's address goes when the page closes", async () => {
+  const revoked = []
+  vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:local/1")
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => void revoked.push(url))
+  answer = offline
+  const { state, close } = open()
+  await state.addComment(place, "The chart is cut off", [new File(["png"], "chart.png", { type: "image/png" })])
+  assert.equal(state.list.value[0].attachments[0].url, "blob:local/1")
+  close()
+  assert.deepEqual(revoked, ["blob:local/1"])
+  vi.restoreAllMocks()
+})

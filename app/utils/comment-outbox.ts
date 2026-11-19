@@ -1,6 +1,6 @@
 import type { CommentDelivery, CommentsOutboxEntry, CommentsTransport, CommentThread } from "vite-hub/comments/client"
 import type { CommentInput } from "#shared/schemas"
-import type { CommentReply, DropComment } from "#shared/types"
+import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
 import * as v from "valibot"
 import { toThread } from "./comment-threads"
 
@@ -269,6 +269,53 @@ interface OutboxView {
   accepted: ReadonlyMap<string, string>
   /** The id the server gives each waiting reply (replyMessageId), by replyKey, once the browser has worked it out. */
   replyIds?: ReadonlyMap<string, string>
+  /** Where the browser shows a waiting image (fileUrls), until the server has its own copy. */
+  fileUrl?: (file: Blob) => string
+}
+
+/** The key of a waiting image among a message's attachments: no drop has it yet, so attachmentUrl asks the browser. */
+export const LOCAL_ATTACHMENT = "local:"
+
+/**
+ * A waiting comment's or reply's images, as the server will list them, shown from the browser's copy. A site comment's
+ * first file is the screenshot of its box, named so the row shows it as the server's copy would.
+ */
+function localAttachments(entry: CommentsOutboxEntry, view: OutboxView, screenshotFirst = false): CommentAttachment[] {
+  const { fileUrl } = view
+  if (!fileUrl) return []
+  return entry.files.map((file, index) => ({
+    id: `${LOCAL_ATTACHMENT}${entry.id}:${index}`,
+    filename:
+      file instanceof File && file.name ? file.name : screenshotFirst && index === 0 ? "screenshot.png" : "image",
+    contentType: file.type,
+    size: file.size,
+    url: fileUrl(file),
+  }))
+}
+
+/**
+ * Object URLs for the outbox's images, one per Blob however often the list is computed. `keep` revokes the ones whose
+ * entry left the outbox (landed or discarded), `clear` all of them, when the page goes.
+ */
+export function fileUrls() {
+  const urls = new Map<Blob, string>()
+  const keep = (files: Iterable<Blob>) => {
+    const kept = new Set(files)
+    for (const [file, url] of urls)
+      if (!kept.has(file)) {
+        URL.revokeObjectURL(url)
+        urls.delete(file)
+      }
+  }
+  return {
+    urlOf(file: Blob) {
+      let url = urls.get(file)
+      if (!url) urls.set(file, (url = URL.createObjectURL(file)))
+      return url
+    },
+    keep,
+    clear: () => keep([]),
+  }
 }
 
 /** A waiting reply's key in OutboxView.replyIds: the server's thread and the reply's retry key. */
@@ -352,7 +399,7 @@ function pendingReply(entry: CommentsOutboxEntry, view: OutboxView): CommentRepl
     createdAt: entry.createdAt,
     editedAt: null,
     mine: true,
-    attachments: [],
+    attachments: localAttachments(entry, view),
     requestId: entry.requestId,
     delivery: delivery(entry),
   }
@@ -367,6 +414,7 @@ function pendingComment(entry: CommentsOutboxEntry, target: Target, view: Outbox
     authorImage: view.author.image,
     mentions: entry.input.mentions ?? [],
     mine: true,
+    attachments: localAttachments(entry, view, target.route === "review"),
     requestId: entry.requestId,
     delivery: delivery(entry),
   }

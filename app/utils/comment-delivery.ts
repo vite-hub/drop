@@ -41,7 +41,7 @@ export function deliveryLine(delivery: CommentDelivery, since: number, now: numb
     }
   }
   // Held for the reader: it goes out once they sign in again, or once the plan has room.
-  if (status === 401) return { state: "sign-in", text: "Sign in to send", actions: ["sign-in"] }
+  if (status === 401) return { state: "sign-in", text: "Sign in to send", actions: ["sign-in", "discard"] }
   if (status === 402) return { state: "plan", text: why || "Plan limit reached", actions: ["retry"] }
   if (now - since < WAITING_NOTICE_MS) return undefined
   return { state: "waiting", text: "Waiting to send", actions: [] }
