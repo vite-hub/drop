@@ -6,6 +6,7 @@ import { insertDrop, migrate, objects, reset, sql, state, who } from "../cost/ha
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
 const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops } = await import("../../server/utils/drops.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
+const { renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -81,12 +82,16 @@ test("a teammate's upload follows the document across publishing, sharing change
 test("only referenced draft images become public when a new version is published", async () => {
   insertDrop("public-draft", { share: "public" })
   const published = await upload("public-draft")
+  const standalone = await upload("public-draft")
+  const before = await upload("public-draft")
+  const after = await upload("public-draft")
   const unused = await upload("public-draft")
+  const referenced = [published, standalone, before, after]
   const origin = "https://drop.example"
   const attachments = async () => (await dropDetail(await findDrop("public-draft"), null, origin)).attachments
   await readFile(published.url)
   state.who = null
-  await assert.rejects(readFile(published.url), status(404))
+  for (const file of referenced) await assert.rejects(readFile(file.url), status(404))
   assert.deepEqual(await attachments(), [])
   const publish = (source) =>
     createDocDrop(who, {
@@ -94,16 +99,29 @@ test("only referenced draft images become public when a new version is published
       supersedes: "public-draft",
       bytes: new TextEncoder().encode(source),
     })
-  await publish(`An edit with a URL in code: \`${published.url}\`.`)
-  await assert.rejects(readFile(published.url), status(404))
+  await publish(`An edit with URLs in code: \`${published.url}\` and \`${standalone.url}\`.`)
+  for (const file of referenced) await assert.rejects(readFile(file.url), status(404))
   assert.deepEqual(await attachments(), [])
-  await publish(`![Screenshot](${published.url})`)
-  await readFile(published.url)
+  const source = `![Screenshot](${published.url})
+
+::screenshot{src="${standalone.url}" alt="Overview"}
+::
+
+::compare
+:::screenshot{src="${before.url}" alt="Before the edit"}
+:::
+:::screenshot{src="${after.url}" alt="After the edit"}
+:::
+::
+`
+  await publish(source)
+  const { html } = await renderMarkdownCached("published-screenshots", async () => source)
+  for (const file of referenced) {
+    assert.ok(html.includes(`src="${file.url}"`), `${file.url} is rendered as an image source`)
+    await readFile(file.url)
+  }
   await assert.rejects(readFile(unused.url), status(404))
-  assert.deepEqual(
-    (await attachments()).map((file) => file.url),
-    [published.url],
-  )
+  assert.deepEqual(new Set((await attachments()).map((file) => file.url)), new Set(referenced.map((file) => file.url)))
   await publish("The screenshot is still available in the older version.")
   await readFile(published.url)
 })

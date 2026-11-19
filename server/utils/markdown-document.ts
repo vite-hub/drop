@@ -155,7 +155,7 @@ export async function referencedFileKeys(source: string, fileLink: RegExp) {
     for (const node of nodes) {
       if (!Array.isArray(node) || node[0] === null) continue
       const [tag, attrs, ...children] = node
-      const url = textValue(tag === "img" ? attrs.src : tag === "a" ? attrs.href : undefined)
+      const url = textValue(tag === "img" || tag === "screenshot" ? attrs.src : tag === "a" ? attrs.href : undefined)
       const [match] = url?.matchAll(fileLink) ?? []
       if (match?.[1]) keys.add(match[1])
       collect(children)
