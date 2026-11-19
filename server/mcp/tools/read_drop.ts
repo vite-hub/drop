@@ -14,7 +14,7 @@ import { listComments, toolbarThreadsOn } from "../../utils/comments"
 import { dropDetail, permissions } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { type Identity, requireIdentity } from "../../utils/identity"
-import { findDropOrSite, onPage, originOf, siteItems } from "../../utils/review"
+import { findDropOrSite, originOf, siteItems } from "../../utils/review"
 import { countView } from "../../utils/views"
 import { runtimeErrors } from "../../utils/runtime-errors"
 import { writtenBy } from "#shared/agents"
@@ -74,7 +74,13 @@ export default defineMcpTool({
     const resources = detail.resources ? { resources: detail.resources } : {}
     const toolbar = await toolbarComments(drop.id, new URL(meta.url).pathname, who)
     if (drop.kind === "site") {
-      const { list, unavailable } = await unlessUnavailable(siteItems(drop, who, event.url.origin))
+      // Every open one, past Comments' 500 at once; with `resolved`, the 500 most active besides.
+      const { list, unavailable } = await unlessUnavailable(
+        Promise.all([
+          siteItems(drop, who, event.url.origin, undefined, { open: true }),
+          resolved ? siteItems(drop, who, event.url.origin) : [],
+        ]).then(([open, all]) => [...open, ...all.filter((item) => item.resolved)]),
+      )
       // Every comment on the preview, not only the asked page's: reviewers comment across tabs in one round, and an agent
       // that read one page left the comments on its sibling tab pinned for the next review.
       const preview = page && isSitePattern(drop.siteUrl!) ? originOf(page) : null
@@ -279,7 +285,7 @@ function byPage(items: SiteReviewItem[], page: string | null) {
     .map(([path, list]) => ({
       path,
       items: list,
-      asked: page !== null && list.some((item) => onPage(item.page, page)),
+      asked: page !== null && path === pathOf(page),
     }))
     .sort((a, b) => Number(b.asked) - Number(a.asked) || latest(b.items) - latest(a.items))
 }

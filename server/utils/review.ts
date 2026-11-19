@@ -686,16 +686,18 @@ async function insertReviewComment(
 
 /**
  * The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps
- * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active.
+ * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active; `open` lists every open
+ * one instead.
  */
 export async function siteItems(
   site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
   who: Identity | null,
   origin: string,
   page?: string,
+  { open = false } = {},
 ): Promise<SiteReviewItem[]> {
   const [{ threads, attachments }, shots] = await Promise.all([
-    threadsFor(site),
+    threadsFor(site, { open }),
     db
       .select({ id: drops.id, slug: drops.slug, blobKey: drops.blobKey })
       .from(drops)
@@ -775,7 +777,6 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     author: { name: writtenBy(item), image: item.agent ? null : item.authorImage },
     createdAt: item.createdAt,
     resolved: item.resolved,
-    resolvedBy: item.resolved ? (item.resolvedBy?.name ?? null) : null,
     mine: item.mine,
     canResolve: others || item.mine,
     page: item.page,

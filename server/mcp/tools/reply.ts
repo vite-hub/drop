@@ -48,23 +48,33 @@ export default defineMcpTool({
     if (resolved) await setResolved(thread, true, who)
     logDrop(event, drop, { change: resolved ? "reply-resolve" : "reply" })
     const within = page && drop.kind === "site" && isSitePattern(drop.siteUrl!) ? originOf(page) : undefined
-    const open = [...(await openByPage(drop, within))].flatMap(([where, list]) =>
-      list.filter((item) => item.n !== n).map((item) => ({ ...item, page: where || "/" })),
+    // What's left, so an agent never says it's done while pins it didn't answer stay on the page. The reply is saved
+    // either way: a failed count says so instead of failing the call, which would only get the reply sent twice.
+    const open = await openByPage(drop, within).then(
+      (pages) => [...pages].flatMap(([where, list]) => list.map((item) => ({ ...item, page: where || "/" }))),
+      () => null,
     )
-    // What's left, so an agent never says it's done while pins it didn't answer stay on the page.
-    const owed = open.filter((item) => !item.answered)
-    const waiting = open.filter((item) => item.answered)
-    const numbers = (list: typeof open) =>
-      list.map((item) => `#${item.n}${drop.kind === "site" ? ` on ${item.page}` : ""}`).join(", ")
-    const still = [
-      owed.length
-        ? `Still open with no answer from you: ${numbers(owed)}. Answer each before you say the review is done.`
-        : "Every other open comment has your answer.",
-      ...(waiting.length ? [`Waiting on the reviewer after your reply: ${numbers(waiting)}.`] : []),
-    ].join(" ")
+    const replied = `Replied to #${n}${resolved ? " and resolved it" : ""}.`
     return {
-      content: [{ type: "text" as const, text: `Replied to #${n}${resolved ? " and resolved it" : ""}. ${still}` }],
+      content: [
+        { type: "text" as const, text: `${replied} ${open ? stillOpen(open, drop.kind === "site") : UNCOUNTED}` },
+      ],
       structuredContent: { comment: n, reply, ...(resolve ? { resolved } : {}), stillOpen: open },
     }
   },
 })
+
+const UNCOUNTED = "What's still open couldn't be read just now: read the drop again before you say the review is done."
+
+/** The open comments with no answer from an agent, and the ones waiting on the reviewer after one. */
+function stillOpen(open: { n: number; answered: boolean; page: string }[], site: boolean) {
+  const numbers = (list: typeof open) => list.map((item) => `#${item.n}${site ? ` on ${item.page}` : ""}`).join(", ")
+  const owed = open.filter((item) => !item.answered)
+  const waiting = open.filter((item) => item.answered)
+  return [
+    owed.length
+      ? `Still open with no answer from you: ${numbers(owed)}. Answer each before you say the review is done.`
+      : "Every open comment has your answer.",
+    ...(waiting.length ? [`Waiting on the reviewer after your reply: ${numbers(waiting)}.`] : []),
+  ].join(" ")
+}

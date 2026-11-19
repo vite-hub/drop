@@ -172,18 +172,6 @@ function agentOf(actor: CommentActor | undefined): CommentAgent | null {
   return { name, image: knownAgent(actor.id)?.logo ?? knownAgent(name)?.logo ?? null }
 }
 
-/**
- * The agent that resolved a thread. Comments keeps only the person who resolved it, so this is the agent whose reply
- * closed it: `reply` with `resolve: true` posts the reply and resolves it in one call, as that person.
- */
-function resolvedByAgent(thread: CommentThread): CommentAgent | null {
-  const last = thread.messages.length > 1 ? thread.messages.at(-1) : undefined
-  if (thread.status !== "resolved" || !thread.resolvedAt || !last?.actor) return null
-  if (thread.resolvedBy && thread.resolvedBy.id !== last.author.id) return null
-  const gap = thread.resolvedAt - last.createdAt
-  return gap >= 0 && gap < 60_000 ? agentOf(last.actor) : null
-}
-
 const isMine = (author: CommentUser, who: Identity | null) => Boolean(who && author.id === who.userId)
 /** Whether `who` wrote the thread's first message, which lets them resolve or delete it. */
 export const wroteThread = (thread: CommentThread, who: Identity | null) => isMine(thread.author, who)
@@ -251,7 +239,6 @@ export function toComment(
     mentions: first?.mentions ?? [],
     resolved: thread.status === "resolved",
     resolvedAt: thread.resolvedAt ?? null,
-    resolvedBy: resolvedByAgent(thread),
     createdAt: thread.createdAt,
     editedAt: first?.editedAt ?? null,
     version: thread.version,
@@ -279,19 +266,46 @@ async function threadsOf(list: CommentList, version?: number) {
   return threads.flatMap((thread) => dropThread(thread) ?? [])
 }
 
+/**
+ * Every open thread of a list, page by page past Comments' 500 at once: what an agent still owes an answer must not
+ * stop at the most active threads, which on a pattern site can all be other previews' resolved ones. Past 20 pages it
+ * says it can't tell, rather than report the rest as done.
+ */
+async function openThreadsOf(list: CommentList, version?: number) {
+  const all: CommentThread[] = []
+  let before: { updatedAt: number; id: string } | undefined
+  for (let page = 0; page < 20; page++) {
+    const [error, threads] = await comments.list({
+      subject: list.subject,
+      status: "open",
+      limit: 500,
+      ...(version === undefined ? {} : { revision: { lte: version } }),
+      ...(before ? { before } : {}),
+    })
+    if (error) throw commentsFailure(error)
+    all.push(...threads)
+    const last = threads.at(-1)
+    if (threads.length < 500 || !last) return all.flatMap((thread) => dropThread(thread) ?? [])
+    before = { updatedAt: last.updatedAt, id: last.id }
+  }
+  throw new HTTPError({ status: 503, statusText: "More than 10,000 comments are open; not all could be read" })
+}
+
 /** The images of a list's comments and replies, by id. Read beside the threads, not after them. */
 async function imagesOf(list: CommentList): Promise<Attachments> {
   return new Map((await attachmentsUnder(list.parents)).map((file) => [file.id, toAttachment(file)]))
 }
 
 /**
- * The threads and images of a list. A site lists all of them, with its screenshots'; a screenshot only its own. A
+ * The threads and images of a list. A site lists all of them, with its screenshots'; a screenshot only its own. `open`
+ * reads every open one instead of the 500 most active. A
  * version lists its own and those of every version before it: a comment stays with the doc until someone resolves it.
  */
-export async function threadsFor(row: Commented) {
+export async function threadsFor(row: Commented, { open = false } = {}) {
   const list = await commentList(row)
+  const version = list.subject.kind === "drop" ? row.version : undefined
   const [threads, attachments] = await Promise.all([
-    threadsOf(list, list.subject.kind === "drop" ? row.version : undefined),
+    open ? openThreadsOf(list, version) : threadsOf(list, version),
     imagesOf(list),
   ])
   return { threads: list.shot ? threads.filter((thread) => thread.meta.dropId === row.id) : threads, attachments }
@@ -303,10 +317,10 @@ export async function threadsFor(row: Commented) {
  */
 export async function openByPage(row: Commented, within?: string) {
   const list = await commentList(row)
-  const threads = await threadsOf(list, list.subject.kind === "drop" ? row.version : undefined)
+  const threads = await openThreadsOf(list, list.subject.kind === "drop" ? row.version : undefined)
   const pages = new Map<string, { n: number; answered: boolean }[]>()
   for (const thread of threads.sort((a, b) => a.n - b.n)) {
-    if (thread.status !== "open" || (list.shot && thread.meta.dropId !== row.id)) continue
+    if (list.shot && thread.meta.dropId !== row.id) continue
     if (within && !thread.meta.page?.startsWith(within)) continue
     const page = (thread.meta.page ?? "").replace(/[?#].*$/, "")
     pages.set(page, [...(pages.get(page) ?? []), { n: thread.n, answered: answeredByAgent(thread) }])

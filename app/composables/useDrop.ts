@@ -66,7 +66,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     const resolvedAt = (comment: DropComment) =>
       resolved ? Math.max(Date.now(), ...comment.replies.map((reply) => reply.createdAt)) : null
     comments.data.value = before.map((comment) =>
-      comment.id === commentId ? { ...comment, resolved, resolvedAt: resolvedAt(comment), resolvedBy: null } : comment,
+      comment.id === commentId ? { ...comment, resolved, resolvedAt: resolvedAt(comment) } : comment,
     )
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "PATCH", body: { resolved } })

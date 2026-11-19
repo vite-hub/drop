@@ -677,7 +677,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function renderThread(item) {
-    $(".title", thread).textContent = "#" + item.n + (item.resolved ? " · Resolved" + (item.resolvedBy ? " by " + item.resolvedBy : "") : "");
+    $(".title", thread).textContent = "#" + item.n + (item.resolved ? " · Resolved" : "");
     const resolve = $("[data-act=resolve]", thread);
     resolve.hidden = !item.canResolve;
     resolve.innerHTML = item.resolved ? ${JSON.stringify(ICONS.reopen)} : ${JSON.stringify(ICONS.check)};
