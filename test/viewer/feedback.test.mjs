@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { awaitingAnswer, needsLook } from "../../app/utils/comment-threads.ts"
+import { needsLook } from "../../app/utils/comment-threads.ts"
 import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "../../shared/feedback.ts"
 
 test("copied image-only feedback includes fetchable comment and reply images", () => {
@@ -94,26 +94,14 @@ const reply = (fields) => ({
   ...fields,
 })
 
-test("the prompt waits on open threads where the reader spoke last, not an agent writing for them", () => {
+test("a resolved thread with a reply since asks for a look", () => {
   const resolvedWithFollowUp = thread(7, {
     resolved: true,
     resolvedAt: 1,
     replies: [reply({ mine: true, body: "Not yet" })],
   })
   assert.equal(needsLook(resolvedWithFollowUp), true)
-  const waiting = awaitingAnswer([
-    thread(3),
-    thread(1, { resolved: true, resolvedAt: 1 }),
-    thread(2, { mine: false, replies: [reply({ mine: true, body: "Still off" })] }),
-    thread(4, { replies: [reply({ body: "Fixed in v2" })] }),
-    thread(5, { mine: false }),
-    thread(6, { agent: { name: "Claude", image: null } }),
-    resolvedWithFollowUp,
-  ])
-  assert.deepEqual(
-    waiting.map((comment) => comment.n),
-    [2, 3],
-  )
+  assert.equal(needsLook(thread(1, { resolved: true, resolvedAt: 1 })), false)
 })
 
 test("the prompt counts the comments, quotes them, and names the MCP calls for the drop's kind", () => {

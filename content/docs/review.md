@@ -96,6 +96,10 @@ Comments stay anchored to what they point at, per page for apps. Click a pin to 
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
+**Send** hands your own agent every open thread that waits for an answer, yours and everyone else's, in one click. It sits in the toolbar under the page as **Send 3**, with the number of waiting threads, and turns into its status: Sending, Sent, then Working while the agent answers, with **Open thread** to follow it. If it doesn't arrive, it says **Not delivered**, with **Retry**. The first Send connects your agent in place: it copies a setup prompt, you paste it in a T3 Code thread, and Drop asks once, **Allow and send 3**. The agent then shows under **Send comments to** on the **Agents** page, where **Send test** checks it and **Remove** disconnects it.
+
+Signed out, as a guest, or on a Drop without Send, **Copy prompt** takes its place. It copies the same threads as a prompt for any agent: yours as what you ask, and others' quoted, as context.
+
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 
 ### Review toolbar {#toolbar}

@@ -123,6 +123,10 @@
   --ui-border-accented: rgb(255 255 255 / 18%);
   --ui-border-inverted: #fafafa;
   --ui-primary: #fafafa;
+  /* Nuxt UI's dark-mode status colors, for Send's Not delivered and Limit reached on the dark pill. */
+  --ui-success: var(--ui-color-success-400);
+  --ui-warning: var(--ui-color-warning-400);
+  --ui-error: var(--ui-color-error-400);
   color: var(--ui-text);
   background-color: var(--review-surface);
   box-shadow: 0 8px 24px rgb(0 0 0 / 25%);

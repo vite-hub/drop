@@ -285,6 +285,8 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
+  // `send`: members get Send in the review pill and on the Agents page (app/utils/comment-send.ts). Off until Send has
+  // its server; NUXT_PUBLIC_SEND=true turns it on.
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     release,
@@ -292,7 +294,7 @@ export default defineNuxtConfig({
     deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
-    public: { realtime: liveEditing },
+    public: { realtime: liveEditing, send: false },
   },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
