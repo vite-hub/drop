@@ -136,7 +136,7 @@ async function through(route) {
       body: JSON.stringify({
         status: 400,
         statusCode: 400,
-        statusMessage: "Keep it shorter.",
+        statusText: "Keep it shorter.",
         message: "Keep it shorter.",
       }),
     })
@@ -613,6 +613,8 @@ await step("5a. Refused with 404 (drop trashed): the words stay, Copy and Discar
   )
   check((await entriesWith(page, GONE)).length > 0, "the outbox still keeps it")
   await shot(page, "5a-refused-404")
+  // The row says it in a line; its thread has what the reader can do.
+  await openThread(page, GONE)
   const copy = page.getByRole("button", { name: /^Copy$/ })
   if (
     check(
@@ -678,6 +680,7 @@ await step("5b. Refused with 400: Edit, resend, it lands", async (check) => {
     "the server's sentence shows",
   )
   await shot(page, "5b-refused-400")
+  await openThread(page, BAD)
   const edit = page.getByRole("button", { name: /^Edit$/ })
   if (
     check(
@@ -689,7 +692,7 @@ await step("5b. Refused with 400: Edit, resend, it lands", async (check) => {
     )
   ) {
     await edit.first().click()
-    const box = page.getByRole("textbox", { name: /Edit comment|Comment/ }).last()
+    const box = page.getByRole("textbox", { name: "Edit the comment" })
     await box.fill(FIXED)
     await box.press("Enter")
     const resend = page.getByRole("button", { name: /^(Retry|Resend|Send)/ })
