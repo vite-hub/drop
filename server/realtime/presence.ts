@@ -9,7 +9,6 @@ import { defineRealtime } from "vite-hub/realtime"
  * connection is read-only, and nothing is stored.
  */
 export default defineRealtime({
-  auth: true,
   async origins({ event, request, origin }) {
     const { presenceOrigin } = await import("../utils/presence")
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which the presence checks read.
@@ -20,7 +19,8 @@ export default defineRealtime({
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which the presence checks read.
     return presenceIdentity(event as H3Event, request)
   },
-  async authorize({ event, request, documentId, mode }) {
+  async authorize({ event, request, documentId, mode, user }) {
+    if (!user) return false
     const { presenceAllows } = await import("../utils/presence")
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which the presence checks read.
     return presenceAllows(event as H3Event, request, documentId, mode)
