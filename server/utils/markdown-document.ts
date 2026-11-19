@@ -155,6 +155,43 @@ function textContent(node: MarkdownNode): string {
   return tag === null ? "" : children.map((child) => textContent(child)).join("")
 }
 
+function tableChipCount(node: MarkdownNode): number {
+  if (!Array.isArray(node) || node[0] === null) return 0
+  const [tag, , ...children] = node
+  return tag === "chip" ? 1 : children.reduce((count, child) => count + tableChipCount(child), 0)
+}
+
+/** Temporary compatibility for the table preview: match its 32-character prose measure, excluding headers. */
+function markScrollableTables(nodes: MarkdownNode[]): void {
+  for (const node of nodes) {
+    if (!Array.isArray(node) || node[0] === null) continue
+    const [tag, attrs, ...children] = node
+    if (tag === "comments" || tag === "comments-render") markScrollableTables(children)
+    if (tag !== "div" || !("data-cols" in attrs) || !("data-wide" in attrs) || "data-fold" in attrs) continue
+    const [table] = children
+    if (!Array.isArray(table) || table[0] !== "table" || table[1].role !== "table") continue
+
+    const totals: { length: number; count: number }[] = []
+    const [, , ...parts] = table
+    for (const part of parts) {
+      if (!Array.isArray(part) || part[0] !== "tbody") continue
+      const [, , ...rows] = part
+      for (const row of rows) {
+        if (!Array.isArray(row) || row[0] !== "tr") continue
+        const [, , ...cells] = row
+        cells.forEach((cell, index) => {
+          const total = (totals[index] ??= { length: 0, count: 0 })
+          total.length += textContent(cell).trim().length + 3 * tableChipCount(cell)
+          total.count++
+        })
+      }
+    }
+    if (totals.length && !totals.some((total) => total.length >= 32 * total.count)) {
+      table[1]["data-drop-scroll-table"] = ""
+    }
+  }
+}
+
 function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): string {
   const title = textValue(document.frontmatter.title)?.trim()
   if (title) return title
@@ -336,6 +373,7 @@ async function renderMarkdownBody(
 ): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseForReaders(renameLegacyProps(markdown))
+    markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`

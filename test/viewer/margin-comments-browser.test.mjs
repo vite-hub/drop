@@ -471,6 +471,7 @@ test("a saved area is a 1px grey line with no fill, firmer while its thread is o
     })
     const focused = await look()
     assert.equal(focused.area.border, focused.firm, "the open thread's area is a firmer grey, not blue")
+    assert.equal(focused.area.width, "1px")
     assert.equal(focused.area.fill, "rgba(0, 0, 0, 0)")
   } finally {
     await browser.close()

@@ -130,6 +130,18 @@ export async function deleteBlobKeys(keys: string[]) {
 }
 
 /**
+ * Refuses a version on top of one the agent didn't read: `base` is the version it read, and the drop has moved on
+ * since. Without `base`, the next version goes on top of the latest, as before.
+ */
+export function requireBase(latest: Pick<DropRow, "id" | "version">, base: number | undefined) {
+  if (base !== undefined && base !== latest.version)
+    throw new HTTPError({
+      status: 409,
+      message: `v${latest.version} is the latest version of ${latest.id}, not v${base}, so nothing was published. Call read_drop for ${latest.id} again, carry its changes and comments into your version, and publish with base: ${latest.version}.`,
+    })
+}
+
+/**
  * Stores one file as a private doc drop, or as the next version of the drop `supersedes` names. Markdown and HTML must
  * be UTF-8. `slug` names the link (the previous version's, or the title's, otherwise); with `nameFromSlug` the file is
  * called after it too, keeping the extension.
@@ -140,6 +152,8 @@ export async function createDocDrop(
   who: Identity,
   input: LifetimeInput & {
     agent?: AgentMetadata
+    /** The version the agent read, refused unless it's still the latest (`requireBase`). */
+    base?: number
     filename: string
     bytes: Uint8Array
     title?: string
@@ -215,6 +229,8 @@ export async function createDocDrop(
         throw new HTTPError({ status: 403, statusText: "Only the drop's owner can change what kind of file it is." })
       // A file of an earlier version names the drop too; the next version goes on top of the latest.
       previous = found.head ? await findDrop(found.id) : found
+      // Checked again on the row the write guards, so a version published since the caller's check is refused too.
+      if (previous) requireBase(previous, input.base)
     }
   }
   // What the drop stores itself, before its folders widen its share or lend it their lifetime.
@@ -483,6 +499,8 @@ export async function publishApp(
   who: Identity,
   input: LifetimeInput & {
     agent?: AgentMetadata
+    /** The version the agent read, refused unless it's still the latest (`requireBase`). */
+    base?: number
     id?: string
     name?: string
     slug?: string
@@ -530,6 +548,7 @@ export async function publishApp(
       statusText: "That app is in the Trash. Restore it first, or publish a new app.",
     })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
+  if (row) requireBase(row, input.base)
   // The app's own share, not the one a folder gives it: this writes the row.
   const own = row?.raw ?? row
   const folder = row ? null : (input.folder ?? null)

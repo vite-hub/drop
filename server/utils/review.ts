@@ -215,14 +215,8 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
   return { drop: found?.site ?? null, page: found?.page ?? null }
 }
 
-/**
- * Whether a comment's page, as `reviewPage` keeps it, is `page` with or without a query or hash. A `page` ending in a
- * slash covers every page under it, so a preview's root address covers that whole preview.
- */
-export function onPage(commentPage: string | null, page: string) {
-  if (commentPage === null || !commentPage.startsWith(page)) return false
-  return page.endsWith("/") || /^(?:[?#]|$)/.test(commentPage.slice(page.length))
-}
+/** `https://pr1.preview.example.com` from a pattern site's page, which keeps the origin in front of the path. */
+export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
 
 /**
  * Who may resolve or reopen a thread on a site review: its author, guests included, and anyone signed in who may
@@ -683,16 +677,18 @@ async function insertReviewComment(
 
 /**
  * The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps
- * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active.
+ * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active; `open` lists every open
+ * one instead.
  */
 export async function siteItems(
   site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
   who: Identity | null,
   origin: string,
   page?: string,
+  { open = false } = {},
 ): Promise<SiteReviewItem[]> {
   const [{ threads, attachments }, shots] = await Promise.all([
-    threadsFor(site),
+    threadsFor(site, { open }),
     db
       .select({ id: drops.id, slug: drops.slug, blobKey: drops.blobKey })
       .from(drops)

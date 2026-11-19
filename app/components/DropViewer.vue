@@ -14,6 +14,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
+import { feedbackMarkdown, promptMarkdown } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { faviconUrl, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
@@ -21,6 +22,7 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import {
   AvatarStack,
+  CommentSelectionBar,
   ConnectionStatus,
   ConnectionStatusLabel,
   type ConnectionStatusState,
@@ -777,7 +779,7 @@ function download() {
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as agents get it (server/middleware/0.09.drop-markdown.ts). Only Markdown docs: an HTML page's
+// The version on screen, as agents get it (server/routes/d/[link]/[slug].md.get.ts). Only Markdown docs: an HTML page's
 // Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
@@ -1958,7 +1960,7 @@ watch(
       class="fixed z-30 w-max -translate-x-1/2 -translate-y-full"
       :style="selectionBarStyle"
     >
-      <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
+      <CommentSelectionBar suggest @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
     <!-- Focus stays in the page while text is selected there, so a screen reader hears the keys instead of the bar. -->
     <p aria-live="polite" class="sr-only">
