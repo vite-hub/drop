@@ -163,11 +163,13 @@ Edits go to a draft until someone presses **Publish**, which makes it the next v
 
 An agent publishes the next version with `publish` and `previous` set to the drop's id or link, or a `?v=` link to any of its versions. It lands on top of the latest, with a note saying what changed. Sharing and lifetime carry over unless the agent changes them. If two publish at once, one gets a conflict, reads the latest, and publishes again.
 
+**`base`** is the version the agent read. When someone published a newer one since, Drop refuses the publish with a conflict, creates no version, and tells the agent which version is latest, so it reads the drop again instead of writing over changes and comments it never saw. Without `base`, the version goes on top of the latest, as before.
+
 The owner's agents and admins' agents publish versions. People who may edit a Markdown doc publish from the editor.
 
 A doc keeps one link, `/d/<key>/<slug>`, that opens its latest version, and `?v=2` pins one. The agent picks the slug, and a link with an old slug still works.
 
-A doc's **History** lists its versions, newest first, with each note, who published it, and how many comments it got. When the publishing agent supplies them, each version also shows its model, harness, and reasoning level. Older versions and browser edits have no agent metadata. Click one to see what it changed, or copy its pinned link; :kbd[Esc] goes back. Open comments carry over and keep their numbers. A comment on text the new version dropped shows under **From earlier versions**.
+A doc's **History** lists its versions, newest first, with each note, who published it, and how many comments it got. When the publishing agent supplies them, each version also shows its model, harness, and reasoning level. An agent can also name the session it publishes from (`agent.session`: harness, thread, project, worktree, branch), identifiers only, which `read_drop` lists with the version. Older versions and browser edits have no agent metadata. Click one to see what it changed, or copy its pinned link; :kbd[Esc] goes back. Open comments carry over and keep their numbers. A comment on text the new version dropped shows under **From earlier versions**.
 
 An app keeps only its latest file set. A built app's next archive replaces every file. With `files`, the agent sends the files it changed, and a file goes away only when the agent names it in `removes`.
 
