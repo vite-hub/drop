@@ -232,9 +232,10 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
 export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
 
 /**
- * Who may resolve or reopen a thread on a site review: its author, guests included, and anyone signed in who may
- * comment on the site, with their agents. The people reviewing a site and the agents fixing it close each other's
- * comments once they're fixed; otherwise fixed comments stay pinned to the page until the site's owner comes by.
+ * Who may resolve or reopen a thread on a site review: its author when signed in, and anyone signed in who may comment
+ * on the site, with their agents. A guest resolves nothing, their own comments included. The people reviewing a site
+ * and the agents fixing it close each other's comments once they're fixed; otherwise fixed comments stay pinned to the
+ * page until the site's owner comes by.
  */
 export const mayResolveSite = (site: DropRow, who: Identity | null, wrote: boolean) =>
   wrote || permissions(site, who).manage || (who !== null && permissions(site, who).comment)
@@ -748,7 +749,7 @@ type ReviewItem = Omit<SiteReviewItem, "screenshot"> & { screenshot: { id: strin
  */
 export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
   const others = mayResolveSite(site, who, false)
-  return items.map((item) => reviewThread(item, others))
+  return items.map((item) => reviewThread(item, others, who !== null))
 }
 
 /**
@@ -772,10 +773,12 @@ export function reviewThreadOf(
       screenshot: meta.dropId === site.id ? null : { id: meta.dropId },
     },
     mayResolveSite(site, who, false),
+    who !== null,
   )
 }
 
-function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
+/** `others`: the reader may resolve anyone's thread. A guest's own (`mine`) aren't theirs to resolve. */
+function reviewThread(item: ReviewItem, others: boolean, signedIn: boolean): ReviewThread {
   return {
     n: item.n,
     requestId: item.requestId,
@@ -785,7 +788,7 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     createdAt: item.createdAt,
     resolved: item.resolved,
     mine: item.mine,
-    canResolve: others || item.mine,
+    canResolve: others || (signedIn && item.mine),
     page: item.page,
     element: item.label ? { selector: item.label, label: item.quote } : null,
     spot: item.spot,

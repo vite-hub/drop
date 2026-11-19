@@ -7,6 +7,10 @@ const { default: dropCommentsPost } = await import("../../server/api/drops/[id]/
 const { default: dropComments } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
 const { default: siteReplyPost } = await import("../../server/api/review/comments/[n]/replies.post.ts")
+const { default: siteCommentPost } = await import("../../server/api/drops/[id]/review.post.ts")
+const { default: commentPatch } = await import("../../server/api/comments/[id]/index.patch.ts")
+const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
+const { default: replyDelete } = await import("../../server/api/replies/[id].delete.ts")
 
 // A comment's retry key (`requestId`): a client that lost the answer sends the same comment again, and gets the first
 // one back, with nothing stored twice.
@@ -14,6 +18,7 @@ const { default: siteReplyPost } = await import("../../server/api/review/comment
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
 const SITE = "https://pr12-acme.preview.example.com"
 const KEY = "4b0c2a3e-6f1d-4c3b-9a8e-2d7f5e1c0b9a"
+const ada = { ...who, userId: "ada", name: "Ada", email: "ada@example.com", actorName: "Ada" }
 
 migrate()
 beforeEach(() => {
@@ -194,4 +199,115 @@ test("past the limit, a comment's 429 says when to send again", async () => {
   assert.equal(cloudflare.status, 429)
   assert.equal(cloudflare.headers.get("retry-after"), "60")
   assert.equal(threads().length, 0)
+})
+
+test("a comment or reply sent as someone the session isn't gets 401 and stores nothing", async () => {
+  insertDrop("doc", { visibility: "public", access: "comment" })
+  state.who = who
+  const thread = await dropCommentsPost(commentOn(page({ as: "owner" })))
+  assert.equal(threads().length, 1)
+  const stored = images()
+
+  // Signed out: a guest may comment here, but this was written as the owner.
+  state.who = null
+  const signedOut = commentOn(page({ as: "owner", requestId: KEY }))
+  const refused = await answer(dropCommentsPost, signedOut)
+  assert.equal(refused.status, 401)
+  assert.equal(signedOut.context.dropSessionCookies, undefined, "no guest cookie either")
+  assert.equal((await answer(replyPost, replyIn(thread.id, { body: "And this", as: "owner" }))).status, 401)
+  // Someone else signed in.
+  state.who = ada
+  assert.equal((await answer(dropCommentsPost, commentOn(page({ as: "owner" })))).status, 401)
+  assert.equal((await answer(replyPost, replyIn(thread.id, { body: "And this", as: "owner" }))).status, 401)
+  assert.equal(threads().length, 1)
+  assert.equal(threads()[0].messages.length, 1)
+  assert.equal(images(), stored)
+
+  // Without `as`, a guest's send goes out as before.
+  state.who = null
+  assert.equal((await answer(dropCommentsPost, commentOn(page()))).status, 200)
+})
+
+test("signed out of a drop only its people see, a send as its owner gets 401, not 404", async () => {
+  insertDrop("doc", { visibility: "private" })
+  insertDrop("site", { visibility: "private", kind: "site", blob_key: null, filename: "site", site_url: SITE })
+  state.who = who
+  const thread = await dropCommentsPost(commentOn(page()))
+  state.who = null
+  assert.equal((await answer(dropCommentsPost, commentOn(page({ as: "owner" })))).status, 401)
+  assert.equal((await answer(replyPost, replyIn(thread.id, { body: "And this", as: "owner" }))).status, 401)
+  const frame = (data) =>
+    answer(
+      siteCommentPost,
+      request(`/api/drops/site/review?origin=${encodeURIComponent(SITE)}`, {
+        method: "POST",
+        body: form({ body: "From the frame", page: "/", ox: 0, oy: 0, ow: 10, oh: 10, ...data }),
+        id: "site",
+      }),
+    )
+  assert.equal((await frame({ as: "owner" })).status, 401)
+  // Without `as`, it's the same refusal as ever.
+  assert.equal((await answer(dropCommentsPost, commentOn(page()))).status, 404)
+  assert.equal((await frame({})).status, 404)
+  assert.equal(threads().length, 1)
+  assert.equal(threads()[0].messages.length, 1)
+  assert.equal(images(), 1)
+})
+
+test("a guest resolves and deletes nothing, their own comments and replies included", async () => {
+  insertDrop("doc", { visibility: "public", access: "comment" })
+  state.who = null
+  const read = request("/api/drops/doc/comments")
+  await dropComments(read)
+  const cookie = cookieOf(read)
+  const json = { "content-type": "application/json", cookie }
+  const thread = await dropCommentsPost(commentOn(page(), { cookie }))
+  const reply = await replyPost(replyIn(thread.id, { body: "And this" }, { cookie }))
+  assert.deepEqual([thread.mine, reply.mine], [true, true])
+
+  const resolve = await answer(
+    commentPatch,
+    request(`/api/comments/${thread.id}`, {
+      method: "PATCH",
+      headers: json,
+      body: JSON.stringify({ resolved: true }),
+      id: thread.id,
+    }),
+  )
+  assert.equal(resolve.status, 404)
+  const removeReply = await answer(
+    replyDelete,
+    request(`/api/replies/${reply.id}`, { method: "DELETE", headers: { cookie }, id: reply.id }),
+  )
+  assert.equal(removeReply.status, 404)
+  const remove = await answer(
+    commentDelete,
+    request(`/api/comments/${thread.id}`, { method: "DELETE", headers: { cookie }, id: thread.id }),
+  )
+  assert.equal(remove.status, 404)
+  const [listed] = threads()
+  assert.equal(listed.status, "open")
+  assert.equal(listed.messages.length, 2)
+})
+
+test("a comment's retry key comes back to its author only", async () => {
+  insertDrop("doc", { visibility: "public", access: "comment" })
+  state.who = who
+  const sent = await dropCommentsPost(commentOn(page({ requestId: KEY })))
+  assert.equal(sent.requestId, KEY)
+  await replyPost(replyIn(sent.id, { body: "And this", requestId: crypto.randomUUID() }))
+  const [mine] = await dropComments(request("/api/drops/doc/comments"))
+  assert.equal(mine.requestId, KEY)
+  assert.equal(
+    "requestId" in mine.replies[0],
+    false,
+    "the viewer finds a reply by the id its key gives (replyMessageId)",
+  )
+  state.who = ada
+  const [theirs] = await dropComments(request("/api/drops/doc/comments"))
+  assert.equal(theirs.mine, false)
+  assert.equal("requestId" in theirs, false)
+  state.who = null
+  const [guest] = await dropComments(request("/api/drops/doc/comments"))
+  assert.equal("requestId" in guest, false)
 })

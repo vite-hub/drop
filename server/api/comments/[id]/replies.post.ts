@@ -1,7 +1,15 @@
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
-import { attachmentsById, imageParent, lists, readCommentBody, withImages } from "../../../utils/comment-images"
+import {
+  attachmentsById,
+  imageParent,
+  lists,
+  readCommentBody,
+  refuseSend,
+  requireSender,
+  withImages,
+} from "../../../utils/comment-images"
 import {
   actorOf,
   authorOf,
@@ -20,17 +28,19 @@ import { routeId } from "../../../utils/params"
 
 /**
  * Reply in a comment's thread: anyone who may comment on the drop, like a new comment. Images as for a comment. A
- * resend with the same `requestId` answers the reply the first one added, without storing its images again.
+ * resend with the same `requestId` answers the reply the first one added, without storing its images again. One sent
+ * `as` someone the session isn't answers 401 (requireSender).
  */
 export default defineHandler(async (event) => {
   const thread = await findThread(await routeId(event))
   const drop = thread ? await findDrop(thread.meta.dropId, event) : null
   const who = await identify(event)
   if (!thread || !drop || !permissions(drop, who).comment)
-    throw new HTTPError({ status: 404, statusText: "You can't reply to this comment." })
+    return refuseSend(event, who, new HTTPError({ status: 404, statusText: "You can't reply to this comment." }))
   // Replies share the comment limit: a thread is no way around it.
   await withRetryAfter(requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m" }))
   const { input, images } = await readCommentBody(event, CommentReplySchema)
+  requireSender(who, input.as)
   if (!input.body && !images.length) throw new HTTPError({ status: 400, statusText: "Write a reply." })
   const guest = who ? null : await guestOf(event, { mint: true })
   const author = authorOf(who, who?.name ?? "Guest", guest)

@@ -101,6 +101,31 @@ export async function readCommentBody<T extends v.GenericSchema>(
   return { input: parsed.output, images: form ? await imagesOf(form) : [] }
 }
 
+/**
+ * A comment or reply from the viewer's outbox says whom it was written as (`as`, their user id; none for a guest). When
+ * the session isn't them, because they signed out or someone else signed in, it answers 401 and stores nothing: the
+ * outbox holds it until they sign in again, rather than send it as someone else.
+ */
+export function requireSender(who: Identity | null, as: string | undefined) {
+  if (as !== undefined && as !== who?.userId)
+    throw new HTTPError({ status: 401, statusText: "Sign in again to send this comment." })
+}
+
+/**
+ * Refuses a comment or reply before its body is read: with `refusal`, unless the body was written as someone the
+ * session isn't (requireSender). So a person signed out of a drop only members see gets the 401 that holds their
+ * outbox, not the 404 that drops what they wrote. An unreadable body gets `refusal`.
+ */
+export async function refuseSend(event: H3Event, who: Identity | null, refusal: HTTPError): Promise<never> {
+  const multipart = event.req.headers.get("content-type")?.startsWith("multipart/form-data")
+  const data: unknown = await (
+    multipart ? readForm(event).then((form) => JSON.parse(textValue(form.get("data")) ?? "")) : event.req.json()
+  ).catch(() => null)
+  const as = v.safeParse(v.object({ as: v.string() }), data)
+  requireSender(who, as.success ? as.output.as : undefined)
+  throw refusal
+}
+
 /** An image of `parent`'s, stored as `key`: private, since it follows its parent's sharing. */
 export function imageDrop(
   parent: Pick<DropRow, "id" | "ownerId" | "teamId">,

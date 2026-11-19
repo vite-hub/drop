@@ -1,7 +1,6 @@
 import { defineHandler, HTTPError } from "h3"
 import { findThread, readerOf, removeThread, wroteThread } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
-import { guestOf } from "../../../utils/guests"
 import { identify } from "../../../utils/identity"
 import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
@@ -10,8 +9,7 @@ export default defineHandler(async (event) => {
   const thread = await findThread(await routeId(event))
   const drop = thread ? await findDrop(thread.meta.dropId) : null
   const who = await identify(event)
-  const reader = readerOf(who, who ? null : await guestOf(event))
-  if (!thread || !drop || !(permissions(drop, who).manage || wroteThread(thread, reader)))
+  if (!thread || !drop || !(permissions(drop, who).manage || wroteThread(thread, readerOf(who))))
     throw new HTTPError({ status: 404, statusText: "No comment with that id." })
   await removeThread(thread)
   logDrop(event, drop, { change: "comment-delete" })

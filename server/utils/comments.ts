@@ -201,7 +201,10 @@ export type Reader = string | null
 export const readerOf = (who: Identity | null, guest: string | null = null): Reader => who?.userId ?? guest
 
 const isMine = (author: CommentUser, reader: Reader) => reader !== null && author.id === reader
-/** Whether `reader` wrote the thread's first message, which lets them resolve or delete it. */
+/**
+ * Whether `reader` wrote the thread's first message. Resolving and deleting pass `readerOf(who)`, without the guest id:
+ * a guest's comments are theirs to see and resend, but only someone signed in resolves or deletes.
+ */
 export const wroteThread = (thread: CommentThread, reader: Reader) => isMine(thread.author, reader)
 export const wroteMessage = (message: CommentMessage, reader: Reader) => isMine(message.author, reader)
 
@@ -233,7 +236,11 @@ export async function mentionedIn(threads: CommentThread[]): Promise<Named> {
   return new Map((await peopleByIds(ids)).map((person) => [person.id, person]))
 }
 
-/** A thread as Drop's API answers it (DropComment), with the version it was written on. */
+/**
+ * A thread as Drop's API answers it (DropComment), with the version it was written on. The reader's own carry the
+ * retry key they were sent with (a site review's is in its metadata), so a viewer that reloads before the answer shows
+ * its waiting copy and the server's as one.
+ */
 export function toComment(
   thread: DropThread,
   reader: Reader,
@@ -242,6 +249,8 @@ export function toComment(
 ): DropComment {
   const [first, ...replies] = thread.messages
   const { meta } = thread
+  const mine = isMine(thread.author, reader)
+  const requestId = mine ? (thread.requestId ?? meta.requestId) : undefined
   return {
     id: thread.id,
     messageId: first?.id ?? thread.id,
@@ -270,7 +279,8 @@ export function toComment(
     createdAt: thread.createdAt,
     editedAt: first?.editedAt ?? null,
     version: thread.version,
-    mine: isMine(thread.author, reader),
+    mine,
+    ...(requestId ? { requestId } : {}),
     replies: replies.map((reply) => toReply(reply, reader, attachments)),
     attachments: filesOf(first, attachments),
     people: [...new Set(thread.messages.flatMap((message) => message.mentions))].flatMap((id) => {
@@ -499,18 +509,8 @@ export async function resolveComments(row: Commented, numbers: number[], who: Id
   return open.map((thread) => thread.n).sort((a, b) => a - b)
 }
 
-/** Resolves or reopens a thread. `guest` is the guest id of a guest who resolves it. */
-export const setResolved = (
-  thread: CommentThread,
-  resolved: boolean,
-  who: Identity | null,
-  guest: string | null = null,
-) =>
-  done(
-    resolved
-      ? comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest", guest) })
-      : comments.reopen(thread.id),
-  )
+export const setResolved = (thread: CommentThread, resolved: boolean, who: Identity | null) =>
+  done(resolved ? comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest") }) : comments.reopen(thread.id))
 
 /**
  * Adds a reply to a thread; the callers check who may. Drop takes replies on resolved threads too, and the thread

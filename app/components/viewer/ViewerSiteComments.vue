@@ -151,7 +151,7 @@ function pageLabel(comment: DropComment) {
                 Review this page
               </button>
               <button
-                v-if="canManage || comment.mine"
+                v-if="canManage || (comment.mine && !comment.authorId.startsWith('guest:'))"
                 class="min-h-6 cursor-pointer hover:text-highlighted pointer-coarse:min-h-11"
                 type="button"
                 @click="emit('resolve', comment.id, !comment.resolved)"

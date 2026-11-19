@@ -123,6 +123,8 @@ export type Ink = v.InferOutput<typeof InkSchema>
  * the comment or reply the first send added, so a client that lost the answer resends without posting twice.
  */
 const RequestIdSchema = v.optional(v.pipe(v.string(), v.uuid()))
+/** Whom the viewer's outbox wrote it as: their user id, absent for a guest. A session that isn't them gets 401. */
+const SenderSchema = v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(100)))
 
 /**
  * Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. A `page` comment is
@@ -151,6 +153,7 @@ export const CommentSchema = v.pipe(
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
     mentions: MentionsSchema,
     requestId: RequestIdSchema,
+    as: SenderSchema,
   }),
   v.check(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,
@@ -190,6 +193,7 @@ export const ReviewCommentSchema = v.pipe(
   v.object({
     body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
     requestId: RequestIdSchema,
+    as: SenderSchema,
     page: v.pipe(v.string(), v.startsWith("/"), v.maxLength(MAX_REVIEW_PAGE)),
     selector: v.optional(v.pipe(v.string(), v.maxLength(2000)), ""),
     label: v.optional(v.pipe(v.string(), v.maxLength(200))),
@@ -250,6 +254,7 @@ export const CommentReplySchema = v.object({
   body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
   mentions: MentionsSchema,
   requestId: RequestIdSchema,
+  as: SenderSchema,
 })
 
 /** A new text for one's own comment or reply. */

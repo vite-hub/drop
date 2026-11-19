@@ -1456,7 +1456,7 @@ test("an agent finds the review by a page's address on a fixed staging host and 
   assert.match((await call(readDrop, { id: "http://staging.example.org/settings/billing" })).message, /No drop/)
 })
 
-test("on a site review, people signed in who may comment resolve each other's comments; guests only their own", async () => {
+test("on a site review, people signed in who may comment resolve each other's comments; guests resolve nothing", async () => {
   state.mode = "team"
   site()
   state.who = null
@@ -1479,16 +1479,16 @@ test("on a site review, people signed in who may comment resolve each other's co
   await comment(ada_, { body: "Ada's" })
   const asGuest = (await json(await count(guest, "/pricing?plan=pro"))).threads
   assert.deepEqual(
-    asGuest.map((item) => [item.body, item.canResolve]),
+    asGuest.map((item) => [item.body, item.mine, item.canResolve]),
     [
-      ["Ada's", false],
-      ["From a guest", true],
+      ["Ada's", false, false],
+      ["From a guest", true, false],
     ],
-    "a guest's token names their browser, so their own comments are theirs",
+    "a guest's own comment is theirs to see, not to resolve",
   )
   assert.equal((await resolve(guest, 2)).status, 403)
-  assert.equal((await resolve(guest)).status, 200)
-  assert.equal((await resolve(ada_, 2)).status, 200)
+  assert.equal((await resolve(guest)).status, 403)
+  assert.equal((await resolve(ada_)).status, 200)
 })
 
 test("review.js is one cacheable script with no key, inert until someone presses Comment, safe to add twice", async () => {
