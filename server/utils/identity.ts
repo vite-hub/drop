@@ -113,7 +113,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
     return null
   }
   const { user } = caller
-  if (user.banned) {
+  if (caller.kind === "browser" && user.banned) {
     logDenied(event, "banned")
     return null
   }

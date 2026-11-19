@@ -219,6 +219,16 @@ test("a refused or failed session says why on the event, and the request is stil
   assert.equal(outage.failure.status, 503)
 })
 
+test("an agent accepted by ViteHub after its ban expires is not denied by Drop", async () => {
+  state.mcpCaller = {
+    user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true, banExpires: new Date(0) },
+    clientName: "Claude Code",
+  }
+  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.equal(agent.event.user?.id, "owner")
+  assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
+})
+
 test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed", async () => {
   const now = Date.UTC(2026, 10, 17, 12)
   vi.useFakeTimers({ toFake: ["Date"], now })
