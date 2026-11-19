@@ -71,12 +71,16 @@ test("a members-only Drop gates ViteHub's data routes, and leaves its signed and
     "/_vitehub/realtime/drafts/abc",
     "/_vitehub/browser-errors",
     "/_vitehub/console/status",
+    "/api/_vitehub/comments/threads",
+    "/api/_vitehub/realtime/drafts/abc",
   ])
     assert.equal((await request(path)).status, 401, path)
   for (const path of [
     "/_vitehub/comments/attachments/abc",
+    "/api/_vitehub/comments/attachments/abc",
     "/_vitehub/realtime/latest/abc",
     "/_vitehub/realtime/presence/abc",
+    "/api/_vitehub/realtime/presence/abc",
     "/_vitehub/rpc",
     "/_vitehub/comments/assets/overlay.js",
     "/_vitehub/console/assets/page-tool.js",

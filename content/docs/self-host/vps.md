@@ -91,6 +91,8 @@ Browser pages and shared links can require proxy authentication. Exempt `/oauth2
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
 
+When upgrading from an older Drop, keep `/api/_vitehub/realtime/presence/` exempt from the browser redirect too, so cached presence clients can still reconnect over WebSocket.
+
 If a browser cannot connect a site review, check the response from `/review/connect`. A 401 means GitHub rejected the token; open `/signin` to sign in again. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means verification failed because GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` distinguish these cases without including credentials. Sign-in and sign-out stay available when a proxy token fails verification.
 
 Exempt `POST /_vitehub/rpc` from the proxy too: the [ViteHub Console](/docs/self-host#github) calls it from its own server with a signature, not a sign-in, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
@@ -106,7 +108,7 @@ ${EDITOR:-nano} .env
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
+For the [ViteHub Console](/docs/self-host#github), also set `DROP_PUBLIC_URL=https://drop.example.com` in `.env`: the build compiles it in. Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
 
 ## Updates and backups {#data}
 
