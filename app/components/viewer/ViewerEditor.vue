@@ -10,7 +10,6 @@ import { chooseFiles, uploadKey, uploadPlugin, type UploadOptions } from "comark
 import * as v from "valibot"
 import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
 import { EDITOR_IMAGE_PICK, editorImageExtension } from "#shared/editor-images"
-import { viewerEditorControls } from "../../utils/viewer-editor-controls"
 
 const props = defineProps<{ editor?: Editor; synced: boolean; publishing: boolean; dropId: string; width: DocWidth }>()
 const notify = useNotify()
@@ -91,6 +90,7 @@ provide(viewerEditorControls, {
       label: "URL",
       initial: previous ?? "",
       confirmLabel: previous ? "Save" : "Insert",
+      schema: previous ? v.pipe(v.string(), v.trim()) : undefined,
     })
     if (href === null || editor.isDestroyed || !editor.isEditable) return
     const chain = editor.chain().focus().extendMarkRange("link")

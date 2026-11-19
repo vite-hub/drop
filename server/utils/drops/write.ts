@@ -268,6 +268,10 @@ export async function createDocDrop(
     kind === "markdown" && text !== undefined
       ? await (await import("../markdown-document")).requirePublishableMarkdown(text, event)
       : []
+  const draftKeys =
+    own && kind === "markdown" && text?.match(FILE_LINK)
+      ? await (await import("../markdown-document")).referencedFileKeys(text, FILE_LINK)
+      : []
 
   return withDropQuota(
     ownerId,
@@ -327,6 +331,7 @@ export async function createDocDrop(
         trashedAt: null,
         trashReason: null,
         parentId,
+        draftImage: Boolean(attachment),
         // A public link waits for an admin's review again with each version: what it shows changed.
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: own?.quarantinedAt ?? null,
@@ -369,6 +374,12 @@ export async function createDocDrop(
         await quota.commit(
           [
             ...write,
+            ...d1Chunks(draftKeys).map((chunk) =>
+              db
+                .update(drops)
+                .set({ draftImage: false })
+                .where(and(eq(drops.parentId, row.id), eq(drops.draftImage, true), inArray(drops.blobKey, chunk))),
+            ),
             ...textStatements(row, text),
             ...(folder ? [touchFolder(folder.id, now)] : []),
             ...(input.acceptedSuggestionId
@@ -682,6 +693,7 @@ export async function publishApp(
           createdAt: row?.createdAt ?? now,
           updatedAt: now,
           publishToken: token,
+          draftImage: false,
           teamId: null,
           lastAccessedAt: now,
           ...life,

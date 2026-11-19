@@ -149,6 +149,22 @@ const parseForReaders = createMarkdownParser({
 
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
+export async function referencedFileKeys(source: string, fileLink: RegExp) {
+  const keys = new Set<string>()
+  function collect(nodes: MarkdownNode[]) {
+    for (const node of nodes) {
+      if (!Array.isArray(node) || node[0] === null) continue
+      const [tag, attrs, ...children] = node
+      const url = textValue(tag === "img" ? attrs.src : tag === "a" ? attrs.href : undefined)
+      const [match] = url?.matchAll(fileLink) ?? []
+      if (match?.[1]) keys.add(match[1])
+      collect(children)
+    }
+  }
+  collect((await parseMarkdown(source)).nodes)
+  return [...keys]
+}
+
 function textContent(node: MarkdownNode): string {
   if (!Array.isArray(node)) return node
   const [tag, , ...children] = node

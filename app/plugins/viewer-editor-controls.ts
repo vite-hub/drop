@@ -1,5 +1,4 @@
 import type { EditorHandler, EditorSuggestionMenuProps, EditorToolbarProps } from "@nuxt/ui"
-import { viewerEditorControls } from "../utils/viewer-editor-controls"
 
 function itemGroups<Item>(items: Item[] | Item[][] = []): Item[][] {
   const groups: Item[][] = []

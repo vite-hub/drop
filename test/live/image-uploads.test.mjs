@@ -4,7 +4,7 @@ import { beforeEach, test } from "vite-plus/test"
 import { insertDrop, migrate, objects, reset, sql, state, who } from "../cost/harness.mjs"
 
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
-const { createDocDrop, findDropByBlob, listDrops } = await import("../../server/utils/drops.ts")
+const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops } = await import("../../server/utils/drops.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 
 const png = Buffer.from(
@@ -53,7 +53,11 @@ test("a teammate's upload follows the document across publishing, sharing change
   insertDrop("team-draft", { share: "team_edit", lifetime: "keep" })
   state.who = teammate
   const file = await upload("team-draft")
+  await readFile(file.url)
   const key = new URL(file.url).pathname.slice(3)
+  sql.exec("UPDATE drops SET share = 'team' WHERE id = 'team-draft'")
+  await assert.rejects(readFile(file.url), status(404))
+  sql.exec("UPDATE drops SET share = 'team_edit' WHERE id = 'team-draft'")
   await createDocDrop(teammate, {
     filename: "team-draft.md",
     supersedes: "team-draft",
@@ -72,6 +76,36 @@ test("a teammate's upload follows the document across publishing, sharing change
   sql.exec("UPDATE drops SET trashed_at = 10 WHERE id = 'team-draft'")
   state.who = teammate
   await assert.rejects(readFile(file.url), status(404))
+})
+
+test("only referenced draft images become public when a new version is published", async () => {
+  insertDrop("public-draft", { share: "public" })
+  const published = await upload("public-draft")
+  const unused = await upload("public-draft")
+  const origin = "https://drop.example"
+  const attachments = async () => (await dropDetail(await findDrop("public-draft"), null, origin)).attachments
+  await readFile(published.url)
+  state.who = null
+  await assert.rejects(readFile(published.url), status(404))
+  assert.deepEqual(await attachments(), [])
+  const publish = (source) =>
+    createDocDrop(who, {
+      filename: "public-draft.md",
+      supersedes: "public-draft",
+      bytes: new TextEncoder().encode(source),
+    })
+  await publish(`An edit with a URL in code: \`${published.url}\`.`)
+  await assert.rejects(readFile(published.url), status(404))
+  assert.deepEqual(await attachments(), [])
+  await publish(`![Screenshot](${published.url})`)
+  await readFile(published.url)
+  await assert.rejects(readFile(unused.url), status(404))
+  assert.deepEqual(
+    (await attachments()).map((file) => file.url),
+    [published.url],
+  )
+  await publish("The screenshot is still available in the older version.")
+  await readFile(published.url)
 })
 
 test("document uploads require a browser editor and validate image bytes rather than MIME or filename", async () => {
