@@ -285,6 +285,9 @@ const edit = (messageId: string, text: string, ids: string[]) =>
           </p>
         </div>
       </template>
+      <template #status="{ message, delivery }">
+        <ViewerDeliveryStatus :delivery="delivery" :message="message" />
+      </template>
       <template v-if="screenshot" #after>
         <ViewerReviewScreenshot :comment="comment" :screenshot="screenshot" />
       </template>

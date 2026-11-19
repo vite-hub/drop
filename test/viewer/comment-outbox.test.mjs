@@ -1,8 +1,8 @@
 import assert from "node:assert/strict"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { computed, effectScope, onScopeDispose, readonly, ref, shallowRef, toValue, watch } from "vue"
-import { createMemoryOutboxStore } from "vite-hub/comments/client"
-import { createEventHook, createInjectionState } from "@vueuse/core"
+import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/client"
+import { createEventHook, createInjectionState, useEventListener } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
 
@@ -27,6 +27,7 @@ for (const [name, value] of Object.entries({
   effectScope,
   createEventHook,
   createInjectionState,
+  useEventListener,
   keys,
   toThread,
   useApi: (_url, options) => ({ data: ref(options.default?.()), refresh: async () => {} }),
@@ -175,6 +176,28 @@ test("a reply to a waiting comment waits for it, then lands under it", { timeout
     [["c1", [["r1", undefined]]]],
   )
   assert.equal(wrote.mock.calls.length, 2)
+})
+
+test("a waiting reply and its server copy, loaded before the reply's own answer, show once", async () => {
+  // The reply reached the server, but its answer was lost: the outbox waits to resend it.
+  answer = offline
+  const { state } = open()
+  state.comments.data.value = [comment("c1", "The chart is cut off")]
+  const sent = await state.addReply("c1", "Also on mobile")
+  assert.equal(sent.value.delivery?.status, "pending")
+  const { requestId } = app.entries.value[0]
+
+  // A list loaded meanwhile (another viewer's comment, a reload) holds the server's copy, with the id the server
+  // derives from the retry key and without the key itself.
+  const id = await replyMessageId("c1", requestId)
+  state.comments.data.value = [{ ...comment("c1", "The chart is cut off"), replies: [reply(id, "Also on mobile")] }]
+  await vi.waitFor(() =>
+    assert.deepEqual(
+      state.list.value[0].replies.map((item) => [item.id, Boolean(item.delivery)]),
+      [[id, false]],
+    ),
+  )
+  assert.equal(app.entries.value.length, 1, "the outbox still holds it until its resend answers")
 })
 
 test(

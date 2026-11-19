@@ -65,6 +65,9 @@ const owner = computed(() => drop.value.isOwner)
 const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
+// The pill's "N waiting": what's still on its way after its quiet start, so a send on a working network never shows it.
+const second = useNow({ interval: 1000 })
+const waiting = computed(() => waitingCount(comments.value, second.value.getTime()))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -1802,6 +1805,7 @@ watch(
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
+                :waiting="waiting"
                 :list-open="commentsOpen && !popover"
                 :pins="!lightbox && !shownVersion && (framed || pdf) && pinned.length > 0"
                 :pins-shown="overlays.pins"

@@ -85,6 +85,12 @@ function select(thread: { id: string }) {
           />
         </template>
         <template v-else>{{ text }}</template>
+        <ViewerDeliveryStatus
+          v-if="thread.delivery && thread.messages[0]"
+          compact
+          :delivery="thread.delivery"
+          :message="thread.messages[0]"
+        />
       </template>
     </CommentPanel>
   </div>

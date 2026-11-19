@@ -135,8 +135,7 @@ export function createCommentsOutbox(
   const guard = (event: Event) => {
     if (entries.value.length) event.preventDefault()
   }
-  window.addEventListener("beforeunload", guard)
-  onScopeDispose(() => window.removeEventListener("beforeunload", guard))
+  useEventListener(window, "beforeunload", guard)
 
   return { ...outbox, account }
 }

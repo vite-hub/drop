@@ -1,6 +1,7 @@
 import type { CommentDelivery, CommentsOutboxEntry, CommentsTransport, CommentThread } from "vite-hub/comments/client"
 import type { CommentInput } from "#shared/schemas"
 import type { CommentReply, DropComment } from "#shared/types"
+import * as v from "valibot"
 import { toThread } from "./comment-threads"
 
 // Drop's comments through ViteHub's outbox (`createCommentsClient({ outbox })`): a new comment or reply is saved in the
@@ -39,20 +40,25 @@ export function targetMetadata(target: Target) {
   }
 }
 
+/** The metadata targetMetadata writes, as the outbox's store gives it back. */
+const TargetMetadataSchema = v.object({
+  route: v.optional(v.string()),
+  drop: v.string(),
+  version: v.optional(v.number(), 0),
+  v: v.optional(v.number()),
+  origin: v.optional(v.string()),
+  place: v.string(),
+})
+
 function targetOf(metadata: Record<string, unknown> | undefined): Target | undefined {
-  if (!metadata || typeof metadata.drop !== "string" || typeof metadata.place !== "string") return undefined
-  const version = typeof metadata.version === "number" ? metadata.version : 0
+  const parsed = v.safeParse(TargetMetadataSchema, metadata)
+  if (!parsed.success) return undefined
+  const { route, drop, version, v: at, origin } = parsed.output
+  // doctor-disable-next-line typescript/boundaries/no-unvalidated-deserialization -- the JSON targetMetadata wrote in this browser's own outbox
   // SAFETY: `place` is the JSON targetMetadata wrote from a CommentPlace or a SiteCommentPlace, by `route`.
-  const place = JSON.parse(metadata.place) as CommentPlace & SiteCommentPlace
-  if (metadata.route === "review" && typeof metadata.origin === "string")
-    return { route: "review", drop: metadata.drop, version, origin: metadata.origin, place }
-  return {
-    route: "comment",
-    drop: metadata.drop,
-    version,
-    ...(typeof metadata.v === "number" ? { v: metadata.v } : {}),
-    place,
-  }
+  const place = JSON.parse(parsed.output.place) as CommentPlace & SiteCommentPlace
+  if (route === "review" && origin !== undefined) return { route: "review", drop, version, origin, place }
+  return { route: "comment", drop, version, ...(at ? { v: at } : {}), place }
 }
 
 /** The drop a waiting entry's list is on. */
@@ -69,16 +75,18 @@ function withImages(data: Record<string, unknown>, files: readonly Blob[]) {
 }
 
 const field = (error: unknown, name: string): unknown =>
-  error && typeof error === "object" ? Reflect.get(error, name) : undefined
+  error instanceof Object ? Reflect.get(error, name) : undefined
 const answerOf = (error: unknown) => {
   const response = field(error, "response")
   return response instanceof Response ? response : undefined
 }
 
+const StatusSchema = v.pipe(v.number(), v.integer(), v.minValue(1))
+
 /** The status a route answered a send with, or undefined when no answer came. */
 export function statusOf(error: unknown) {
   const status = field(error, "status") ?? field(error, "statusCode") ?? answerOf(error)?.status
-  return typeof status === "number" && status > 0 ? status : undefined
+  return v.is(StatusSchema, status) ? status : undefined
 }
 
 /** What the outbox reads from a refusal: the status (none when there was no answer), the server's sentence, and its wait. */
@@ -256,30 +264,65 @@ interface OutboxView {
   author: { name: string; image: string | null }
   /** The comments and replies the server took in this tab, by `requestId`, with the thread each is in. */
   accepted: ReadonlyMap<string, string>
+  /** The id the server gives each waiting reply (replyMessageId), by replyKey, once the browser has worked it out. */
+  replyIds?: ReadonlyMap<string, string>
 }
 
+/** A waiting reply's key in OutboxView.replyIds: the server's thread and the reply's retry key. */
+export const replyKey = (threadId: string, requestId: string) => `${threadId}\n${requestId}`
+
 /**
- * The drop's comments with what still waits in the outbox: waiting comments last, oldest first, each reply under its
- * comment. One the server already has, by its `requestId`, shows once, as the server's.
+ * The drop's waiting entries, what the server already has by `requestId`, and the server's thread of each waiting
+ * reply: a reply names its comment by the local id while the comment waits, and by the server's once it took it.
  */
-export function withOutbox(server: DropComment[], entries: readonly CommentsOutboxEntry[], view: OutboxView) {
+function outboxOf(server: readonly DropComment[], entries: readonly CommentsOutboxEntry[], view: OutboxView) {
   const mine = entries.filter((entry) => dropOf(entry) === view.drop)
-  if (!mine.length) return server
   const landed = new Map(view.accepted)
   for (const comment of server) {
     if (comment.requestId) landed.set(comment.requestId, comment.id)
     for (const reply of comment.replies) if (reply.requestId) landed.set(reply.requestId, comment.id)
   }
   const creates = new Map(mine.flatMap((entry) => (entry.kind === "create" ? [[entry.id, entry] as const] : [])))
-  // A reply names its comment by the local id while the comment waits; once the server took it, by the server's.
   const parentOf = (threadId: string) => {
     const parent = creates.get(threadId)
     return parent ? (landed.get(parent.requestId) ?? parent.id) : threadId
   }
+  return { mine, landed, creates, parentOf }
+}
+
+/**
+ * The waiting replies whose server copy may already be in the list, as [thread, requestId]: the viewer works out each
+ * one's message id (replyMessageId, which hashes) and hands them back to withOutbox as `replyIds`.
+ */
+export function waitingReplies(
+  server: readonly DropComment[],
+  entries: readonly CommentsOutboxEntry[],
+  view: OutboxView,
+) {
+  const { mine, landed, parentOf } = outboxOf(server, entries, view)
+  return mine.flatMap((entry) =>
+    entry.kind === "reply" && !landed.has(entry.requestId)
+      ? [[parentOf(entry.input.threadId), entry.requestId] as const]
+      : [],
+  )
+}
+
+/**
+ * The drop's comments with what still waits in the outbox: waiting comments last, oldest first, each reply under its
+ * comment. One the server already has shows once, as the server's: a comment by its `requestId`, a reply by its
+ * `requestId` or by the message id the server derives from it (replyMessageId), which a list from before its answer
+ * came back already holds.
+ */
+export function withOutbox(server: DropComment[], entries: readonly CommentsOutboxEntry[], view: OutboxView) {
+  const { mine, landed, creates, parentOf } = outboxOf(server, entries, view)
+  if (!mine.length) return server
+  const stored = new Set(server.flatMap((comment) => comment.replies.map((reply) => reply.id)))
   const replies = new Map<string, CommentReply[]>()
   for (const entry of mine) {
     if (entry.kind !== "reply" || landed.has(entry.requestId)) continue
     const parent = parentOf(entry.input.threadId)
+    const id = view.replyIds?.get(replyKey(parent, entry.requestId))
+    if (id && stored.has(id)) continue
     replies.set(parent, [...(replies.get(parent) ?? []), pendingReply(entry, view)])
   }
   const withReplies = (comment: DropComment) => {
@@ -353,7 +396,7 @@ function pendingComment(entry: CommentsOutboxEntry, target: Target, view: Outbox
  * in development has neither.
  */
 export function randomId() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  if (globalThis.isSecureContext) return crypto.randomUUID()
   const bytes = crypto.getRandomValues(new Uint8Array(16))
   bytes[6] = (bytes[6]! & 0x0f) | 0x40
   bytes[8] = (bytes[8]! & 0x3f) | 0x80

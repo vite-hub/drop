@@ -90,7 +90,16 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |
 
-A comment shows the moment you send it. If it doesn't go through, it comes back to its box with the reason.
+A comment shows the moment you send it, with a clock on its pin until Drop has it. **With no network** it waits in the browser, stays through a reload, and goes out once the network is back. After a couple of seconds it says **Waiting to send**, and the toolbar counts what waits. Closing the tab or signing out while one hasn't gone out asks first.
+
+When Drop refuses one, its words stay, and the line under them says why:
+
+| It says | What you can do |
+| --- | --- |
+| **Sign in to send** | Sign in again; it goes out then. |
+| The plan's limit | **Send again** once the plan has room. |
+| **This drop no longer takes comments** | **Copy** the words, or **Discard** them. |
+| Why, such as an image that's too large | **Edit** it, and it goes out again, or **Discard** it. |
 
 Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread. A guest's comments show as theirs in the browser they wrote them in, but resolving or deleting one needs someone signed in.
 

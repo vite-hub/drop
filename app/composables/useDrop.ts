@@ -1,7 +1,16 @@
 import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import * as v from "valibot"
-import { type CommentPlace, randomId, type SiteCommentPlace, targetMetadata, withOutbox } from "../utils/comment-outbox"
+import { replyMessageId } from "vite-hub/comments/client"
+import {
+  type CommentPlace,
+  randomId,
+  replyKey,
+  type SiteCommentPlace,
+  targetMetadata,
+  waitingReplies,
+  withOutbox,
+} from "../utils/comment-outbox"
 
 /** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }
@@ -51,14 +60,34 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     return client
   }
 
+  const view = () => ({
+    drop: toValue(id),
+    account: app.account.value,
+    author: { name: me.value?.name ?? "Guest", image: me.value?.image ?? null },
+    accepted: app.accepted,
+  })
+  // The id the server gives each waiting reply, so a list that already holds its copy (loaded before the reply's own
+  // answer came back, or in another tab) shows it once. Worked out in the browser, which hashes asynchronously.
+  const replyIds = shallowRef<ReadonlyMap<string, string>>(new Map())
+  watch(
+    () => waitingReplies(comments.data.value, app.entries.value, view()),
+    async (replies) => {
+      const missing = replies.filter(([thread, requestId]) => !replyIds.value.has(replyKey(thread, requestId)))
+      if (!missing.length) return
+      const found = await Promise.all(
+        missing.map(async ([thread, requestId]) => {
+          // crypto.subtle exists only on HTTPS and localhost: elsewhere the reply's requestId alone matches it.
+          const message = await replyMessageId(thread, requestId).catch(() => undefined)
+          return message ? [[replyKey(thread, requestId), message] as const] : []
+        }),
+      )
+      if (found.flat().length) replyIds.value = new Map([...replyIds.value, ...found.flat()])
+    },
+    { immediate: true },
+  )
   /** The drop's comments with the ones that wait to go out, each shown once. */
   const list = computed(() =>
-    withOutbox(comments.data.value, app.entries.value, {
-      drop: toValue(id),
-      account: app.account.value,
-      author: { name: me.value?.name ?? "Guest", image: me.value?.image ?? null },
-      accepted: app.accepted,
-    }),
+    withOutbox(comments.data.value, app.entries.value, { ...view(), replyIds: replyIds.value }),
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
 

@@ -395,6 +395,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.gp:active{scale:.96}.gp:focus-visible{outline:2px solid var(--foreground);outline-offset:2px}' +
     '.gp b{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--background);color:var(--foreground);font:600 10px/16px var(--font-sans);font-variant-numeric:tabular-nums;box-shadow:0 0 0 1px var(--border)}' +
     '.gp.me{cursor:default}.gp.in{animation:gp-in 200ms cubic-bezier(.23,1,.32,1) both}@keyframes gp-in{from{opacity:0;scale:.7}}' +
+    // A comment still in Drop's outbox: a clock in the corner where a pin's count goes, red once the server refused it.
+    '.wt{position:absolute;top:-6px;right:-6px;display:grid;place-items:center;width:16px;height:16px;border-radius:8px;background:var(--background);color:var(--foreground);box-shadow:0 0 0 1px var(--border);pointer-events:none}.wt svg{width:10px;height:10px}' +
+    '[data-delivery="failed"] .wt{color:var(--destructive,#dc2626)}' +
     '@media (prefers-reduced-motion:reduce){.gp.in{animation:none}}' +
     // On what opens a closed tooltip or menu (standIn), not on the thing itself.
     '.away{outline:1.5px dashed var(--foreground);outline-offset:2px}' +
@@ -436,7 +439,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     '.rail{position:absolute;height:0}.rail .g>.cr-bub{display:none}.rail .g>.cr-card{position:absolute;margin:0}.rail .cr-card{float:none;clear:none;cursor:pointer}' +
     '.rail .g:has(.cr-tg:checked)>*{z-index:1}.rail .g[data-covered]>.cr-card{visibility:hidden}.rail .cr-av{overflow:hidden}.rail .cr-av img{display:block;width:100%;height:100%;object-fit:cover}' +
     '.rail .cr-entry{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}' +
-    '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}' +
+    '.rail .cr-card small{display:block;margin-top:.25rem;color:var(--_comark-muted);font-size:.75rem}.rail .cr-card small[data-delivery="failed"]{color:var(--destructive,#dc2626)}' +
     '</style>';
   // While Comark's zoom holds this layer (see onZoom), the page's own marks, which sit at page coordinates, stay hidden
   // behind it as they were behind the top layer; the tool's layer, hover outlines, and rulers are fixed and work on it.
@@ -770,7 +773,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const replies = m.replies || 0;
     // The redline is a highlight and generated text, which screen readers skip, so the bubble says what it suggests.
     const change = m.suggestion == null ? "" : m.suggestion ? ": replace \u201c" + m.quote + "\u201d with \u201c" + m.suggestion + "\u201d" : ": delete \u201c" + m.quote + "\u201d";
-    bubble.setAttribute("aria-label", (m.suggestion == null ? "Comment" : "Suggestion") + " by " + (m.author || "someone") + change + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : ""));
+    bubble.setAttribute("aria-label", (m.suggestion == null ? "Comment" : "Suggestion") + " by " + (m.author || "someone") + change + (replies ? ", " + replies + (replies === 1 ? " reply" : " replies") : "") + (m.waiting ? ", " + waitingText(m).toLowerCase() : ""));
     // Like the package's: the count only once the thread has more than its first comment.
     if (replies) { const count = document.createElement("b"); count.dataset.n = String(replies + 1); bubble.appendChild(count); }
     afterQuote(range).insertNode(bubble);
@@ -803,6 +806,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     }
     return Math.min(r.right - pad + 12, innerWidth - 34) + scrollX;
   }
+  /** What a comment still in Drop's outbox says (m.waiting): on its way, or refused, which its thread explains. */
+  function waitingText(m) {
+    return m.waiting === "failed" ? "Not sent" : "Waiting to send";
+  }
+  /** The clock where a pin's count goes, on a comment that hasn't reached the server. */
+  function waitingBadge(dot, m) {
+    dot.dataset.delivery = m.waiting === "failed" ? "failed" : "pending";
+    const clock = document.createElement("i");
+    clock.className = "wt"; clock.setAttribute("aria-hidden", "true");
+    clock.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    dot.appendChild(clock);
+  }
   function gutterPin(m, last, x) {
     const dot = document.createElement("button");
     dot.type = "button";
@@ -822,8 +837,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       return;
     }
     const replies = m.replies || 0;
-    if (replies) { const count = document.createElement("b"); count.textContent = String(replies + 1); count.setAttribute("aria-hidden", "true"); dot.appendChild(count); }
-    dot.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (replies ? ", " + (replies + 1) + " comments" : ""));
+    if (m.waiting) waitingBadge(dot, m);
+    else if (replies) { const count = document.createElement("b"); count.textContent = String(replies + 1); count.setAttribute("aria-hidden", "true"); dot.appendChild(count); }
+    dot.setAttribute("aria-label", "Comment by " + (m.author || "someone") + (m.waiting ? ", " + waitingText(m).toLowerCase() : replies ? ", " + (replies + 1) + " comments" : ""));
     dot.setAttribute("aria-expanded", String(m.id === opened));
     if (m.id === opened) dot.dataset.active = "true";
     dot.dataset.id = m.id;
@@ -838,9 +854,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // an image, is centered on it.
   const PIN = 28;
   function placePin(m, x, y, into, away) {
-    const round = m.kind !== "text", look = [round, m.resolved, m.id === active, away].join();
+    const round = m.kind !== "text", look = [round, m.resolved, m.id === active, away, m.waiting].join();
     const left = round ? x - PIN / 2 : x, top = round ? y - PIN / 2 : y - PIN;
-    const title = (m.author || "Comment") + " · #" + m.n + (away ? " · on something that opens here" : "");
+    // A comment still in the outbox has no number yet.
+    const title = (m.author || "Comment") + " · " + (m.waiting ? waitingText(m) : "#" + m.n) + (away ? " · on something that opens here" : "");
     const last = into === marks && lastPins.get(m.id);
     if (last && last.look === look && last.title === title && last.dataset.image === (m.image || "")) {
       last.style.left = left + "px"; last.style.top = top + "px";
@@ -857,6 +874,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The author's picture, else their initials; the panel and the agent feedback keep the number.
     if (m.image) { const img = document.createElement("img"); img.src = m.image; img.alt = ""; img.referrerPolicy = "no-referrer"; img.onerror = () => { img.remove(); dot.textContent = initials(m.author); }; dot.appendChild(img); }
     else dot.textContent = initials(m.author);
+    if (m.waiting) waitingBadge(dot, m);
     dot.title = title;
     dot.dataset.image = m.image || "";
     dot.style.left = left + "px"; dot.style.top = top + "px"; dot.dataset.id = m.id;
@@ -1117,7 +1135,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       body.textContent = m.body || (m.suggestion == null ? "" : m.suggestion ? "Suggested an edit" : "Suggested deleting this");
       entry.append(avatar, name, body);
       card.appendChild(entry);
-      if (replies) { const more = document.createElement("small"); more.textContent = replies + (replies === 1 ? " reply" : " replies"); card.appendChild(more); }
+      if (m.waiting) { const wait = document.createElement("small"); wait.dataset.delivery = m.waiting === "failed" ? "failed" : "pending"; wait.textContent = waitingText(m); card.appendChild(wait); }
+      else if (replies) { const more = document.createElement("small"); more.textContent = replies + (replies === 1 ? " reply" : " replies"); card.appendChild(more); }
       group.append(toggle, stand, card);
       rail.appendChild(group);
       const height = card.offsetHeight;
