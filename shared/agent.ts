@@ -11,7 +11,7 @@ const identifier = v.pipe(
   v.minLength(1),
   v.maxLength(160),
   // oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
-  v.regex(/^[^\u0000-\u001f\u007f]*[^\s\u0000-\u001f\u007f][^\u0000-\u001f\u007f]*$/),
+  v.regex(/^(?!\s{1,160}$)[^\u0000-\u001f\u007f\u2028\u2029]{1,160}$/),
 )
 
 /**

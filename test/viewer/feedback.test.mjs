@@ -129,6 +129,7 @@ test("the prompt counts the comments, quotes them, and names the MCP calls for t
   assert.match(doc, /4\. The whole page\n {3}Shorter intro \(Ada, on v1\)/)
   assert.match(doc, /read_drop for drop abc/)
   assert.match(doc, /accept_suggestion/)
+  assert.match(doc, /accept_suggestion.*call read_drop again.*(?:returned|fresh) content.*base.*version/)
   assert.match(doc, /Only if edits are still needed, publish.*previous "abc"/)
   assert.match(doc, /resolves only the still-open comments addressed by that publish from \[1, 4\]/)
 })

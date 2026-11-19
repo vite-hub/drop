@@ -71,7 +71,7 @@ function nextStep(drop: PromptDrop, comments: DropComment[]) {
     return `${read} Prepare proposed folder changes for me to review. For questions, use reply if you can comment, or give me the answers directly.`
   const accept =
     drop.kind === "markdown" && comments.some((comment) => comment.suggestion !== null)
-      ? " First use accept_suggestion for suggestions that are right as written, one call each; it publishes and resolves that thread. If nothing remains, do not publish again."
+      ? " First use accept_suggestion for suggestions that are right as written, one call each; it publishes and resolves that thread. If nothing remains, do not publish again. If feedback remains after accepting suggestions, call read_drop again after the last acceptance. Prepare the remaining edits from the returned content and use its version as base."
       : ""
   return `${read}${accept} Only if edits are still needed, publish the next version from the latest content with previous "${drop.id}", base set to the version read_drop showed, and a note saying what changed. Include in resolves only the still-open comments addressed by that publish from [${numbers}]. Where words are the answer, use reply in the comment's thread instead. ${fallback}`
 }

@@ -2,9 +2,11 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { event, sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
+const { default: addressFeedback } = await import("../../server/mcp/prompts/address_feedback.ts")
+const { default: detailGet } = await import("../../server/api/drops/[id].get.ts")
 const { createDocDrop } = await import("../../server/utils/drops.ts")
 
 migrate()
@@ -13,8 +15,14 @@ beforeEach(() => {
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
 })
 
-const server = createMcpHandler({ name: "drop-test", version: "1", origin: false, tools: [publish, readDrop] })
-async function call(tool, input) {
+const server = createMcpHandler({
+  name: "drop-test",
+  version: "1",
+  origin: false,
+  tools: [publish, readDrop],
+  prompts: [addressFeedback],
+})
+async function requestMcp(method, params) {
   const request = new H3Event(
     new Request("https://drop.example/mcp", {
       method: "POST",
@@ -26,14 +34,18 @@ async function call(tool, input) {
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
-        method: "tools/call",
-        params: { name: tool.name, arguments: input },
+        method,
+        params,
       }),
     }),
   )
   request.context.log = { set() {}, error() {}, warn() {} }
   const text = await (await toResponse(await server(request), request)).text()
-  const body = JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
+  return JSON.parse(text.startsWith("{") ? text : text.match(/^data: (.+)$/m)[1])
+}
+
+async function call(tool, input) {
+  const body = await requestMcp("tools/call", { name: tool.name, arguments: input })
   if (body.error) return { isError: true, message: body.error.message }
   const result = body.result
   return result.isError ? { isError: true, message: result.content.map((block) => block.text).join(" ") } : result
@@ -134,6 +146,8 @@ test("agent.session is stored with its version and read back in Versions", async
 
   for (const bad of [
     { thread: "a\nb" },
+    { thread: "a\u2028b" },
+    { thread: "a\u2029b" },
     { project: "\u0001" },
     { harness: "   " },
     { branch: "" },
@@ -144,4 +158,54 @@ test("agent.session is stored with its version and read back in Versions", async
     assert.equal(result.isError, true, JSON.stringify(bad))
   }
   assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 1)
+})
+
+test("shared drop details and read_drop hide current and archived session identifiers from other readers", async () => {
+  const attribution = { model: "Opus", harness: "Claude Code", reasoningLevel: "high" }
+  const doc = (
+    await call(publish, {
+      markdown: "# Plan",
+      note: "First",
+      lifetime: "review",
+      share: "public",
+      agent: { ...attribution, session: { thread: "private-thread" } },
+    })
+  ).structuredContent
+  await call(publish, {
+    previous: doc.id,
+    base: 1,
+    markdown: "# Updated plan",
+    note: "Second",
+    agent: { ...attribution, session: { worktree: "/local/worktree" } },
+  })
+
+  state.who = null
+  for (const query of ["", "?v=1"]) {
+    const request = event(`/api/drops/${doc.id}${query}`)
+    request.context.params = { id: doc.id }
+    const detail = await detailGet(request)
+    assert.deepEqual(
+      detail.versions.map((version) => version.agent),
+      [attribution, attribution],
+    )
+  }
+
+  state.who = { ...who, userId: "reader", actorKind: "agent" }
+  for (const id of [doc.id, `${doc.url}?v=1`]) {
+    const read = await call(readDrop, { id })
+    assert.deepEqual(
+      read.structuredContent.versions.map((version) => version.agent),
+      [attribution, attribution],
+    )
+    assert.match(read.content[0].text, /Opus · Claude Code · high reasoning/)
+    assert.doesNotMatch(read.content[0].text, /private-thread|local\/worktree/)
+  }
+})
+
+test("address_feedback refreshes content and base after accepting suggestions and before editing", async () => {
+  const { result } = await requestMcp("prompts/get", { name: addressFeedback.name, arguments: { id: "doc" } })
+  assert.match(
+    result.messages[0].content.text,
+    /accept_suggestion.*call read_drop again.*returned content.*base.*version returned/,
+  )
 })
