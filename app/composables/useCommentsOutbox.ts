@@ -55,32 +55,30 @@ interface Holder {
  */
 const AUTHOR_KEY = "drop-comments-author"
 const AuthorSchema = v.object({ id: v.string(), name: v.string(), image: v.optional(v.string()) })
-const author = {
-  read() {
-    try {
-      const parsed = v.safeParse(AuthorSchema, JSON.parse(localStorage.getItem(AUTHOR_KEY) ?? "null"))
-      return parsed.success ? parsed.output : undefined
-    } catch {
-      return undefined
-    }
-  },
-  write(user: CommentUser) {
-    try {
-      localStorage.setItem(
-        AUTHOR_KEY,
-        JSON.stringify({ id: user.id, name: user.name ?? "", ...(user.image ? { image: user.image } : {}) }),
-      )
-    } catch {
-      // Blocked storage: the comments still go out, they just show as a guest's after a sign-out.
-    }
-  },
-  forget() {
-    try {
-      localStorage.removeItem(AUTHOR_KEY)
-    } catch {
-      // Blocked storage held nothing.
-    }
-  },
+function readAuthor() {
+  try {
+    const parsed = v.safeParse(AuthorSchema, JSON.parse(localStorage.getItem(AUTHOR_KEY) ?? "null"))
+    return parsed.success ? parsed.output : undefined
+  } catch {
+    return undefined
+  }
+}
+function writeAuthor(user: CommentUser) {
+  try {
+    localStorage.setItem(
+      AUTHOR_KEY,
+      JSON.stringify({ id: user.id, name: user.name ?? "", ...(user.image ? { image: user.image } : {}) }),
+    )
+  } catch {
+    // Blocked storage: the comments still go out, they just show as a guest's after a sign-out.
+  }
+}
+function forgetAuthor() {
+  try {
+    localStorage.removeItem(AUTHOR_KEY)
+  } catch {
+    // Blocked storage held nothing.
+  }
 }
 
 /** Moves what a guest wrote in this browser to the person who signed in here, so it goes out as them. */
@@ -124,7 +122,7 @@ export function createCommentsOutbox(
     },
     clear: async () => {
       await client.value?.outbox.clear()
-      if (import.meta.client) author.forget()
+      if (import.meta.client) forgetAuthor()
     },
   }
   // The outbox lives in the browser: the server renders the comments it has.
@@ -163,11 +161,11 @@ export function createCommentsOutbox(
           held: false,
         }
       } else {
-        const last = author.read()
+        const last = readAuthor()
         const waiting = last ? await store.list(last.id).catch(() => []) : []
         if (last && waiting.length) next = { account: last.id, user: last, held: true }
         else {
-          if (last) author.forget()
+          if (last) forgetAuthor()
           next = { account: GUEST_ACCOUNT, held: false }
         }
       }
@@ -180,7 +178,7 @@ export function createCommentsOutbox(
   async function releaseIfEmpty(who: Holder) {
     const left = await store.list(who.account).catch(() => [])
     if (left.length || holder.value !== who) return
-    author.forget()
+    forgetAuthor()
     holder.value = { account: GUEST_ACCOUNT, held: false }
   }
 
@@ -237,8 +235,8 @@ export function createCommentsOutbox(
           void (page ? page.refresh() : refreshNuxtData(keys.comments(drop)))
         }
         // Whose they are outlives a sign-out while any wait, and goes with the last of them.
-        if (now.length && who.user && !who.held) author.write(who.user)
-        else if (emptied && who.account !== GUEST_ACCOUNT) author.forget()
+        if (now.length && who.user && !who.held) writeAuthor(who.user)
+        else if (emptied && who.account !== GUEST_ACCOUNT) forgetAuthor()
         if (emptied && who.held) holder.value = { account: GUEST_ACCOUNT, held: false }
       })
       const stop = next.start()
