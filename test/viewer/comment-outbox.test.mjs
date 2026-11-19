@@ -5,6 +5,7 @@ import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/clien
 import { createEventHook, createInjectionState, useEventListener } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
+import { fileUrls } from "../../app/utils/comment-outbox.ts"
 
 // useDrop's sends go through the app's outbox (useCommentsOutbox, on ViteHub's): they return at once, show as waiting,
 // and reach Drop's routes once, from whatever page the reader is on by then.
@@ -474,6 +475,22 @@ test("a waiting image's address goes when the page closes", async () => {
   await state.addComment(place, "The chart is cut off", [new File(["png"], "chart.png", { type: "image/png" })])
   assert.equal(state.list.value[0].attachments[0].url, "blob:local/1")
   close()
+  assert.deepEqual(revoked, ["blob:local/1"])
+  vi.restoreAllMocks()
+})
+
+test("a waiting image keeps its address when the outbox reads its entry again", () => {
+  const revoked = []
+  let made = 0
+  vi.spyOn(URL, "createObjectURL").mockImplementation(() => `blob:local/${++made}`)
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => void revoked.push(url))
+  const urls = fileUrls()
+  // IndexedDB gives back a new Blob of the same image after each try.
+  assert.equal(urls.urlOf("e1:0", new Blob(["png"])), "blob:local/1")
+  urls.keep(["e1:0"])
+  assert.equal(urls.urlOf("e1:0", new Blob(["png"])), "blob:local/1")
+  assert.deepEqual(revoked, [])
+  urls.keep([])
   assert.deepEqual(revoked, ["blob:local/1"])
   vi.restoreAllMocks()
 })

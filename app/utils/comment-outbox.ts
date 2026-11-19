@@ -269,8 +269,8 @@ interface OutboxView {
   accepted: ReadonlyMap<string, string>
   /** The id the server gives each waiting reply (replyMessageId), by replyKey, once the browser has worked it out. */
   replyIds?: ReadonlyMap<string, string>
-  /** Where the browser shows a waiting image (fileUrls), until the server has its own copy. */
-  fileUrl?: (file: Blob) => string
+  /** Where the browser shows a waiting image (fileUrls), by its key (fileKey), until the server has its own copy. */
+  fileUrl?: (key: string, file: Blob) => string
 }
 
 /** The key of a waiting image among a message's attachments: no drop has it yet, so attachmentUrl asks the browser. */
@@ -284,33 +284,42 @@ function localAttachments(entry: CommentsOutboxEntry, view: OutboxView, screensh
   const { fileUrl } = view
   if (!fileUrl) return []
   return entry.files.map((file, index) => ({
-    id: `${LOCAL_ATTACHMENT}${entry.id}:${index}`,
+    id: `${LOCAL_ATTACHMENT}${fileKey(entry, index)}`,
     filename:
       file instanceof File && file.name ? file.name : screenshotFirst && index === 0 ? "screenshot.png" : "image",
     contentType: file.type,
     size: file.size,
-    url: fileUrl(file),
+    url: fileUrl(fileKey(entry, index), file),
   }))
 }
 
+/** A waiting image's key: its entry and place, which stay while the entry waits. */
+export const fileKey = (entry: CommentsOutboxEntry, index: number) => `${entry.id}:${index}`
+
+/** Every waiting image's key, for fileUrls().keep. */
+export const fileKeys = (entries: readonly CommentsOutboxEntry[]) =>
+  entries.flatMap((entry) => entry.files.map((_, index) => fileKey(entry, index)))
+
 /**
- * Object URLs for the outbox's images, one per Blob however often the list is computed. `keep` revokes the ones whose
- * entry left the outbox (landed or discarded), `clear` all of them, when the page goes.
+ * Object URLs for the outbox's images, one per image however often the list is computed. They're keyed by entry and
+ * place, not by Blob: the outbox reads its entries again from IndexedDB after each try, which gives new Blobs of the
+ * same image, and a new URL each time would revoke the one the thread shows. `keep` revokes the ones whose entry left
+ * the outbox (landed or discarded), `clear` all of them, when the page goes.
  */
 export function fileUrls() {
-  const urls = new Map<Blob, string>()
-  const keep = (files: Iterable<Blob>) => {
-    const kept = new Set(files)
-    for (const [file, url] of urls)
-      if (!kept.has(file)) {
+  const urls = new Map<string, string>()
+  const keep = (keys: Iterable<string>) => {
+    const kept = new Set(keys)
+    for (const [key, url] of urls)
+      if (!kept.has(key)) {
         URL.revokeObjectURL(url)
-        urls.delete(file)
+        urls.delete(key)
       }
   }
   return {
-    urlOf(file: Blob) {
-      let url = urls.get(file)
-      if (!url) urls.set(file, (url = URL.createObjectURL(file)))
+    urlOf(key: string, file: Blob) {
+      let url = urls.get(key)
+      if (!url) urls.set(key, (url = URL.createObjectURL(file)))
       return url
     },
     keep,

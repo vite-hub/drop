@@ -4,6 +4,7 @@ import * as v from "valibot"
 import { replyMessageId } from "vite-hub/comments/client"
 import {
   type CommentPlace,
+  fileKeys,
   fileUrls,
   randomId,
   replyKey,
@@ -90,14 +91,14 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   )
   // A waiting comment's images show from the browser's copy; their addresses go once their entry leaves the outbox.
   const imageUrls = fileUrls()
-  watch(app.entries, (entries) => imageUrls.keep(entries.flatMap((entry) => entry.files)))
+  watch(app.entries, (entries) => imageUrls.keep(fileKeys(entries)))
   onScopeDispose(() => imageUrls.clear())
   /** The drop's comments with the ones that wait to go out, each shown once. */
   const list = computed(() =>
     withOutbox(comments.data.value, app.entries.value, {
       ...view(),
       replyIds: replyIds.value,
-      fileUrl: (file) => imageUrls.urlOf(file),
+      fileUrl: (key, file) => imageUrls.urlOf(key, file),
     }),
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
