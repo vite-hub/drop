@@ -7,7 +7,8 @@ import { requireIdentity } from "../utils/identity"
 
 /**
  * Agents upload one file. It becomes a private drop, or with `folder` (an id or link) one in that folder, shared and kept
- * with it; `url` serves the file, `page` opens it for review. In the live editor, `document` attaches an image instead.
+ * with it; `url` serves the file, `page` opens it for review. In the live editor, `document` attaches an image and
+ * returns a root-relative `url` so drafts can be opened and published on another hostname of the same Drop.
  */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
@@ -56,9 +57,10 @@ export default defineHandler(async (event) => {
   )
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })
   const origin = event.url.origin
+  const path = `/f/${drop.blobKey}`
   return {
     id: drop.id,
-    url: new URL(`/f/${drop.blobKey}`, origin).href,
+    url: attachment ? path : new URL(path, origin).href,
     page: dropPageUrl(origin, drop),
     share: drop.share,
     version: drop.version,
