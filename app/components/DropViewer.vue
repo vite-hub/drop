@@ -21,6 +21,7 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import {
   AvatarStack,
+  CommentSelectionBar,
   ConnectionStatus,
   ConnectionStatusLabel,
   type ConnectionStatusState,
@@ -1958,7 +1959,7 @@ watch(
       class="fixed z-30 w-max -translate-x-1/2 -translate-y-full"
       :style="selectionBarStyle"
     >
-      <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
+      <CommentSelectionBar suggest @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
     <!-- Focus stays in the page while text is selected there, so a screen reader hears the keys instead of the bar. -->
     <p aria-live="polite" class="sr-only">
