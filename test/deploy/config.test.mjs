@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { test } from "vite-plus/test"
+import { test, vi } from "vite-plus/test"
 import { deployment } from "../../scripts/deployment.ts"
 
 test("host detection and explicit hosts select compatible storage", () => {
@@ -31,4 +31,36 @@ test("invalid configuration fails instead of changing providers", () => {
     { DROP_HOST: "vps", DROP_DATABASE_URL: "libsql://remote" },
   ])
     assert.throws(() => deployment(env), Error, JSON.stringify(env))
+})
+
+test.each([
+  ["cloudflare", false],
+  ["vercel", false],
+  ["netlify", false],
+  ["vps", true],
+  ["deno", true],
+])("%s registers only its intended health handler", async (host, databaseOnly) => {
+  vi.resetModules()
+  vi.stubGlobal("defineNuxtConfig", (config) => config)
+  vi.stubEnv("DROP_HOST", host)
+  vi.stubEnv("DROP_DATABASE", undefined)
+  vi.stubEnv("DROP_DATABASE_URL", undefined)
+  vi.stubEnv("VITEHUB_BUILD_COMMIT", "health-test-commit")
+  try {
+    const { default: config } = await import("../../nuxt.config.ts")
+    const handlers = config.nitro.handlers?.filter(({ route }) => route === "/api/health") ?? []
+    if (databaseOnly) {
+      assert.equal(config.vitehub.health, undefined)
+      assert.equal(handlers.length, 1)
+      assert.equal(handlers[0].method, "get")
+      assert.match(handlers[0].handler, /[/\\]server[/\\]handlers[/\\]database-health\.ts$/)
+      assert.equal(config.runtimeConfig.release.commit, "health-test-commit")
+    } else {
+      assert.deepEqual(config.vitehub.health, { route: "/api/health" })
+      assert.deepEqual(handlers, [])
+    }
+  } finally {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  }
 })
