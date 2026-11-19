@@ -66,6 +66,20 @@ export async function syncRole(userId: string) {
 
 export const authFor = (event: H3Event) => useAuth(event)
 
+/**
+ * The browser's session, with its cookie kept in step. Once a day Better Auth extends a session: it writes the new expiry
+ * to the database and sends a fresh cookie on the call's own response. A server-side call drops that response, so
+ * without this the cookie lapsed a week after sign-in while the database still said the session was live.
+ */
+export async function sessionOf(event: H3Event) {
+  const { headers, response } = await authFor(event).api.getSession({
+    headers: event.req.headers,
+    returnHeaders: true,
+  })
+  for (const cookie of headers.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
+  return response
+}
+
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 
 /**
@@ -97,14 +111,12 @@ async function verify(event: H3Event): Promise<Identity | null> {
 
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (bearerFrom(event.req.headers)) return fromAccessToken(event)
-  const session = await authFor(event)
-    .api.getSession({ headers: event.req.headers })
-    .catch((error: unknown) => {
-      // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
-      rethrowMembershipOutage(error)
-      logError(event, error, { auth: { session: "failed" } })
-      return null
-    })
+  const session = await sessionOf(event).catch((error: unknown) => {
+    // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
+    rethrowMembershipOutage(error)
+    logError(event, error, { auth: { session: "failed" } })
+    return null
+  })
   if (!session?.user) return null
   if (session.user.banned) {
     logDenied(event, "banned")
