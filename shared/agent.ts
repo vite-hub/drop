@@ -17,7 +17,7 @@ export type AgentMetadata = v.InferOutput<typeof AgentMetadataSchema>
 export const AgentInputSchema = v.union([label, AgentMetadataSchema])
 
 export function agentMetadata(agent: v.InferOutput<typeof AgentInputSchema> | undefined): AgentMetadata | undefined {
-  return typeof agent === "string" ? { model: agent } : agent
+  return v.is(label, agent) ? { model: agent } : agent
 }
 
 export function agentLabel(agent: AgentMetadata | null) {
