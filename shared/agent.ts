@@ -3,7 +3,7 @@ import * as v from "valibot"
 const label = v.pipe(v.string(), v.minLength(1), v.maxLength(160), v.regex(/\S/))
 
 /** Self-reported for this publish. Omit values the agent's runtime does not expose. */
-export const AgentMetadataSchema = v.object({
+const AgentMetadataSchema = v.object({
   model: v.optional(v.pipe(label, v.description("Exact model name or id from your runtime, when known."))),
   harness: v.optional(v.pipe(label, v.description("Agent harness, e.g. Codex or Claude Code, when known."))),
   reasoningLevel: v.optional(

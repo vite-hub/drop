@@ -349,10 +349,21 @@ test("publish accepts partial agent metadata and rejects invalid labels before w
 })
 
 test("publish reads a plain agent string as the model", async () => {
-  const doc = (await call(publish, { markdown: "# Model only", note: "String agent", lifetime: "review", agent: "claude-opus-5-5" }))
-    .structuredContent
-  assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, { model: "claude-opus-5-5" })
-  assert.equal((await call(publish, { markdown: "# Blank", note: "Blank", lifetime: "review", agent: "  " })).isError, true)
+  const doc = (
+    await call(publish, {
+      markdown: "# Model only",
+      note: "String agent",
+      lifetime: "review",
+      agent: "claude-opus-5-5",
+    })
+  ).structuredContent
+  assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, {
+    model: "claude-opus-5-5",
+  })
+  assert.equal(
+    (await call(publish, { markdown: "# Blank", note: "Blank", lifetime: "review", agent: "  " })).isError,
+    true,
+  )
 })
 
 test("app replacement records the current publisher without inheriting earlier metadata", async () => {
