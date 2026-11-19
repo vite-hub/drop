@@ -40,7 +40,7 @@ export default defineMcpTool({
     const thread = await findCommentByNumber(drop, n)
     if (!thread) throw new HTTPError({ status: 404, message: `No comment #${n} on this drop.` })
     const mayResolve =
-      drop.kind === "site" ? mayResolveSite(drop, who, wroteThread(thread, who)) : permissions(drop, who).manage
+      drop.kind === "site" ? mayResolveSite(drop, who, wroteThread(thread, who.userId)) : permissions(drop, who).manage
     if (resolve && !mayResolve)
       throw new HTTPError({ status: 403, message: `Only the drop's owner resolves #${n}. Nothing was sent.` })
     const reply = await addReply(thread, who, text)

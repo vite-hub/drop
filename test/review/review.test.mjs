@@ -1466,25 +1466,29 @@ test("on a site review, people signed in who may comment resolve each other's co
   await comment(guest, { body: "From a guest" })
   const [thread] = (await json(await count(ada_, "/pricing?plan=pro"))).threads
   assert.equal(thread.canResolve, true, "a teammate may resolve the guest's comment")
-  const resolve = (bearer) =>
+  const resolve = (bearer, n = 1) =>
     answer(
       threadPatch,
-      request("/api/review/comments/1", {
+      request(`/api/review/comments/${n}`, {
         method: "PATCH",
         headers: { origin: SITE, authorization: `Bearer ${bearer}`, "content-type": "application/json" },
         body: JSON.stringify({ resolved: true }),
-        params: { n: "1" },
+        params: { n: String(n) },
       }),
     )
   await comment(ada_, { body: "Ada's" })
   const asGuest = (await json(await count(guest, "/pricing?plan=pro"))).threads
   assert.deepEqual(
-    asGuest.map((item) => item.canResolve),
-    [false, false],
-    "a guest resolves nothing, since a guest's comments aren't tied to them",
+    asGuest.map((item) => [item.body, item.canResolve]),
+    [
+      ["Ada's", false],
+      ["From a guest", true],
+    ],
+    "a guest's token names their browser, so their own comments are theirs",
   )
-  assert.equal((await resolve(guest)).status, 403)
-  assert.equal((await resolve(ada_)).status, 200)
+  assert.equal((await resolve(guest, 2)).status, 403)
+  assert.equal((await resolve(guest)).status, 200)
+  assert.equal((await resolve(ada_, 2)).status, 200)
 })
 
 test("review.js is one cacheable script with no key, inert until someone presses Comment, safe to add twice", async () => {
@@ -1715,7 +1719,8 @@ test("a resolved comment in Drop still takes replies from people who may comment
       id: "doc",
     }),
   )
-  assert.deepEqual([posted.authorName, posted.mine, posted.n], ["Guest", false, 1])
+  // Theirs, by their browser's cookie: nobody else's.
+  assert.deepEqual([posted.authorName, posted.mine, posted.n], ["Guest", true, 1])
   state.who = who
   const [listed] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
   assert.equal(listed.mine, false, "a guest's comment is nobody's")
@@ -1731,7 +1736,7 @@ test("a resolved comment in Drop still takes replies from people who may comment
       id: posted.id,
     }),
   )
-  assert.deepEqual([reply.authorName, reply.mine], ["Guest", false])
+  assert.deepEqual([reply.authorName, reply.mine], ["Guest", true])
   const [after] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
   assert.equal(after.resolved, true)
   assert.deepEqual(

@@ -92,7 +92,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 
 A comment shows the moment you send it. If it doesn't go through, it comes back to its box with the reason.
 
-Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread.
+Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread. A guest is the author of their comments in the browser they wrote them in.
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 

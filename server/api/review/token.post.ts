@@ -3,6 +3,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteMatches } from "#shared/review"
 import { ReviewTokenSchema } from "#shared/schemas"
 import { findDrop, permissions } from "../../utils/drops"
+import { guestOf } from "../../utils/guests"
 import { identify } from "../../utils/identity"
 import { openChoice, signReviewToken } from "../../utils/review"
 
@@ -38,6 +39,8 @@ export default defineValidatedHandler({
       u: who?.userId ?? null,
       n: author,
       o: origin,
+      // The popup is on Drop, so a guest's token carries their browser's guest id there.
+      ...(who ? {} : { g: await guestOf(event, { mint: true }) }),
     })
     event.res.headers.set("Cache-Control", "no-store")
     return { token, expiresAt, origin, title: site.title, name: author }

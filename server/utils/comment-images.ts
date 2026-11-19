@@ -228,15 +228,17 @@ export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType
 
 /**
  * Stores the images, then runs `write` (which adds a comment or a reply that lists them in `attachments`), then links
- * them to it. If `write` fails, the images go, so a retry doesn't leave them behind.
+ * them to it. If `write` fails, the images go, so a retry doesn't leave them behind. `owner` says which comment or reply
+ * they're in, or null when `write` returned one that an earlier request with the same retry key added, which lists
+ * that request's images: then these go too, and `attachments` is null.
  */
 export async function withImages<T extends { id: string }>(
   parent: DropRow | null,
   images: CommentImage[],
   actorName: string,
   write: (attachments: string[]) => Promise<T>,
-  owner: (row: T) => { commentId: string; replyId: string | null },
-): Promise<{ row: T; attachments: CommentAttachment[] }> {
+  owner: (row: T, attachments: string[]) => { commentId: string; replyId: string | null } | null,
+): Promise<{ row: T; attachments: CommentAttachment[] | null }> {
   const stored = parent ? await storeImages(parent, images, actorName) : []
   const ids = stored.map((row) => row.id)
   let row: T
@@ -246,8 +248,28 @@ export async function withImages<T extends { id: string }>(
     await deleteImages(ids)
     throw error
   }
-  await linkImages(ids, owner(row))
+  const link = owner(row, ids)
+  if (!link) {
+    await deleteImages(ids)
+    return { row, attachments: null }
+  }
+  await linkImages(ids, link)
   return { row, attachments: stored.map(toAttachment) }
+}
+
+/** Whether a message lists all of `ids`: the images this request stored, rather than an earlier request's. */
+export const lists = (message: { attachments: readonly string[] } | undefined, ids: string[]) =>
+  ids.every((id) => message?.attachments.includes(id))
+
+/** The comment images `ids` names, as Drop's API answers them, for a comment or reply an earlier request stored. */
+export async function attachmentsById(ids: readonly string[]): Promise<Map<string, CommentAttachment>> {
+  if (!ids.length) return new Map()
+  const rows = await db
+    .select({ id: drops.id, filename: drops.filename, contentType: drops.contentType, size: drops.size })
+    .from(commentAttachments)
+    .innerJoin(drops, eq(drops.id, commentAttachments.dropId))
+    .where(inArray(drops.id, [...ids]))
+  return new Map(rows.map((row) => [row.id, toAttachment(row)]))
 }
 
 /**
