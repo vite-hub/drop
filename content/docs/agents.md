@@ -10,6 +10,13 @@ description: Agents reach Drop over MCP. They sign in through your browser once;
 
 Signed in, the Agents page lists the clients you've connected, and disconnecting one revokes its access.
 
+### Claude Code and Codex plugin {#plugin}
+
+For drop.vitehub.dev, the Drop plugin adds the server and the [skills](#skill) in one install. Sign in before using Drop tools:
+
+- **Claude Code:** Run `claude plugin marketplace add vite-hub/drop`, then `claude plugin install drop@drop`. In Claude Code, open `/mcp`, select the Drop plugin server, and authenticate in your browser.
+- **Codex:** Run `codex plugin marketplace add vite-hub/drop`, then `codex plugin add drop@drop`. Run `codex mcp login drop` and finish signing in through your browser.
+
 ## How sign-in works {#sign-in}
 
 Drop is an OAuth 2.1 authorization server for its own MCP endpoint. When a client first connects:
@@ -34,7 +41,7 @@ Drop's skills come with the server through the MCP Skills extension (`skills/lis
 - `learning` keeps a model of what you know per topic in a `learning` folder, with the answers behind it and when each concept is due for review, so a lesson starts where your knowledge stops. It also quizzes you, in chat or in a doc, to place you on a new topic or review what's due. The first time, it suggests the folders to create.
 - `skill-hub` shares agent skills through a Drop folder: it publishes a skill from your disk into the folder, and installs one from it into the agents you pick. See [Share skills from a folder](#skill-hub).
 
-The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there for everyone; every way of getting skills then leaves it out.
+The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there so this Drop instance no longer serves it. This does not change the skills bundled in the Git plugin.
 
 To install them into agents that don't load skills over MCP, run the [skills CLI](https://github.com/vercel-labs/skills) with this Drop's address. It asks which skills and which agents, and copies each skill where those agents read it:
 

@@ -1,4 +1,4 @@
-import { agentLabel } from "#shared/agent"
+import { agentLabel, sessionLabel } from "#shared/agent"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
@@ -40,7 +40,7 @@ export default defineMcpTool({
   name: "read_drop",
   title: "Read a drop",
   description:
-    "Read a drop, including original file bytes up to 4 MiB from private user uploads. PNG, JPEG, WebP and GIF arrive as MCP images; PDF, video and other binaries as embedded blob resources. Use read_file for only the original bytes or a single app path. Read a doc's source, with inline base64 figures as placeholders (read_file has their bytes), or every file of an app, an app's pages with links that open the drop at each (?path=), its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. For a link, the page it opens. For a board, an outline of its frames, items and arrows, with who added each. Address the open comments and errors in the next version (publish with previous and resolves); a comment's replies follow it (↳), with the images people sent (Images: their addresses, to fetch and look at), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; a comment's box is in thousandths of its screenshot, so ox 683 is 68.3% from the left. Pass a page's address, like a pull request's preview URL, to read the site review covering it: every open comment on that preview, by page, that page's first. Fix the site, then reply to each comment with what you changed and resolve: true, so its pin leaves the page; reply without resolving to say why one stays open. Read it again before you say the review is done: nothing open should be left without your answer. The links it shows at the top, like its pull request. For the drop's owner, how many viewed it: people signed in, anonymous visitors, and agents, each once a day. For a Markdown doc with questions, polls, or recall cards, how people signed in answered each (counts per option, never who picked what) and the user's own answers, first and latest: use them to see which wrong options people pick.",
+    "Read a drop, including original file bytes up to 4 MiB from private user uploads. PNG, JPEG, WebP and GIF arrive as MCP images; PDF, video and other binaries as embedded blob resources. Use read_file for only the original bytes or a single app path. Read a doc's source, with inline base64 figures as placeholders (read_file has their bytes), or every file of an app, an app's pages with links that open the drop at each (?path=), its open review comments, its versions with their notes, the files a doc embeds, and for an app or HTML page the errors it threw while people had the current version open. For a folder, the drops in it. For a link, the page it opens. For a board, an outline of its frames, items and arrows, with who added each. Address the open comments and errors in the next version (publish with previous, base set to the version you read, and resolves); a comment's replies follow it (↳), with the images people sent (Images: their addresses, to fetch and look at), and reply answers in its thread. For a site, the comments people sent from its pages, each with its page, the element under the box, and a screenshot; a comment's box is in thousandths of its screenshot, so ox 683 is 68.3% from the left. Pass a page's address, like a pull request's preview URL, to read the site review covering it: every open comment on that preview, by page, that page's first. Fix the site, then reply to each comment with what you changed and resolve: true, so its pin leaves the page; reply without resolving to say why one stays open. Read it again before you say the review is done: nothing open should be left without your answer. The links it shows at the top, like its pull request. For the drop's owner, how many viewed it: people signed in, anonymous visitors, and agents, each once a day. For a Markdown doc with questions, polls, or recall cards, how people signed in answered each (counts per option, never who picked what) and the user's own answers, first and latest: use them to see which wrong options people pick.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(
     v.object({
@@ -152,11 +152,16 @@ export default defineMcpTool({
     // A doc's text without the bytes of its inline figures: a converted paper's ran to 3 MB.
     const source = detail.content !== undefined ? withoutInlineData(detail.content) : null
 
+    // An earlier version read through a `?v=` link isn't the one to build on.
+    const versionsLead =
+      drop.head || drop.kind === "folder" || drop.kind === "link"
+        ? ""
+        : `Publish the next version with base ${drop.version}, the version you read.\n`
     const sections = [
       `${meta.title} (${meta.kind} v${meta.version}, ${meta.share}${meta.sharedThrough ? ` through ${meta.sharedThrough}` : ""}, ${meta.lifetime}, ${meta.status.toLowerCase()}) ${meta.url}${folder ? `\nIn ${folder}` : ""}${views ? `\n${viewsLine(views)}` : ""}${links}`,
       ...(children ? [`## In this folder\n${children.map(dropLine).join("\n") || "Nothing yet."}`] : []),
       ...(meta.href ? [`## Link\nOpens ${meta.href}${drop.note ? `\n${drop.note}` : ""}`] : []),
-      `## Versions\n${versions.map((item) => `v${item.version}${item.note ? `: ${item.note}` : ""} (${item.by}${agentLabel(item.agent) ? ` · ${agentLabel(item.agent)}` : ""})`).join("\n")}`,
+      `## Versions\n${versionsLead}${versions.map((item) => `v${item.version}${item.note ? `: ${item.note}` : ""} (${[item.by, agentLabel(item.agent), sessionLabel(item.agent)].filter(Boolean).join(" · ")})`).join("\n")}`,
       `## ${resolved ? "Comments" : "Open comments"}\n${unavailable ?? (shown.map((comment) => `${commentLine(comment, drop.version, event.url.origin)}${comment.resolved ? " [resolved]" : ""}`).join("\n") || "None.")}`,
       ...(toolbar ? [toolbar.text] : []),
       ...(errors.length

@@ -4,6 +4,7 @@ import { defineSkill, defineSkills, type Skill } from "vite-hub/skills"
 import comarkUiSkill from "comark-ui/skills/comark-ui/SKILL.md?raw"
 import { skills as comarkSkills } from "comark-ui/skills"
 import prEvidenceMd from "../../skills/pr-evidence/SKILL.md?raw"
+import prEvidenceReview from "../../skills/pr-evidence/references/review.md?raw"
 import { skillSettings } from "../databases/default/index"
 
 /**
@@ -29,6 +30,7 @@ const comarkUiReferences = import.meta.glob<string>(
 )
 const prEvidence = defineSkill({
   "SKILL.md": prEvidenceMd,
+  "references/review.md": prEvidenceReview,
   "references/annotations.md": comarkUiSkill
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n+/, "")
     .replaceAll("](references/", "](comark-ui/references/"),

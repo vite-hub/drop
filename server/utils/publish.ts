@@ -10,7 +10,16 @@ import { BoardInput } from "../mcp/board"
 import { dropLine, folderLife, mcpDrop, pagesSection, SHARE_INPUT } from "../mcp/format"
 import { applyChanges, boardChanges, emptyBoard, serializeBoard } from "#shared/board"
 import { resolveComments } from "./comments"
-import { createDocDrop, findDrop, findDropByRef, MAX_FILE_BYTES, permissions, publishApp, toSummary } from "./drops"
+import {
+  createDocDrop,
+  findDrop,
+  findDropByRef,
+  MAX_FILE_BYTES,
+  permissions,
+  publishApp,
+  requireBase,
+  toSummary,
+} from "./drops"
 import { updateDrop } from "./drop-update"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
@@ -29,7 +38,7 @@ export const PublishInput = v.object({
     v.pipe(
       AgentInputSchema,
       v.description(
-        "Your model, harness, and reasoning level for this publish, as { model, harness, reasoningLevel }; a plain string is read as the model. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
+        "Your model, harness, and reasoning level for this publish, as { model, harness, reasoningLevel, session }; a plain string is read as the model. session names where you run, as short identifiers: { harness, thread, project, worktree, branch }. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
       ),
     ),
   ),
@@ -141,6 +150,16 @@ export const PublishInput = v.object({
       ),
     ),
   ),
+  base: v.optional(
+    v.pipe(
+      v.number(),
+      v.integer(),
+      v.minValue(1),
+      v.description(
+        "With previous: the version you read with read_drop. When the drop has a newer version, the call fails with a conflict and publishes nothing, so you don't write over changes and comments you haven't seen; read the drop again and build on the latest. Without it, the version goes on top of the latest.",
+      ),
+    ),
+  ),
   note: v.pipe(
     v.string(),
     v.minLength(1),
@@ -209,6 +228,8 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: "Pass exactly one of markdown, html, files, archive, file, site, board, or link.",
     })
+  if (input.base !== undefined && !input.previous)
+    throw new HTTPError({ status: 400, message: "base is the version you read of previous: pass previous with it." })
   if (!input.previous && !input.folder && !input.lifetime)
     throw new HTTPError({
       status: 400,
@@ -294,11 +315,13 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: `previous is a ${previous.kind}, which has no versions. Change it with update_drop.`,
     })
-  // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest.
+  // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest, unless `base`
+  // says the agent read an older one.
   if (previous?.head) previous = await findDrop(previous.id, event)
+  if (previous) requireBase(previous, input.base)
   let resources = links && addedResources(previous, links)
   const share = input.share ? { share: input.share } : {}
-  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent }
+  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent, base: input.base }
 
   let row
   let warnings: string[] = []
