@@ -24,12 +24,12 @@ const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-err
 
 const { host, database } = deployment()
 
-// What /api/health reports: package.json's version and the commit the host built, from Drop's Docker build or the host's
-// own build variable (Workers Builds, Vercel, Netlify).
+// What every wide event names: package.json's version and the commit the host built, from Drop's Docker build or the
+// host's own build variable (Workers Builds, Vercel, Netlify). ViteHub's health route reads the same variables.
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
   commit:
-    process.env.DROP_COMMIT ||
+    process.env.VITEHUB_BUILD_COMMIT ||
     process.env.WORKERS_CI_COMMIT_SHA ||
     process.env.VERCEL_GIT_COMMIT_SHA ||
     process.env.COMMIT_REF ||
@@ -180,6 +180,9 @@ export default defineNuxtConfig({
     // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
     // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
     trustProxy: true,
+    // /api/health answers Drop's version, the commit, the ViteHub version, and whether the Database and each store
+    // answer, without a sign-in (server/middleware/0.2.members-only.ts lets it through).
+    health: { route: "/api/health" },
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
@@ -284,7 +287,6 @@ export default defineNuxtConfig({
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
-    release,
     // Which host this build is for, on every wide event (server/plugins/wide-events.ts).
     deployment: { host },
     seoIndex: false,
