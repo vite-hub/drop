@@ -1,6 +1,7 @@
 import type { CommentDelivery, CommentsOutboxEntry, CommentsTransport, CommentThread } from "vite-hub/comments/client"
 import type { CommentInput } from "#shared/schemas"
 import type { CommentReply, DropComment } from "#shared/types"
+import { toThread } from "./comment-threads"
 
 // Drop's comments through ViteHub's outbox (`createCommentsClient({ outbox })`): a new comment or reply is saved in the
 // browser with its images, shows at once as the reader's, and goes to Drop's own routes once, with its `requestId`.
@@ -67,29 +68,48 @@ function withImages(data: Record<string, unknown>, files: readonly Blob[]) {
   return form
 }
 
+const field = (error: unknown, name: string): unknown =>
+  error && typeof error === "object" ? Reflect.get(error, name) : undefined
+const answerOf = (error: unknown) => {
+  const response = field(error, "response")
+  return response instanceof Response ? response : undefined
+}
+
+/** The status a route answered a send with, or undefined when no answer came. */
+export function statusOf(error: unknown) {
+  const status = field(error, "status") ?? field(error, "statusCode") ?? answerOf(error)?.status
+  return typeof status === "number" && status > 0 ? status : undefined
+}
+
 /** What the outbox reads from a refusal: the status (none when there was no answer), the server's sentence, and its wait. */
 function refusal(error: unknown) {
-  const field = (name: string): unknown => (error && typeof error === "object" ? Reflect.get(error, name) : undefined)
-  const response = field("response")
-  const answered = response instanceof Response ? response : undefined
-  const status = field("status") ?? field("statusCode") ?? answered?.status
-  const seconds = Number(answered?.headers.get("retry-after") ?? Number.NaN)
+  const status = statusOf(error)
+  const seconds = Number(answerOf(error)?.headers.get("retry-after") ?? Number.NaN)
   return Object.assign(new Error(errorText(error, "Couldn't send it. It waits and tries again.")), {
-    ...(typeof status === "number" && status > 0 ? { status } : {}),
+    ...(status ? { status } : {}),
     ...(Number.isFinite(seconds) && seconds >= 0 ? { retryAfter: seconds * 1000 } : {}),
     cause: error,
   })
 }
 
+/** Whose outbox a guest's browser keeps: one for every guest, since the server knows a guest by its cookie alone. */
+export const GUEST_ACCOUNT = "guest"
+
+/** Whose outbox this browser sends: the signed-in person's, or the guests' one. */
+export const outboxAccount = (userId: string | undefined) => userId ?? GUEST_ACCOUNT
+
 interface DropTransportHost {
   fetch: typeof $fetch
+  /**
+   * The signed-in person who wrote what this transport sends, none for a guest. Each request carries it as `as`, and
+   * the routes answer 401 when the session is somebody else, so a comment never goes out as another person.
+   */
+  as?: string
   /** The server took a comment: `comment` when the route answered it, else the drop whose list to load again. */
   created: (requestId: string, drop: string, comment: DropComment | null) => void | Promise<void>
   replied: (requestId: string, drop: string | undefined, threadId: string, reply: CommentReply) => void
   /** A refusal the plan-limit dialog explains, or another the reader should hear of. */
   refused: (error: unknown) => void
-  /** The comment as a thread, for the outbox's receipt. */
-  thread: (comment: DropComment) => CommentThread
 }
 
 const unused = () => Promise.reject(new Error("Drop's outbox only sends new comments and replies."))
@@ -99,6 +119,7 @@ const unused = () => Promise.reject(new Error("Drop's outbox only sends new comm
  * guests, and take the images with the comment. Only `create` and `reply` go through the outbox; the rest stay in useDrop.
  */
 export function dropTransport(host: DropTransportHost): CommentsTransport {
+  const as = host.as ? { as: host.as } : {}
   const send = async <T>(request: () => Promise<T>) => {
     try {
       return await request()
@@ -122,7 +143,7 @@ export function dropTransport(host: DropTransportHost): CommentsTransport {
       if (target.route === "review") {
         const [screenshot, ...images] = files
         const form = new FormData()
-        form.append("data", JSON.stringify({ ...target.place, body: input.body, requestId }))
+        form.append("data", JSON.stringify({ ...target.place, body: input.body, requestId, ...as }))
         if (screenshot) form.append("screenshot", screenshot, "screenshot")
         for (const file of images) form.append("image", file, file instanceof File && file.name ? file.name : "image")
         const { n } = await send(() =>
@@ -152,24 +173,30 @@ export function dropTransport(host: DropTransportHost): CommentsTransport {
         host.fetch<DropComment>(`/api/drops/${target.drop}/comments`, {
           method: "POST",
           query: target.v ? { v: target.v } : {},
-          body: withImages({ ...target.place, body: input.body, mentions: input.mentions ?? [], requestId }, files),
+          body: withImages(
+            { ...target.place, body: input.body, mentions: input.mentions ?? [], requestId, ...as },
+            files,
+          ),
         }),
       )
       const landed = { ...comment, requestId }
       await host.created(requestId, target.drop, landed)
       // The subject stays the outbox's, which names the drop whose list the comment and its waiting replies are on.
-      return { ...host.thread(landed), subject: input.subject, requestId }
+      return { ...toThread(landed, input.subject), requestId }
     },
     async reply(input) {
       const requestId = input.requestId ?? ""
       const reply = await send(() =>
         host.fetch<CommentReply>(`/api/comments/${input.threadId}/replies`, {
           method: "POST",
-          body: withImages({ body: input.body, mentions: input.mentions ?? [], requestId }, input.files ?? []),
+          body: withImages({ body: input.body, mentions: input.mentions ?? [], requestId, ...as }, input.files ?? []),
         }),
       )
       host.replied(requestId, input.subject?.id, input.threadId, { ...reply, requestId })
-      return host.thread({ ...emptyComment(input.threadId), replies: [{ ...reply, requestId }] })
+      return toThread(
+        { ...emptyComment(input.threadId), replies: [{ ...reply, requestId }] },
+        input.subject ?? { kind: "drop", id: "" },
+      )
     },
     edit: unused,
     delete: unused,
@@ -332,23 +359,4 @@ export function randomId() {
   bytes[8] = (bytes[8]! & 0x3f) | 0x80
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
-}
-
-let guestFallback: string | undefined
-/**
- * Whose outbox this browser sends: the signed-in person's, or a guest's, one id per device. Kept in localStorage, so
- * a guest's waiting comments survive a reload; a window that blocks storage gets one id per page.
- */
-export function outboxAccount(userId: string | undefined) {
-  if (userId) return userId
-  const key = "drop-guest-device"
-  try {
-    const saved = localStorage.getItem(key)
-    if (saved) return `guest:${saved}`
-    const id = randomId()
-    localStorage.setItem(key, id)
-    return `guest:${id}`
-  } catch {
-    return `guest:${(guestFallback ??= randomId())}`
-  }
 }

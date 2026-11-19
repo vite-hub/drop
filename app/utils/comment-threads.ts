@@ -8,7 +8,8 @@ const person = (id: string, name: string, image: string | null): CommentUser => 
   id,
   name,
   ...(image ? { image } : {}),
-  ...(id.startsWith("guest:") ? { guest: true } : {}),
+  // A guest's id from the server, or "guest" for a guest's words still waiting in the outbox (GUEST_ACCOUNT).
+  ...(id === "guest" || id.startsWith("guest:") ? { guest: true } : {}),
 })
 
 /** The agent that wrote it, which the parts show in place of its author, with its logo. */

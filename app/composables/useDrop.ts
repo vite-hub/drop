@@ -1,16 +1,7 @@
-import { createCommentsClient, type CommentsClient, type CommentsOutbox } from "vite-hub/comments/client"
 import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import * as v from "valibot"
-import {
-  type CommentPlace,
-  dropTransport,
-  outboxAccount,
-  randomId,
-  type SiteCommentPlace,
-  targetMetadata,
-  withOutbox,
-} from "../utils/comment-outbox"
+import { type CommentPlace, randomId, type SiteCommentPlace, targetMetadata, withOutbox } from "../utils/comment-outbox"
 
 /** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }
@@ -37,65 +28,36 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   // (usePresence's `commented`). Loading them again never fires it, so two viewers can't keep waking each other.
   const wrote = createEventHook<void>()
 
-  // New comments and replies go through ViteHub's outbox: saved in the browser with their images, shown at once, and
-  // sent to Drop's routes once each, in order, as soon as the network lets them (app/utils/comment-outbox.ts).
+  // New comments and replies go through the app's outbox (useCommentsOutbox): saved in the browser with their images,
+  // shown at once, and sent to Drop's routes once each, in order, as soon as the network lets them, on whatever page
+  // the reader is by then. While this page is open, they land in its list.
   const subject = () => ({ kind: "drop", id: toValue(id) })
-  const accepted = new Map<string, string>()
-  const transport = dropTransport({
-    fetch: $fetch,
-    async created(requestId, dropId, comment) {
-      if (comment) accepted.set(requestId, comment.id)
-      if (dropId !== toValue(id)) return void refreshNuxtData(keys.comments(dropId))
+  const app = useCommentsOutbox()
+  app.attach({
+    drop: () => toValue(id),
+    async created(_requestId, comment) {
       if (comment) comments.data.value = [...comments.data.value.filter((item) => item.id !== comment.id), comment]
-      else await Promise.all([comments.refresh(), refreshNuxtData(keys.review(dropId))])
+      else await Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))])
       void wrote.trigger()
     },
-    replied(requestId, dropId, threadId, reply) {
-      accepted.set(requestId, threadId)
-      if (dropId && dropId !== toValue(id)) return void refreshNuxtData(keys.comments(dropId))
+    replied(_requestId, threadId, reply) {
       setReplies(threadId, (replies) => [...replies.filter((item) => item.id !== reply.id), reply])
       void wrote.trigger()
     },
-    refused: (error) => {
-      // Only the plan-limit dialog speaks now; the comment itself says it waits or was refused.
-      if (quotaFailureOf(error)) notify.problem(error)
-    },
-    thread: (comment) => toThread(comment, subject()),
   })
-  const account = computed(() => outboxAccount(me.value?.id))
-  const client = shallowRef<CommentsClient & { readonly outbox: CommentsOutbox }>()
-  const entries = shallowRef<CommentsOutbox["entries"]>([])
-  watch(
-    account,
-    (who, _, onCleanup) => {
-      // The outbox lives in the browser: the server renders the comments it has.
-      if (import.meta.server) return
-      const user = me.value
-        ? { id: me.value.id, name: me.value.name, ...(me.value.image ? { image: me.value.image } : {}) }
-        : undefined
-      const next = createCommentsClient({ transport, user, refreshOnFocus: false, outbox: { account: who } })
-      client.value = next
-      const stopChange = next.onChange(() => (entries.value = next.outbox.entries))
-      const stop = next.start()
-      onCleanup(() => {
-        stopChange()
-        stop()
-      })
-    },
-    { immediate: true },
-  )
   const outbox = () => {
-    if (!client.value) throw new Error("Comments can't be written before the page has loaded.")
-    return client.value
+    const client = app.client()
+    if (!client) throw new Error("Comments can't be written before the page has loaded.")
+    return client
   }
 
   /** The drop's comments with the ones that wait to go out, each shown once. */
   const list = computed(() =>
-    withOutbox(comments.data.value, entries.value, {
+    withOutbox(comments.data.value, app.entries.value, {
       drop: toValue(id),
-      account: account.value,
+      account: app.account.value,
       author: { name: me.value?.name ?? "Guest", image: me.value?.image ?? null },
-      accepted,
+      accepted: app.accepted,
     }),
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
@@ -325,10 +287,10 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     comments,
     /** What the viewer shows: the server's comments and the ones that wait in the outbox, marked by `delivery`. */
     list,
-    /** The saved comments and replies that haven't gone out, of every drop, for the dock and the tab-close guard. */
-    outboxEntries: readonly(entries),
+    /** The saved comments and replies that haven't gone out, of every drop, for the dock. */
+    outboxEntries: app.entries,
     /** The outbox's actions (retry, dismiss, edit, clear), once the browser started it. */
-    outbox: () => client.value?.outbox,
+    outbox: app.outbox,
     /** Runs after each comment write of this reader's, for whoever else should hear of it. */
     onWrote: wrote.on,
     findComment,
