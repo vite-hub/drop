@@ -108,7 +108,7 @@ ${EDITOR:-nano} .env
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
+For the [ViteHub Console](/docs/self-host#github), also set `DROP_PUBLIC_URL=https://drop.example.com` in `.env`: the build compiles it in. Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
 
 ## Updates and backups {#data}
 
@@ -143,6 +143,6 @@ Run one instance. Rate limits count in its memory. Code images are SVG, and an h
 | Port | `3000`, or `PORT`. |
 | Volume | `/app/.data`, persistent. The image runs as user 1000; on Kubernetes set `fsGroup: 1000`. |
 | Instances | One. SQLite has one writer, so replace the old instance before starting the new one (Kubernetes `strategy: Recreate`). |
-| Health | `GET /api/health` answers `{ ok, version, commit }` without a sign-in. |
+| Health | `GET /api/health` answers `{ ok, version, commit }` without a sign-in. It checks only the database, not KV or Blob. |
 
 To update, restart it on a moving tag such as `latest`, with the image pulled again (Kubernetes `imagePullPolicy: Always`), or change a pinned tag.

@@ -94,7 +94,7 @@ export function dropTestStubs(): Plugin {
       // ViteHub's comment marks.
       const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
       if (css) return PREFIX + css[0]
-      if (id in stubs) return PREFIX + id
+      if (id in stubs && importer !== `${root}nuxt.config.ts`) return PREFIX + id
       const module = Object.keys(modules).find(
         (name) => id.endsWith(`/utils/${name}`) || id === `./${name}` || id === `../${name}`,
       )

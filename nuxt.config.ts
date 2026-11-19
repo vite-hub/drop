@@ -24,13 +24,14 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+const databaseOnlyHealth = host === "vps" || host === "deno"
+const healthRoute = "/api/health"
 
-// What /api/health reports: package.json's version and the commit the host built, from Drop's Docker build or the host's
-// own build variable (Workers Builds, Vercel, Netlify).
+// What every wide event and Drop's database-only health handler report: the app version and the commit the host built.
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
   commit:
-    process.env.DROP_COMMIT ||
+    process.env.VITEHUB_BUILD_COMMIT ||
     process.env.WORKERS_CI_COMMIT_SHA ||
     process.env.VERCEL_GIT_COMMIT_SHA ||
     process.env.COMMIT_REF ||
@@ -181,6 +182,7 @@ export default defineNuxtConfig({
     // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
     // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
     trustProxy: true,
+    ...(!databaseOnlyHealth && { health: { route: healthRoute } }),
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
@@ -419,6 +421,15 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    ...(databaseOnlyHealth && {
+      handlers: [
+        {
+          route: healthRoute,
+          method: "GET",
+          handler: fileURLToPath(new URL("./server/handlers/database-health.ts", import.meta.url)),
+        },
+      ],
+    }),
     // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
     // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
