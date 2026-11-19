@@ -85,8 +85,11 @@ test("only referenced draft images become public when a new version is published
   const standalone = await upload("public-draft")
   const before = await upload("public-draft")
   const after = await upload("public-draft")
+  const bound = await upload("public-draft")
+  const linked = await upload("public-draft")
   const unused = await upload("public-draft")
-  const referenced = [published, standalone, before, after]
+  const images = [published, standalone, before, after, bound]
+  const referenced = [...images, linked]
   const origin = "https://drop.example"
   const attachments = async () => (await dropDetail(await findDrop("public-draft"), null, origin)).attachments
   await readFile(published.url)
@@ -99,27 +102,40 @@ test("only referenced draft images become public when a new version is published
       supersedes: "public-draft",
       bytes: new TextEncoder().encode(source),
     })
-  await publish(`An edit with URLs in code: \`${published.url}\` and \`${standalone.url}\`.`)
+  await publish(`An edit with URLs in code: \`${published.url}\` and \`<img src="${standalone.url}">\`.`)
   for (const file of referenced) await assert.rejects(readFile(file.url), status(404))
   assert.deepEqual(await attachments(), [])
-  const source = `![Screenshot](${published.url})
+  const source = `---
+capture: ${bound.url}
+after: ${after.url}
+---
+
+![Screenshot](${published.url})
+
+[Download](${linked.url}?raw)
+
+[External preview](https://example.com/preview?image=${unused.url})
 
 ::screenshot{src="${standalone.url}" alt="Overview"}
+::
+
+::screenshot{:src="frontmatter.capture" alt="Bound overview"}
 ::
 
 ::compare
 :::screenshot{src="${before.url}" alt="Before the edit"}
 :::
-:::screenshot{src="${after.url}" alt="After the edit"}
+:::screenshot{:src="frontmatter.after" alt="After the edit"}
 :::
 ::
 `
-  await publish(source)
-  const { html } = await renderMarkdownCached("published-screenshots", async () => source)
-  for (const file of referenced) {
+  const { blobKey } = await publish(source)
+  const { html } = await renderMarkdownCached(blobKey, async () => source)
+  for (const file of images) {
     assert.ok(html.includes(`src="${file.url}"`), `${file.url} is rendered as an image source`)
-    await readFile(file.url)
   }
+  assert.ok(html.includes(`href="${linked.url}?raw"`))
+  for (const file of referenced) await readFile(file.url)
   await assert.rejects(readFile(unused.url), status(404))
   assert.deepEqual(new Set((await attachments()).map((file) => file.url)), new Set(referenced.map((file) => file.url)))
   await publish("The screenshot is still available in the older version.")
