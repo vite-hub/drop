@@ -193,6 +193,12 @@ test("a person in the browser is their id on the event, never their name; an age
   const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
   assert.ok(!JSON.stringify(agent.event).includes("Realname"))
+
+  // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
+  state.mcpCaller = null
+  const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.deepEqual(refused.event.token, { rejected: "invalid token" })
+  assert.equal(refused.event.user, undefined)
 })
 
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {
