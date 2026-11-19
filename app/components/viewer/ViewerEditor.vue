@@ -5,12 +5,16 @@
 // Emoji and names go in as plain text, so the Markdown stays plain.
 import type { EditorEmojiMenuItem } from "@nuxt/ui"
 import type { Editor } from "@tiptap/vue-3"
-import { MarkdownEditor, type MarkdownEditorUpload } from "@vite-hub/ui/markdown-editor"
+import { MarkdownEditor } from "@vite-hub/ui/markdown-editor"
+import { chooseFiles, uploadKey, uploadPlugin, type UploadOptions } from "comark-ui/editor"
 import * as v from "valibot"
 import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
+import { EDITOR_IMAGE_PICK, editorImageExtension } from "#shared/editor-images"
+import { viewerEditorControls } from "../../utils/viewer-editor-controls"
 
-const props = defineProps<{ editor?: Editor; synced: boolean; width: DocWidth }>()
+const props = defineProps<{ editor?: Editor; synced: boolean; publishing: boolean; dropId: string; width: DocWidth }>()
 const notify = useNotify()
+const prompt = usePrompt()
 
 // The people who may read this drop, for "@", from the same list as the comment boxes.
 const { people: members } = usePeople()
@@ -38,16 +42,61 @@ const editorKey = computed(() => {
   return id
 })
 
-// A pasted, dropped, or picked image becomes the editor's own file drop, as an agent's upload does, and the doc links
-// its /f/ URL. Publishing makes the files a doc embeds its attachments (server/utils/drops/write.ts).
-const upload: MarkdownEditorUpload = async (file, progress) => {
-  const form = new FormData()
-  form.append("file", file)
-  const { url } = await sendFile("/api/files", form, v.object({ url: v.string() }), { onProgress: progress })
-  return url
-}
-// The Realtime schema has an image node but no video or audio one: those would vanish on the next checkpoint.
-const isImage = (file: File) => file.type.startsWith("image/")
+const canUpload = (editor: Editor) =>
+  props.editor === editor && !editor.isDestroyed && editor.isEditable && props.synced && !props.publishing
+
+const imageUpload = (editor: Editor): UploadOptions => ({
+  pick: EDITOR_IMAGE_PICK,
+  accept: (file) => {
+    if (!canUpload(editor)) return false
+    if (editorImageExtension(file.type)) return true
+    notify.alert(`Couldn't upload ${file.name}`, "Choose a PNG, JPEG, GIF, WebP, or BMP image.")
+    return false
+  },
+  async upload(file, progress) {
+    const form = new FormData()
+    form.append("file", file)
+    form.append("document", props.dropId)
+    const { url } = await sendFile("/api/files", form, v.object({ url: v.string() }), { onProgress: progress })
+    return url
+  },
+  onError: (error, file) => notify.fail(`Couldn't upload ${file.name}`, error),
+})
+
+watch(
+  () => props.editor,
+  (editor, _, onCleanup) => {
+    if (!editor) return
+    const plugin = uploadPlugin(imageUpload(editor))
+    const { handlePaste, handleDrop } = plugin.props
+    plugin.props.handlePaste = (view, event, slice) =>
+      handlePaste?.call(plugin, view, event, slice) || Boolean(event.clipboardData?.files.length)
+    plugin.props.handleDrop = (view, event, slice, moved) =>
+      handleDrop?.call(plugin, view, event, slice, moved) || (!moved && Boolean(event.dataTransfer?.files.length))
+    editor.registerPlugin(plugin)
+    onCleanup(() => {
+      if (!editor.isDestroyed) editor.unregisterPlugin(uploadKey)
+    })
+  },
+  { immediate: true },
+)
+
+provide(viewerEditorControls, {
+  canUpload,
+  chooseImage: (editor) => canUpload(editor) && chooseFiles(editor.view, imageUpload(editor)),
+  async editLink(editor) {
+    const previous: string | undefined = editor.getAttributes("link").href
+    const href = await prompt({
+      title: previous ? "Edit link" : "Insert link",
+      label: "URL",
+      initial: previous ?? "",
+      confirmLabel: previous ? "Save" : "Insert",
+    })
+    if (href === null || editor.isDestroyed || !editor.isEditable) return
+    const chain = editor.chain().focus().extendMarkRange("link")
+    void (href.trim() ? chain.setLink({ href: href.trim() }) : chain.unsetLink()).run()
+  },
+})
 </script>
 
 <template>
@@ -61,16 +110,7 @@ const isImage = (file: File) => file.type.startsWith("image/")
         <USkeleton class="h-4 w-11/12" />
         <USkeleton class="h-4 w-4/5" />
       </div>
-      <MarkdownEditor
-        v-if="editor"
-        v-show="synced"
-        :key="editorKey"
-        class="typeset comark-typeset"
-        :editor="editor"
-        :upload="upload"
-        :accept="isImage"
-        @upload-error="(error, file) => notify.fail(`Couldn't upload ${file.name}`, error)"
-      />
+      <MarkdownEditor v-if="editor" v-show="synced" :key="editorKey" class="typeset comark-typeset" :editor="editor" />
       <ViewerCodeLanguages v-if="editor && synced" :editor="editor" />
     </main>
     <template v-if="editor">

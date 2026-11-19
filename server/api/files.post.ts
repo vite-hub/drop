@@ -1,13 +1,13 @@
 import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError, requireContentType } from "h3"
 import { textValue } from "#shared/utils/text"
-import { createDocDrop, dropPageUrl, MAX_FILE_BYTES } from "../utils/drops"
+import { createDocDrop, dropPageUrl, findDrop, MAX_FILE_BYTES, permissions } from "../utils/drops"
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 
 /**
  * Agents upload one file. It becomes a private drop, or with `folder` (an id or link) one in that folder, shared and kept
- * with it; `url` serves the file, `page` opens it for review.
+ * with it; `url` serves the file, `page` opens it for review. In the live editor, `document` attaches an image instead.
  */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
@@ -31,18 +31,27 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ status: 400, statusText: "Exactly one file is required." })
   if (file.size > MAX_FILE_BYTES) throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 
-  const folderRef = textValue(form.get("folder"))
+  const document = textValue(form.get("document"))
+  const attachment = document ? await findDrop(document, event) : null
+  if (
+    form.has("document") &&
+    (who.actorKind !== "browser" || attachment?.kind !== "markdown" || !permissions(attachment, who).edit)
+  )
+    throw new HTTPError({ status: 404, statusText: "You can't edit this drop." })
+  const folderRef = attachment ? undefined : textValue(form.get("folder"))
   const folder = folderRef ? await requireFolder(folderRef, who, event) : undefined
+  const input = { filename: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
   const drop = await createDocDrop(
     who,
-    {
-      filename: file.name,
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      title: textValue(form.get("title")),
-      slug: textValue(form.get("slug"))?.slice(0, 200),
-      supersedes: textValue(form.get("supersedes")),
-      folder,
-    },
+    attachment
+      ? { ...input, attachment }
+      : {
+          ...input,
+          title: textValue(form.get("title")),
+          slug: textValue(form.get("slug"))?.slice(0, 200),
+          supersedes: textValue(form.get("supersedes")),
+          folder,
+        },
     event,
   )
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })

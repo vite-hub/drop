@@ -24,6 +24,7 @@ import { textStatements } from "../search"
 import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
 import { MAX_FILE_BYTES } from "#shared/schemas"
+import { editorImageExtension } from "#shared/editor-images"
 import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, storageFailure } from "./query"
@@ -166,6 +167,7 @@ export async function createDocDrop(
     undoneSuggestionId?: string
     share?: Share
     folder?: DropRow
+    attachment?: DropRow
   },
   event?: H3Event,
 ) {
@@ -173,9 +175,16 @@ export async function createDocDrop(
   if (input.bytes.byteLength > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
+  let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
+  const { attachment } = input
+  if (attachment) {
+    const imageExtension = editorImageExtension(contentType)
+    if (!imageExtension)
+      throw new HTTPError({ status: 415, statusText: "Choose a PNG, JPEG, GIF, WebP, or BMP image." })
+    filename = `${filename.replace(/\.[a-z0-9]{1,16}$/i, "") || "image"}${imageExtension}`
+  }
   const extension = filename.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
   let kind: DropKind = kindFromFilename(filename)
-  let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
   let text: string | undefined
   if ([".md", ".markdown", ".html", ".htm", ".txt"].includes(extension)) {
     try {
@@ -236,15 +245,19 @@ export async function createDocDrop(
   // What the drop stores itself, before its folders widen its share or lend it their lifetime.
   const own = previous?.raw ?? previous
   const folder = previous ? null : (input.folder ?? null)
-  const parentId = previous?.parentId ?? folder?.id ?? null
+  const parentId = attachment?.id ?? previous?.parentId ?? folder?.id ?? null
   // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
-  const ownerId = previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
-  const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, own, event)
+  const ownerId =
+    attachment?.ownerId ?? previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
+  const life = parentId
+    ? lifetimeFields(who, {}, attachment ?? own ?? folder, event)
+    : lifetimeFields(who, input, own, event)
   await requireKeepSlot(ownerId, life, own?.lifetime === "keep", !parentId)
   // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
   const mode = modeFor(previous ?? folder, event)
-  const share =
-    input.share !== undefined
+  const share = attachment
+    ? { share: "private" as const, publicUntil: null }
+    : input.share !== undefined
       ? shareFields(input.share, { kind, team: mode === "team" }, event)
       : own
         ? { share: own.share, publicUntil: own.publicUntil }
@@ -258,7 +271,7 @@ export async function createDocDrop(
 
   return withDropQuota(
     ownerId,
-    { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id },
+    { drops: previous || attachment ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id },
     event,
     async (quota) => {
       const key = `${crypto.randomUUID()}${extension}`
@@ -403,7 +416,14 @@ export async function createDocDrop(
                     .from(drops)
                     .where(and(eq(drops.id, row.id), eq(drops.blobKey, key))),
                 )
-              : sql`1`,
+              : attachment
+                ? exists(
+                    db
+                      .select({ id: drops.id })
+                      .from(drops)
+                      .where(and(eq(drops.id, attachment.id), eq(drops.kind, "markdown"))),
+                  )
+                : sql`1`,
             input.undoneSuggestionId
               ? exists(
                   db

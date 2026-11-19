@@ -1539,7 +1539,9 @@ watch(
           <!-- A draft the room turned away never syncs again, but its text stays readable. -->
           <LazyViewerEditor
             v-if="editing"
+            :drop-id="drop.id"
             :editor="live.editor.value"
+            :publishing="live.publishing.value"
             :synced="live.synced.value || live.refused.value !== undefined"
             :width="docWidth"
           />
@@ -1762,7 +1764,7 @@ watch(
                 size="xs"
                 data-review-primary
                 color="neutral"
-                :disabled="!live.synced.value"
+                :disabled="!live.synced.value || live.uploading.value"
                 label="Publish"
                 :loading="live.publishing.value"
                 @click="live.publish()"
