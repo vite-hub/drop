@@ -693,7 +693,7 @@ async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachme
   const rows = await db
     .select()
     .from(drops)
-    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), notCommentImage))
+    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), eq(drops.draftImage, false), notCommentImage))
     .limit(100)
   return rows.map((item) => ({
     id: item.id,

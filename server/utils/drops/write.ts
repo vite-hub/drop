@@ -24,6 +24,7 @@ import { textStatements } from "../search"
 import type { DropKind } from "#shared/types"
 import type { DropRow, LifetimeInput } from "./types"
 import { MAX_FILE_BYTES } from "#shared/schemas"
+import { editorImageExtension } from "#shared/editor-images"
 import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, storageFailure } from "./query"
@@ -35,6 +36,26 @@ const Unavailable = v.object({ status: v.literal(503) })
 const TEXT_KINDS = new Set(["markdown", "html"])
 /** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
 const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,16})/gi
+
+/** Draft images follow rendered file URLs that target this Drop independently of the reader's page path. */
+async function referencedFileKeys(html: string, origin: string) {
+  const keys = new Set<string>()
+  const { htmlToMarkdown } = await import("mdream")
+  htmlToMarkdown(html, {
+    format: "text",
+    extraction: {
+      "img[src], a[href]": ({ tagName, attributes }) => {
+        const reference = tagName === "img" ? attributes.src : attributes.href
+        if (!reference || !(reference.startsWith("/") || /^https?:\/\//i.test(reference))) return
+        const url = URL.parse(reference, origin)
+        if (!url || url.origin !== origin) return
+        const [match] = url.pathname.matchAll(FILE_LINK)
+        if (match?.[1] && match[0] === url.pathname) keys.add(match[1])
+      },
+    },
+  })
+  return [...keys]
+}
 
 /**
  * Makes the files a doc embeds its attachments, so they share its sharing, lifetime, and Trash. Only the doc owner's
@@ -166,6 +187,7 @@ export async function createDocDrop(
     undoneSuggestionId?: string
     share?: Share
     folder?: DropRow
+    attachment?: DropRow
   },
   event?: H3Event,
 ) {
@@ -173,9 +195,16 @@ export async function createDocDrop(
   if (input.bytes.byteLength > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
   let filename = input.filename.replace(/[/\\]/g, "-").slice(0, 200) || "drop"
+  let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
+  const { attachment } = input
+  if (attachment) {
+    const imageExtension = editorImageExtension(contentType)
+    if (!imageExtension)
+      throw new HTTPError({ status: 415, statusText: "Choose a PNG, JPEG, GIF, WebP, or BMP image." })
+    filename = `${filename.replace(/\.[a-z0-9]{1,16}$/i, "") || "image"}${imageExtension}`
+  }
   const extension = filename.match(/\.[a-z0-9]{1,16}$/i)?.[0].toLowerCase() ?? ""
   let kind: DropKind = kindFromFilename(filename)
-  let contentType = detectContentType(input.bytes) ?? "application/octet-stream"
   let text: string | undefined
   if ([".md", ".markdown", ".html", ".htm", ".txt"].includes(extension)) {
     try {
@@ -236,15 +265,19 @@ export async function createDocDrop(
   // What the drop stores itself, before its folders widen its share or lend it their lifetime.
   const own = previous?.raw ?? previous
   const folder = previous ? null : (input.folder ?? null)
-  const parentId = previous?.parentId ?? folder?.id ?? null
+  const parentId = attachment?.id ?? previous?.parentId ?? folder?.id ?? null
   // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
-  const ownerId = previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
-  const life = parentId ? lifetimeFields(who, {}, own ?? folder, event) : lifetimeFields(who, input, own, event)
+  const ownerId =
+    attachment?.ownerId ?? previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
+  const life = parentId
+    ? lifetimeFields(who, {}, attachment ?? own ?? folder, event)
+    : lifetimeFields(who, input, own, event)
   await requireKeepSlot(ownerId, life, own?.lifetime === "keep", !parentId)
   // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
   const mode = modeFor(previous ?? folder, event)
-  const share =
-    input.share !== undefined
+  const share = attachment
+    ? { share: "private" as const, publicUntil: null }
+    : input.share !== undefined
       ? shareFields(input.share, { kind, team: mode === "team" }, event)
       : own
         ? { share: own.share, publicUntil: own.publicUntil }
@@ -255,10 +288,9 @@ export async function createDocDrop(
     kind === "markdown" && text !== undefined
       ? await (await import("../markdown-document")).requirePublishableMarkdown(text, event)
       : []
-
   return withDropQuota(
     ownerId,
-    { drops: previous ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id },
+    { drops: previous || attachment ? 0 : 1, bytes: input.bytes.byteLength, writes: 1, targetId: previous?.id },
     event,
     async (quota) => {
       const key = `${crypto.randomUUID()}${extension}`
@@ -270,11 +302,14 @@ export async function createDocDrop(
 
       // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
       let parsedTitle: string | undefined
+      let draftKeys: string[] = []
       try {
-        parsedTitle =
-          kind === "markdown" && text
-            ? (await (await import("../markdown-document")).renderMarkdownCached(key, async () => text, event)).title
-            : undefined
+        if (kind === "markdown" && text) {
+          const { renderMarkdownCached } = await import("../markdown-document")
+          const rendered = await renderMarkdownCached(key, async () => text, event)
+          parsedTitle = rendered.title
+          if (own && event) draftKeys = await referencedFileKeys(rendered.html, event.url.origin)
+        }
       } catch (error) {
         await deleteBlobKeys([key])
         throw error
@@ -314,6 +349,7 @@ export async function createDocDrop(
         trashedAt: null,
         trashReason: null,
         parentId,
+        draftImage: Boolean(attachment),
         // A public link waits for an admin's review again with each version: what it shows changed.
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: own?.quarantinedAt ?? null,
@@ -356,6 +392,12 @@ export async function createDocDrop(
         await quota.commit(
           [
             ...write,
+            ...d1Chunks(draftKeys).map((chunk) =>
+              db
+                .update(drops)
+                .set({ draftImage: false })
+                .where(and(eq(drops.parentId, row.id), eq(drops.draftImage, true), inArray(drops.blobKey, chunk))),
+            ),
             ...textStatements(row, text),
             ...(folder ? [touchFolder(folder.id, now)] : []),
             ...(input.acceptedSuggestionId
@@ -403,7 +445,14 @@ export async function createDocDrop(
                     .from(drops)
                     .where(and(eq(drops.id, row.id), eq(drops.blobKey, key))),
                 )
-              : sql`1`,
+              : attachment
+                ? exists(
+                    db
+                      .select({ id: drops.id })
+                      .from(drops)
+                      .where(and(eq(drops.id, attachment.id), eq(drops.kind, "markdown"))),
+                  )
+                : sql`1`,
             input.undoneSuggestionId
               ? exists(
                   db
@@ -662,6 +711,7 @@ export async function publishApp(
           createdAt: row?.createdAt ?? now,
           updatedAt: now,
           publishToken: token,
+          draftImage: false,
           teamId: null,
           lastAccessedAt: now,
           ...life,
