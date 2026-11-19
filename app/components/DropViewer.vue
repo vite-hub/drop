@@ -12,13 +12,16 @@ import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
-import type { DocHeader, DocHeaderFact } from "#shared/doc-header"
+import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
+import { knownAgent } from "#shared/agents"
+import { describeTime } from "comark-time"
 import { faviconUrl, resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
+import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
 import {
   AvatarStack,
+  CommentSelectionBar,
   ConnectionStatus,
   ConnectionStatusLabel,
   type ConnectionStatusState,
@@ -595,9 +598,14 @@ const {
     void copy(shared.href, { announce: "Link to the section copied" })
   },
   docAction: (action) => {
+    // A frame without the Clipboard API asks the viewer to copy.
     if (action === "markdown") void copyMarkdown()
     else if (action === "download") download()
     else if (printsPdf.value) exportPdf()
+  },
+  docIntent: (what) => (what === "markdown" ? sendMarkdown() : void sendFolder()),
+  docCopied: (ok, error) => {
+    if (!ok) reportClientError("copy", new Error(`The doc header's Copy: ${error ?? "refused"}`))
   },
   openDrop: (id) => void router.push(`/drops/${id}`),
 })
@@ -770,7 +778,7 @@ function download() {
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as agents get it (server/middleware/0.09.drop-markdown.ts). Only Markdown docs: an HTML page's
+// The version on screen, as agents get it (server/routes/d/[link]/[slug].md.get.ts). Only Markdown docs: an HTML page's
 // Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
@@ -812,6 +820,77 @@ function viewsFact(views: { person: number; anonymous: number; agent: number }):
 }
 
 /**
+ * Who dropped the doc: its owner with the agent that published this version, "[avatar] Max · [logo] Claude Code", and
+ * on hover what it came through ("via Executor"), the model and the reasoning level. Without an owner (an anonymous
+ * drop), the name the version was published under.
+ */
+const droppedBy = computed<DocHeaderWho>(() => {
+  const d = drop.value
+  const agent = d.versions.find((version) => version.version === d.version)?.agent ?? null
+  const harness = agent?.harness ? knownAgent(agent.harness) : null
+  const client = d.actorKind === "agent" ? knownAgent(d.actorName) : null
+  const shown = harness ?? client
+  const origin = import.meta.client ? location.origin : ""
+  const label = agent?.harness ?? (client ? d.actorName : undefined)
+  const via = d.actorKind === "agent" && label !== d.actorName ? `via ${d.actorName}` : `via ${VIA_LABELS[d.actorKind]}`
+  const tip = [via, agent?.model, agent?.reasoningLevel && `${agent.reasoningLevel} reasoning`]
+    .filter(Boolean)
+    .join(" · ")
+  const person = d.owner ?? { name: d.actorName, image: null }
+  return {
+    name: person.name,
+    image: person.image,
+    ...(label ? { agent: { label, logo: `${origin}${shown?.logo ?? "/agents/executor.png"}` } } : {}),
+    tip,
+  }
+})
+
+// The doc's folder, for the list its header opens: the newest drops in it and this one, signed-in readers only.
+const FOLDER_ROWS = 8
+const KIND_ICON: Record<DropKind, DocHeaderKindIcon> = {
+  markdown: "doc",
+  html: "code",
+  app: "code",
+  image: "image",
+  file: "file",
+  board: "file",
+  folder: "folder",
+  site: "link",
+  link: "link",
+}
+const docFolder = computed(() => {
+  const crumb = drop.value.ancestors.at(-1)
+  return crumb?.kind === "folder" && me.value ? crumb : null
+})
+async function sendFolder() {
+  const folder = docFolder.value
+  if (!folder) return
+  const d = drop.value
+  const listed = await $fetch<DropSummary[]>("/api/drops", {
+    query: { folder: folder.id, limit: FOLDER_ROWS },
+  }).catch(() => null)
+  if (!listed) return send({ type: "doc-folder-items", folder: null })
+  const rows = listed.filter((item) => item.id !== d.id).slice(0, FOLDER_ROWS - 1)
+  const items = [...rows, d]
+    .toSorted((a, b) => b.updatedAt - a.updatedAt)
+    .map((item) => {
+      const time = describeTime(item.updatedAt, { now: now.value, locale: "en-US", style: "short" })
+      return {
+        id: item.id,
+        title: item.title,
+        icon: KIND_ICON[item.kind],
+        at: time?.label ?? "",
+        tip: time?.tip ?? "",
+        current: item.id === d.id,
+      }
+    })
+  send({
+    type: "doc-folder-items",
+    folder: { id: folder.id, title: folder.title, items } satisfies DocHeaderFolder,
+  })
+}
+
+/**
  * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
  * properties box, its related drops among its links, and under See more the facts the Details used to list.
  */
@@ -823,8 +902,8 @@ const docHeader = computed<DocHeader | null>(() => {
   const facts: DocHeaderFact[] = [
     ...(views ? [viewsFact(views)] : []),
     { icon: "file", label: "File", value: d.filename, detail: `Markdown · ${formatBytes(d.size)}` },
-    { icon: "person", label: "Dropped by", value: d.actorName, detail: `via ${VIA_LABELS[d.actorKind]}` },
-    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder }] : []),
+    { icon: "person", label: "Dropped by", value: droppedBy.value.name, who: droppedBy.value },
+    ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: docFolder.value?.id }] : []),
   ]
   const origin = import.meta.client ? location.origin : ""
   const listed = new Set((d.resources ?? []).map((resource) => resource.url))
@@ -834,7 +913,6 @@ const docHeader = computed<DocHeader | null>(() => {
       ...(d.url ? [{ id: "download" as const, label: "Download original", kbd: "D" }] : []),
       ...(printsPdf.value ? [{ id: "pdf" as const, label: "Export as PDF" }] : []),
     ],
-    copied: copied("markdown"),
     facts,
     related: related.value.map((item) => ({
       id: item.id,
@@ -906,19 +984,38 @@ const detailsActions = computed<DetailsAction[]>(() => [
     ? [{ id: "trash", label: "Move to Trash", icon: "i-mingcute-delete-2-line", destructive: true, press: deleteDrop }]
     : []),
 ])
-const copyMarkdown = (announce?: string) =>
-  copyLoading(
-    $fetch<string>(`${dropPath(drop.value)}.md`, { query: { v: drop.value.version }, responseType: "text" }),
-    { key: "markdown", announce },
+// The version's Markdown, loaded once: the header asks for it when the pointer or focus reaches Copy, so a click copies
+// at once, and the shortcut and menus copy the same text.
+let markdownLoad: { key: string; text: Promise<string> } | null = null
+function markdownText() {
+  const d = drop.value
+  const key = `${d.id}@${d.version}`
+  if (markdownLoad?.key !== key) {
+    const text = $fetch<string>(`${dropPath(d)}.md`, { query: { v: d.version }, responseType: "text" })
+    markdownLoad = { key, text }
+    text.catch(() => {
+      if (markdownLoad?.text === text) markdownLoad = null
+    })
+  }
+  return markdownLoad.text
+}
+const sendMarkdown = () =>
+  void markdownText().then(
+    (text) => send({ type: "doc-markdown", text }),
+    () => send({ type: "doc-markdown", text: null }),
   )
-const copyFeedback = () =>
-  copy(feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version), { key: "feedback" })
+const copyMarkdown = (announce?: string) => copyLoading(markdownText(), { key: "markdown", announce })
+// A copy by the shortcut or a menu shows on the header's Copy too.
+watch(
+  () => copied("markdown"),
+  (on) => on && docHeader.value && send({ type: "doc-copied" }),
+)
+const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
 // Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
 // It steps aside while they comment, so the comment actions keep the pill to one row.
 const awaiting = computed(() => awaitingAnswer(comments.value))
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const copyPrompt = () =>
-  copy(promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value), { key: "prompt" })
+const prompt = () => promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1071,10 +1168,10 @@ function copyCommentLink(comment: DropComment) {
   void copy(url.href, { announce: "Link to the comment copied" })
 }
 /** The drop's link with the diff showing: it opens the same changes, History beside them. */
-function copyChangesLink(version: DropVersion) {
+function changesLink(version: DropVersion) {
   const url = new URL(link.value)
   url.searchParams.set("changes", String(version.version))
-  void copy(url.href, { key: "changes", announce: "Link to the changes copied" })
+  return url.href
 }
 
 /** Select the thread immediately; the frame only scrolls to its anchor. */
@@ -1555,10 +1652,9 @@ watch(
             v-if="shownVersion && !editing"
             :key="shownVersion.version"
             :previous="previousVersion"
-            :copied="copied('changes')"
+            :link="changesLink(shownVersion)"
             :version="shownVersion"
             @close="closeChanges"
-            @copy-link="copyChangesLink(shownVersion)"
           />
         </div>
         <ViewerReviewDock
@@ -1584,15 +1680,7 @@ watch(
             >
               <template #actions>
                 <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
-                  <UButton
-                    aria-label="Copy feedback for your agent"
-                    color="neutral"
-                    :icon="copied('feedback') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-                    :ui="{ leadingIcon: copied('feedback') ? 'animate-icon-in' : undefined }"
-                    size="sm"
-                    variant="ghost"
-                    @click="copyFeedback"
-                  />
+                  <DropCopyButton aria-label="Copy feedback for your agent" size="sm" :value="feedback" />
                 </UTooltip>
                 <UButton
                   aria-label="Collapse comments"
@@ -1729,19 +1817,18 @@ watch(
                   <UTooltip
                     :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
                   >
-                    <UButton
+                    <DropCopyButton
                       aria-label="Copy prompt for your agent"
                       class="[animation:pop-in_200ms_var(--ease-out)]"
                       color="neutral"
                       :disabled="loadingScreenshots"
-                      :icon="copied('prompt') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
+                      icon="i-mingcute-copy-2-line"
                       size="xs"
-                      :ui="{ leadingIcon: copied('prompt') ? 'animate-icon-in' : undefined }"
+                      :value="prompt"
                       variant="ghost"
-                      @click="copyPrompt"
                     >
                       <span class="hidden sm:inline">Copy prompt</span>
-                    </UButton>
+                    </DropCopyButton>
                   </UTooltip>
                 </template>
               </ViewerCommentsSegment>
@@ -1832,7 +1919,7 @@ watch(
       class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain bg-default motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
       :class="
         compactFloat
-          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)]'
+          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)] has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(0_0_0/22%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(255_255_255/22%)]'
           : 'rounded-lg border border-default shadow-lg'
       "
       :style="floatStyle"
@@ -1853,7 +1940,7 @@ watch(
         class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overscroll-contain border border-default bg-default shadow-lg"
         :class="
           pinDraft
-            ? 'overflow-y-auto rounded-[6px_18px_18px_18px]'
+            ? 'overflow-y-auto rounded-[6px_18px_18px_18px] has-[textarea:focus-visible]:border-accented'
             : threadSpot?.rail
               ? 'overflow-hidden rounded-xl'
               : 'overflow-hidden rounded-[6px_16px_16px_16px]'
@@ -1872,7 +1959,7 @@ watch(
       class="fixed z-30 w-max -translate-x-1/2 -translate-y-full"
       :style="selectionBarStyle"
     >
-      <ViewerSelectionBar @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
+      <CommentSelectionBar suggest @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
     <!-- Focus stays in the page while text is selected there, so a screen reader hears the keys instead of the bar. -->
     <p aria-live="polite" class="sr-only">

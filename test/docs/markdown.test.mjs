@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
-import { H3 } from "h3"
+import { defineMiddleware, H3 } from "h3"
+import { defineContentMarkdownHandler } from "vite-hub/content/markdown"
 import { test } from "vite-plus/test"
 
 const { default: docsMarkdown } = await import("../../server/middleware/0.08.docs-markdown.ts")
@@ -19,6 +20,14 @@ const PAGE = `<!doctype html><html><body><nav><a href="/docs">Docs</a></nav><mai
 
 const app = new H3()
   .use(docsMarkdown)
+  .use(
+    defineMiddleware(
+      defineContentMarkdownHandler(
+        { seo: { markdown: true }, markdown: async () => null },
+        { render: (request) => app.fetch(request) },
+      ),
+    ),
+  )
   .get("/docs/agents", () => new Response(PAGE, { headers: { "content-type": "text/html" } }))
 
 test("a docs page as Markdown keeps its text, links its pages' .md, and leaves figures and buttons out", async () => {
@@ -45,9 +54,31 @@ codex mcp add drop
 - An *app*
 `,
   )
-  const asked = await app.fetch(
-    new Request("https://drop.example/docs/agents", { headers: { accept: "text/markdown" } }),
-  )
-  assert.match(await asked.text(), /^# Agents/)
   assert.equal((await app.fetch(new Request("https://drop.example/docs/nope.md"))).status, 404)
+})
+
+test("Content negotiates the docs copy using client order at equal quality", async () => {
+  const request = (accept, agent) =>
+    app.fetch(new Request("https://drop.example/docs/agents", { headers: { accept, "user-agent": agent } }))
+  const html = await request("text/html;q=0.8, text/markdown;q=0.8", "browser")
+  assert.equal(html.headers.get("content-type"), "text/html")
+  for (const response of [
+    await request("text/markdown;q=0.8, text/html;q=0.8", "browser"),
+    await request("text/html, text/markdown", "Claude-User/1.0"),
+  ]) {
+    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8")
+    assert.match(await response.text(), /^# Agents\n/)
+  }
+})
+
+test("Content keeps docs in HTML when only a wildcard matches Markdown and HTML is acceptable", async () => {
+  for (const [accept, contentType] of [
+    ["text/html;q=0.8, */*;q=1", "text/html"],
+    ["text/*, text/html", "text/html"],
+    ["text/html;q=0, text/*", "text/markdown; charset=utf-8"],
+    ["text/html;q=0, text/markdown;q=0, text/*", "text/html"],
+  ]) {
+    const response = await app.fetch(new Request("https://drop.example/docs/agents", { headers: { accept } }))
+    assert.equal(response.headers.get("content-type"), contentType, accept)
+  }
 })
