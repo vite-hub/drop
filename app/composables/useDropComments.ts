@@ -8,6 +8,7 @@ import {
 import { type CommentCan, useComments } from "vite-hub/ui/headless"
 import type { DropComment } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
+import { LOCAL_ATTACHMENT } from "../utils/comment-outbox"
 
 /** What a viewer action sent, or its failure as the error the comment parts show under the box. */
 async function settled<T>(sent: Promise<Sent<T>>) {
@@ -154,10 +155,14 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     people,
     can,
     upload: async (list: File[]) => stash(list),
-    /** A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. */
+    /**
+     * A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. One
+     * still waiting in the outbox shows from the browser's copy (LOCAL_ATTACHMENT).
+     */
     attachmentUrl: (key: string) => {
       const file = images.value.get(key)
-      return { url: rest.attachmentUrl(key), ...(file ? { name: file.filename, type: file.contentType } : {}) }
+      const url = key.startsWith(LOCAL_ATTACHMENT) && file ? file.url : rest.attachmentUrl(key)
+      return { url, ...(file ? { name: file.filename, type: file.contentType } : {}) }
     },
     /** The thread of a comment the viewer holds, for a CommentThread outside the panel. */
     thread: (comment: DropComment): CommentThread => toThread(comment, subject.value),

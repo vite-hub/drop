@@ -90,13 +90,13 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |
 
-A comment shows the moment you send it, with a clock on its pin until Drop has it. **With no network** it waits in the browser, stays through a reload, and goes out once the network is back. After a couple of seconds it says **Waiting to send**, and the toolbar counts what waits. Closing the tab or signing out while one hasn't gone out asks first.
+A comment shows the moment you send it, images too, with a clock on its pin until Drop has it. **With no network** it waits in the browser, stays through a reload, and goes out once the network is back. After a couple of seconds it says **Waiting to send**, and the toolbar counts what waits. Closing the tab or signing out while one hasn't gone out asks first.
 
 When Drop refuses one, its words stay, and the line under them says why:
 
 | It says | What you can do |
 | --- | --- |
-| **Sign in to send** | Sign in again; it goes out then. |
+| **Sign in to send** | Sign in again; it goes out then. Or **Discard** it. |
 | The plan's limit | **Send again** once the plan has room. |
 | **This drop no longer takes comments** | **Copy** the words, or **Discard** them. |
 | Why, such as an image that's too large | **Edit** it, and it goes out again, or **Discard** it. |

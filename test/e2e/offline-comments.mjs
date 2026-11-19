@@ -5,7 +5,7 @@ import { chromium } from "playwright"
 // DROP_URL=http://127.0.0.1:3027 node test/e2e/offline-comments.mjs checks comments written with no network against a
 // local Drop built for VPS and served with DROP_TEST_SIGNIN=true (email sign-up). The comment and reply POSTs are cut
 // with Playwright routes, so the browser thinks it's online and the outbox must cope with failed requests, a lost
-// answer, two tabs, refusals, a closed tab and a stale session. Each step reports pass or fail and the run goes on;
+// answer, two tabs, refusals, a closed tab, a stale session and a guest who signs in. Each step reports pass or fail and the run goes on;
 // screenshots go to tmp/offline-check/. Exit 1 when any step failed.
 const origin = new URL(process.env.DROP_URL ?? "http://127.0.0.1:3027")
 assert.ok(
@@ -112,7 +112,9 @@ const requestIdOf = (request) =>
     .postDataBuffer()
     ?.toString("latin1")
     .match(/"requestId":"([^"]+)"/)?.[1]
-await context.route(commentPost, async (route) => {
+// Every context's comment and reply POSTs go through the same switch: the reviewer's, and the guest's in step 8.
+const cut = (target) => target.route(commentPost, through)
+async function through(route) {
   const request = route.request()
   if (request.method() !== "POST") return route.fallback()
   const entry = { requestId: requestIdOf(request), url: request.url(), status: 0 }
@@ -142,7 +144,8 @@ await context.route(commentPost, async (route) => {
   const response = await route.fetch()
   entry.status = response.status()
   return route.fulfill({ response })
-})
+}
+await cut(context)
 const postsFor = (requestId) => sent.filter((entry) => entry.requestId === requestId)
 const landedPosts = () => sent.filter((entry) => entry.status >= 200 && entry.status < 300 && !entry.lost)
 
@@ -184,7 +187,7 @@ async function frameBox(page) {
   assert.ok(box, "the drop's frame is on the page")
   return box
 }
-/** The composer's automatic screenshot of the box, removed so the server's image count is the pasted image alone. */
+/** The composer's automatic screenshot of the box, removed so the area carries the pasted image alone. */
 async function removeShot(page) {
   const remove = page.getByRole("region", { name: "New comment" }).getByRole("button", { name: /^Remove screenshot/ })
   await remove.waitFor({ timeout: 15_000 }).then(
@@ -199,7 +202,11 @@ async function pin(page, x, y, body) {
   await page.mouse.down()
   await page.mouse.up()
   await newComment(page).waitFor()
-  await removeShot(page)
+  // The pin keeps the frame's screenshot of its box, which its row shows.
+  await page
+    .getByRole("region", { name: "New comment" })
+    .getByRole("button", { name: /^Remove screenshot/ })
+    .waitFor({ timeout: 15_000 })
   await newComment(page).fill(body)
   await newComment(page).press("Enter")
 }
@@ -274,6 +281,28 @@ async function reply(page, to, body) {
   await box.press("Enter")
   await page.waitForTimeout(300)
 }
+/** The browser's copy of a waiting image (blob:) or the server's, in the row's thumbnail or the thread's pictures. */
+const rowImage = (page, body) => item(page, body).locator("img[data-review-thumb]").first()
+async function threadImage(page, body, name) {
+  await openThread(page, body)
+  const image = page.getByRole("dialog", { name: "Comment thread" }).locator(`img[alt="${name}"]`).first()
+  const src = await image.getAttribute("src", { timeout: 5000 }).catch(() => null)
+  await showList(page)
+  return src
+}
+/** Whether an image's address works in the page: a revoked blob: URL doesn't load. */
+const loads = (page, src) =>
+  page.evaluate(
+    (src) =>
+      new Promise((resolve) => {
+        const image = new Image()
+        image.addEventListener("load", () => resolve(image.naturalWidth > 0))
+        image.addEventListener("error", () => resolve(false))
+        image.src = src
+      }),
+    src,
+  )
+
 /** Waiting or refused, as ViteHub's UI marks it (data-pending, data-failed) or Drop says it under the words. */
 async function marked(page, body, state) {
   return page.evaluate(
@@ -368,6 +397,13 @@ await step("1. Offline write: five show at once as waiting, the dock says 5 wait
   )
   await shot(page, "1-offline-thread")
   await showList(page)
+  const thumb = await rowImage(page, PIN)
+    .getAttribute("src", { timeout: 5000 })
+    .catch(() => null)
+  check(thumb?.startsWith("blob:"), `the waiting pin's row shows its screenshot from the browser (${thumb})`)
+  const pasted = await threadImage(page, AREA, "pasted.png")
+  check(pasted?.startsWith("blob:"), `the waiting area's thread shows the pasted image from the browser (${pasted})`)
+  if (pasted) check(await loads(page, pasted), "the pasted image loads")
   check((await page.getByText("Waiting to send").count()) > 0, 'a "Waiting to send" line shows')
   check(
     await page
@@ -383,6 +419,8 @@ await step("1. Offline write: five show at once as waiting, the dock says 5 wait
   await shot(page, "1-offline-write")
 })
 
+// The browser's addresses of the waiting images, revoked once they land.
+const stale = []
 await step("2. Reload: all five come back, the image too", async (check) => {
   await page.reload()
   await page
@@ -414,7 +452,13 @@ await step("2. Reload: all five come back, the image too", async (check) => {
     areaEntry.some((record) => record.blobs.some((size) => size > 0)),
     "the area's pasted image is still saved",
   )
-  check((await item(page, AREA).locator("img").count()) > 0, "the waiting area comment shows its image")
+  const thumb = await rowImage(page, PIN)
+    .getAttribute("src", { timeout: 5000 })
+    .catch(() => null)
+  check(thumb?.startsWith("blob:"), `the pin's row still shows its screenshot (${thumb})`)
+  const pasted = await threadImage(page, AREA, "pasted.png")
+  check(Boolean(pasted?.startsWith("blob:") && (await loads(page, pasted))), "the area's thread still shows its image")
+  stale.push(...[thumb, pasted].filter(Boolean))
   check(
     await page
       .getByText(/\b5 waiting\b/)
@@ -427,7 +471,7 @@ await step("2. Reload: all five come back, the image too", async (check) => {
 })
 
 await step(
-  "3. Lost answer, then reconnect: four threads, one reply, one image; numbers replace the clocks",
+  "3. Lost answer, then reconnect: four threads, one reply, two images; numbers replace the clocks",
   async (check) => {
     network = "lose"
     // The outbox retries on its own; the first try reaches the server and its answer is dropped.
@@ -444,7 +488,14 @@ await step(
     await page.waitForTimeout(2000)
     check(server.comments.length === 4, `four threads (${server.comments.length}: ${server.bodies.join(" | ")})`)
     check(server.replies.length === 1, `one reply (${server.replies.length})`)
-    check(server.images === 1, `one image (${server.images})`)
+    check(server.images === 2, `two images, the pin's screenshot and the pasted one (${server.images})`)
+    const thumb = await rowImage(page, PIN)
+      .getAttribute("src", { timeout: 5000 })
+      .catch(() => null)
+    check(Boolean(thumb && !thumb.startsWith("blob:")), `the pin's row shows the server's screenshot (${thumb})`)
+    const pasted = await threadImage(page, AREA, "pasted.png")
+    check(Boolean(pasted && !pasted.startsWith("blob:")), `the area's thread shows the server's image (${pasted})`)
+    for (const src of stale) check(!(await loads(page, src)), `the browser's address ${src} is revoked`)
     const lost = sent.find((entry) => entry.lost)
     check(postsFor(lost.requestId).length >= 2, "the comment whose answer was lost went out again")
     for (const body of five) check(!(await marked(page, body, "pending")), `"${body}" isn't marked waiting any more`)
@@ -765,6 +816,54 @@ await step(
     await shot(page, "7-sent-after-sign-in")
   },
 )
+
+await step("8. A guest writes offline, then signs in: it lands once, as them", async (check) => {
+  const GUEST = "Guest: written before signing in"
+  const guest = await browser.newContext({ viewport: { width: 1400, height: 900 } })
+  await cut(guest)
+  const tab = await guest.newPage()
+  await open(tab, drop)
+  network = "offline"
+  await pageComment(tab, GUEST)
+  await showList(tab)
+  check(
+    await item(tab, GUEST)
+      .first()
+      .isVisible()
+      .catch(() => false),
+    "the guest's comment shows",
+  )
+  check(await marked(tab, GUEST, "pending"), "it's marked data-pending")
+  const [kept] = await entriesWith(tab, GUEST)
+  const requestId = kept?.text.match(/"requestId":"([^"]+)"/)?.[1]
+  check(Boolean(kept?.text.includes('"account":"guest"')), "the outbox keeps it as the guest's")
+  await shot(tab, "8-guest-offline")
+
+  // The guest signs up and comes back to the drop, as the sign-in page returns them; the network is back meanwhile.
+  const name = "Former guest"
+  const account = await api(guest, "/api/auth/sign-up/email", { name, email: email("guest"), password })
+  network = "online"
+  await tab.reload()
+  const landed = await until(
+    async () => (await held(owner, drop)).comments.find((comment) => comment.body === GUEST),
+    WAIT,
+    "the guest's comment to land",
+  ).catch(() => undefined)
+  check(Boolean(landed), "it lands once they're signed in, with no prompt")
+  check(landed?.authorName === name, `it's theirs (${landed?.authorName})`)
+  check(landed?.authorId === account.user.id, "under their account")
+  await tab.waitForTimeout(2000)
+  const server = await held(owner, drop)
+  check(server.bodies.filter((body) => body === GUEST).length === 1, "the server holds it once")
+  const answered = postsFor(requestId).filter((entry) => entry.status >= 200 && entry.status < 300)
+  check(answered.length === 1, `one POST of it landed (${answered.length})`)
+  check((await entriesWith(tab, GUEST)).length === 0, "the outbox is empty")
+  await showList(tab)
+  check((await item(tab, GUEST).count()) === 1, "it shows once")
+  check(!(await marked(tab, GUEST, "pending")), "it isn't marked waiting any more")
+  await shot(tab, "8-guest-signed-in")
+  await guest.close()
+})
 
 if (errors.length) console.log(`Page errors:\n${[...new Set(errors)].map((line) => `  ${line}`).join("\n")}`)
 await browser.close()
