@@ -106,7 +106,7 @@ ${EDITOR:-nano} .env
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
+For the [ViteHub Console](/docs/self-host#github), also set `DROP_PUBLIC_URL=https://drop.example.com` in `.env`: the build compiles it in. Drop runs the D1 migrations before it starts. To update, `git pull` and run the same command. Changing to SQLite needs a separate data migration.
 
 ## Updates and backups {#data}
 
