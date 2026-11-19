@@ -1,16 +1,17 @@
 import assert from "node:assert/strict"
 import { test, vi } from "vite-plus/test"
 import { H3, H3Event, HTTPError, HTTPResponse } from "h3"
-import { state } from "../cost/harness.mjs"
+import { migrate, state } from "../cost/harness.mjs"
 
 vi.mock("nitro", () => ({ definePlugin: (plugin) => plugin }))
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ seoIndex: false }) }))
 
 const { default: contentHeaders } = await import("../../server/plugins/content-headers.ts")
 const { default: contentError } = await import("../../server/handlers/content-error.ts")
-const { sessionOf } = await import("../../server/utils/identity.ts")
+const { identify, sessionOf } = await import("../../server/utils/identity.ts")
 let onResponse
 await contentHeaders({ hooks: { hook: (_name, fn) => (onResponse = fn) } })
+migrate()
 
 const key = "00000000-0000-4000-8000-000000000001"
 function respond(path, init = {}) {
@@ -54,7 +55,10 @@ test("an answer that sets a cookie is never kept, whatever it was cached for", (
   assert.equal(respond(`/f/${key}.png`, session("private, no-cache", { ETag: '"abc"' })), "private, no-store")
 })
 
-test("session renewal reaches the final response, including HTML, JSON and plain-text misses", async () => {
+test.each([
+  ["proxy session", sessionOf],
+  ["browser identity", identify],
+])("%s renewal reaches the final response, including HTML, JSON and plain-text misses", async (_name, readSession) => {
   const renewal = "session_token=renewed; Path=/; Max-Age=604800; HttpOnly"
   const replacement = "session_token=replacement; Path=/; HttpOnly"
   const authApi = state.authApi
@@ -66,7 +70,7 @@ test("session renewal reaches the final response, including HTML, JSON and plain
   }
   try {
     const app = new H3({ onError: contentError, onResponse }).use(async (event) => {
-      await sessionOf(event)
+      await readSession(event)
       event.context.dropIdentity = Promise.resolve(null)
     })
     app.get("/d/missing", () => {

@@ -32,10 +32,9 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
 }
 export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
-  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls. An
-  // access token is `dropTest.mcpCaller`'s.
+  // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":
-    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }; export const verifyMcpRequest = async () => globalThis.dropTest.mcpCaller ? [undefined, globalThis.dropTest.mcpCaller] : [new Error('invalid token')]",
+    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
   // ViteHub Auth's VITEHUB_MEMBERS check, on the test's emails: `state.members` lists them, empty lets everyone in.
   "vite-hub/auth/server": `import { sql } from "drizzle-orm"
 export const checkAuthMember = async (userId) => {
@@ -44,6 +43,18 @@ export const checkAuthMember = async (userId) => {
   if (globalThis.dropTest.memberCheckError) return [{ code: globalThis.dropTest.memberCheckError }, undefined]
   const [row] = await globalThis.dropTest.db.all(sql\`SELECT email FROM user WHERE id = \${userId}\`)
   return row && listed.includes(row.email.toLowerCase()) ? [undefined, undefined] : [{ code: "AUTH_NOT_MEMBER" }, undefined]
+}
+// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, else the session of \`dropTest.authApi\`.
+export const requireCaller = async (event) => {
+  const headers = event.req.headers
+  if (/^Bearer\\s+\\S+$/i.test(headers.get("authorization") ?? "")) {
+    const caller = globalThis.dropTest.mcpCaller
+    if (!caller) return [{ code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
+    return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
+  }
+  const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })
+  for (const cookie of responseHeaders.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
+  return session?.user ? [undefined, { kind: "browser", user: session.user, session: session.session ?? {} }] : [{ code: "AUTH_SIGNED_OUT" }, undefined]
 }
 // A test that needs Better Auth's API sets \`dropTest.authApi\`; the rest build Better Auth themselves.
 export const useAuth = () => {

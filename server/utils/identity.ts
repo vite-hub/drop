@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
-import { verifyMcpRequest } from "vite-hub/auth/mcp"
-import { useAuth } from "vite-hub/auth/server"
+import { requireCaller, useAuth } from "vite-hub/auth/server"
 import { db } from "vite-hub/database"
 import { user as users } from "../databases/default/index"
 import { logActor, logDenied, logError, requestLog } from "./logs"
@@ -112,54 +111,50 @@ async function verify(event: H3Event): Promise<Identity | null> {
   return who
 }
 
+/**
+ * A person's browser session, or an MCP client's OAuth access token that this Drop issued. ViteHub reads the person and
+ * the client again for a token, so a banned person or a deleted client loses access at once.
+ * ViteHub puts session cookies on the prepared response; hold them for the final response hook as in `sessionOf`.
+ */
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
-  if (bearerFrom(event.req.headers)) return fromAccessToken(event)
-  const session = await sessionOf(event).catch((error: unknown) => {
-    // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
-    rethrowMembershipOutage(error)
-    logError(event, error, { auth: { session: "failed" } })
+  const headers = event.res.headers
+  const previousCookies = headers.getSetCookie()
+  const result = await requireCaller(event)
+    .catch((error: unknown) => {
+      // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
+      rethrowMembershipOutage(error)
+      logError(event, error, { auth: { session: "failed" } })
+      return null
+    })
+    .finally(() => {
+      const cookies = headers.getSetCookie().filter((cookie) => !previousCookies.includes(cookie))
+      if (!cookies.length) return
+      headers.delete("Set-Cookie")
+      for (const cookie of previousCookies) headers.append("Set-Cookie", cookie)
+      const sessionCookies = (event.context.dropSessionCookies ??= [])
+      sessionCookies.push(...cookies)
+    })
+  if (!result) return null
+  const [error, caller] = result
+  if (error) {
+    // The client only sees a 401, so the wide event keeps which token check failed.
+    if (error.code === "AUTH_MCP_TOKEN_INVALID") requestLog(event)?.set({ token: { rejected: error.message } })
     return null
-  })
-  if (!session?.user) return null
-  if (session.user.banned) {
+  }
+  const { user } = caller
+  if (caller.kind === "browser" && user.banned) {
     logDenied(event, "banned")
     return null
   }
   return {
-    userId: session.user.id,
-    name: session.user.name,
-    email: session.user.email,
-    image: session.user.image ?? null,
-    role: roleOf(session.user),
-    actorKind: "browser",
-    actorName: session.user.name,
-  }
-}
-
-/**
- * An MCP client's OAuth access token: a JWT this Drop issued for this Drop's `/mcp`. `verifyMcpRequest` checks it with
- * the signing keys read in-process (a Worker fetching its own hostname is a loop), and reads the person and the client
- * again, so a banned person or a deleted client loses access at once.
- */
-async function fromAccessToken(event: H3Event): Promise<Identity | null> {
-  // Only the URL and the Authorization header are read; a Request of its own leaves the body to the MCP handler.
-  const request = new Request(event.url, { headers: event.req.headers })
-  const [error, caller] = await verifyMcpRequest(request, { resource: `${event.url.origin}/mcp` })
-  if (error) {
-    // The client only sees a 401, so the wide event keeps which check failed.
-    requestLog(event)?.set({ token: { rejected: error.message } })
-    return null
-  }
-  const { user } = caller
-  const email = user.email ?? ""
-  return {
     userId: user.id,
-    name: user.name ?? "",
-    email,
+    name: user.name,
+    email: user.email,
     image: user.image ?? null,
-    role: roleOf({ email, emailVerified: user.emailVerified === true }),
-    actorKind: "agent",
-    actorName: caller.clientName ?? "MCP client",
+    role: roleOf(user),
+    actorKind: caller.kind,
+    // An agent shows as its MCP client, often the agent itself, like "Claude Code".
+    actorName: caller.kind === "agent" ? (caller.client.name ?? "MCP client") : user.name,
   }
 }
 
