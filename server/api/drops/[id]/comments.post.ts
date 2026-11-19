@@ -49,7 +49,8 @@ export default defineHandler(async (event) => {
   const author = authorOf(who, who?.name ?? "Guest", guest)
   const reader = readerOf(who, guest)
   const { body, quote, label, page, mentions, ink, requestId, as: _sender, ...anchor } = input
-  const earlier = requestId ? await earlierThread(drop, requestId, author) : null
+  // Signed in, this browser's guest id, without making one: a guest's resend after they signed in is still theirs.
+  const earlier = requestId ? await earlierThread(drop, requestId, author, guest ?? (await guestOf(event))) : null
   if (earlier)
     return toComment(
       earlier,

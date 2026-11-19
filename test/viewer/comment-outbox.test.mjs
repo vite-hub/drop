@@ -10,6 +10,9 @@ import { toThread } from "../../app/utils/comment-threads.ts"
 // and reach Drop's routes once, from whatever page the reader is on by then.
 const fetches = []
 const refreshed = []
+// What a page's own list loaded again (useApi's refresh), apart from refreshNuxtData's keys.
+const pageRefreshes = []
+const saved = new Map()
 let answer
 const ada = { id: "ada", name: "Ada", image: null }
 const me = ref(ada)
@@ -30,7 +33,16 @@ for (const [name, value] of Object.entries({
   useEventListener,
   keys,
   toThread,
-  useApi: (_url, options) => ({ data: ref(options.default?.()), refresh: async () => {} }),
+  useApi: (_url, options) => ({
+    data: ref(options.default?.()),
+    refresh: async () => void pageRefreshes.push(toValue(options.key)),
+  }),
+  reportClientError: () => {},
+  localStorage: {
+    getItem: (key) => saved.get(key) ?? null,
+    setItem: (key, value) => void saved.set(key, String(value)),
+    removeItem: (key) => void saved.delete(key),
+  },
   useMe: () => ({ data: me, status: ref("success") }),
   useNotify: () => ({ problem: () => "problem", alert() {}, fail() {} }),
   useCommentsOutbox: () => app,
@@ -71,6 +83,8 @@ afterEach(() => {
   scopes.splice(0).forEach((scope) => scope.stop())
   fetches.length = 0
   refreshed.length = 0
+  pageRefreshes.length = 0
+  saved.clear()
   confirm.mockReset()
   signOut.mockClear()
 })
@@ -277,11 +291,19 @@ test(
     assert.equal(fetches[0].body.as, "ada", "it says who wrote it")
     assert.ok(refreshed.includes("me"), "a 401 asks who's signed in now")
 
-    // /api/me says nobody: the guests' outbox runs, and Ada's comment stays saved without going out.
+    // /api/me says nobody: Ada's comment stays in view as hers, held, says to sign in, and nothing goes out.
     me.value = null
-    await vi.waitFor(() => assert.equal(app.account.value, "guest"))
-    assert.equal(app.entries.value.length, 0)
-    assert.equal(state.list.value.length, 0)
+    const sends = fetches.length
+    await vi.waitFor(() => assert.equal(app.author.value?.name, "Ada"))
+    assert.equal(app.account.value, "ada")
+    assert.deepEqual(
+      state.list.value.map((item) => [item.authorName, item.delivery?.status, item.delivery?.error?.status]),
+      [["Ada", "pending", 401]],
+    )
+    assert.equal(fetches.length, sends, "nothing goes out while she's signed out")
+    const unload = new Event("beforeunload", { cancelable: true })
+    window.dispatchEvent(unload)
+    assert.equal(unload.defaultPrevented, true, "closing the tab still asks")
 
     session = "ada"
     me.value = ada
@@ -293,6 +315,99 @@ test(
     assert.equal(app.entries.value.length, 0)
   },
 )
+
+test(
+  "signed out with nothing held, the guests' outbox runs, and a discard of the last held one gets there too",
+  {
+    timeout: 10_000,
+  },
+  async () => {
+    const signedOut = () => Promise.reject(Object.assign(new Error("Sign in again to send it."), { status: 401 }))
+    answer = signedOut
+    const { state } = open()
+    await state.addComment(place, "The chart is cut off")
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.held, true), { timeout: 5_000 })
+    assert.ok(saved.size, "whose they are is kept while they wait")
+
+    const signedIn = app.client()
+    me.value = null
+    await vi.waitFor(() => assert.ok(app.client() && app.client() !== signedIn))
+    assert.equal(app.author.value?.name, "Ada")
+    assert.ok(await app.outbox().dismiss(app.entries.value[0].id))
+    await vi.waitFor(() => assert.equal(app.account.value, "guest"))
+    assert.equal(saved.size, 0, "and forgotten with the last of them")
+    assert.equal(app.author.value, undefined)
+  },
+)
+
+test("signing out forgets whose the held comments were", async () => {
+  answer = offline
+  const { state } = open()
+  await state.addComment(place, "The chart is cut off")
+  await vi.waitFor(() => assert.ok(saved.size))
+  confirm.mockResolvedValueOnce(true)
+  await useSignOut()()
+  assert.equal(saved.size, 0)
+})
+
+test("a guest's waiting comment goes out as the person who signs in, without asking", { timeout: 10_000 }, async () => {
+  me.value = null
+  await vi.waitFor(() => assert.equal(app.account.value, "guest"))
+  let online = false
+  answer = (_url, body) => (online ? comment("c1", body.body, body.requestId) : offline())
+  const { state } = open()
+  await state.addComment(place, "The chart is cut off")
+  assert.equal(app.entries.value.length, 1)
+
+  online = true
+  me.value = ada
+  await vi.waitFor(() => assert.equal(state.list.value[0]?.id, "c1"), { timeout: 5_000 })
+  assert.equal(confirm.mock.calls.length, 0)
+  assert.equal(fetches.at(-1).body.as, "ada", "it goes out as Ada")
+  assert.equal(fetches.at(-1).body.requestId, fetches[0].body.requestId, "with the guest's retry key")
+  assert.equal(app.entries.value.length, 0)
+})
+
+test("a comment another tab sent loads in this tab's list", { timeout: 10_000 }, async () => {
+  // Two tabs of one browser: one store, and messages between them. This tab is offline, the other one sends.
+  const store = createMemoryOutboxStore()
+  const listeners = new Set()
+  const tab = (online) => {
+    const own = new Set()
+    return {
+      listen: () => () => {},
+      isVisible: () => true,
+      isOnline: () => online,
+      lock: (_name, task) => task(),
+      lead(_name, task) {
+        const controller = new AbortController()
+        void task(controller.signal)
+        return () => controller.abort()
+      },
+      post: (message) => listeners.forEach((listener) => !own.has(listener) && listener(message)),
+      receive(listener) {
+        listeners.add(listener)
+        own.add(listener)
+        return () => listeners.delete(listener)
+      },
+      schedule(task, ms) {
+        const timer = setTimeout(task, ms)
+        return () => clearTimeout(timer)
+      },
+      random: () => 0.5,
+    }
+  }
+  app = scoped(() => createCommentsOutbox({ store, environment: tab(false) })).value
+  await vi.waitFor(() => assert.ok(app.client()))
+  const { state } = open()
+  answer = (_url, body) => comment("c1", body.body, body.requestId)
+  await state.addComment(place, "The chart is cut off")
+  assert.equal(state.list.value.length, 1)
+
+  scoped(() => createCommentsOutbox({ store, environment: tab(true) }))
+  await vi.waitFor(() => assert.equal(fetches.length, 1), { timeout: 5_000 })
+  await vi.waitFor(() => assert.ok(pageRefreshes.includes("comments:doc")), { timeout: 5_000 })
+})
 
 test("a guest's comment says nobody's name", { timeout: 10_000 }, async () => {
   me.value = null

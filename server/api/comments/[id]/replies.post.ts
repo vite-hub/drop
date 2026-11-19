@@ -45,7 +45,10 @@ export default defineHandler(async (event) => {
   const guest = who ? null : await guestOf(event, { mint: true })
   const author = authorOf(who, who?.name ?? "Guest", guest)
   const reader = readerOf(who, guest)
-  const earlier = input.requestId ? await earlierReply(thread, input.requestId, author) : null
+  // Signed in, this browser's guest id, without making one: a guest's resend after they signed in is still theirs.
+  const earlier = input.requestId
+    ? await earlierReply(thread, input.requestId, author, guest ?? (await guestOf(event)))
+    : null
   if (earlier) return toReply(earlier, reader, await attachmentsById(earlier.attachments))
   // The images go where the comment's own would.
   const { row, attachments } = await withImages(

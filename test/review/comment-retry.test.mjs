@@ -147,6 +147,37 @@ test("a guest's resend is theirs: the same thread, with mine, from their browser
   assert.equal(images(), stored)
 })
 
+test("a guest's lost-answer resend after signing in, from the same browser, gets the guest's comment and reply back", async () => {
+  insertDrop("doc", { visibility: "public", access: "comment" })
+  state.who = null
+  const read = request("/api/drops/doc/comments")
+  await dropComments(read)
+  const cookie = cookieOf(read)
+  const first = await dropCommentsPost(commentOn(page({ requestId: KEY }), { cookie }))
+  const replyKey = crypto.randomUUID()
+  const reply = await replyPost(replyIn(first.id, { body: "And this", requestId: replyKey }, { cookie }))
+  const stored = images()
+
+  // The answers were lost, and the guest signed in: the outbox sends both again as them, from the same browser.
+  state.who = who
+  const again = await dropCommentsPost(commentOn(page({ requestId: KEY, as: who.userId }), { cookie }))
+  assert.equal(again.id, first.id)
+  const replied = await replyPost(
+    replyIn(first.id, { body: "And this", requestId: replyKey, as: who.userId }, { cookie }),
+  )
+  assert.equal(replied.id, reply.id)
+  assert.equal(threads().length, 1)
+  assert.equal(threads()[0].messages.length, 2)
+  assert.equal(images(), stored)
+
+  // Someone signed in on another browser still can't take the key.
+  state.who = ada
+  assert.equal((await answer(dropCommentsPost, commentOn(page({ requestId: KEY, as: ada.userId })))).status, 409)
+  const other = replyIn(first.id, { body: "And this", requestId: replyKey, as: ada.userId })
+  assert.equal((await answer(replyPost, other)).status, 409)
+  assert.equal(images(), stored)
+})
+
 test("a site reply sent twice from the review script is one reply", async () => {
   insertDrop("site", { kind: "site", blob_key: null, filename: "site", site_url: SITE })
   state.who = who

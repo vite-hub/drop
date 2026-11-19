@@ -21,7 +21,6 @@ export type Sent<T> = { value: T } | { error?: string }
  */
 function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number | undefined>) {
   const notify = useNotify()
-  const { data: me } = useMe()
   const query = computed(() => (toValue(version) ? { v: toValue(version) } : {}))
   const drop = useApi<DropDetail>(() => `/api/drops/${toValue(id)}`, {
     key: () => keys.drop(toValue(id), toValue(version)),
@@ -53,6 +52,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       setReplies(threadId, (replies) => [...replies.filter((item) => item.id !== reply.id), reply])
       void wrote.trigger()
     },
+    // Another tab sent it, and told nobody here: the list has it now. That tab announced it.
+    refresh: () => Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))]),
   })
   const outbox = () => {
     const client = app.client()
@@ -63,7 +64,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   const view = () => ({
     drop: toValue(id),
     account: app.account.value,
-    author: { name: me.value?.name ?? "Guest", image: me.value?.image ?? null },
+    // The outbox's person, also while signed out with their comments held.
+    author: { name: app.author.value?.name ?? "Guest", image: app.author.value?.image ?? null },
     accepted: app.accepted,
   })
   // The id the server gives each waiting reply, so a list that already holds its copy (loaded before the reply's own

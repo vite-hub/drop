@@ -448,22 +448,43 @@ const takenKey = () =>
   new HTTPError({ status: 409, statusText: "Another comment was sent with this request id. Send a new one." })
 
 /**
- * The thread an earlier `addThread` with this retry key started on `row`'s list, or null. A route looks it up before
- * storing a resend's images, so they aren't stored twice. Another author's thread is refused.
+ * Whether a resend comes from whoever sent the first: the same author, or this browser's guest (`guest`, its cookie's
+ * id), whose waiting comments go out as the person who signed in there since.
  */
-export async function earlierThread(row: Commented, requestId: string, author: CommentUser) {
+const sameSender = (first: CommentUser, author: CommentUser, guest: string | null) =>
+  first.id === author.id || (guest !== null && first.id === guest)
+
+/**
+ * The thread an earlier `addThread` with this retry key started on `row`'s list, or null. A route looks it up before
+ * storing a resend's images, so they aren't stored twice. Another author's thread is refused, unless this browser's
+ * guest wrote it (`guest`).
+ */
+export async function earlierThread(
+  row: Commented,
+  requestId: string,
+  author: CommentUser,
+  guest: string | null = null,
+) {
   const [error, found] = await comments.findThread({ subject: (await commentList(row)).subject, requestId })
   if (error) throw commentsFailure(error)
   const thread = found ? dropThread(found) : null
-  if (thread && thread.author.id !== author.id) throw takenKey()
+  if (thread && !sameSender(thread.author, author, guest)) throw takenKey()
   return thread
 }
 
-/** The reply an earlier `replyTo` with this retry key added to the thread, or null. Another author's is refused. */
-export async function earlierReply(thread: CommentThread, requestId: string, author: CommentUser) {
+/**
+ * The reply an earlier `replyTo` with this retry key added to the thread, or null. Another author's is refused, unless
+ * this browser's guest wrote it (`guest`).
+ */
+export async function earlierReply(
+  thread: CommentThread,
+  requestId: string,
+  author: CommentUser,
+  guest: string | null = null,
+) {
   const [error, found] = await comments.findReply(thread.id, requestId)
   if (error) throw commentsFailure(error)
-  if (found && found.author.id !== author.id) throw takenKey()
+  if (found && !sameSender(found.author, author, guest)) throw takenKey()
   return found
 }
 

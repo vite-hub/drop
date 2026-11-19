@@ -62,7 +62,7 @@ function targetOf(metadata: Record<string, unknown> | undefined): Target | undef
 }
 
 /** The drop a waiting entry's list is on. */
-const dropOf = (entry: CommentsOutboxEntry) =>
+export const dropOf = (entry: CommentsOutboxEntry) =>
   entry.kind === "create" ? targetOf(entry.input.metadata)?.drop : entry.subject?.id
 
 /** A comment's or reply's body: JSON, or multipart with the JSON in `data` when it carries images. */
@@ -103,9 +103,6 @@ function refusal(error: unknown) {
 /** Whose outbox a guest's browser keeps: one for every guest, since the server knows a guest by its cookie alone. */
 export const GUEST_ACCOUNT = "guest"
 
-/** Whose outbox this browser sends: the signed-in person's, or the guests' one. */
-export const outboxAccount = (userId: string | undefined) => userId ?? GUEST_ACCOUNT
-
 interface DropTransportHost {
   fetch: typeof $fetch
   /**
@@ -118,6 +115,11 @@ interface DropTransportHost {
   replied: (requestId: string, drop: string | undefined, threadId: string, reply: CommentReply) => void
   /** A refusal the plan-limit dialog explains, or another the reader should hear of. */
   refused: (error: unknown) => void
+  /**
+   * The person who wrote them is signed out: nothing goes out, and each entry is held as a 401 would hold it, until
+   * they sign in again.
+   */
+  held?: boolean
 }
 
 const unused = () => Promise.reject(new Error("Drop's outbox only sends new comments and replies."))
@@ -129,6 +131,7 @@ const unused = () => Promise.reject(new Error("Drop's outbox only sends new comm
 export function dropTransport(host: DropTransportHost): CommentsTransport {
   const as = host.as ? { as: host.as } : {}
   const send = async <T>(request: () => Promise<T>) => {
+    if (host.held) throw Object.assign(new Error("Sign in again to send it."), { status: 401 })
     try {
       return await request()
     } catch (error) {
