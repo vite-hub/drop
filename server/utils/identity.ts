@@ -19,6 +19,7 @@ declare module "h3" {
     /** On a page render's own API call (useApi), the page's request: same visitor, same cookie, already identified. */
     dropPage?: H3Event
     dropAccessChecked?: boolean
+    dropSessionCookies?: string[]
   }
 }
 
@@ -65,6 +66,22 @@ export async function syncRole(userId: string) {
 
 export const authFor = (event: H3Event) => useAuth(event)
 
+/**
+ * The browser's session, with its cookie kept in step. Once a day Better Auth extends a session: it writes the new expiry
+ * to the database and sends a fresh cookie on the call's own response. A server-side call drops that response, so
+ * without this the cookie lapsed a week after sign-in while the database still said the session was live. Keep the
+ * cookies for the final response hook, since an error handler can replace the response and its headers.
+ */
+export async function sessionOf(event: H3Event) {
+  const { headers, response } = await authFor(event).api.getSession({
+    headers: event.req.headers,
+    returnHeaders: true,
+  })
+  const cookies = headers.getSetCookie()
+  if (cookies.length) (event.context.dropSessionCookies ??= []).push(...cookies)
+  return response
+}
+
 export const bearerFrom = (headers: Headers) => headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? null
 
 /**
@@ -97,14 +114,26 @@ async function verify(event: H3Event): Promise<Identity | null> {
 /**
  * A person's browser session, or an MCP client's OAuth access token that this Drop issued. ViteHub reads the person and
  * the client again for a token, so a banned person or a deleted client loses access at once.
+ * ViteHub puts session cookies on the prepared response; hold them for the final response hook as in `sessionOf`.
  */
 async function resolveIdentity(event: H3Event): Promise<Identity | null> {
-  const result = await requireCaller(event).catch((error: unknown) => {
-    // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
-    rethrowMembershipOutage(error)
-    logError(event, error, { auth: { session: "failed" } })
-    return null
-  })
+  const headers = event.res.headers
+  const previousCookies = headers.getSetCookie()
+  const result = await requireCaller(event)
+    .catch((error: unknown) => {
+      // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
+      rethrowMembershipOutage(error)
+      logError(event, error, { auth: { session: "failed" } })
+      return null
+    })
+    .finally(() => {
+      const cookies = headers.getSetCookie().filter((cookie) => !previousCookies.includes(cookie))
+      if (!cookies.length) return
+      headers.delete("Set-Cookie")
+      for (const cookie of previousCookies) headers.append("Set-Cookie", cookie)
+      const sessionCookies = (event.context.dropSessionCookies ??= [])
+      sessionCookies.push(...cookies)
+    })
   if (!result) return null
   const [error, caller] = result
   if (error) {

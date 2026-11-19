@@ -9,7 +9,7 @@ const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve(
 // Drop modules swapped by their file name, wherever they're imported from.
 const modules: Record<string, string> = {
   identity:
-    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
+    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const sessionOf = event => authFor().api.getSession({ headers: event.req.headers }); export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
   "code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "live-drafts":
@@ -52,7 +52,8 @@ export const requireCaller = async (event) => {
     if (!caller) return [{ code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
     return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
   }
-  const session = await useAuth(event).api.getSession({ headers })
+  const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })
+  for (const cookie of responseHeaders.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
   return session?.user ? [undefined, { kind: "browser", user: session.user, session: session.session ?? {} }] : [{ code: "AUTH_SIGNED_OUT" }, undefined]
 }
 // A test that needs Better Auth's API sets \`dropTest.authApi\`; the rest build Better Auth themselves.

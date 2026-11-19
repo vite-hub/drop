@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
-import { authFor } from "../utils/identity"
+import { authFor, sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
 import { authProxy } from "../utils/proxy-auth"
 import { isProxyMember } from "../utils/proxy-auth-config"
@@ -28,7 +28,7 @@ export default defineHandler(async (event) => {
     })
   const auth = authFor(event)
   // A failed lookup signs in again through the proxy; the wide event keeps why.
-  const current = await auth.api.getSession({ headers: event.req.headers }).catch((error: unknown) => {
+  const current = await sessionOf(event).catch((error: unknown) => {
     requestLog(event)?.warn("Session lookup failed", {
       auth: { session: error instanceof Error ? error.message : String(error) },
     })
