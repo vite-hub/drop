@@ -1,0 +1,27 @@
+{
+  "name": "drop",
+  "version": "0.1.0",
+  "description": "Publish plans, docs, pages and small apps to Drop as a link people review and comment on, read their comments, and publish the next version. Adds Drop's MCP server and its skills.",
+  "author": { "name": "ViteHub", "url": "https://vitehub.dev" },
+  "homepage": "https://drop.vitehub.dev",
+  "repository": "https://github.com/vite-hub/drop",
+  "keywords": ["review", "comments", "mcp", "skills", "prototype", "dashboard"],
+  "skills": "./skills/",
+  "mcpServers": "./.codex-plugin/mcp.json",
+  "interface": {
+    "displayName": "Drop",
+    "shortDescription": "Review what your agent makes",
+    "longDescription": "Your agent publishes its plan, page, or app to Drop and sends you a link. You comment on the exact spot, and it reads the comments and publishes the next version. The skills cover pull request evidence, prototypes, data dashboards, handoffs, slides, and lessons.",
+    "developerName": "ViteHub",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://drop.vitehub.dev",
+    "termsOfServiceURL": "https://drop.vitehub.dev/terms",
+    "composerIcon": "./public/favicon.svg",
+    "logo": "./public/icon.png",
+    "defaultPrompt": [
+      "Publish this plan to Drop so I can comment on it.",
+      "Read the comments on my last drop and publish the next version."
+    ]
+  }
+}
