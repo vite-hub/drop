@@ -17,6 +17,9 @@ test("signed-out content errors lead with sign-in, which comes back to the origi
   const html = await response.text()
   assert.equal(response.status, 404)
   assert.match(html, /<h1[^>]*>Sign in to open this drop<\/h1>/)
+  // Signed out, nothing yet says private or deleted: that's for the card an account that can't open it sees.
+  assert.match(html, /Drops shared with you or your team open right after you sign in\./)
+  assert.doesNotMatch(html, /private|deleted/)
   assert.match(html, /Sign in with GitHub/)
   // Pressing it lets GitHub offer every account (`choose`).
   assert.ok(html.includes(`href="/signin/start?redirect=${encodeURIComponent(path)}&amp;choose=1"`))
@@ -38,6 +41,8 @@ test("signed-in content errors show only the current account and offer account s
   )
   const html = await response.text()
   assert.match(html, /viewer\+&lt;test&gt;@example.test/)
+  assert.match(html, /You can&apos;t open this drop/)
+  assert.match(html, /shared with this account, or it was deleted/)
   assert.match(html, /Use another account/)
   assert.doesNotMatch(html, /hidden-owner|Secret title|reconnect/i)
   assert.equal(response.status, 404)

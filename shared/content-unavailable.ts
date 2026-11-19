@@ -31,28 +31,23 @@ export function contentUnavailable(
       email: null,
       action: { label: "Home", to: "/" },
     }
+  const thing = path.startsWith("/f/") ? "file" : "drop"
   // Behind an auth proxy, signing in again returns the same GitHub account to the same page: a loop, not a fix.
-  if (email && authProxy)
-    return {
-      title: "This content isn't available to your account.",
-      description: "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it.",
-      email,
-      action: { label: "My drops", to: "/drops" },
-    }
   if (email)
     return {
-      title: "This content isn't available to your account.",
-      description:
-        "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account.",
+      title: `You can't open this ${thing}`,
+      description: `It isn't shared with this account, or it was deleted. Ask whoever sent the link to share it with you.`,
       email,
-      action: { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
+      action: authProxy
+        ? { label: "My drops", to: "/drops" }
+        : { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
     }
-  // Most people who land here signed out were sent a team link they can open: lead with signing in. A private, team or
-  // deleted drop all answer the same 404, so the words fit each and tell nobody which one this is.
+  // Most people who land here signed out were sent a team link they can open: say only what to do. Whether it's private
+  // or deleted is for the signed-in card above, once there's an account to compare; a private, team or deleted drop all
+  // answer the same 404 here, so these words tell nobody which one this is.
   return {
-    title: `Sign in to open this ${path.startsWith("/f/") ? "file" : "drop"}`,
-    description:
-      "If it was shared with you or your team, it opens once you sign in. Otherwise it may be private or deleted.",
+    title: `Sign in to open this ${thing}`,
+    description: `${thing === "file" ? "Files" : "Drops"} shared with you or your team open right after you sign in.`,
     email: null,
     action: { label: "Sign in with GitHub", to: signIn },
   }
