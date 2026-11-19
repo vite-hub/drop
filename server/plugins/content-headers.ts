@@ -1,3 +1,4 @@
+import { getEventContext, type H3EventContext } from "h3"
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import { HUB_SKILLS_PATH } from "#shared/links"
@@ -33,7 +34,7 @@ export default definePlugin((app) => {
       const indexed = useRuntimeConfig().seoIndex && isIndexedPath(path)
       if (!file && !indexed && !response.headers.has("X-Robots-Tag")) response.headers.set("X-Robots-Tag", "noindex")
     }
-    const sessionCookies = event.context.dropSessionCookies
+    const sessionCookies = getEventContext<H3EventContext>(event).dropSessionCookies
     if (sessionCookies?.length) {
       const responseCookies = response.headers.getSetCookie()
       response.headers.delete("Set-Cookie")
