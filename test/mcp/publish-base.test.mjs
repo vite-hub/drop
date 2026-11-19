@@ -132,7 +132,14 @@ test("agent.session is stored with its version and read back in Versions", async
   )
   assert.match(read.content[0].text, /v2: Second \(.+ · Codex\)\n/)
 
-  for (const bad of [{ thread: "a\nb" }, { branch: "" }, { worktree: "x".repeat(161) }, { thread: 7 }]) {
+  for (const bad of [
+    { thread: "a\nb" },
+    { project: "\u0001" },
+    { harness: "   " },
+    { branch: "" },
+    { worktree: "x".repeat(161) },
+    { thread: 7 },
+  ]) {
     const result = await call(publish, { markdown: "# Bad", note: "Bad", lifetime: "review", agent: { session: bad } })
     assert.equal(result.isError, true, JSON.stringify(bad))
   }

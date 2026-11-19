@@ -2,9 +2,17 @@ import * as v from "valibot"
 
 const label = v.pipe(v.string(), v.minLength(1), v.maxLength(160), v.regex(/\S/))
 
-/** An identifier for one session field: one line, so it can't start lines of its own in read_drop's text. */
-// oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
-const identifier = v.pipe(label, v.regex(/^[^\u0000-\u001f\u007f]+$/))
+/**
+ * An identifier for one session field: one line, so it can't start lines of its own in read_drop's text. One regex
+ * says both that and label's "not blank": JSON Schema has room for one pattern, and tools/list fails on a second.
+ */
+const identifier = v.pipe(
+  v.string(),
+  v.minLength(1),
+  v.maxLength(160),
+  // oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
+  v.regex(/^[^\u0000-\u001f\u007f]*[^\s\u0000-\u001f\u007f][^\u0000-\u001f\u007f]*$/),
+)
 
 /**
  * Where the publishing agent runs, so the next round's comments can reach the same session. Identifiers only, never
