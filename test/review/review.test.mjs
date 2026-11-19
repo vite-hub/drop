@@ -1356,10 +1356,20 @@ test("an agent on a pull request finds the review by its preview's address, says
   assert.equal(page.isError, undefined, page.message)
   assert.deepEqual(
     page.structuredContent.comments.map((item) => item.body),
-    ["Button covers the table"],
-    "that page's comments, not another page's or another preview's",
+    ["Button covers the table", "Typo in the footer"],
+    "every page of that preview, not another preview's",
   )
-  assert.match(page.content[0].text, /After you fix one, reply to it with what you changed and resolve: true/)
+  assert.deepEqual(page.structuredContent.openByPage, [
+    { page: `${SITE}/pricing`, open: 1, asked: true },
+    { page: `${SITE}/about`, open: 1 },
+  ])
+  const text = page.content[0].text
+  assert.match(text, /2 open on 2 pages, from Owner\. Each one needs an answer/)
+  assert.ok(
+    text.indexOf(`### ${SITE}/pricing (1), the page you asked about`) < text.indexOf(`### ${SITE}/about (1)`),
+    "the asked page first",
+  )
+  assert.doesNotMatch(text, /Other PR/)
   assert.deepEqual(
     (await call(readDrop, { id: `${SITE}/` })).structuredContent.comments.map((item) => item.body),
     ["Button covers the table", "Typo in the footer"],
@@ -1374,7 +1384,16 @@ test("an agent on a pull request finds the review by its preview's address, says
     resolve: true,
   })
   assert.equal(done.isError, undefined, done.message)
-  assert.match(done.content[0].text, /Replied to #1 and resolved it/)
+  assert.match(done.content[0].text, /Replied to #1 and resolved it\. Still open with no answer from you: #2 on /)
+  assert.deepEqual(done.structuredContent.stillOpen, [{ n: 2, answered: false, page: `${SITE}/about` }])
+  const asked = await call(replyTool, { id: `${SITE}/about`, comment: 2, body: "Which word is wrong?" })
+  assert.match(
+    asked.content[0].text,
+    /Every open comment has your answer\. Waiting on the reviewer after your reply: #2 on /,
+  )
+  assert.deepEqual(asked.structuredContent.stillOpen, [{ n: 2, answered: true, page: `${SITE}/about` }])
+  const after = (await call(readDrop, { id: `${SITE}/pricing` })).content[0].text
+  assert.match(after, /1 open on 1 page, from Owner; 1 answered by an agent and waiting on the reviewer/)
   assert.deepEqual((await call(updateDrop, { id: `${SITE}/about`, resolves: [2] })).structuredContent.resolved, [2])
 
   // The reviewer sees both gone from the page, with the agent's words under the first.
@@ -1413,12 +1432,21 @@ test("an agent finds the review by a page's address on a fixed staging host and 
     assert.equal(billing.structuredContent.id, id)
     assert.deepEqual(
       billing.structuredContent.comments.map((item) => item.body),
-      [`Billing on ${id}`],
+      [`Billing on ${id}`, `Docs on ${id}`],
     )
+    assert.deepEqual(billing.structuredContent.openByPage, [
+      { page: "/settings/billing", open: 1, asked: true },
+      { page: "/d/getting-started", open: 1 },
+    ])
     assert.deepEqual(
-      (await call(readDrop, { id: `${origin}/d/getting-started` })).structuredContent.comments.map((item) => item.body),
-      [`Docs on ${id}`],
+      (await call(readDrop, { id: `${origin}/d/getting-started` })).structuredContent.openByPage[0],
+      { page: "/d/getting-started", open: 1, asked: true },
       "a page whose path looks like a drop link still finds the site",
+    )
+    assert.equal(
+      (await call(readDrop, { id: `${origin}/` })).structuredContent.openByPage.filter((group) => group.asked).length,
+      0,
+      "the root asks about no page of its own",
     )
   }
   assert.match(
