@@ -172,6 +172,18 @@ function agentOf(actor: CommentActor | undefined): CommentAgent | null {
   return { name, image: knownAgent(actor.id)?.logo ?? knownAgent(name)?.logo ?? null }
 }
 
+/**
+ * The agent that resolved a thread. Comments keeps only the person who resolved it, so this is the agent whose reply
+ * closed it: `reply` with `resolve: true` posts the reply and resolves it in one call, as that person.
+ */
+function resolvedByAgent(thread: CommentThread): CommentAgent | null {
+  const last = thread.messages.length > 1 ? thread.messages.at(-1) : undefined
+  if (thread.status !== "resolved" || !thread.resolvedAt || !last?.actor) return null
+  if (thread.resolvedBy && thread.resolvedBy.id !== last.author.id) return null
+  const gap = thread.resolvedAt - last.createdAt
+  return gap >= 0 && gap < 60_000 ? agentOf(last.actor) : null
+}
+
 const isMine = (author: CommentUser, who: Identity | null) => Boolean(who && author.id === who.userId)
 /** Whether `who` wrote the thread's first message, which lets them resolve or delete it. */
 export const wroteThread = (thread: CommentThread, who: Identity | null) => isMine(thread.author, who)
@@ -239,6 +251,7 @@ export function toComment(
     mentions: first?.mentions ?? [],
     resolved: thread.status === "resolved",
     resolvedAt: thread.resolvedAt ?? null,
+    resolvedBy: resolvedByAgent(thread),
     createdAt: thread.createdAt,
     editedAt: first?.editedAt ?? null,
     version: thread.version,
@@ -283,6 +296,27 @@ export async function threadsFor(row: Commented) {
   ])
   return { threads: list.shot ? threads.filter((thread) => thread.meta.dropId === row.id) : threads, attachments }
 }
+
+/**
+ * The numbers of the open comments on a drop, by page without its query, for an agent that just answered one: what it
+ * still owes an answer. `within` keeps a pattern site's to one preview's origin. Comments only, no images.
+ */
+export async function openByPage(row: Commented, within?: string) {
+  const list = await commentList(row)
+  const threads = await threadsOf(list, list.subject.kind === "drop" ? row.version : undefined)
+  const pages = new Map<string, { n: number; answered: boolean }[]>()
+  for (const thread of threads.sort((a, b) => a.n - b.n)) {
+    if (thread.status !== "open" || (list.shot && thread.meta.dropId !== row.id)) continue
+    if (within && !thread.meta.page?.startsWith(within)) continue
+    const page = (thread.meta.page ?? "").replace(/[?#].*$/, "")
+    pages.set(page, [...(pages.get(page) ?? []), { n: thread.n, answered: answeredByAgent(thread) }])
+  }
+  return pages
+}
+
+/** Whether an agent has the last word on a thread: it answered, and the thread waits on the person who wrote it. */
+const answeredByAgent = (thread: { messages: { actor?: CommentActor }[] }) =>
+  thread.messages.length > 1 && Boolean(thread.messages.at(-1)?.actor)
 
 /**
  * A version's comments and those of every version before it, by number. The viewer decides which of the older ones

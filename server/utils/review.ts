@@ -215,6 +215,9 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
   return { drop: found?.site ?? null, page: found?.page ?? null }
 }
 
+/** `https://pr1.preview.example.com` from a pattern site's page, which keeps the origin in front of the path. */
+export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
+
 /**
  * Whether a comment's page, as `reviewPage` keeps it, is `page` with or without a query or hash. A `page` ending in a
  * slash covers every page under it, so a preview's root address covers that whole preview.
@@ -772,6 +775,7 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     author: { name: writtenBy(item), image: item.agent ? null : item.authorImage },
     createdAt: item.createdAt,
     resolved: item.resolved,
+    resolvedBy: item.resolved ? (item.resolvedBy?.name ?? null) : null,
     mine: item.mine,
     canResolve: others || item.mine,
     page: item.page,

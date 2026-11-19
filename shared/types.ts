@@ -272,6 +272,8 @@ export interface DropComment {
   resolved: boolean
   /** When it was last resolved. A reply after it brings the comment back to Open, still resolved. */
   resolvedAt: number | null
+  /** The agent that resolved it, with the reply that says what it changed. Null when a person resolved it. */
+  resolvedBy: CommentAgent | null
   createdAt: number
   editedAt: number | null
   /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
@@ -340,6 +342,8 @@ export interface ReviewThread {
   author: { name: string; image: string | null }
   createdAt: number
   resolved: boolean
+  /** The agent that resolved it, by name, so the reviewer knows to check its reply and can reopen it. */
+  resolvedBy: string | null
   mine: boolean
   /** Its author and the site's managers may resolve it, as in Drop. */
   canResolve: boolean

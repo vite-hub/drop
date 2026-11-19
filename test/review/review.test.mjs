@@ -1356,10 +1356,20 @@ test("an agent on a pull request finds the review by its preview's address, says
   assert.equal(page.isError, undefined, page.message)
   assert.deepEqual(
     page.structuredContent.comments.map((item) => item.body),
-    ["Button covers the table"],
-    "that page's comments, not another page's or another preview's",
+    ["Button covers the table", "Typo in the footer"],
+    "every page of that preview, not another preview's",
   )
-  assert.match(page.content[0].text, /After you fix one, reply to it with what you changed and resolve: true/)
+  assert.deepEqual(page.structuredContent.openByPage, [
+    { page: `${SITE}/pricing`, open: 1, asked: true },
+    { page: `${SITE}/about`, open: 1 },
+  ])
+  const text = page.content[0].text
+  assert.match(text, /2 open on 2 pages, from Ole \(guest\)\. Each one needs an answer/)
+  assert.ok(
+    text.indexOf(`### ${SITE}/pricing (1), the page you asked about`) < text.indexOf(`### ${SITE}/about (1)`),
+    "the asked page first",
+  )
+  assert.doesNotMatch(text, /Other PR/)
   assert.deepEqual(
     (await call(readDrop, { id: `${SITE}/` })).structuredContent.comments.map((item) => item.body),
     ["Button covers the table", "Typo in the footer"],
@@ -1374,12 +1384,18 @@ test("an agent on a pull request finds the review by its preview's address, says
     resolve: true,
   })
   assert.equal(done.isError, undefined, done.message)
-  assert.match(done.content[0].text, /Replied to #1 and resolved it/)
+  assert.match(done.content[0].text, /Replied to #1 and resolved it\. Still open with no answer from you: #2 on /)
+  assert.deepEqual(done.structuredContent.stillOpen, [{ n: 2, answered: false, page: `${SITE}/about` }])
+  const asked = await call(replyTool, { id: `${SITE}/about`, comment: 2, body: "Which word is wrong?" })
+  assert.match(asked.content[0].text, /Every other open comment has your answer\./)
+  const after = (await call(readDrop, { id: `${SITE}/pricing` })).content[0].text
+  assert.match(after, /1 open on 1 page, from Ole \(guest\); 1 answered by an agent and waiting on the reviewer/)
   assert.deepEqual((await call(updateDrop, { id: `${SITE}/about`, resolves: [2] })).structuredContent.resolved, [2])
 
   // The reviewer sees both gone from the page, with the agent's words under the first.
   const [first] = (await json(await count(ole, "/pricing?plan=pro"))).threads
   assert.equal(first.resolved, true)
+  assert.match(first.resolvedBy, /^Claude/, "the thread says the agent resolved it")
   assert.deepEqual(
     first.replies.map((reply) => reply.body),
     ["Moved the pin out of the table header."],

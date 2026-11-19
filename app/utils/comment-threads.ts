@@ -64,6 +64,10 @@ export function toThread(comment: DropComment, subject: CommentSubject): Comment
     anchor: { kind: "page" },
     status: comment.resolved ? "resolved" : "open",
     ...(comment.resolved && comment.resolvedAt ? { resolvedAt: comment.resolvedAt } : {}),
+    // The thread reads "Resolved by Claude" under the agent's reply, so the reviewer knows whose word closed it.
+    ...(comment.resolved && comment.resolvedBy
+      ? { resolvedBy: person(`agent:${comment.resolvedBy.name}`, comment.resolvedBy.name, comment.resolvedBy.image) }
+      : {}),
     author: person(comment.authorId, comment.authorName, comment.authorImage),
     ...(comment.agent ? { actor: actor(comment.agent) } : {}),
     messages,
