@@ -1,3 +1,4 @@
+import { getIP } from "better-auth/api"
 import { defineHandler, redirect } from "h3"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
@@ -23,10 +24,13 @@ export default defineHandler(async (event) => {
   if (await identify(event)) return redirect(next, 302)
   if (authProxy().enabled) return redirect(page, 302)
   // Better Auth's own limit counts requests to its routes, not this call, and each start stores an OAuth state. It counts
-  // per visitor by the address Better Auth trusts (shared/client-ip.ts): behind a VPS's proxy the connection's own
-  // address is the proxy's, the same for everyone. Elsewhere the runtime reports the visitor's.
+  // visitors the way Better Auth does, from the header server/auth.ts trusts (shared/client-ip.ts), one per IPv6 /64:
+  // behind a VPS's proxy the connection's own address is the proxy's, the same for everyone. Without a header
+  // (Cloudflare, Deno), the address the runtime reports.
   const { clientIpHeader } = useRuntimeConfig()
-  const visitor = clientIpHeader ? event.req.headers.get(clientIpHeader)?.split(",")[0]?.trim() : undefined
+  const visitor = clientIpHeader
+    ? getIP(event.req.headers, { advanced: { ipAddress: { ipAddressHeaders: [clientIpHeader] } } })
+    : null
   await requireRateLimit(event, "sign-in-start", { key: visitor || undefined, limit: 10, window: "1m" })
   const choose = event.url.searchParams.has("choose")
   const response = await authFor(event)
