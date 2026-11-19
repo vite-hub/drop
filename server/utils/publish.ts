@@ -1,6 +1,6 @@
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
-import { AgentMetadataSchema } from "#shared/agent"
+import { AgentInputSchema, agentMetadata } from "#shared/agent"
 import { LIFETIMES, MAX_KEEP_REASON } from "#shared/expiry"
 import { MAX_SLUG, slugify } from "#shared/links"
 import { appLinkIssues, appPageLinks, MAX_LISTED_PAGES } from "#shared/project-bundle"
@@ -27,9 +27,9 @@ import { signUpload } from "./uploads"
 export const PublishInput = v.object({
   agent: v.optional(
     v.pipe(
-      AgentMetadataSchema,
+      AgentInputSchema,
       v.description(
-        "Your model, harness, and reasoning level for this publish. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
+        "Your model, harness, and reasoning level for this publish, as { model, harness, reasoningLevel }; a plain string is read as the model. Report known values from your runtime; omit unknown fields. Supplied separately on every version, never inherited.",
       ),
     ),
   ),
@@ -200,6 +200,7 @@ export type PublishInput = v.InferOutput<typeof PublishInput>
  * a drop, after the same checks.
  */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
+  const agent = agentMetadata(input.agent)
   const given = (["markdown", "html", "files", "archive", "file", "site", "board", "link"] as const).filter(
     (key) => input[key] !== undefined,
   )
@@ -242,7 +243,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         lifetime: input.lifetime,
         keepReason: input.keepReason,
         note: input.note,
-        agent: input.agent,
+        agent,
       },
       event,
     )
@@ -268,7 +269,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         lifetime: input.lifetime,
         keepReason: input.keepReason,
         note: input.note,
-        agent: input.agent,
+        agent,
       },
       event,
     )
@@ -297,7 +298,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (previous?.head) previous = await findDrop(previous.id, event)
   let resources = links && addedResources(previous, links)
   const share = input.share ? { share: input.share } : {}
-  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent: input.agent }
+  const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent }
 
   let row
   let warnings: string[] = []

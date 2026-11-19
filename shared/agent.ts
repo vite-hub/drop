@@ -13,6 +13,13 @@ export const AgentMetadataSchema = v.object({
 
 export type AgentMetadata = v.InferOutput<typeof AgentMetadataSchema>
 
+/** What publish takes: the metadata, or only the model name as a string, which is what an agent passes first. */
+export const AgentInputSchema = v.union([label, AgentMetadataSchema])
+
+export function agentMetadata(agent: v.InferOutput<typeof AgentInputSchema> | undefined): AgentMetadata | undefined {
+  return typeof agent === "string" ? { model: agent } : agent
+}
+
 export function agentLabel(agent: AgentMetadata | null) {
   return [agent?.model, agent?.harness, agent?.reasoningLevel && `${agent.reasoningLevel} reasoning`]
     .filter(Boolean)
