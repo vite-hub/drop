@@ -97,10 +97,10 @@ export default defineMcpTool({
           ...resources,
           siteUrl: drop.siteUrl,
           ...(page ? { page } : {}),
-          openByPage: groups.map(({ path, items, asked }) => ({
-            page: path,
-            open: items.filter((item) => !item.resolved).length,
-            ...(asked ? { asked } : {}),
+          openByPage: groups.map((group) => ({
+            page: group.path,
+            open: group.items.filter((item) => !item.resolved).length,
+            ...(group.asked ? { asked: true } : {}),
           })),
           script,
           ...(unavailable ? { commentsUnavailable: unavailable } : {}),
@@ -262,6 +262,9 @@ async function toolbarComments(dropId: string, path: string, who: Identity) {
 
 const pct = (n: number) => `${Math.round(n / 10)}%`
 
+/** When a group's newest comment was sent. */
+const latest = (list: SiteReviewItem[]) => Math.max(...list.map((item) => item.createdAt))
+
 /** A comment's page without its query or hash, so the filters someone had on don't split one page into many. */
 const pathOf = (page: string | null) => (page ?? "/").replace(/[?#].*$/, "") || "/"
 
@@ -272,7 +275,6 @@ const pathOf = (page: string | null) => (page ?? "/").replace(/[?#].*$/, "") || 
 function byPage(items: SiteReviewItem[], page: string | null) {
   const groups = new Map<string, SiteReviewItem[]>()
   for (const item of items) groups.set(pathOf(item.page), [...(groups.get(pathOf(item.page)) ?? []), item])
-  const latest = (list: SiteReviewItem[]) => Math.max(...list.map((item) => item.createdAt))
   return [...groups]
     .map(([path, list]) => ({
       path,
