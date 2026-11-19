@@ -274,7 +274,11 @@ function byPage(items: SiteReviewItem[], page: string | null) {
   for (const item of items) groups.set(pathOf(item.page), [...(groups.get(pathOf(item.page)) ?? []), item])
   const latest = (list: SiteReviewItem[]) => Math.max(...list.map((item) => item.createdAt))
   return [...groups]
-    .map(([path, list]) => ({ path, items: list, asked: page !== null && list.some((item) => onPage(item.page, page)) }))
+    .map(([path, list]) => ({
+      path,
+      items: list,
+      asked: page !== null && list.some((item) => onPage(item.page, page)),
+    }))
     .sort((a, b) => Number(b.asked) - Number(a.asked) || latest(b.items) - latest(a.items))
 }
 
