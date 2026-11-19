@@ -79,7 +79,11 @@ export default defineMcpTool({
         Promise.all([
           siteItems(drop, who, event.url.origin, undefined, { open: true }),
           resolved ? siteItems(drop, who, event.url.origin) : [],
-        ]).then(([open, all]) => [...open, ...all.filter((item) => item.resolved)]),
+        ]).then(([open, all]) => {
+          // A comment resolved between the two reads is in both: keep the open read's.
+          const seen = new Set(open.map((item) => item.n))
+          return [...open, ...all.filter((item) => item.resolved && !seen.has(item.n))]
+        }),
       )
       // Every comment on the preview, not only the asked page's: reviewers comment across tabs in one round, and an agent
       // that read one page left the comments on its sibling tab pinned for the next review.

@@ -274,15 +274,17 @@ async function threadsOf(list: CommentList, version?: number) {
 async function openThreadsOf(list: CommentList, version?: number) {
   const all: CommentThread[] = []
   let before: { updatedAt: number; id: string } | undefined
-  for (let page = 0; page < 20; page++) {
+  for (let page = 0; ; page++) {
+    // The 21st read asks only whether one more is left: exactly 10,000 is still all of them.
     const [error, threads] = await comments.list({
       subject: list.subject,
       status: "open",
-      limit: 500,
+      limit: page < 20 ? 500 : 1,
       ...(version === undefined ? {} : { revision: { lte: version } }),
       ...(before ? { before } : {}),
     })
     if (error) throw commentsFailure(error)
+    if (page === 20 && threads.length) break
     all.push(...threads)
     const last = threads.at(-1)
     if (threads.length < 500 || !last) return all.flatMap((thread) => dropThread(thread) ?? [])
