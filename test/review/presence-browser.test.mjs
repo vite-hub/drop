@@ -56,7 +56,7 @@ async function open(browser, { presence = true } = {}) {
     if (url.origin !== DROP) return route.abort()
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
-    if (url.pathname === "/review-presence.js") {
+    if (url.pathname === "/review-presence.js" && url.searchParams.get("v") === "2") {
       seen.client++
       return route.fulfill({ contentType: "text/javascript", headers: CORS, body: CLIENT })
     }

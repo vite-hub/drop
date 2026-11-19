@@ -1,6 +1,6 @@
-diff --git a/dist/markdown-negotiation-TAdMpgTK.js b/dist/markdown-negotiation-TAdMpgTK.js
---- a/dist/markdown-negotiation-TAdMpgTK.js
-+++ b/dist/markdown-negotiation-TAdMpgTK.js
+diff --git a/dist/markdown-negotiation-DEnatB83.js b/dist/markdown-negotiation-DEnatB83.js
+--- a/dist/markdown-negotiation-DEnatB83.js
++++ b/dist/markdown-negotiation-DEnatB83.js
 @@ -76,19 +76,19 @@
  	return entries;
  }
@@ -43,7 +43,7 @@ diff --git a/dist/markdown-negotiation-TAdMpgTK.js b/dist/markdown-negotiation-T
  }
  /** The links that the Markdown 404 body lists for the files that `seo` serves. */
  function contentMarkdownErrorLinks(seo) {
-@@ -365,7 +365,7 @@
+@@ -377,7 +377,7 @@
  				headers
  			});
  			else {

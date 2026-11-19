@@ -87,9 +87,11 @@ Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, 
 
 Use a Secure, host-only proxy cookie with `Path=/`, such as `__Host-drop-auth`, and set `DROP_AUTH_PROXY_COOKIE` to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
 
-Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js`, `/api/review/related`, `/api/review/comments` and the paths under it (resolving and replies), `/api/review/images/`, and, for who's here, `/review-presence.js`, `/api/review/presence`, and the WebSocket path `/api/_vitehub/realtime/presence/`. The toolbar asks `/api/review/related` whether a doc links to the site before connecting. Its other requests send a review token or a presence ticket, not a sign-in, so a proxy redirect breaks their CORS preflight and their WebSocket.
+Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. For [site review](/docs/sites), exempt `/review.js`, `/api/review/related`, `/api/review/comments` and the paths under it (resolving and replies), `/api/review/images/`, and, for who's here, `/review-presence.js`, `/api/review/presence`, and the WebSocket path `/_vitehub/realtime/presence/`. The toolbar asks `/api/review/related` whether a doc links to the site before connecting. Its other requests send a review token or a presence ticket, not a sign-in, so a proxy redirect breaks their CORS preflight and their WebSocket.
 
 Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
+
+When upgrading from an older Drop, keep `/api/_vitehub/realtime/presence/` exempt from the browser redirect too, so cached presence clients can still reconnect over WebSocket.
 
 If a browser cannot connect a site review, check the response from `/review/connect`. A 401 means GitHub rejected the token; open `/signin` to sign in again. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means verification failed because GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` distinguish these cases without including credentials. Sign-in and sign-out stay available when a proxy token fails verification.
 
@@ -141,6 +143,6 @@ Run one instance. Rate limits count in its memory. Code images are SVG, and an h
 | Port | `3000`, or `PORT`. |
 | Volume | `/app/.data`, persistent. The image runs as user 1000; on Kubernetes set `fsGroup: 1000`. |
 | Instances | One. SQLite has one writer, so replace the old instance before starting the new one (Kubernetes `strategy: Recreate`). |
-| Health | `GET /api/health` answers `{ ok, version, commit }` without a sign-in. |
+| Health | `GET /api/health` answers `{ ok, version, commit }` without a sign-in. It checks only the database, not KV or Blob. |
 
 To update, restart it on a moving tag such as `latest`, with the image pulled again (Kubernetes `imagePullPolicy: Always`), or change a pinned tag.

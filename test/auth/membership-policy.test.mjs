@@ -35,7 +35,7 @@ function auth(members = [{ kind: "email", email: "listed@example.com" }]) {
     database: currentRoleAdapter(drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }), (person) =>
       roleFor(person, "promoted@example.com", false),
     ),
-    plugins: [...plugins, createAccessPolicyPlugin({ members: gate, policy: { recheck: 0, allow: () => true } })],
+    plugins: [...plugins, createAccessPolicyPlugin({ members: gate, policy: { recheck: "0s", allow: () => true } })],
   })
   return { instance, gate }
 }

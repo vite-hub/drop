@@ -312,7 +312,7 @@ export interface CommentAttachment {
   filename: string
   contentType: string
   size: number
-  /** Where ViteHub Comments serves it (`/api/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
+  /** Where ViteHub Comments serves it (`/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
   url: string
 }
 

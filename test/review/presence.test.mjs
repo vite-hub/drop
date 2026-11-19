@@ -46,7 +46,7 @@ async function answer(handler, made) {
 
 /** One connection to a presence room: identify, the origin check, and authorize, each on its own request as ViteHub runs them. */
 async function connect(room, query, origin = DROP) {
-  const url = `${DROP}/api/_vitehub/realtime/presence/${room}?${new URLSearchParams(query)}`
+  const url = `${DROP}/_vitehub/realtime/presence/${room}?${new URLSearchParams(query)}`
   const fresh = () => event(url, { headers: { origin, upgrade: "websocket" } })
   const first = fresh()
   return {
@@ -195,8 +195,8 @@ test("a members-only Drop lets presence through its gate: the room and the ticke
   state.members = "ada@example.com"
   state.who = null
   assert.equal(await membersOnly(event("/api/review/presence")), undefined)
-  assert.equal(await membersOnly(event("/api/_vitehub/realtime/presence/0123abcd")), undefined)
-  await assert.rejects(Promise.resolve(membersOnly(event("/api/_vitehub/realtime/drops/x"))))
+  assert.equal(await membersOnly(event("/_vitehub/realtime/presence/0123abcd")), undefined)
+  await assert.rejects(Promise.resolve(membersOnly(event("/_vitehub/realtime/drops/x"))))
   await assert.rejects(Promise.resolve(membersOnly(event("/api/drops/x/presence"))))
   state.members = undefined
 })
