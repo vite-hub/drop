@@ -37,8 +37,8 @@ const TEXT_KINDS = new Set(["markdown", "html"])
 /** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
 const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,16})/gi
 
-/** Draft images follow the reader's rendered references, not URLs in source text or unresolved component props. */
-async function referencedFileKeys(html: string) {
+/** Draft images follow rendered file URLs that target this Drop independently of the reader's page path. */
+async function referencedFileKeys(html: string, origin: string) {
   const keys = new Set<string>()
   const { htmlToMarkdown } = await import("mdream")
   htmlToMarkdown(html, {
@@ -46,9 +46,9 @@ async function referencedFileKeys(html: string) {
     extraction: {
       "img[src], a[href]": ({ tagName, attributes }) => {
         const reference = tagName === "img" ? attributes.src : attributes.href
-        if (!reference) return
-        const url = URL.parse(reference, "https://drop.invalid/")
-        if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) return
+        if (!reference || !(reference.startsWith("/") || /^https?:\/\//i.test(reference))) return
+        const url = URL.parse(reference, origin)
+        if (!url || url.origin !== origin) return
         const [match] = url.pathname.matchAll(FILE_LINK)
         if (match?.[1] && match[0] === url.pathname) keys.add(match[1])
       },
@@ -308,7 +308,7 @@ export async function createDocDrop(
           const { renderMarkdownCached } = await import("../markdown-document")
           const rendered = await renderMarkdownCached(key, async () => text, event)
           parsedTitle = rendered.title
-          if (own) draftKeys = await referencedFileKeys(rendered.html)
+          if (own && event) draftKeys = await referencedFileKeys(rendered.html, event.url.origin)
         }
       } catch (error) {
         await deleteBlobKeys([key])

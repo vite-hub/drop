@@ -13,6 +13,7 @@ const png = Buffer.from(
   "base64",
 )
 const teammate = { ...who, userId: "teammate", email: "teammate@example.com", actorName: "Teammate" }
+const origin = "https://drop.example"
 
 migrate()
 beforeEach(() => {
@@ -34,11 +35,17 @@ function upload(document, file = new File([png], "screenshot.png", { type: "imag
   const body = new FormData()
   body.set("document", document)
   body.set("file", file)
-  return uploadFile(context(new Request("https://drop.example/api/files", { method: "POST", body })))
+  return uploadFile(context(new Request(`${origin}/api/files`, { method: "POST", body })))
 }
 
 const readFile = (url) => requireBlobAccess(context(new Request(url)), new URL(url).pathname.slice(3))
 const status = (expected) => (error) => error.status === expected
+const publish = (id, source, actor = who) =>
+  createDocDrop(
+    actor,
+    { filename: `${id}.md`, supersedes: id, bytes: new TextEncoder().encode(source) },
+    context(new Request(`${origin}/api/drops/${id}/versions`, { method: "POST" })),
+  )
 
 test("an image uploaded into an Only me draft is never a standalone team drop", async () => {
   insertDrop("private-draft", { share: "private" })
@@ -59,11 +66,7 @@ test("a teammate's upload follows the document across publishing, sharing change
   sql.exec("UPDATE drops SET share = 'team' WHERE id = 'team-draft'")
   await assert.rejects(readFile(file.url), status(404))
   sql.exec("UPDATE drops SET share = 'team_edit' WHERE id = 'team-draft'")
-  await createDocDrop(teammate, {
-    filename: "team-draft.md",
-    supersedes: "team-draft",
-    bytes: new TextEncoder().encode(`![Screenshot](${file.url})`),
-  })
+  await publish("team-draft", `![Screenshot](${file.url})`, teammate)
   const row = await findDropByBlob(key)
   assert.equal(row.parentId, "team-draft")
   assert.equal(row.ownerId, who.userId)
@@ -87,22 +90,19 @@ test("only referenced draft images become public when a new version is published
   const after = await upload("public-draft")
   const bound = await upload("public-draft")
   const linked = await upload("public-draft")
+  const rootLinked = await upload("public-draft")
   const unused = await upload("public-draft")
   const images = [published, standalone, before, after, bound]
-  const referenced = [...images, linked]
-  const origin = "https://drop.example"
+  const referenced = [...images, linked, rootLinked]
   const attachments = async () => (await dropDetail(await findDrop("public-draft"), null, origin)).attachments
   await readFile(published.url)
   state.who = null
   for (const file of referenced) await assert.rejects(readFile(file.url), status(404))
   assert.deepEqual(await attachments(), [])
-  const publish = (source) =>
-    createDocDrop(who, {
-      filename: "public-draft.md",
-      supersedes: "public-draft",
-      bytes: new TextEncoder().encode(source),
-    })
-  await publish(`An edit with URLs in code: \`${published.url}\` and \`<img src="${standalone.url}">\`.`)
+  await publish(
+    "public-draft",
+    `An edit with URLs in code: \`${published.url}\` and \`<img src="${standalone.url}">\`.`,
+  )
   for (const file of referenced) await assert.rejects(readFile(file.url), status(404))
   assert.deepEqual(await attachments(), [])
   const source = `---
@@ -113,6 +113,8 @@ after: ${after.url}
 ![Screenshot](${published.url})
 
 [Download](${linked.url}?raw)
+
+[Local download](${new URL(rootLinked.url).pathname}?raw)
 
 [External preview](https://example.com/preview?image=${unused.url})
 
@@ -129,7 +131,7 @@ after: ${after.url}
 :::
 ::
 `
-  const { blobKey } = await publish(source)
+  const { blobKey } = await publish("public-draft", source)
   const { html } = await renderMarkdownCached(blobKey, async () => source)
   for (const file of images) {
     assert.ok(html.includes(`src="${file.url}"`), `${file.url} is rendered as an image source`)
@@ -138,8 +140,24 @@ after: ${after.url}
   for (const file of referenced) await readFile(file.url)
   await assert.rejects(readFile(unused.url), status(404))
   assert.deepEqual(new Set((await attachments()).map((file) => file.url)), new Set(referenced.map((file) => file.url)))
-  await publish("The screenshot is still available in the older version.")
+  await publish("public-draft", "The screenshot is still available in the older version.")
   await readFile(published.url)
+})
+
+test.each([
+  ["document-relative", (path) => path.slice(1)],
+  ["cross-origin", (path) => `https://elsewhere.example${path}`],
+])("a %s link does not publish a draft image", async (_kind, target) => {
+  insertDrop("public-draft", { share: "public" })
+  const file = await upload("public-draft")
+  const href = target(new URL(file.url).pathname)
+  const source = `[Download](${href})`
+  const { blobKey } = await publish("public-draft", source)
+  const { html } = await renderMarkdownCached(blobKey, async () => source)
+  assert.ok(html.includes(`href="${href}"`))
+  state.who = null
+  assert.deepEqual((await dropDetail(await findDrop("public-draft"), null, origin)).attachments, [])
+  await assert.rejects(readFile(file.url), status(404))
 })
 
 test("document uploads require a browser editor and validate image bytes rather than MIME or filename", async () => {
