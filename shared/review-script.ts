@@ -1373,7 +1373,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     joining = true;
     try {
       const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
-      const client = await import(drop + "/review-presence.js");
+      const client = await import(drop + "/review-presence.js?v=2");
       if (!token || presence) return;
       const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);

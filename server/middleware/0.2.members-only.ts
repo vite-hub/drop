@@ -8,7 +8,7 @@ import { membersOnly } from "../utils/members"
  * (0.drop-access.ts, permissions, server/comments.ts), so a stranger reaches only what its owner made public.
  */
 const PUBLIC_LINK =
-  /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies|_vitehub\/realtime\/latest\/[^/]+|_vitehub\/comments\/attachments\/[^/]+)$/
+  /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies|_vitehub\/realtime\/latest\/[^/]+|(?:api\/)?_vitehub\/comments\/attachments\/[^/]+)$/
 
 /**
  * The routes review.js calls from a site (shared/review-script.ts): threads, resolving, replies, their images, the docs
@@ -20,14 +20,15 @@ const REVIEW_SCRIPT = /^\/api\/review\/(?:comments(?:\/[^/]+(?:\/replies)?)?|ima
  * Presence rooms (server/realtime/presence.ts) check everyone themselves: Drop's pages by session, and a reviewed site's
  * page by its presence ticket, which carries a member.
  */
-const PRESENCE_ROOM = /^\/_vitehub\/realtime\/presence\/[^/]+$/
+const PRESENCE_ROOM = /^\/(?:api\/)?_vitehub\/realtime\/presence\/[^/]+$/
 
 /**
  * The ViteHub routes that answer for Drop's data: Comments, Realtime rooms, browser errors, and the Console's status,
  * logs and usage. They sit under /_vitehub beside routes that check a signature or serve static files (the Console's
  * /_vitehub/rpc, its tool script, the Comments overlay assets), which stay open.
  */
-const VITEHUB_DATA = /^\/_vitehub\/(?:comments(?!\/assets\/)|realtime|browser-errors|console\/(?:status|logs|usage))(?:\/|$)/
+const VITEHUB_DATA =
+  /^\/_vitehub\/(?:comments(?!\/assets\/)|realtime|browser-errors|console\/(?:status|logs|usage))(?:\/|$)/
 
 /** Members-only Drops serve anonymous visitors only the drops shared publicly; the rest of the app needs a member. */
 export default defineHandler(async (event) => {
