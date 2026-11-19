@@ -51,7 +51,7 @@ test("the pill's Console link shows only to a verified, unbanned admin who is a 
 test("content-origin hosts never reach the Console", async () => {
   state.contentOrigin = "https://*-drop.vitehub.dev"
   for (const hostname of [`${"a".repeat(26)}-drop.vitehub.dev`, "stray-drop.vitehub.dev"])
-    for (const path of ["/_vitehub/rpc", "/api/_vitehub/console/status"])
+    for (const path of ["/_vitehub/rpc", "/_vitehub/console/status"])
       for (const method of ["GET", "POST"]) {
         const request = new Request(`https://${hostname}${path}`, { method })
         assert.equal((await authorize({ ...signed(user.email), request })).status, 404)

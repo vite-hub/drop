@@ -101,6 +101,12 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
   }
 })
 
+test("the content origin blocks ViteHub routes including the legacy aliases", async () => {
+  for (const prefix of ["/_vitehub", "/api/_vitehub"])
+    for (const path of ["/comments/attachments/abc", "/realtime/presence/abc"])
+      assert.equal((await contentMiddleware(request(`https://drop-usercontent.example${prefix}${path}`)))?.status, 404)
+})
+
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {
   for (const path of ["/", "/product/", "/api/me", "/d/abc", "/f/key.html"]) {
     const response = await contentMiddleware(

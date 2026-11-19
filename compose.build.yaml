@@ -10,3 +10,5 @@ services:
         DROP_DATABASE_URL: ${DROP_DATABASE_URL:-}
         CLOUDFLARE_D1_DATABASE_ID: ${CLOUDFLARE_D1_DATABASE_ID:-}
         CLOUDFLARE_D1_DATABASE_NAME: ${CLOUDFLARE_D1_DATABASE_NAME:-my-drop}
+        # Signed Console calls on Node trust only the origin compiled in at build time.
+        DROP_PUBLIC_URL: ${DROP_PUBLIC_URL:-}

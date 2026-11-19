@@ -382,7 +382,7 @@ test("a webhook that cancels and updates a subscription lists both, and audits t
 
 test("a realtime room says why it refused someone", async () => {
   const { default: latest } = await import("../../server/realtime/latest.ts")
-  const { event } = await request("/api/_vitehub/realtime/latest/gone", (event) =>
+  const { event } = await request("/_vitehub/realtime/latest/gone", (event) =>
     latest.authorize({ event, documentId: "gone", mode: "read" }),
   )
   assert.deepEqual(event.realtime, { reason: "not-found" })
