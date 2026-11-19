@@ -20,7 +20,7 @@ const AgentSessionSchema = v.object({
   branch: v.optional(v.pipe(identifier, v.description("The git branch it works on."))),
 })
 
-export type AgentSession = v.InferOutput<typeof AgentSessionSchema>
+
 
 /** Self-reported for this publish. Omit values the agent's runtime does not expose. */
 const AgentMetadataSchema = v.object({
