@@ -152,7 +152,7 @@ export default defineComments({
 
   /**
    * A comment image by its key: a page image's blob key, else the image drop's id. ViteHub serves it at
-   * /api/_vitehub/comments/attachments/<key> once it found a thread that lists the key and the reader may read.
+   * /_vitehub/comments/attachments/<key> once it found a thread that lists the key and the reader may read.
    */
   async readAttachment(key) {
     const pageType = pageImageType(key)

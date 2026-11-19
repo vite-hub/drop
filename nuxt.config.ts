@@ -55,7 +55,8 @@ const d1 = (fallback: string) => ({
 })
 
 /**
- * ViteHub per host. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
+ * ViteHub per host. A Definition folder turns its feature on (server/realtime/, server/schedules/), so hosts without
+ * that feature set it to false. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
  * for Nitro's cache. Elsewhere code images are SVG only, rate limits count per server instance (ViteHub's
  * in-memory limiter), and Nitro's cache stays in memory. The host comes from DROP_HOST or the build env
  * (scripts/deployment.ts).
@@ -99,6 +100,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     database: d1("vitehub-drop-vercel"),
     // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
     schedule: { cron: { cleanup: "0 0 * * *" } },
+    realtime: false,
   },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: {
@@ -106,10 +108,11 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     blob: files,
     database: d1("vitehub-drop-netlify"),
     schedule: { providerOutput: "standalone" },
+    realtime: false,
   },
-  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
-  // Deno preset has no schedule, so none of the hourly cleanup runs: expired drops and code images stop being served
-  // but stay stored, the Trash is never purged, and unused OAuth clients stay registered.
+  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). The hourly
+  // cleanup stays off here until Deno.cron is tested: expired drops and code images stop being served but stay stored,
+  // the Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     host: "deno",
     blob: {
@@ -120,6 +123,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       region: process.env.S3_REGION || "auto",
     },
     database: d1("vitehub-drop-deno"),
+    schedule: false,
+    realtime: false,
   },
   // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
   // timer inside the process (its run history in KV files).
@@ -179,7 +184,7 @@ export default defineNuxtConfig({
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
     // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
-    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // POST /_vitehub/browser-errors. Failures the app catches still go through reportClientError()
     // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
     observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt

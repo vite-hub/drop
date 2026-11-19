@@ -1563,7 +1563,7 @@ test("comments and replies in Drop take images, which belong to the drop and go 
     [["mock.png", "image/png"]],
   )
   // ViteHub Comments serves it (server/comments.ts `readAttachment`), to whoever may read the thread.
-  assert.equal(posted.attachments[0].url, `/api/_vitehub/comments/attachments/${posted.attachments[0].id}`)
+  assert.equal(posted.attachments[0].url, `/_vitehub/comments/attachments/${posted.attachments[0].id}`)
   const stored = sql.prepare("SELECT * FROM drops WHERE parent_id = 'doc'").get()
   assert.equal(stored.kind, "image")
   assert.equal(stored.owner_id, "owner")
