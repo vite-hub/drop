@@ -52,7 +52,7 @@ test.each([
     if (databaseOnly) {
       assert.equal(config.vitehub.health, undefined)
       assert.equal(handlers.length, 1)
-      assert.equal(handlers[0].method, "get")
+      assert.equal(handlers[0].method, "GET")
       assert.match(handlers[0].handler, /[/\\]server[/\\]handlers[/\\]database-health\.ts$/)
       assert.equal(config.runtimeConfig.release.commit, "health-test-commit")
     } else {

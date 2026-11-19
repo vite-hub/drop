@@ -425,7 +425,7 @@ export default defineNuxtConfig({
       handlers: [
         {
           route: healthRoute,
-          method: "get",
+          method: "GET",
           handler: fileURLToPath(new URL("./server/handlers/database-health.ts", import.meta.url)),
         },
       ],
