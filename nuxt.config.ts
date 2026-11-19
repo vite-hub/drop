@@ -23,9 +23,10 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+const databaseOnlyHealth = host === "vps" || host === "deno"
+const healthRoute = "/api/health"
 
-// What every wide event names: package.json's version and the commit the host built, from Drop's Docker build or the
-// host's own build variable (Workers Builds, Vercel, Netlify). ViteHub's health route reads the same variables.
+// What every wide event and Drop's database-only health handler report: the app version and the commit the host built.
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
   commit:
@@ -180,9 +181,7 @@ export default defineNuxtConfig({
     // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
     // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
     trustProxy: true,
-    // /api/health answers Drop's version, the commit, the ViteHub version, and whether the Database and each store
-    // answer, without a sign-in (server/middleware/0.2.members-only.ts lets it through).
-    health: { route: "/api/health" },
+    ...(!databaseOnlyHealth && { health: { route: healthRoute } }),
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
@@ -287,6 +286,7 @@ export default defineNuxtConfig({
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
+    release,
     // Which host this build is for, on every wide event (server/plugins/wide-events.ts).
     deployment: { host },
     seoIndex: false,
@@ -420,6 +420,15 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    ...(databaseOnlyHealth && {
+      handlers: [
+        {
+          route: healthRoute,
+          method: "get",
+          handler: fileURLToPath(new URL("./server/handlers/database-health.ts", import.meta.url)),
+        },
+      ],
+    }),
     // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
     // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
