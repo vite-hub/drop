@@ -32,7 +32,7 @@ const files = computed({
 const lookup = async (query: string) => draft.rememberPeople(await users(query))
 const error = ref<string>()
 watch(draft.body, () => (error.value = undefined))
-const busy = computed(() => draft.sending.value || draft.waiting.value)
+const busy = computed(() => draft.waiting.value)
 
 function send(sent: CommentComposerSubmit) {
   if (!busy.value) emit("submit", sent.body, sent.files, sent.mentions)

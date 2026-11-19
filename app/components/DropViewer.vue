@@ -34,7 +34,8 @@ const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
-const comments = computed(() => state.comments.data.value)
+// With the ones that wait in the outbox, each marked by its `delivery` (useDrop).
+const comments = computed(() => state.list.value)
 
 // Site reviews attach screenshots to the same comment threads. Fetch the thumbnails once for list and thread.
 const siteReview =
@@ -115,7 +116,7 @@ watch(
 )
 const hasComments = computed(() => drop.value.kind !== "folder")
 const commentsOpen = ref(false)
-const reviewDraft = provideReviewDraft()
+const reviewDraft = provideReviewDraft(() => drop.value.id)
 const siteRef = useTemplateRef<{
   canDraw: boolean
   capturing: boolean
@@ -205,8 +206,7 @@ const annotations = useViewerAnnotations({
     const { images } = reviewDraft
     const before = images.picks.value.find((pick) => pick.file === autoShot)
     if (before) images.remove(before)
-    // A send under way clears the draft when it's done, but not one that changed meanwhile: the picture would stay.
-    autoShot = file && !reviewDraft.sending.value ? file : null
+    autoShot = file
     if (autoShot) images.add([autoShot])
   },
   // Pin style: a click on the page puts away the thread beside a pin, or a composer with nothing typed in it.
@@ -1084,43 +1084,40 @@ watch(shownVersion, (version) => {
   }
 })
 
-// Keep drafts and image picks until the server accepts them, including after a retry.
+/** How long a send waits for the picture of its area before it goes without it. */
+const SHOT_WAIT = 1500
+
+// The comment goes into the outbox and shows at once; the draft clears so the next one can start. Only a browser that
+// can't keep it brings the words back, with why.
 async function submit(body: string, files: File[] = [], mentions: string[] = []) {
   const open = popover.value
   if (open?.type !== "new") return
-  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it.
+  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it, for a moment.
   const before = reviewDraft.images.picks.value.length
   reviewDraft.waiting.value = true
   try {
-    await annotations.waitForShot()
+    await Promise.race([annotations.waitForShot(), new Promise((done) => setTimeout(done, SHOT_WAIT))])
   } finally {
     reviewDraft.waiting.value = false
   }
   if (popover.value !== open) return
   const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-  const finish = reviewDraft.beginSend()
-  if (!finish) return
-  const composer = popoverRef.value
-  try {
-    const sent = await state.addComment(
-      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
-      body,
-      attached,
-      mentions,
-    )
-    if (!("value" in sent)) {
-      if (popoverRef.value === composer) composer?.fail(sent.error)
-      return
-    }
-    showSent(sent.value.id)
-    const cleared = finish(true)
-    if (popover.value !== open || popoverRef.value !== composer) return
-    if (!cleared) return composer?.fail()
-    popover.value = null
-    send({ type: "clear-selection" })
-  } finally {
-    finish(false)
-  }
+  reviewDraft.clear()
+  popover.value = null
+  send({ type: "clear-selection" })
+  const sent = await state.addComment(
+    { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
+    body,
+    attached,
+    mentions,
+  )
+  if ("value" in sent) return showSent(sent.value.id)
+  // The words come back in a composer at the same place.
+  popover.value = open
+  await nextTick()
+  if (!reviewDraft.body.value) reviewDraft.body.value = body
+  if (!reviewDraft.images.picks.value.length) reviewDraft.images.add(attached)
+  await popoverRef.value?.fail(sent.error)
 }
 
 /**

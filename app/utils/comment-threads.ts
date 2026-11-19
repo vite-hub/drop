@@ -43,6 +43,8 @@ function message(thread: DropComment, item: DropComment | CommentReply, id: stri
     attachments: item.attachments.map((file) => file.id),
     createdAt: item.createdAt,
     ...(item.editedAt ? { editedAt: item.editedAt } : {}),
+    // A message waiting in the outbox (useDrop), for the parts' pending and failed states.
+    ...(item.delivery ? { delivery: item.delivery } : {}),
   }
 }
 
@@ -70,6 +72,8 @@ export function toThread(comment: DropComment, subject: CommentSubject): Comment
     revision: comment.version,
     createdAt: comment.createdAt,
     updatedAt: Math.max(...messages.map((item) => item.editedAt ?? item.createdAt)),
+    ...(comment.requestId ? { requestId: comment.requestId } : {}),
+    ...(comment.delivery ? { delivery: comment.delivery } : {}),
   }
 }
 

@@ -51,7 +51,7 @@ const lookup = async (query: string) => {
 }
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
-const busy = computed(() => Boolean(draft && (draft.sending.value || draft.waiting.value)))
+const busy = computed(() => Boolean(draft?.waiting.value))
 // The composer's files are the draft's picks, so the viewer's own pictures show and go with the rest.
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
