@@ -2,7 +2,8 @@
 // A site under review, open inside Drop: the page in a frame, an address bar above it, and Comment, which draws a box
 // over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
-// are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
+// are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way. They
+// go through the drop's outbox (useDrop), so a comment written offline waits with its screenshot and goes out once.
 // The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
@@ -19,7 +20,6 @@ const deviceBottom = computed(() =>
 )
 
 const notify = useNotify()
-// The others in the review's presence room load the new comment at once (usePresence).
 const state = injectDrop()
 const capture = useTabCapture()
 
@@ -65,7 +65,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const { body: note, images, sending, beginSend } = injectReviewDraft()!
+const { body: note, images, clear } = injectReviewDraft()!
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -167,41 +167,29 @@ const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
 async function send() {
   const shot = pending.value
-  if (!shot || !note.value.trim()) return
+  if (!shot || !note.value.trim() || !state) return
   const { box: b, size } = shot
   const ox = thousandths(b.left, size.width),
     oy = thousandths(b.top, size.height)
-  const form = new FormData()
-  form.append(
-    "data",
-    JSON.stringify({
-      body: note.value.trim(),
+  const body = note.value.trim()
+  const attached = [shot.blob, ...files.value]
+  // The draft and the screenshot clear at once, so the next box can be drawn while this one goes out.
+  clear()
+  discard()
+  const kept = await state.addSiteComment(
+    shot.origin,
+    {
       page: shot.page,
       ox,
       oy,
       ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
       oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
       viewport: size,
-    }),
+    },
+    body,
+    attached,
   )
-  form.append("screenshot", shot.blob, "screenshot")
-  for (const file of files.value) form.append("image", file, file.name || "image")
-  const finish = beginSend()
-  if (!finish) return
-  try {
-    await sendSiteComment(props.drop.id, shot.origin, form)
-    notify.done("Comment sent")
-    finish(true)
-    if (pending.value === shot) discard()
-    // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
-    // events go nowhere.
-    void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
-    state?.wrote()
-  } catch (error) {
-    notify.fail("Couldn't send the comment", error)
-  } finally {
-    finish(false)
-  }
+  if (!kept && !note.value) note.value = body
 }
 
 function cancelDrawing() {
@@ -354,7 +342,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
               variant="ghost"
               @click="discard"
             />
-            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" type="submit" />
           </div>
         </form>
       </Teleport>

@@ -19,9 +19,9 @@ async function settled<T>(sent: Promise<Sent<T>>) {
 /**
  * The comments of the open drop for vite-hub/ui's comment parts (CommentPanel, CommentThread, CommentComposer).
  *
- * Threads go through Drop's own comment routes, which keep the anchor, the suggestion, and the screenshot Drop's viewer
- * draws, and answer the comments the viewer already holds (useDrop): the pins in the frame and the parts show the same
- * list, and a change from either side shows in both. Whom "@" names and the comment images go straight to ViteHub's
+ * Threads answer the comments the viewer already holds (useDrop), the waiting ones too: the pins in the frame and the
+ * parts show the same list, and a change from either side shows in both. New comments and replies go into useDrop's
+ * outbox, which sends them to Drop's own routes, so a composer here empties as soon as its words are saved. Whom "@" names and the comment images go straight to ViteHub's
  * Comments API (`createRestTransport`), which asks server/comments.ts who may.
  *
  * `source` is what the dock lists: the drop's comments, or an image's in the lightbox. `page` is the app page a new
