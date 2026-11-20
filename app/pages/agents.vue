@@ -27,7 +27,6 @@ const { agents, status, disconnect } = useAgents()
 
 // Send: the agent that a Send button in the review pill hands comments to. A member pairs one from any Send button;
 // this row shows it, tests it, and removes it.
-const sendOn = useRuntimeConfig().public.send
 const endpoint = ref<SendEndpoint | null>(null)
 const tested = ref<SendTestResult | null>(null)
 const testing = ref(false)
@@ -49,7 +48,6 @@ async function removeEndpoint() {
 }
 let unwatchEndpoint: (() => void) | undefined
 onMounted(() => {
-  if (!sendOn) return
   void loadEndpoint()
   unwatchEndpoint = dropSend.onChange(() => void loadEndpoint())
 })
@@ -99,7 +97,7 @@ onBeforeUnmount(() => unwatchEndpoint?.())
       </p>
     </UCard>
 
-    <UCard v-if="sendOn" class="mt-4" :ui="{ body: 'p-5 sm:p-5' }">
+    <UCard class="mt-4" :ui="{ body: 'p-5 sm:p-5' }">
       <h2 class="font-medium text-highlighted">Send comments to</h2>
       <div
         v-if="!endpoint"
@@ -124,8 +122,9 @@ onBeforeUnmount(() => unwatchEndpoint?.())
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium text-highlighted">{{ endpoint.agent.name }}</p>
           <p v-if="tested?.status === 'delivered'" class="flex items-center gap-1 truncate text-xs text-success">
-            <UIcon name="i-mingcute-check-circle-line" class="size-3.5 shrink-0" />Delivered · {{ tested.code }} in
-            {{ tested.ms }} ms
+            <UIcon name="i-mingcute-check-circle-line" class="size-3.5 shrink-0" />{{
+              tested.code === null ? "In the inbox" : `Delivered · ${tested.code} in ${tested.ms} ms`
+            }}
           </p>
           <p v-else-if="tested" class="flex items-center gap-1 truncate text-xs text-error">
             <UIcon name="i-mingcute-alert-octagon-line" class="size-3.5 shrink-0" />Not delivered · {{ tested.reason }}

@@ -8,6 +8,10 @@ const COMMON: Array<[string, string]> = [
   ["BETTER_AUTH_SECRET", "Signs sessions and agent tokens. One per deployment: openssl rand -base64 32"],
   ["DROP_ADMINS", "Admin emails, comma-separated. Whoever signs in with one of them is Admin."],
   [
+    "VITEHUB_WEBHOOKS_KEY",
+    "Seals each member's agent for Send, the URL and its secret: openssl rand -base64 32. A new key disconnects every agent.",
+  ],
+  [
     "VITEHUB_MEMBERS",
     "Optional. Only these people (and the admins) sign in, open shared links, and use MCP: github:<id>, verified emails, @domains, or github-org:<org>, comma-separated.",
   ],

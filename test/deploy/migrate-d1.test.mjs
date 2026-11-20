@@ -144,6 +144,97 @@ test("the latest Drizzle snapshot includes all migrated columns of its registere
   }
 })
 
+test("a D1 that recorded every earlier migration gets Send's tables, and a member's sends are found by them", async () => {
+  const previousFetch = globalThis.fetch
+  const previousEnv = { ...process.env }
+  const database = new DatabaseSync(":memory:")
+  const all = dropMigrations()
+  const send = all.find((migration) => migration.name === "0017_comment_sends.sql")
+  assert.ok(send, "0017_comment_sends is a migration")
+  try {
+    // Production's D1 before this change: every other migration applied and in Wrangler's ledger.
+    database.exec(
+      "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+    )
+    for (const migration of all.filter((item) => item !== send)) {
+      database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
+      database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(migration.name)
+    }
+    const applied = []
+    Object.assign(process.env, settings)
+    globalThis.fetch = async (_url, options) => {
+      const { sql } = JSON.parse(options.body)
+      if (sql.startsWith("SELECT"))
+        return Response.json({ success: true, result: [{ success: true, results: database.prepare(sql).all() }] })
+      if (sql.includes("INSERT INTO d1_migrations")) applied.push(sql)
+      database.exec(`BEGIN; ${sql}; COMMIT;`)
+      return Response.json({ success: true, result: [{ success: true, results: [] }] })
+    }
+    await migrateD1()
+    assert.equal(applied.length, 1)
+    assert.match(applied[0], /INSERT INTO d1_migrations \(name\) VALUES \('0017_comment_sends\.sql'\)/)
+    // The columns ViteHub reads and writes: a send's endpoint and agent thread, a code's thread, and who owns or
+    // disabled an endpoint.
+    const columns = (table) =>
+      database
+        .prepare("SELECT name FROM pragma_table_info(?)")
+        .all(table)
+        .map((row) => row.name)
+    for (const [table, names] of [
+      ["vitehub_comment_sends", ["endpoint", "thread"]],
+      ["vitehub_comment_send_codes", ["thread"]],
+      ["vitehub_webhook_endpoints", ["owner_name", "owner_email", "disabled_by"]],
+    ])
+      for (const name of names) assert.ok(columns(table).includes(name), `${table}.${name}`)
+
+    // What `list_handoffs` asks: a member's sends that wait, newest first, through the member index.
+    const insert = database.prepare(
+      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', 'k', ?, '{}', ?, ?)",
+    )
+    insert.run("send_a", "ana", "sent", 1, 1)
+    insert.run("send_b", "ana", "done", 2, 2)
+    insert.run("send_c", "bob", "sent", 3, 3)
+    const lookup =
+      "SELECT id FROM vitehub_comment_sends WHERE member = ? AND state IN ('sent', 'working') ORDER BY created_at DESC"
+    assert.deepEqual(
+      database
+        .prepare(lookup)
+        .all("ana")
+        .map((row) => row.id),
+      ["send_a"],
+    )
+    assert.match(
+      database
+        .prepare(`EXPLAIN QUERY PLAN ${lookup}`)
+        .all("ana")
+        .map((row) => row.detail)
+        .join("\n"),
+      /vitehub_comment_sends_member/,
+    )
+    // Webhooks keeps each member's agent once, and Send's codes by member.
+    database
+      .prepare(
+        "INSERT INTO vitehub_webhook_endpoints (id, owner, name, kind, created_at, updated_at) VALUES ('e1', 'ana', 'T3 Code thread', 'url', 1, 1)",
+      )
+      .run()
+    assert.throws(() =>
+      database
+        .prepare(
+          "INSERT INTO vitehub_webhook_endpoints (id, owner, name, kind, created_at, updated_at) VALUES ('e2', 'ana', 'Codex inbox', 'inbox', 1, 1)",
+        )
+        .run(),
+    )
+    assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_comment_send_codes'").get())
+    assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_deliveries'").get())
+    await migrateD1()
+    assert.equal(applied.length, 1)
+  } finally {
+    globalThis.fetch = previousFetch
+    process.env = previousEnv
+    database.close()
+  }
+})
+
 test("missing credentials and D1 errors stop migrations", async () => {
   const previousFetch = globalThis.fetch
   const previousEnv = { ...process.env }

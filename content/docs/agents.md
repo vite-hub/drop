@@ -81,7 +81,18 @@ What the server offers, read from the server itself:
 ::mcp-tools
 ::
 
-Every call runs as the person who allowed the client, with their role. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.
+Every call runs as the person who allowed the client, with their role.
+
+### Handoffs {#handoffs}
+
+**Send** in a drop's review pill hands the comments that wait for an answer to your own agent. Each send is a **handoff**, with an id like `send_3f1c…`.
+
+| Tool | Does |
+| --- | --- |
+| `list_handoffs` | Your handoffs that no agent finished, newest first: `sent` ones wait, `working` ones an agent opened |
+| `read_drop` with `handoff` | Reads the drop with that handoff's threads first, your own as asks and others' as quotes, and shows you Working on the drop's page |
+
+Publish with `agent.session`, its `thread` set to your thread's id (`T3CODE_THREAD_ID` in T3 Code), and with `base`, the version you read. Each delivery names that session, so the next round of comments reaches the thread that wrote the drop, and a stale `base` fails instead of overwriting a newer version. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.
 
 ## Read uploaded files {#read-files}
 

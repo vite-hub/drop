@@ -7,6 +7,7 @@ import { db } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
 import { pageImageType, storeCommentFile, storePageImage } from "./utils/comment-images"
 import { findDrop, permissions } from "./utils/drops"
+import { handoffData, sendSubject } from "./utils/handoffs"
 import { type Identity, identify, identityOf } from "./utils/identity"
 
 /**
@@ -81,6 +82,17 @@ export async function peopleByIds(ids: readonly string[]): Promise<CommentUser[]
 
 export default defineComments({
   subjects: [dropLink("drop"), dropLink("site")],
+
+  /**
+   * Send in the review pill hands the threads that wait for an answer to the member's own agent (server/utils/handoffs.ts).
+   * The agent reads them through Drop's MCP, `read_drop({ handoff })`, as the member, so a send carries no read token.
+   * Each delivery says which drop and version to publish on, and the session that published it.
+   */
+  send: { grant: false, payload: ({ subject }) => handoffData(subject) },
+
+  // Send asks about the drop whose page it's on. Everything else, the toolbar on Drop's pages included, keeps `page`.
+  page: ({ url, event }) =>
+    sendSubject(url.pathname, new URL((event instanceof H3Event ? event.req : event["~standard"].req).url).pathname),
 
   async identify({ event }) {
     // Comments also receives Fetch requests; keep their shared identity and logger context when adapting to H3.
