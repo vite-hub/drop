@@ -294,7 +294,7 @@ function localAttachments(entry: CommentsOutboxEntry, view: OutboxView, screensh
 }
 
 /** A waiting image's key: its entry and place, which stay while the entry waits. */
-export const fileKey = (entry: CommentsOutboxEntry, index: number) => `${entry.id}:${index}`
+const fileKey = (entry: CommentsOutboxEntry, index: number) => `${entry.id}:${index}`
 
 /** Every waiting image's key, for fileUrls().keep. */
 export const fileKeys = (entries: readonly CommentsOutboxEntry[]) =>

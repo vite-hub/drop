@@ -13,7 +13,7 @@ import * as v from "valibot"
 import { dropOf, dropTransport, GUEST_ACCOUNT, statusOf } from "../utils/comment-outbox"
 
 /** A drop page that shows its comments as they land. A drop without one only loads its list again. */
-export interface OutboxPage {
+interface OutboxPage {
   drop: () => string
   /** The server took a comment: `comment` when the route answered it, else the page loads its list again. */
   created: (requestId: string, comment: DropComment | null) => void | Promise<void>
