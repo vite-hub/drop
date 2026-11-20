@@ -429,7 +429,7 @@ test("reopening Links mid-collapse animates to the expanded height", { timeout: 
 })
 
 // Quiver's oauth2-proxy answered /api/favicons/ with its sign-in page, and every chip lost its icon to an empty space.
-test("a site icon that doesn't load shows the link icon", { timeout: 30000 }, async () => {
+test("a site icon that doesn't load shows its site's letter tile", { timeout: 30000 }, async () => {
   const browser = await chromium.launch()
   try {
     const { page, frame } = await open(browser, { signIn: true })
@@ -439,6 +439,9 @@ test("a site icon that doesn't load shows the link icon", { timeout: 30000 }, as
       Array.from(document.querySelectorAll("img.cp-img")).every((img) => img.src.startsWith("data:")),
     )
     assert.ok((await icons.evaluateAll((all) => all.map((img) => img.naturalWidth))).every((w) => w > 0))
+    // Each takes its site's letter tile: GitHub's G for the doc's pull request.
+    const first = decodeURIComponent(await icons.first().getAttribute("src"))
+    assert.match(first, />G<\/text>/)
     // The agent's logo, also blocked, goes; its name stays.
     await frame.getByRole("button", { name: "See more" }).click()
     const who = frame.locator(".drop-who")

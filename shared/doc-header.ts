@@ -13,6 +13,7 @@
 // viewer's Markdown arrives ahead of it ("doc-intent" on hover or focus, answered with "doc-markdown"). Before it has
 // arrived, the write takes a promise of it. A frame without the Clipboard API asks the viewer to copy instead.
 import ICON_SWAP_CSS from "@vite-hub/ui/icon-swap.css?raw"
+import { siteTile } from "./site-tile"
 
 type DocHeaderAction = { id: "markdown" | "download" | "pdf"; label: string; kbd?: string }
 /** A person with the agent that acted for them: "[avatar] Max · [logo] Claude Code", the rest on hover. */
@@ -89,10 +90,6 @@ const MASKS = Object.fromEntries(
     `url("data:image/svg+xml,${encodeURIComponent(svg(ICONS[name]).replace("currentColor", "#000"))}")`,
   ]),
 )
-
-// A site icon that doesn't load (a sign-in proxy in front of Drop's /api/favicons/, a host that's down) shows the link
-// icon the server falls back to (server/utils/favicons.ts) instead of an empty space before the words.
-const LINK_ICON = `data:image/svg+xml,${encodeURIComponent(svg(ICONS.link).replace("currentColor", "#737373"))}`
 
 // The menu and the folder list are popovers in the top layer, placed on their button by CSS anchor positioning: they
 // open with the header's motion (140 ms, from .98), and Escape, a click elsewhere, and focus going back are the
@@ -181,7 +178,7 @@ const LINKS_SHOWN = 6
 export const DOC_HEADER_SCRIPT = String.raw`(() => {
   const box = document.querySelector("article > dl.cfm");
   if (!box) return;
-  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, LINK_ICON = ${JSON.stringify(LINK_ICON)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
+  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
   const style = document.createElement("style");
   style.textContent = ${JSON.stringify(CSS)};
   document.head.appendChild(style);
@@ -198,10 +195,21 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     return a;
   }
 
-  // A chip's icon that fails takes the link icon; an agent's logo that fails goes, leaving its name. Images that
+  // A chip's icon that doesn't load (a sign-in proxy in front of Drop's /api/favicons/, a host that's down) takes its
+  // site's letter tile, as the server draws one for a site without an icon, instead of an empty space before the
+  // words. The frame has no public suffix list: the site's name is the label before the last, or before a
+  // two-letter country's co/com/org/net/gov/ac/edu. An agent's logo that fails goes, leaving its name. Images that
   // failed before this script ran are caught up at once.
+  const siteTile = ${siteTile.toString()};
+  function siteName(href) {
+    const labels = new URL(href, location.href).hostname.replace(/^www\./, "").split(".");
+    if (labels.length < 2) return labels[0] || "?";
+    const at = labels.length > 2 && /^[a-z]{2}$/.test(labels[labels.length - 1]) && /^(?:co|com|org|net|gov|ac|edu)$/.test(labels[labels.length - 2]) ? 3 : 2;
+    return labels[labels.length - at];
+  }
   function brokenImage(img) {
-    if (img.matches("img.cp-img") && img.src !== LINK_ICON) img.src = LINK_ICON;
+    const chip = img.matches("img.cp-img") && img.closest("a[href]");
+    if (chip && !img.src.startsWith("data:")) img.src = "data:image/svg+xml," + encodeURIComponent(siteTile(siteName(chip.href)));
     else if (img.matches(".drop-who img")) img.remove();
   }
   document.addEventListener("error", (e) => { if (e.target instanceof HTMLImageElement) brokenImage(e.target); }, true);
