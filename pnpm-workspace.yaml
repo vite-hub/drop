@@ -61,6 +61,7 @@ overrides:
   "@tiptap/extension-floating-menu": 3.31.4
 
 patchedDependencies:
+  "@vite-hub/comments@0.0.0-preview-c3cfab6": patches/@vite-hub__comments@0.0.0-preview-c3cfab6.patch
   # Markdown negotiation: the most specific Accept range wins, a tie goes to the range listed first, and
   # Content-Location keeps the query string. Not upstream yet.
   "@vite-hub/content@0.0.0-preview-c3cfab6": patches/@vite-hub__content@0.0.0-preview-c3cfab6.patch

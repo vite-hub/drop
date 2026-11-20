@@ -41,8 +41,8 @@ function createDropSend(): DropSend {
       return {
         ...http,
         // Allow saves the agent and sends, and a send moves "last sent": the Agents row follows both.
-        allow: async (code) => {
-          const result = await http.allow(code)
+        allow: async (code, selection) => {
+          const result = await http.allow(code, selection)
           changed()
           return result
         },

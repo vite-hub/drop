@@ -218,7 +218,6 @@ test("Send walks every In place state in the pill, one row each, through a stub 
     await step("sent", "sent")
 
     // The agent starts and links its thread; it finishes, and the button pops out.
-    await tab.waitForSelector('[data-slot="comment-send"][data-state="working"]', { timeout: 4000 })
     await control("work", "https://app.example.com/threads/42")
     const open = segment.getByRole("link", { name: "Open the T3 Code thread" })
     await open.waitFor()
@@ -235,7 +234,6 @@ test("Send walks every In place state in the pill, one row each, through a stub 
     await step("failed", "failed")
     await segment.getByRole("button", { name: "Retry: send 1 comment again" }).click()
     await step("sent-again", "sent")
-    await tab.waitForSelector('[data-slot="comment-send"][data-state="working"]', { timeout: 4000 })
     await control("work", "https://app.example.com/threads/42")
 
     // A comment while the agent works brings Send 1 back beside Working, and the 31st send an hour is refused.

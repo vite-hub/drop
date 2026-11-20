@@ -1,3 +1,5 @@
+ALTER TABLE `drops` ADD `session_publisher_id` text;
+--> statement-breakpoint
 CREATE TABLE `vitehub_comment_sends` (
 	`id` text PRIMARY KEY,
 	`member` text NOT NULL,

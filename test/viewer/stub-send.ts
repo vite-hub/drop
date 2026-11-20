@@ -87,7 +87,9 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         count: unsent().length,
         ...(endpoint ? { agent: endpoint.agent } : {}),
         ...(working?.drop === drop
-          ? { working: { id: working.id, ...(working.thread ? { thread: working.thread } : {}) } }
+          ? working.thread
+            ? { working: { id: working.id, thread: working.thread } }
+            : { sent: { id: working.id, inbox: !endpoint?.agent.host } }
           : {}),
       }),
       startPairing: async () => {

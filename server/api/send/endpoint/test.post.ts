@@ -16,7 +16,7 @@ export default defineHandler(async (event) => {
   const [sendError, sent] = await sendToMemberEndpoint(
     who.userId,
     { event: "webhooks.test", text: TEST_TEXT },
-    { event: "webhooks.test", key: `test:${crypto.randomUUID()}` },
+    { event: "webhooks.test", key: `test:${crypto.randomUUID()}`, endpointId: endpoint.id },
   )
   const ms = Date.now() - started
   if (sendError) return { status: "failed" as const, reason: sendError.why }

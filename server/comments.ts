@@ -29,6 +29,7 @@ type DropCommentsUser = CommentsUser & { identity?: Identity }
 
 /** Who a Comments user is in Drop: the identity `identify` put on them. Guests are nobody. */
 const identityIn = (user: DropCommentsUser | null): Identity | null => (user?.guest ? null : (user?.identity ?? null))
+const sendPermissions = new WeakMap<Identity, Map<string, ReturnType<typeof allowed>>>()
 
 const dropLink = (kind: string) =>
   defineCommentSubject({
@@ -109,7 +110,9 @@ export default defineComments({
     const email = isSendRoute(request.url.pathname)
       ? { email: who.email, emailVerified: who.emailVerified === true }
       : {}
-    return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), ...email, identity: who }
+    const identity = { ...who }
+    if (isSendRoute(request.url.pathname)) sendPermissions.set(identity, new Map())
+    return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), ...email, identity }
   },
 
   async authorize({ user, action, thread, subject, console: admitted }) {
@@ -119,7 +122,12 @@ export default defineComments({
     // check is for Drop's MCP. Drop and site threads keep the drop's sharing.
     if (admitted === true && on?.kind !== "drop" && on?.kind !== "site") return true
     const who = identityIn(user)
-    const can = await allowed(on, who)
+    const memo = who && sendPermissions.get(who)
+    if (memo && on?.kind !== "drop" && on?.kind !== "site") return false
+    const key = on ? `${on.kind}:${on.id}` : ""
+    const policy = memo?.get(key) ?? allowed(on, who)
+    memo?.set(key, policy)
+    const can = await policy
     if (action === "read") return can.view
     if (action === "write") return can.comment
     // As in Drop: its author or the drop's managers resolve a thread, and only managers delete other people's words.

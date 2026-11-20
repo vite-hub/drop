@@ -1,14 +1,12 @@
 import { defineHandler } from "h3"
-import { getMemberEndpoint, removeMemberEndpoint } from "vite-hub/webhooks"
+import { eq } from "drizzle-orm"
+import { db } from "vite-hub/database"
+import { webhookEndpoints } from "vite-hub/webhooks/database"
 import { requireIdentity } from "../../utils/identity"
 
-/** Removes the caller's Send agent. Their next Send pairs one again. */
+/** Disconnects all of the caller's Send destinations, including paired publishing threads. */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
-  const [error, endpoint] = await getMemberEndpoint(who.userId)
-  if (error) throw error
-  if (!endpoint) return null
-  const [removeError] = await removeMemberEndpoint(who.userId, endpoint.id)
-  if (removeError) throw removeError
+  await db.delete(webhookEndpoints).where(eq(webhookEndpoints.owner, who.userId))
   return null
 })

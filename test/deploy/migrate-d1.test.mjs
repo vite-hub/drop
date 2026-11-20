@@ -181,6 +181,7 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
         .all(table)
         .map((row) => row.name)
     for (const [table, names] of [
+      ["drops", ["session_publisher_id"]],
       ["vitehub_comment_sends", ["endpoint", "thread"]],
       ["vitehub_webhook_pairings", ["address"]],
       ["vitehub_webhook_endpoints", ["owner_name", "owner_email", "disabled_by", "address"]],

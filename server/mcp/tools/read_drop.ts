@@ -15,7 +15,7 @@ import { dropDetail, permissions } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { type Identity, requireIdentity } from "../../utils/identity"
 import { findDropOrSite, originOf, siteItems } from "../../utils/review"
-import { type Handoff, openHandoff } from "../../utils/handoffs"
+import { type Handoff, openHandoff, publishingSession } from "../../utils/handoffs"
 import { countView } from "../../utils/views"
 import { runtimeErrors } from "../../utils/runtime-errors"
 import { writtenBy } from "#shared/agents"
@@ -268,8 +268,7 @@ function handoffSection<T extends { id: string; n: number; resolved: boolean }>(
   comments: T[],
   line: (comment: T) => string,
 ) {
-  // A handoff is its reader's own, so the publishing session shows only when they own the drop, as on Versions.
-  const session = handoff.sender === handoff.drop.ownerId ? sessionLabel(handoff.drop.agent) : ""
+  const session = publishingSession(handoff.drop, handoff.sender) ? sessionLabel(handoff.drop.agent) : ""
   const byId = new Map(comments.map((comment) => [comment.id, comment]))
   const marked = (role: "ask" | "quote") =>
     handoff.threads.flatMap((thread) => {

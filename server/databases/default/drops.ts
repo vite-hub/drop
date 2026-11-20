@@ -40,6 +40,7 @@ export const drops = sqliteTable(
     actorKind: text("actor_kind", { enum: ACTOR_KINDS }).notNull(),
     actorName: text("actor_name").notNull(),
     agent: text("agent", { mode: "json" }).$type<AgentMetadata>(),
+    sessionPublisherId: text("session_publisher_id"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     /** Last real visit by a person or an agent. Expiry counts from here, falling back to `createdAt`. */

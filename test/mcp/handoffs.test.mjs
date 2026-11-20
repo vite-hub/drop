@@ -1,29 +1,33 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { installComments } from "vite-hub/comments/server"
+import { createCommentSend, createCommentSendTransport } from "vite-hub/comments/client"
 import { createCommentsHandler } from "vite-hub/comments/runtime"
 import * as realWebhooks from "vite-hub/webhooks"
 import { createDrizzleWebhookEndpointStore, createDrizzleWebhookStore } from "vite-hub/webhooks/database"
 import { installWebhooks } from "vite-hub/webhooks/runtime"
-import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { queries, sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: listHandoffs } = await import("../../server/mcp/tools/list_handoffs.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: comments } = await import("../../server/comments.ts")
+const { default: disconnect } = await import("../../server/api/send/endpoint.delete.ts")
+const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 
 // Send end to end on Drop's side: ViteHub Comments' Send routes with `send` from server/comments.ts, over real Webhooks
 // pairing and endpoints, and then Drop's MCP opening what was sent. Only the delivery is a stand-in: it records what
 // would go out.
 const delivered = []
+let rejectDelivery = false
 const webhooks = {
   ...realWebhooks,
   sendToMemberEndpoint: async (owner, body, options) => {
     delivered.push({ owner, body, endpoint: options.endpointId })
-    return [undefined, { id: `dl_${delivered.length}`, status: "inbox" }]
+    return [undefined, { id: `dl_${delivered.length}`, status: rejectDelivery ? "failed" : "inbox" }]
   },
 }
 /** The member's newest endpoint, as the table holds it. */
@@ -50,6 +54,7 @@ beforeEach(() => {
     "DELETE FROM vitehub_comment_sends; DELETE FROM vitehub_webhook_pairings; DELETE FROM vitehub_webhook_endpoints; DELETE FROM vitehub_webhook_deliveries",
   )
   delivered.length = 0
+  rejectDelivery = false
   state.who = agentOf(ana)
 })
 
@@ -95,6 +100,12 @@ async function send(path, { method = "GET", body, origin = "https://drop.example
   return { status: response.status, body: await response.json() }
 }
 
+const transportFor = (id) =>
+  createCommentSendTransport({
+    page: `/d/${id}`,
+    fetch: (path, init) => handler.fetch(new Request(`https://drop.example${path}`, init)),
+  })
+
 /** A comment from the browser, as `person`. */
 async function comment(drop, person, body) {
   state.who = person
@@ -134,7 +145,7 @@ async function pairAndSend(doc, person = ana) {
   state.who = person
   const page = `?page=${encodeURIComponent(`/d/${doc.id}/plan`)}`
   assert.equal((await send(`/status${page}`)).body.data.count, 2)
-  const { code } = (await send(`/start${page}`, { method: "POST" })).body.data
+  const { code, selection } = (await send(`/start${page}`, { method: "POST" })).body.data
   // The agent posts from its own machine: no Origin, no session.
   state.who = null
   assert.equal(
@@ -142,7 +153,7 @@ async function pairAndSend(doc, person = ana) {
     200,
   )
   state.who = person
-  const sent = (await send(`/allow${page}`, { method: "POST", body: { code } })).body.data
+  const sent = (await send(`/allow${page}`, { method: "POST", body: { code, selection } })).body.data
   assert.equal(sent.status, "sent")
   return sent.id
 }
@@ -150,6 +161,12 @@ async function pairAndSend(doc, person = ana) {
 test("Send carries the drop, the version to build on, and the publishing session, and nothing anyone wrote", async () => {
   const { doc, mine, theirs, answered } = await reviewed()
   const id = await pairAndSend(doc)
+
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  state.who = ana
+  const status = (await send(`/status${page}`)).body.data
+  assert.deepEqual(status.sent, { id, inbox: true })
+  assert.equal(status.working, undefined)
   assert.equal(delivered.length, 1)
   const [{ owner, body }] = delivered
   assert.equal(owner, "owner")
@@ -238,12 +255,179 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   // Ana's pill reads Working until her ask has an answer, then clears.
   state.who = ana
   const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
-  assert.deepEqual((await send(`/status${page}`)).body.data.working, { id })
+  assert.equal((await send(`/status${page}`)).body.data.working.id, id)
   state.who = agentOf(ana)
   await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
   state.who = ana
   assert.equal((await send(`/status${page}`)).body.data.working, undefined)
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
+})
+
+test("pairing cannot send a changed selection and the copied prompt describes both inbox agents", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  state.who = ana
+  const transport = transportFor(doc.id)
+  const { code, selection, count, prompt } = await transport.startPairing()
+  assert.equal(count, 2)
+  for (const inbox of ["Claude Code", "Codex"]) assert.ok(prompt.includes(JSON.stringify({ code, inbox })))
+  await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
+  const added = await comment(doc.id, ana, "One more question.")
+  assert.equal((await transport.allow(code, selection)).status, "failed")
+  assert.equal(delivered.length, 0)
+  assert.equal(endpointOf(ana.userId), undefined)
+  const next = await transport.startPairing()
+  assert.equal(next.count, 3)
+  await send("/pair", { method: "POST", body: { code: next.code, inbox: "Codex" }, origin: null })
+  assert.equal((await transport.allow(next.code, next.selection)).status, "sent")
+  assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, added.id].toSorted())
+  assert.equal((await transport.status()).count, 0)
+  state.who = bob
+  assert.equal((await transport.status()).count, 3)
+})
+
+test("retrying failed setup or Allow never sends to the publishing endpoint", async () => {
+  const { doc } = await reviewed()
+  const [, publishing] = await realWebhooks.createMemberEndpoint({
+    owner: ana.userId,
+    name: "Publishing thread",
+    address: "thread-p",
+    kind: "inbox",
+    agent: "t3",
+  })
+  state.who = ana
+  const transport = transportFor(doc.id)
+  let pairCode
+  const client = createCommentSend(
+    {
+      ...transport,
+      startPairing: async () => {
+        const pairing = await transport.startPairing()
+        pairCode = pairing.code
+        return pairing
+      },
+    },
+    { pairingInterval: 5 },
+  )
+  try {
+    await client.refresh()
+    await client.pairAnother(() => Promise.reject(new Error("clipboard denied")))
+    assert.equal(client.state.status, "failed")
+    await client.send(() => Promise.resolve(true))
+    assert.equal(client.state.status, "pairing")
+    assert.equal(delivered.length, 0)
+
+    const confirmed = new Promise((resolve) => {
+      const off = client.onChange(() => {
+        if (client.state.status !== "confirm") return
+        off()
+        resolve()
+      })
+    })
+    await send("/pair", { method: "POST", body: { code: pairCode, inbox: "Codex" }, origin: null })
+    await confirmed
+    rejectDelivery = true
+    await client.allow()
+    assert.equal(client.state.status, "failed")
+    assert.equal(delivered.length, 1)
+    assert.notEqual(delivered[0].endpoint, publishing.id)
+    await client.send()
+    assert.equal(client.state.status, "idle")
+    assert.equal(delivered.length, 1)
+  } finally {
+    client.start()()
+  }
+}, 3000)
+
+test("an admin's revision does not forward the owner's handoff to the admin", async () => {
+  const { doc } = await reviewed()
+  state.who = agentOf({ ...bob, role: "admin" })
+  const next = await call(publish, {
+    previous: doc.id,
+    base: 1,
+    markdown: "# Revised plan",
+    note: "Admin revision",
+    agent: { session: { harness: "T3 Code", thread: "thread-admin" } },
+  })
+  assert.equal(next.structuredContent?.version, 2, next.message)
+  const id = await pairAndSend(doc)
+  assert.deepEqual(delivered[0].body.data, { drop: doc.id, version: 2, base: 2, session: null })
+  state.who = agentOf(ana)
+  assert.doesNotMatch((await call(readDrop, { handoff: id })).content[0].text, /hand this handoff's id/)
+})
+
+test("Send authorizes a busy drop once per request", async () => {
+  const { doc } = await reviewed()
+  for (let index = 0; index < 53; index++) await comment(doc.id, ana, `Question ${index}?`)
+  state.who = ana
+  queries.length = 0
+  assert.equal((await transportFor(doc.id).status()).count, 55)
+  assert.ok(queries.filter(({ query }) => query.includes('from "drops"')).length <= 4)
+})
+
+test("Disconnect all removes both approved T3 destinations, including the older publishing thread", async () => {
+  const { doc } = await reviewed()
+  const transport = transportFor(doc.id)
+  const publishing = "t3-thread://v2/laptop/publishing"
+  state.who = agentOf(ana)
+  assert.equal(
+    (
+      await call(publish, {
+        previous: doc.id,
+        base: 1,
+        markdown: "# New plan",
+        note: "Second draft",
+        agent: { session: { harness: "T3 Code", thread: publishing } },
+      })
+    ).structuredContent?.version,
+    2,
+  )
+  state.who = ana
+  const pairThread = async (thread) => {
+    const { code, selection } = await transport.startPairing()
+    vi.stubGlobal("navigator", { userAgent: "Cloudflare-Workers" })
+    try {
+      assert.equal(
+        (
+          await send("/pair", {
+            method: "POST",
+            body: { code, thread, url: "https://relay.t3.codes/hook" },
+            origin: null,
+          })
+        ).status,
+        200,
+      )
+      assert.equal((await transport.allow(code, selection)).thread, thread)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+  await pairThread(publishing)
+  await comment(doc.id, ana, "A question for another agent.")
+  await pairThread("t3-thread://v2/laptop/newer")
+  await comment(doc.id, ana, "A question for the publishing agent.")
+  assert.equal((await transport.send()).thread, publishing)
+  assert.equal(delivered[2].endpoint, delivered[0].endpoint)
+  await disconnect(new H3Event(new Request("https://drop.example/api/send/endpoint", { method: "DELETE" })))
+  await comment(doc.id, ana, "A question after disconnecting.")
+  assert.equal((await transport.status()).agent, undefined)
+  assert.equal((await transport.send()).status, "failed")
+  assert.equal(delivered.length, 3)
+})
+
+test("a live-site screenshot keeps its own feedback and does not Send the parent site's threads", async () => {
+  const { doc: site } = await reviewed()
+  const { doc: shot } = await reviewed()
+  sql.prepare("UPDATE drops SET kind = 'site' WHERE id = ?").run(site.id)
+  sql.prepare("UPDATE drops SET kind = 'image', parent_id = ? WHERE id = ?").run(site.id, shot.id)
+  await comment(shot.id, ana, "Only this screenshot.")
+  const row = await findDrop(shot.id)
+  assert.equal((await dropDetail(row, ana, "https://drop.example")).siteScreenshot, true)
+  const page = `?page=${encodeURIComponent(`/d/${shot.id}`)}`
+  state.who = { ...ana, role: "admin" }
+  assert.deepEqual((await send(`/status${page}`)).body.data, { count: 0 })
+  assert.equal((await send(page, { method: "POST" })).status, 403)
+  assert.equal(delivered.length, 0)
 })
 
 test("Allow keeps the member's verified email with their endpoint, so their Console account may redeliver; an unverified one stays off", async () => {
@@ -252,11 +436,11 @@ test("Allow keeps the member's verified email with their endpoint, so their Cons
   const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
   const allow = async (person) => {
     state.who = person
-    const { code } = (await send(`/start${page}`, { method: "POST" })).body.data
+    const { code, selection } = (await send(`/start${page}`, { method: "POST" })).body.data
     state.who = null
     await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
     state.who = person
-    return (await send(`/allow${page}`, { method: "POST", body: { code } })).status
+    return (await send(`/allow${page}`, { method: "POST", body: { code, selection } })).status
   }
   assert.equal(await allow(verified), 200)
   assert.equal(endpointOf("owner").owner_email, "owner@example.com")
@@ -295,6 +479,6 @@ test("Send stays off the ViteHub toolbar's page threads and off pages that aren'
     new Request(`https://drop.example/_vitehub/comments/session?page=${encodeURIComponent(`/d/${doc.id}`)}`),
   )
   assert.deepEqual((await session.json()).data.subject, { kind: "page", id: `/d/${doc.id}` })
-  // Send on a page that isn't a drop's is about that page, where only admins write.
+  // Send doesn't use ordinary toolbar pages as subjects.
   assert.equal((await send(`/status?page=${encodeURIComponent("/drops")}`)).body.data.count, 0)
 })

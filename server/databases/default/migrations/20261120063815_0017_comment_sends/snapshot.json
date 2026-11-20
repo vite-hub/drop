@@ -1026,6 +1026,16 @@
     },
     {
       "table": "drops",
+      "name": "session_publisher_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drops",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
