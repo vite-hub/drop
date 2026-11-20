@@ -90,6 +90,10 @@ const MASKS = Object.fromEntries(
   ]),
 )
 
+// A site icon that doesn't load (a sign-in proxy in front of Drop's /api/favicons/, a host that's down) shows the link
+// icon the server falls back to (server/utils/favicons.ts) instead of an empty space before the words.
+const LINK_ICON = `data:image/svg+xml,${encodeURIComponent(svg(ICONS.link).replace("currentColor", "#737373"))}`
+
 // The menu and the folder list are popovers in the top layer, placed on their button by CSS anchor positioning: they
 // open with the header's motion (140 ms, from .98), and Escape, a click elsewhere, and focus going back are the
 // browser's.
@@ -176,7 +180,7 @@ const LINKS_SHOWN = 6
 export const DOC_HEADER_SCRIPT = String.raw`(() => {
   const box = document.querySelector("article > dl.cfm");
   if (!box) return;
-  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
+  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, LINK_ICON = ${JSON.stringify(LINK_ICON)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
   const style = document.createElement("style");
   style.textContent = ${JSON.stringify(CSS)};
   document.head.appendChild(style);
@@ -192,6 +196,15 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     a.dataset.dropAdded = "";
     return a;
   }
+
+  // A chip's icon that fails takes the link icon; an agent's logo that fails goes, leaving its name. Images that
+  // failed before this script ran are caught up at once.
+  function brokenImage(img) {
+    if (img.matches("img.cp-img") && img.src !== LINK_ICON) img.src = LINK_ICON;
+    else if (img.matches(".drop-who img")) img.remove();
+  }
+  document.addEventListener("error", (e) => { if (e.target instanceof HTMLImageElement) brokenImage(e.target); }, true);
+  document.querySelectorAll("img.cp-img").forEach((img) => { if (img.complete && !img.naturalWidth) brokenImage(img); });
 
   const rows = () => Array.from(box.children).filter((child) => child.localName === "div");
   const actions = el("drop-doc-actions", { hidden: true });

@@ -42,7 +42,7 @@ const HEADER = {
       id: "abc123",
       title: "Before and after",
       href: "https://drop.test/drops/abc123",
-      icon: "https://drop.test/favicon.ico",
+      icon: "https://drop.test/icon.png",
     },
   ],
 }
@@ -64,7 +64,16 @@ const FOLDER = {
   ],
 }
 
-async function open(browser, resources = [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }]) {
+// A 1×1 PNG for the site icons and logos Drop serves (Playwright never routes /favicon.ico, so related drops use /icon.png here), unless a test sends them to a sign-in page as a proxy would.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+)
+
+async function open(
+  browser,
+  { resources = [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }], signIn = false } = {},
+) {
   const source = "---\nstatus: Ready\n---\n\n# Plan\n\nLaunch on November 18.\n"
   const { html } = await renderMarkdownCached("doc-header.md", async () => source)
   const body = await withDocProperties(html, {
@@ -79,6 +88,10 @@ async function open(browser, resources = [{ url: "https://github.com/acme/app/pu
   const page = await context.newPage()
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
+    if (url.hostname === "drop.test" && /^\/(api\/favicons|agents)\/|^\/icon\.png$/.test(url.pathname))
+      return signIn
+        ? route.fulfill({ status: 302, headers: { location: "https://drop.test/oauth2/start" } })
+        : route.fulfill({ contentType: "image/png", body: PNG })
     if (url.hostname !== "drop.test" || url.pathname !== "/") return route.abort()
     return route.fulfill({
       contentType: "text/html; charset=utf-8",
@@ -109,7 +122,7 @@ test(
         await frame
           .locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
           .evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src"))),
-        ["/api/favicons/github.com", "https://drop.test/favicon.ico"],
+        ["/api/favicons/github.com", "https://drop.test/icon.png"],
       )
       assert.equal((await frame.locator('dl.cfm > div[data-key="links"] > dt').innerText()).trim(), "Links")
       // Related drops join the Links row after the doc's own links; their links stay in their own drops.
@@ -246,7 +259,7 @@ test("a long Links row shows its first links and opens the rest behind N more", 
       url: `https://github.com/acme/app/pull/${i + 1}`,
       title: `PR #${i + 1}`,
     }))
-    const { page, frame } = await open(browser, own)
+    const { page, frame } = await open(browser, { resources: own })
     const chips = frame.locator('dl.cfm > div[data-key="links"] dd a.cp')
     const visible = () => chips.evaluateAll((all) => all.filter((a) => a.checkVisibility()).map((a) => a.textContent))
     assert.equal(await frame.locator(".drop-links-toggle").count(), 0, "six links fit")
@@ -255,7 +268,7 @@ test("a long Links row shows its first links and opens the rest behind N more", 
       id: `rel00${i}`,
       title: `Related ${i + 1}`,
       href: `https://drop.test/drops/rel00${i}`,
-      icon: "https://drop.test/favicon.ico",
+      icon: "https://drop.test/icon.png",
     }))
     await page.evaluate((header) => window.tell(header), { ...HEADER, related })
     const toggle = frame.locator(".drop-links-toggle")
@@ -289,6 +302,27 @@ test("a long Links row shows its first links and opens the rest behind N more", 
     // Paper gets every link.
     await page.emulateMedia({ media: "print" })
     assert.equal((await visible()).length, 10)
+  } finally {
+    await browser.close()
+  }
+})
+
+// Quiver's oauth2-proxy answered /api/favicons/ with its sign-in page, and every chip lost its icon to an empty space.
+test("a site icon that doesn't load shows the link icon", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, { signIn: true })
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const icons = frame.locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
+    await frame.waitForFunction(() =>
+      Array.from(document.querySelectorAll("img.cp-img")).every((img) => img.src.startsWith("data:")),
+    )
+    assert.ok((await icons.evaluateAll((all) => all.map((img) => img.naturalWidth))).every((w) => w > 0))
+    // The agent's logo, also blocked, goes; its name stays.
+    await frame.getByRole("button", { name: "See more" }).click()
+    const who = frame.locator(".drop-who")
+    await frame.waitForFunction(() => !document.querySelector(".drop-who .drop-logo"))
+    assert.match(await who.innerText(), /Claude Code/)
   } finally {
     await browser.close()
   }
