@@ -5,7 +5,6 @@ import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/clien
 import { createEventHook, createInjectionState, useEventListener } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
-import { fileUrls } from "../../app/utils/comment-outbox.ts"
 
 // useDrop's sends go through the app's outbox (useCommentsOutbox, on ViteHub's): they return at once, show as waiting,
 // and reach Drop's routes once, from whatever page the reader is on by then.
@@ -62,6 +61,10 @@ for (const [name, value] of Object.entries({
   },
 }))
   vi.stubGlobal(name, value)
+// Nuxt auto-imports the outbox's utils, which read toThread as they load.
+const outboxUtils = await import("../../app/utils/comment-outbox.ts")
+for (const [name, value] of Object.entries(outboxUtils)) vi.stubGlobal(name, value)
+const { fileUrls } = outboxUtils
 // The outbox listens for online and visible pages.
 vi.stubGlobal("window", new EventTarget())
 vi.stubGlobal("document", Object.assign(new EventTarget(), { visibilityState: "visible" }))

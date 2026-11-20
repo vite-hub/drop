@@ -4,7 +4,6 @@
 // the message above it until the reader discards them. Retry, Edit and Discard act on the app's outbox
 // (useCommentsOutbox), which holds them; the parts' own outbox is the viewer's local copy, which has none.
 import type { CommentDelivery, CommentMessage } from "vite-hub/comments/client"
-import { deliveryLine, WAITING_NOTICE_MS } from "~/utils/comment-delivery"
 
 // compact: the line alone, for a list row, which opens the thread where the actions are.
 const props = defineProps<{ message: CommentMessage; delivery: CommentDelivery; compact?: boolean }>()

@@ -2,17 +2,7 @@ import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
 import * as v from "valibot"
 import { replyMessageId } from "vite-hub/comments/client"
-import {
-  type CommentPlace,
-  fileKeys,
-  fileUrls,
-  randomId,
-  replyKey,
-  type SiteCommentPlace,
-  targetMetadata,
-  waitingReplies,
-  withOutbox,
-} from "../utils/comment-outbox"
+import type { CommentPlace, SiteCommentPlace } from "../utils/comment-outbox"
 
 /** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }

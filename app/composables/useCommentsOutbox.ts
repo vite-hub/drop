@@ -10,7 +10,6 @@ import {
 } from "vite-hub/comments/client"
 import type { CommentReply, DropComment } from "#shared/types"
 import * as v from "valibot"
-import { dropOf, dropTransport, GUEST_ACCOUNT, statusOf } from "../utils/comment-outbox"
 
 /** A drop page that shows its comments as they land. A drop without one only loads its list again. */
 interface OutboxPage {
@@ -165,7 +164,13 @@ export function createCommentsOutbox(
   outbox.discard = async (id) => (await client.value?.outbox.dismiss(id)) || refused(id, () => undefined)
   outbox.edit = async (id, body, mentions) =>
     (await client.value?.outbox.edit(id, body, mentions)) ||
-    refused(id, (entry) => ({ ...entry, input: { ...entry.input, body, ...(mentions ? { mentions } : {}) } }))
+    refused(id, (entry) => {
+      const words = { body, ...(mentions ? { mentions } : {}) }
+      // Each kind apart, so the entry keeps its own input type.
+      return entry.kind === "create"
+        ? { ...entry, input: { ...entry.input, ...words } }
+        : { ...entry, input: { ...entry.input, ...words } }
+    })
 
   // Who's signed in is known once /api/me first answers; until then nothing goes out as a guest by mistake.
   const known = ref(false)

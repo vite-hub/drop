@@ -2,7 +2,6 @@ import type { CommentDelivery, CommentsOutboxEntry, CommentsTransport, CommentTh
 import type { CommentInput } from "#shared/schemas"
 import type { CommentAttachment, CommentReply, DropComment } from "#shared/types"
 import * as v from "valibot"
-import { toThread } from "./comment-threads"
 
 // Drop's comments through ViteHub's outbox (`createCommentsClient({ outbox })`): a new comment or reply is saved in the
 // browser with its images, shows at once as the reader's, and goes to Drop's own routes once, with its `requestId`.

@@ -8,7 +8,6 @@ import {
 import { type CommentCan, useComments } from "vite-hub/ui/headless"
 import type { DropComment } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
-import { LOCAL_ATTACHMENT } from "../utils/comment-outbox"
 
 /** What a viewer action sent, or its failure as the error the comment parts show under the box. */
 async function settled<T>(sent: Promise<Sent<T>>) {
