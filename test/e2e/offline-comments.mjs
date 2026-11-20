@@ -268,10 +268,15 @@ async function pageComment(page, body) {
   await box.press("Enter")
   await page.waitForTimeout(300)
 }
+/** Opens a comment's thread: beside its pin, or in the dock for a comment on the whole page. */
 async function openThread(page, body) {
   await showList(page)
   await item(page, body).getByRole("button").first().click()
-  await page.getByRole("dialog", { name: "Comment thread" }).waitFor()
+  await page
+    .getByRole("dialog", { name: "Comment thread" })
+    .or(page.locator("[data-slot='comment-thread']"))
+    .first()
+    .waitFor()
 }
 async function reply(page, to, body) {
   await openThread(page, to)
@@ -357,6 +362,15 @@ function saved(page) {
 }
 const entriesWith = async (page, body) => (await saved(page)).filter((record) => record.text.includes(body))
 const shot = (page, name) => page.screenshot({ path: `${shots}${name}.png` })
+/** Whether it shows within a few seconds: what follows a clock or an open thread isn't there the instant after. */
+const appears = (locator, timeout = 5000) =>
+  locator
+    .first()
+    .waitFor({ timeout })
+    .then(
+      () => true,
+      () => false,
+    )
 
 const PIN = "Pin: the second paragraph needs a source"
 const AREA = "Area: this part reads oddly"
@@ -405,14 +419,8 @@ await step("1. Offline write: five show at once as waiting, the dock says 5 wait
   check(pasted?.startsWith("blob:"), `the waiting area's thread shows the pasted image from the browser (${pasted})`)
   if (pasted) check(await loads(page, pasted), "the pasted image loads")
   check((await page.getByText("Waiting to send").count()) > 0, 'a "Waiting to send" line shows')
-  check(
-    await page
-      .getByText(/\b5 waiting\b/)
-      .first()
-      .isVisible()
-      .catch(() => false),
-    'the dock says "5 waiting"',
-  )
+  // The dock counts one once its quiet start is over, which the reply's may not be yet.
+  check(await appears(page.getByText(/\b5 waiting\b/)), 'the dock says "5 waiting"')
   check(landedPosts().length === 0, `no POST landed (${landedPosts().length} did)`)
   const server = await held(owner, drop)
   check(server.comments.length === 0, `the server holds no comment (${server.comments.length})`)
@@ -438,14 +446,7 @@ await step("2. Reload: all five come back, the image too", async (check) => {
       `"${body}" shows after reload`,
     )
   await openThread(page, PIN).catch(() => undefined)
-  check(
-    await page
-      .getByText(REPLY)
-      .first()
-      .isVisible()
-      .catch(() => false),
-    "the reply shows after reload",
-  )
+  check(await appears(page.getByText(REPLY)), "the reply shows after reload")
   await showList(page)
   const areaEntry = await entriesWith(page, AREA)
   check(
@@ -459,14 +460,7 @@ await step("2. Reload: all five come back, the image too", async (check) => {
   const pasted = await threadImage(page, AREA, "pasted.png")
   check(Boolean(pasted?.startsWith("blob:") && (await loads(page, pasted))), "the area's thread still shows its image")
   stale.push(...[thumb, pasted].filter(Boolean))
-  check(
-    await page
-      .getByText(/\b5 waiting\b/)
-      .first()
-      .isVisible()
-      .catch(() => false),
-    'the dock still says "5 waiting"',
-  )
+  check(await appears(page.getByText(/\b5 waiting\b/)), 'the dock still says "5 waiting"')
   await shot(page, "2-reload")
 })
 
@@ -696,13 +690,11 @@ await step("5b. Refused with 400: Edit, resend, it lands", async (check) => {
     await box.fill(FIXED)
     await box.press("Enter")
     const resend = page.getByRole("button", { name: /^(Retry|Resend|Send)/ })
-    if (
-      await resend
-        .first()
-        .isVisible()
-        .catch(() => false)
-    )
-      await resend.first().click()
+    // Enter sends it; the form's Send does the same where Enter didn't, and is gone once it did.
+    await resend
+      .first()
+      .click({ timeout: 1000 })
+      .catch(() => undefined)
     const landed = await until(
       async () => (await held(owner, drop)).bodies.includes(FIXED),
       30_000,
@@ -842,11 +834,13 @@ await step("8. A guest writes offline, then signs in: it lands once, as them", a
   check(Boolean(kept?.text.includes('"account":"guest"')), "the outbox keeps it as the guest's")
   await shot(tab, "8-guest-offline")
 
-  // The guest signs up and comes back to the drop, as the sign-in page returns them; the network is back meanwhile.
+  // The guest signs up and comes back to the drop, as the sign-in page returns them; the network is back once they're
+  // there. Back any earlier, the page they leave may send it as the reload starts, and its answer comes too late for
+  // that page: the server then answers the new page's send with the same comment, which is right but counts two POSTs.
   const name = "Former guest"
   const account = await api(guest, "/api/auth/sign-up/email", { name, email: email("guest"), password })
-  network = "online"
   await tab.reload()
+  network = "online"
   const landed = await until(
     async () => (await held(owner, drop)).comments.find((comment) => comment.body === GUEST),
     WAIT,

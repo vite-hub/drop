@@ -31,13 +31,12 @@ async function save() {
   const body = words.value.trim()
   if (!body) return
   // An edit puts it back in the queue with the new words.
-  if (await app.outbox()?.edit(props.message.id, body, props.message.mentions)) editing.value = false
+  if (await app.edit(props.message.id, body, props.message.mentions)) editing.value = false
   else problem.value = "It's on its way to the server. Try again in a moment."
 }
 const retry = () => app.outbox()?.retry(props.message.id)
 async function discard() {
-  if (!(await app.outbox()?.dismiss(props.message.id)))
-    problem.value = "It's on its way to the server. Try again in a moment."
+  if (!(await app.discard(props.message.id))) problem.value = "It's on its way to the server. Try again in a moment."
 }
 const signIn = computed(() => ({ path: "/signin", query: { redirect: route.fullPath } }))
 </script>

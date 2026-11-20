@@ -255,6 +255,33 @@ test("closing the tab asks while a comment waits, and not once it's gone", { tim
   assert.equal(unload(), false)
 })
 
+test(
+  "a comment refused after a try that got no answer can still be discarded or edited",
+  { timeout: 10_000 },
+  async () => {
+    // The drop went to the Trash while the reader was offline: no answer, then 404.
+    let tries = 0
+    const gone = () => Promise.reject(Object.assign(new Error("You can't comment on this drop."), { status: 404 }))
+    answer = () => (++tries === 1 ? offline() : gone())
+    const { state } = open()
+    await state.addComment(place, "First")
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.status, "failed"), { timeout: 5_000 })
+    const [first] = app.entries.value
+    assert.equal(first.uncertain, true, "ViteHub can't tell whether the first try landed")
+
+    assert.equal(await app.edit(first.id, "First, shorter"), true)
+    await vi.waitFor(() => assert.equal(fetches.at(-1).body.body, "First, shorter"), { timeout: 5_000 })
+    assert.equal(fetches.at(-1).body.requestId, first.requestId, "the edit keeps the retry key")
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.status, "failed"), { timeout: 5_000 })
+
+    const sends = fetches.length
+    assert.equal(await app.discard(first.id), true)
+    assert.equal(app.entries.value.length, 0)
+    assert.deepEqual(state.list.value, [])
+    assert.equal(fetches.length, sends, "a discarded comment isn't sent again")
+  },
+)
+
 test("signing out with an unsent comment asks, stays on no, and discards it on yes", async () => {
   answer = offline
   const { state } = open()

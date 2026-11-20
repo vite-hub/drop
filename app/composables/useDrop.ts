@@ -175,7 +175,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   }
   /** Takes a waiting comment or reply out of the outbox, unless it's already on its way. */
   async function discard(messageId: string, title: string) {
-    if (await outbox().outbox.dismiss(messageId)) return
+    if (await app.discard(messageId)) return
     notify.alert(title, "It's on its way to the server. Delete it once it's there.")
   }
 
@@ -242,7 +242,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   ): Promise<Sent<CommentReply>> {
     // Waiting words change in the outbox and go out as edited.
     if (waiting(commentId, messageId)) {
-      if (!(await outbox().outbox.edit(messageId, body, mentions)))
+      if (!(await app.edit(messageId, body, mentions)))
         return { error: "It's on its way to the server. Edit it once it's there." }
       const comment = findComment(commentId)
       const edited = comment?.replies.find((reply) => reply.id === messageId) ?? comment

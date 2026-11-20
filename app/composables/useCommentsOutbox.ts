@@ -36,6 +36,10 @@ export interface AppCommentsOutbox {
   /** The client that saves new comments and replies, once the browser started it. */
   client: () => Client | undefined
   outbox: () => CommentsOutbox | undefined
+  /** Takes a waiting or refused comment or reply out, with the replies that wait on it. `false` while it's going out. */
+  discard: (id: string) => Promise<boolean>
+  /** Changes a waiting or refused one's words and sends it again. `false` while it's going out. */
+  edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
   /** Shows the page's drop's comments as they land, until the page's scope ends. */
   attach: (page: OutboxPage) => void
   /** Discards every entry of the account and forgets whose they were, as at sign-out. */
@@ -116,6 +120,8 @@ export function createCommentsOutbox(
     accepted,
     client: () => client.value,
     outbox: () => client.value?.outbox,
+    discard: async () => false,
+    edit: async () => false,
     attach(page) {
       pages.add(page)
       onScopeDispose(() => pages.delete(page))
@@ -133,6 +139,33 @@ export function createCommentsOutbox(
   // One store for every account, so a person's entries are still there when they sign in again in this page.
   const store = options.store ?? createIndexedDBOutboxStore()
   const pageOf = (drop: string | undefined) => [...pages].find((page) => page.drop() === drop)
+
+  // ViteHub's outbox won't dismiss or edit an entry whose earlier try got no answer, since the server may hold it. Once
+  // the server refuses it, that leaves the reader nothing but sending it again, so a refused one changes in the store
+  // instead. It keeps its retry key: should the server hold the first try after all, the resend answers that comment.
+  const refused = async (id: string, change: (entry: CommentsOutboxEntry) => CommentsOutboxEntry | undefined) => {
+    const lib = client.value?.outbox
+    if (!lib) return false
+    const changed = await store.update(outbox.account.value, (drafts) => {
+      const entry = drafts.get(id)
+      if (entry?.status !== "failed") return false
+      const next = change(entry)
+      if (next) drafts.set(id, next)
+      else {
+        for (const reply of drafts.values())
+          if (reply.kind === "reply" && reply.input.threadId === id) drafts.delete(reply.id)
+        drafts.delete(id)
+      }
+      return true
+    })
+    // Reads the store again and tells the other tabs; a changed entry goes back in the queue.
+    if (changed) await lib.retry(id)
+    return changed
+  }
+  outbox.discard = async (id) => (await client.value?.outbox.dismiss(id)) || refused(id, () => undefined)
+  outbox.edit = async (id, body, mentions) =>
+    (await client.value?.outbox.edit(id, body, mentions)) ||
+    refused(id, (entry) => ({ ...entry, input: { ...entry.input, body, ...(mentions ? { mentions } : {}) } }))
 
   // Who's signed in is known once /api/me first answers; until then nothing goes out as a guest by mistake.
   const known = ref(false)
