@@ -282,7 +282,10 @@ test("a long Links row shows its first links and opens the rest behind N more", 
     assert.equal(await toggle.getAttribute("aria-expanded"), "false")
     const folded = await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)
 
-    await toggle.click()
+    await toggle.focus()
+    await page.keyboard.press("Enter")
+    await page.keyboard.press("Tab")
+    assert.equal(await frame.evaluate(() => document.activeElement.textContent), "Related 1")
     assert.equal((await visible()).length, 11)
     assert.equal(await toggle.innerText(), "Show less")
     assert.equal(await toggle.getAttribute("aria-label"), "Show fewer links")
@@ -302,6 +305,71 @@ test("a long Links row shows its first links and opens the rest behind N more", 
     // Paper gets every link.
     await page.emulateMedia({ media: "print" })
     assert.equal((await visible()).length, 10)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("comments on folded links have a pin by the disclosure", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `Resource ${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.evaluate((header) => {
+      window.tell(header)
+      window.tell({
+        type: "markers",
+        markers: [{ id: "c1", kind: "text", selector: 'dl.cfm div[data-key="links"] dd', quote: "Resource 7", n: 1 }],
+      })
+    }, HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    const pin = frame.locator('drop-comments [data-slot="comment-mark-pin"][data-id="c1"]')
+    const foldedPin = pin.and(frame.locator(".away"))
+    const expandedPin = pin.and(frame.locator(":not(.away)"))
+    await foldedPin.waitFor()
+    await page.evaluate(() => window.tell({ type: "focus", id: "c1", open: true }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "marker" && m.id === "c1" && m.focused))
+
+    await toggle.click()
+    await expandedPin.waitFor()
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    await foldedPin.waitFor()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("reopening Links mid-collapse animates to the expanded height", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `A long resource label ${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    await toggle.click()
+    const row = frame.locator('dl.cfm > div[data-key="links"] > dd')
+    await frame.waitForFunction(
+      () => !document.querySelector('dl.cfm > div[data-key="links"] > dd').getAnimations().length,
+    )
+    const { target, expanded } = await row.evaluate((dd) => {
+      const button = dd.querySelector(".drop-links-toggle")
+      const expanded = dd.offsetHeight
+      button.click()
+      const [collapse] = dd.getAnimations()
+      collapse.pause()
+      collapse.currentTime = 120
+      button.click()
+      const [reopen] = dd.getAnimations()
+      return { target: reopen?.effect.getKeyframes().at(-1).height, expanded }
+    })
+    assert.equal(target, `${expanded}px`)
   } finally {
     await browser.close()
   }

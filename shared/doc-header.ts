@@ -440,15 +440,19 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
   // A long Links row: its first LINKS_SHOWN chips, the doc's own ahead of related drops, then "N more", which opens the
   // rest. The row grows to its new height and the chips it reveals fade in; it stays open when the related drops change.
   let linksOpen = false;
+  const linksMotion = [];
+  const stopLinksMotion = () => { for (const animation of linksMotion.splice(0)) animation.cancel(); };
+  const linksLayout = () => box.dispatchEvent(new Event("drop-links-layout", { bubbles: true }));
   const ease = "cubic-bezier(.23,1,.32,1)";
   function foldLinks() {
+    stopLinksMotion();
     box.querySelectorAll(".drop-links-toggle").forEach((node) => node.remove());
     const dd = box.querySelector(':scope > div[data-key="links"] > dd');
-    if (!dd) return;
+    if (!dd) return linksLayout();
     const chips = Array.from(dd.querySelectorAll("a.cp"));
     const extra = chips.length > LINKS_ALL ? chips.slice(LINKS_SHOWN) : [];
     for (const a of chips) a.classList.remove("drop-folded");
-    if (!extra.length) return;
+    if (!extra.length) return linksLayout();
     const label = el("span");
     const toggle = el("button", { type: "button", className: "drop-links-toggle" }, label, icon("chevron"));
     const show = () => {
@@ -456,18 +460,20 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
       label.textContent = linksOpen ? "Show less" : extra.length + " more";
       toggle.setAttribute("aria-expanded", String(linksOpen));
       toggle.setAttribute("aria-label", linksOpen ? "Show fewer links" : "Show " + extra.length + " more links");
+      linksLayout();
     };
     toggle.addEventListener("click", () => {
       const from = dd.offsetHeight;
+      stopLinksMotion();
       linksOpen = !linksOpen;
       show();
       place();
       if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       const to = dd.offsetHeight;
-      if (from !== to) dd.animate([{ height: from + "px", overflow: "clip" }, { height: to + "px", overflow: "clip" }], { duration: 240, easing: ease });
-      if (linksOpen) extra.forEach((a, i) => a.animate([{ opacity: 0, transform: "translateY(-2px)" }, { opacity: 1, transform: "none" }], { duration: 180, delay: Math.min(i, 8) * 15, easing: ease, fill: "backwards" }));
+      if (from !== to) linksMotion.push(dd.animate([{ height: from + "px", overflow: "clip" }, { height: to + "px", overflow: "clip" }], { duration: 240, easing: ease }));
+      if (linksOpen) extra.forEach((chip, i) => linksMotion.push(chip.animate([{ opacity: 0, transform: "translateY(-2px)" }, { opacity: 1, transform: "none" }], { duration: 180, delay: Math.min(i, 8) * 15, easing: ease, fill: "backwards" })));
     });
-    dd.append(toggle);
+    extra[0].before(toggle);
     show();
   }
 
