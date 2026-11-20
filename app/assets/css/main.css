@@ -384,7 +384,8 @@ body {
   & .ProseMirror > :first-child {
     margin-block-start: 0;
   }
-  & .ProseMirror .is-empty::before {
+  /* An upload's card sits in the empty line it goes to, over the hint. */
+  & .ProseMirror .is-empty:not(:has(.cue-upload))::before {
     content: attr(data-placeholder);
     float: left;
     height: 0;

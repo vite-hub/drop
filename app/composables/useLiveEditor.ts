@@ -31,6 +31,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const room = shallowRef<LiveRoom>()
   const realtime = computed(() => room.value?.realtime)
   const editor = computed(() => room.value?.editor.value)
+  const uploading = computed(() => room.value?.uploading.value ?? false)
   const editing = computed(() => Boolean(documentId.value))
   const people = computed(() => realtime.value?.people.value ?? [])
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
@@ -188,6 +189,10 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
 
   async function publish(force = false): Promise<void> {
     if (!editing.value || publishing.value) return
+    if (uploading.value) {
+      notify.say("Wait for images to finish uploading before publishing")
+      return
+    }
     publishing.value = true
     try {
       await realtime.value?.save()
@@ -261,6 +266,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     editing,
     opening,
     publishing,
+    uploading,
     people,
     status: computed(() => realtime.value?.status.value ?? "disconnected"),
     synced: computed(() => realtime.value?.synced.value ?? false),

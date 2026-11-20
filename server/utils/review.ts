@@ -481,6 +481,7 @@ export async function createSiteDrop(
       parentId: folder?.id ?? null,
       siteUrl,
       publishToken: null,
+      draftImage: false,
       teamId: null,
       resources: null,
     }
