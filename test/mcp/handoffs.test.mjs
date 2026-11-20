@@ -22,9 +22,8 @@ const delivered = []
 const webhooks = {
   ...realWebhooks,
   sendToMemberEndpoint: async (owner, body, options) => {
-    delivered.push({ owner, body, address: options.address })
-    const [, endpoint] = await realWebhooks.getMemberEndpoint(owner, { address: options.address })
-    return [undefined, { id: `dl_${delivered.length}`, status: endpoint?.kind === "inbox" ? "inbox" : "sent" }]
+    delivered.push({ owner, body, endpoint: options.endpointId })
+    return [undefined, { id: `dl_${delivered.length}`, status: "inbox" }]
   },
 }
 /** The member's newest endpoint, as the table holds it. */
@@ -169,22 +168,28 @@ test("Send carries the drop, the version to build on, and the publishing session
 })
 
 test("the owner's Send goes to the thread that published the drop; a teammate's carries no session and no address", async () => {
+  // The owner paired the publishing thread first, then a newer inbox.
+  const [, publishing] = await realWebhooks.createMemberEndpoint({
+    owner: "owner",
+    name: "T3 Code thread",
+    address: "thread-p",
+    kind: "inbox",
+  })
   const owners = await reviewed()
   await pairAndSend(owners.doc)
-  // Allow sends to the agent it just paired; the next Send asks for the publishing thread.
-  assert.equal(delivered[0].address, undefined)
+  // Allow sends to the agent it just paired; the next Send goes to the publishing thread.
+  assert.notEqual(delivered[0].endpoint, publishing.id)
   await comment(owners.doc.id, ana, "And the date?")
   state.who = ana
   const again = await send(`?page=${encodeURIComponent(`/d/${owners.doc.id}`)}`, { method: "POST", body: {} })
   assert.equal(again.body.data.status, "sent")
-  assert.equal(delivered[1].address, "thread-p")
+  assert.equal(delivered[1].endpoint, publishing.id)
 
   delivered.length = 0
   const { doc } = await reviewed()
   const id = await pairAndSend(doc, bob)
-  const [{ owner, body, address }] = delivered
+  const [{ owner, body }] = delivered
   assert.equal(owner, "bob")
-  assert.equal(address, undefined)
   assert.deepEqual(body.data, { drop: doc.id, version: 1, base: 1, session: null })
 
   state.who = agentOf(bob)
