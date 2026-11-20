@@ -103,6 +103,7 @@
     "shiki": "^4.5.0",
     "stripe": "22.6.2",
     "tailwindcss": "4.3.3",
+    "tldts": "^7.5.4",
     "valibot": "^1.4.2",
     "vite-hub": "https://pkg.pr.new/vite-hub/vitehub/vite-hub@5d766a27b2aad2fd9795734ae35ec2c9011baa7d",
     "vue": "3.5.44",
