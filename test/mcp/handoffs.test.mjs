@@ -286,6 +286,49 @@ test("pairing cannot send a changed selection and the copied prompt describes bo
   assert.equal((await transport.status()).count, 3)
 })
 
+test("the real pill refreshes the batch both before and after pairing", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  state.who = ana
+  const transport = transportFor(doc.id)
+  let code
+  const client = createCommentSend(
+    {
+      ...transport,
+      startPairing: async () => {
+        const pairing = await transport.startPairing()
+        code = pairing.code
+        return pairing
+      },
+    },
+    { pairingInterval: 5 },
+  )
+  try {
+    await client.refresh()
+    await client.send()
+    const third = await comment(doc.id, ana, "Added during pairing.")
+    await client.refresh()
+    assert.equal(client.state.count, 3)
+
+    const confirmed = new Promise((resolve) => {
+      const off = client.onChange(() => {
+        if (client.state.status !== "confirm") return
+        off()
+        resolve()
+      })
+    })
+    await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
+    await confirmed
+    const fourth = await comment(doc.id, ana, "Added during confirmation.")
+    await client.refresh()
+    assert.equal(client.state.count, 4)
+    await client.allow()
+    assert.equal(client.state.status, "sent")
+    assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, third.id, fourth.id].toSorted())
+  } finally {
+    client.start()()
+  }
+}, 3000)
+
 test("retrying failed setup or Allow never sends to the publishing endpoint", async () => {
   const { doc } = await reviewed()
   const [, publishing] = await realWebhooks.createMemberEndpoint({

@@ -100,7 +100,7 @@ Agents read open comments and their threads with `read_drop` or the `address_fee
 
 The agent gets ids and fixed words, never what people wrote, and reads the threads through Drop's MCP as you, with `read_drop` and the send's id. A delivery names the drop and the version to build on. It includes the publishing session only when you own the drop and published the latest version; for teammates or versions with no verified publisher, `session` is `null`. Once your agent answers each of your threads, or publishes a version that resolves them, Send clears.
 
-Signed out, as a guest, where you can't comment, or on an individual live-site screenshot, **Copy prompt** takes its place. It copies the same threads as a prompt for any agent: yours as what you ask, and others' quoted, as context.
+Signed out, as a guest, where you can't comment, or on an individual live-site screenshot, **Copy prompt** in the review toolbar copies every open thread waiting for an answer as a prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 

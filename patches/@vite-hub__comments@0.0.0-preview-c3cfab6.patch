@@ -1,15 +1,17 @@
 diff --git a/dist/client.d.ts b/dist/client.d.ts
+index d9f22c4..7345347 100644
 --- a/dist/client.d.ts
 +++ b/dist/client.d.ts
-@@ -199,6 +199,7 @@
+@@ -199,6 +199,8 @@ interface CommentSendStatus {
    count: number;
    /** The member's agent. Without one, Send pairs an agent first. */
    agent?: CommentSendAgent;
++  selection?: string;
 +  sent?: { id: string; thread?: string; inbox: boolean };
    /** The member's last send, while the agent works on it. `thread` is the URL of the agent's thread. */
    working?: {
      id: string;
-@@ -210,6 +211,8 @@
+@@ -210,6 +212,8 @@ interface CommentSendStatus {
  /** A new setup code. The member pastes `prompt` in the agent's thread, and the agent pairs with `code`. */
  interface CommentSendPairing {
    code: string;
@@ -18,7 +20,7 @@ diff --git a/dist/client.d.ts b/dist/client.d.ts
    /** The setup prompt, with the code in it. */
    prompt: string;
    /** The time in ms when the code stops working. */
-@@ -258,7 +261,7 @@
+@@ -258,7 +262,7 @@ interface CommentSendTransport {
    startPairing: () => Promise<CommentSendPairing>;
    pollPairing: (code: string) => Promise<CommentSendPairingCheck>;
    /** Pairs the agent that used `code` and sends the waiting threads to it. */
@@ -27,7 +29,7 @@ diff --git a/dist/client.d.ts b/dist/client.d.ts
    /** Drops `code`, so no agent can use it. */
    cancel: (code: string) => Promise<void>;
    send: () => Promise<CommentSendResult>;
-@@ -494,4 +497,4 @@
+@@ -494,4 +498,4 @@ export declare function createCommentsClient(options: CommentsClientOptions & {
  };
  export declare function createCommentsClient(options: CommentsClientOptions): CommentsClient;
  //#endregion
@@ -35,9 +37,10 @@ diff --git a/dist/client.d.ts b/dist/client.d.ts
 \ No newline at end of file
 +export { type AnchorPoint, type AnchorPosition, type AnchorRect, type AnchorTarget, type AreaAnchor, type CommentActor, type CommentAnchor, type CommentAttachment, type CommentBuild, type CommentComponent, type CommentContext, type CommentCreateInput, type CommentDeleteInput, type CommentDelivery, type CommentDeliveryError, type CommentEditInput, type CommentEvent, type CommentFiles, type CommentForgeLink, type CommentGetInput, type CommentListCursor, type CommentListQuery, type CommentMessage, type CommentMetadata, type CommentReplyInput, type CommentSendAgent, type CommentSendClient, type CommentSendCopy, type CommentSendEvent, type CommentSendLogo, type CommentSendOptions, type CommentSendPairing, type CommentSendPairingCheck, type CommentSendResult, type CommentSendState, type CommentSendStatus, type CommentSendTransport, type CommentSendTransportOptions, type CommentStatus, type CommentStatusInput, type CommentSubject, type CommentThread, type CommentUploadInput, type CommentUser, type CommentUsersInput, type CommentsGuest, type CommentsOutbox, type CommentsOutboxEntry, type CommentsOutboxEnvironment, type CommentsOutboxMessage, type CommentsOutboxOptions, type CommentsOutboxStore, type CommentsRestAnswer, type CommentsRestRequest, type CommentsTransport, type CreateAnchorOptions, type DetachedAnchor, type ElementAnchor, type ImageAnchor, type PageAnchor, type ResolvedAnchor, type RestCommentThread, type RestTransport, type RestTransportOptions, type TextAnchor, commentsErrorDiagnostics };
 diff --git a/dist/client.js b/dist/client.js
+index e4b098b..e37e510 100644
 --- a/dist/client.js
 +++ b/dist/client.js
-@@ -1141,6 +1141,8 @@
+@@ -1141,10 +1141,13 @@ function createCommentSend(transport, options = {}) {
  	let agent;
  	let count = 0;
  	let code;
@@ -46,7 +49,12 @@ diff --git a/dist/client.js b/dist/client.js
  	let fetching = false;
  	let sendId;
  	let thread;
-@@ -1178,6 +1180,10 @@
+ 	let step = 0;
++	let refreshId = 0;
+ 	let timer;
+ 	let run = 0;
+ 	const notify = () => {
+@@ -1178,6 +1181,10 @@ function createCommentSend(transport, options = {}) {
  		});
  		if (!transport.subscribe) later(statusInterval, () => void refresh().catch(working));
  	};
@@ -57,7 +65,7 @@ diff --git a/dist/client.js b/dist/client.js
  	const limited = (retryAt) => {
  		set({
  			status: "limited",
-@@ -1192,9 +1198,13 @@
+@@ -1192,9 +1199,13 @@ function createCommentSend(transport, options = {}) {
  		if (status.working) {
  			sendId = status.working.id;
  			thread = status.working.thread;
@@ -72,12 +80,25 @@ diff --git a/dist/client.js b/dist/client.js
  		sendId = void 0;
  		thread = void 0;
  		if (status.retryAt !== void 0 && status.retryAt > Date.now()) return limited(status.retryAt);
-@@ -1203,7 +1213,13 @@
+@@ -1202,8 +1213,26 @@ function createCommentSend(transport, options = {}) {
+ 	};
  	const refresh = async () => {
  		const at = step;
++		const waitingCode = code;
++		const id = ++refreshId;
  		const status = await transport.status();
 -		if (at !== step || state.status === "pairing" || state.status === "confirm" || state.status === "sending") return;
-+		if (at !== step || state.status === "pairing" || state.status === "confirm" || state.status === "sending") return;
++		if (state.status === "pairing" || state.status === "confirm") {
++			if (!waitingCode || waitingCode !== code || id !== refreshId || (status.count && !status.selection)) return;
++			selection = status.selection;
++			count = status.count;
++			if (count !== state.count) {
++				state = { ...state, count };
++				notify();
++			}
++			return;
++		}
++		if (at !== step || state.status === "sending") return;
 +		if (state.status === "failed") {
 +			if (retry !== "send") return;
 +			count = status.count;
@@ -87,7 +108,7 @@ diff --git a/dist/client.js b/dist/client.js
  		apply(status);
  	};
  	const settle = (result, paired) => {
-@@ -1222,7 +1238,9 @@
+@@ -1222,7 +1251,9 @@ function createCommentSend(transport, options = {}) {
  			count,
  			inbox: inbox()
  		});
@@ -98,7 +119,7 @@ diff --git a/dist/client.js b/dist/client.js
  	};
  	const deliver = async (request, paired) => {
  		set({
-@@ -1267,9 +1285,19 @@
+@@ -1267,9 +1298,19 @@ function createCommentSend(transport, options = {}) {
  	const pair = async (copy) => {
  		if (fetching) return;
  		fetching = true;
@@ -119,7 +140,7 @@ diff --git a/dist/client.js b/dist/client.js
  		try {
  			const next = await pairing;
  			const ok = await copied;
-@@ -1284,6 +1312,8 @@
+@@ -1284,6 +1325,8 @@ function createCommentSend(transport, options = {}) {
  			}
  			if (code) drop(code);
  			code = next.code;
@@ -128,7 +149,7 @@ diff --git a/dist/client.js b/dist/client.js
  			set({
  				status: "pairing",
  				count,
-@@ -1330,7 +1360,7 @@
+@@ -1330,7 +1373,7 @@ function createCommentSend(transport, options = {}) {
  				if (event.type === "working") {
  					sendId = event.id;
  					thread = event.thread;
@@ -137,7 +158,7 @@ diff --git a/dist/client.js b/dist/client.js
  					return;
  				}
  				if (event.id === sendId && (state.status === "working" || state.status === "sent")) refresh().catch(working);
-@@ -1350,7 +1380,14 @@
+@@ -1350,8 +1393,15 @@ function createCommentSend(transport, options = {}) {
  			if (fetching) return;
  			if (state.status !== "idle" && state.status !== "failed" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
@@ -147,13 +168,14 @@ diff --git a/dist/client.js b/dist/client.js
 +				return refresh().catch(() => void 0);
 +			}
  			if (!agent) return pair(copy);
-+			retry = "send";
 -			return deliver(() => transport.send());
++			retry = "send";
 +			await deliver(() => transport.send());
 +			if (state.status === "failed") await refresh().catch(() => void 0);
  		},
  		async pairAnother(copy) {
-@@ -1361,7 +1398,9 @@
+ 			if (state.status !== "idle" || !state.canPairAnother) return;
+@@ -1361,7 +1411,9 @@ function createCommentSend(transport, options = {}) {
  			if (state.status !== "confirm" || !code) return;
  			const used = code;
  			code = void 0;
@@ -164,7 +186,7 @@ diff --git a/dist/client.js b/dist/client.js
  		},
  		async copyAgain(copy) {
  			if (state.status !== "pairing" || !state.reason) return;
-@@ -1545,7 +1584,7 @@
+@@ -1545,7 +1597,7 @@ function createCommentSendTransport(options = {}) {
  		status: async () => (await request(`/send/status?page=${page()}`)).data,
  		startPairing: async () => (await request(`/send/start?page=${page()}`, post())).data,
  		pollPairing: async (value) => (await request(`/send/pair/${code(value)}`)).data,
@@ -174,9 +196,10 @@ diff --git a/dist/client.js b/dist/client.js
  			await request(`/send/pair/${code(value)}`, { method: "DELETE" });
  		},
 diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
+index efafb6b..f30698f 100644
 --- a/dist/install-CmFDZSMH.js
 +++ b/dist/install-CmFDZSMH.js
-@@ -1174,7 +1174,7 @@
+@@ -1174,7 +1174,7 @@ function createCommentSendStore(db, options = {}) {
  			const [row] = await db.select().from(sends).where(and(eq(sends.member, member), eq(sends.key, key), inArray(sends.state, [...states]))).orderBy(desc(sends.createdAt)).limit(1);
  			return row;
  		}),
@@ -185,7 +208,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  			"sent",
  			"working",
  			"done"
-@@ -1291,7 +1291,11 @@
+@@ -1291,7 +1291,11 @@ function commentSendPrompt(input) {
  		dedupe: { replayKey: "{{headers.x-vitehub-delivery}}" }
  	};
  	return [
@@ -198,7 +221,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  		`First call the T3 tool schedule_task with the title ${JSON.stringify(`Comments from ${host}`)}, the prompt ${JSON.stringify(taskPrompt(input.origin, input.grant))}, the schedule ${JSON.stringify(schedule)}, bindToCurrentThread set to true, and freshSession set to true.`,
  		"Then call the T3 tool t3_thread_read with the threadId in the T3CODE_THREAD_ID environment variable. Its link holds the URL of this thread, of the form t3-thread://v2/<environmentId>/<threadId>.",
  		`Post the webhookUrl that schedule_task returns and that thread URL, with this command: curl -sS -X POST ${input.pairUrl} -H 'content-type: application/json' -d '{"code":"${input.code}","url":"<webhookUrl>","thread":"<thread URL>"}'`,
-@@ -1343,19 +1347,30 @@
+@@ -1343,19 +1347,31 @@ function createCommentSendService(options) {
  		return threads.filter((_, index) => allowed[index]);
  	}
  	/** When each thread of the subject last reached an agent. */
@@ -223,17 +246,18 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
 +			waiting: open.filter((thread) => commentThreadWaits(thread) && !sent.get(thread.id)?.has(lastOf(thread).id))
  		};
  	}
-+	const selectionOf = async (caller, user) => {
-+		const threads = (await waiting(caller, user)).waiting.sort((a, b) => a.id.localeCompare(b.id));
++	const selected = async (caller, user, ready) => {
++		const threads = ready.toSorted((a, b) => a.id.localeCompare(b.id));
 +		const entries = threads.map((thread) => ({ id: thread.id, message: lastOf(thread).id, role: roleOf(thread, user.id) }));
 +		const key = await sha256(JSON.stringify([user.id, entries.map(({ id, message }) => [id, message])]));
 +		const selection = await sha256(JSON.stringify([caller.subject.kind, caller.subject.id, key]));
 +		return { threads, entries, key, selection };
 +	};
++	const selectionOf = async (caller, user) => selected(caller, user, (await waiting(caller, user)).waiting);
  	async function retryAt(member, now) {
  		const times = await store.sendTimes(member, now - window);
  		return times.length >= 30 ? times[times.length - 30] + window : void 0;
-@@ -1410,7 +1425,7 @@
+@@ -1410,7 +1426,7 @@ function createCommentSendService(options) {
  	* is the thread link of a pairing that Allow just used, and the send goes to that endpoint; else the send keeps the
  	* link of the last send to the same endpoint.
  	*/
@@ -242,7 +266,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  		const now = Date.now();
  		const limitedUntil = await retryAt(user.id, now);
  		if (limitedUntil !== void 0) return {
-@@ -1422,17 +1437,11 @@
+@@ -1422,17 +1438,11 @@ function createCommentSendService(options) {
  			status: "failed",
  			reason: "No agent is paired. Press Send to pair one."
  		};
@@ -261,7 +285,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  		const earlier = await store.sendByKey(user.id, key, ["sent", "working"]);
  		if (earlier) return {
  			status: "sent",
-@@ -1527,7 +1536,7 @@
+@@ -1527,7 +1537,7 @@ function createCommentSendService(options) {
  				retryAt(user.id, now)
  			]);
  			const agent = agentOf(endpoint);
@@ -270,7 +294,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  			if (latest) {
  				const sent = threadsOf(latest);
  				const own = sent.filter((entry) => entry.role === "ask");
-@@ -1535,8 +1544,9 @@
+@@ -1535,16 +1545,18 @@ function createCommentSendService(options) {
  				if ((own.length ? own : sent).some((entry) => {
  					const thread = byId.get(entry.id);
  					return thread !== void 0 && commentThreadWaits(thread);
@@ -281,16 +305,17 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  					...latest.thread ? { thread: latest.thread } : {}
  				};
  				else await store.setSendState(latest.id, ["sent", "working"], "done", now);
-@@ -1544,7 +1554,7 @@
+ 			}
  			return {
  				count: ready.length,
++				...ready.length ? { selection: (await selected(caller, user, ready)).selection } : {},
  				...agent ? { agent } : {},
 -				...working ? { working } : {},
 +				...active ? { [latest.state]: active } : {},
  				...limitedUntil === void 0 ? {} : { retryAt: limitedUntil }
  			};
  		},
-@@ -1553,6 +1563,7 @@
+@@ -1553,6 +1565,7 @@ function createCommentSendService(options) {
  			if (plain) return plain;
  			const user = await maySend(caller);
  			if (!user) return forbidden();
@@ -298,7 +323,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  			const [error, started] = await (await webhooks()).startMemberPairing(user.id);
  			if (error) throw error;
  			const prompt = commentSendPrompt({
-@@ -1565,6 +1576,8 @@
+@@ -1565,6 +1578,8 @@ function createCommentSendService(options) {
  			return [void 0, {
  				code: started.code,
  				prompt,
@@ -307,7 +332,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  				expiresAt: started.expiresAt,
  				agent: t3()
  			}];
-@@ -1610,11 +1623,16 @@
+@@ -1610,11 +1625,16 @@ function createCommentSendService(options) {
  			const [error] = await (await webhooks()).cancelMemberPairing(caller.user.id, code);
  			if (error) throw error;
  		},
@@ -325,7 +350,7 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  			const email = verifiedEmail(user);
  			const name = typeof user.name === "string" && user.name.trim() ? user.name : void 0;
  			const [error, allowed] = await (await webhooks()).allowMemberPairing(user.id, code, {
-@@ -1631,7 +1649,7 @@
+@@ -1631,7 +1651,7 @@ function createCommentSendService(options) {
  			return [void 0, await deliver(caller, user, {
  				id: allowed.endpoint.id,
  				thread: allowed.pairing.address
@@ -335,9 +360,10 @@ diff --git a/dist/install-CmFDZSMH.js b/dist/install-CmFDZSMH.js
  		async send(caller) {
  			const plain = insecure(caller.origin);
 diff --git a/dist/runtime/index.js b/dist/runtime/index.js
+index c04e8d8..3e122d3 100644
 --- a/dist/runtime/index.js
 +++ b/dist/runtime/index.js
-@@ -558,7 +558,7 @@
+@@ -558,7 +558,7 @@ function createCommentsHandler(options) {
  			const body = await readJson(request);
  			const given = typeof body === "object" && body !== null ? Reflect.get(body, "code") : void 0;
  			if (typeof given !== "string" || !given) return failure$1(commentsErrors.COMMENTS_INVALID_INPUT({ issue: "code: Send the setup code that the agent used." }));
