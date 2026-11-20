@@ -16,7 +16,7 @@ import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocH
 import { knownAgent } from "#shared/agents"
 import { feedbackMarkdown, promptMarkdown } from "#shared/feedback"
 import { describeTime } from "comark-time"
-import { faviconUrl, resourceLabel } from "#shared/resources"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
@@ -907,7 +907,6 @@ const docHeader = computed<DocHeader | null>(() => {
     ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: docFolder.value?.id }] : []),
   ]
   const origin = import.meta.client ? location.origin : ""
-  const listed = new Set((d.resources ?? []).map((resource) => resource.url))
   return {
     actions: [
       ...(copiesMarkdown.value ? [{ id: "markdown" as const, label: "Copy as Markdown", kbd: "M" }] : []),
@@ -921,14 +920,6 @@ const docHeader = computed<DocHeader | null>(() => {
       href: `${origin}/drops/${item.id}`,
       icon: `${origin}/favicon.ico`,
     })),
-    links: related.value
-      .flatMap((item) => item.links)
-      .filter((resource) => !listed.has(resource.url))
-      .map((resource) => ({
-        url: resource.url,
-        label: resourceLabel(resource),
-        icon: faviconUrl(resource.url, origin),
-      })),
   }
 })
 watch(

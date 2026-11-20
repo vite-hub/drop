@@ -45,14 +45,6 @@ const HEADER = {
       icon: "https://drop.test/favicon.ico",
     },
   ],
-  links: [
-    { url: "https://linear.app/acme/issue/ACM-7", label: "ACM-7", icon: "https://drop.test/api/favicons/linear.app" },
-    {
-      url: "https://github.com/acme/app/pull/212",
-      label: "acme/app#212",
-      icon: "https://drop.test/api/favicons/github.com",
-    },
-  ],
 }
 
 // A Markdown doc with a front matter box in the viewer's frame, as DropViewer renders one without a content origin.
@@ -72,11 +64,11 @@ const FOLDER = {
   ],
 }
 
-async function open(browser) {
+async function open(browser, resources = [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }]) {
   const source = "---\nstatus: Ready\n---\n\n# Plan\n\nLaunch on November 18.\n"
   const { html } = await renderMarkdownCached("doc-header.md", async () => source)
   const body = await withDocProperties(html, {
-    resources: [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }],
+    resources,
     updatedAt: Date.UTC(2026, 10, 16),
   })
   const escaped = planDocument("markdown", source, false, body).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
@@ -112,17 +104,18 @@ test(
       await page.evaluate((header) => window.tell(header), HEADER)
       await frame.locator("drop-doc-actions button").first().waitFor()
 
-      // Every link is a chip with its site's icon from Drop, the doc's own and the ones the viewer adds alike.
+      // Every link is a chip with its site's icon from Drop, the doc's own and the related drops the viewer adds alike.
       assert.deepEqual(
         await frame
           .locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
           .evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src"))),
-        ["/api/favicons/github.com", "https://drop.test/favicon.ico", "https://drop.test/api/favicons/linear.app"],
+        ["/api/favicons/github.com", "https://drop.test/favicon.ico"],
       )
       assert.equal((await frame.locator('dl.cfm > div[data-key="links"] > dt').innerText()).trim(), "Links")
-      // Related drops and their links join the Links row; a link the doc lists already isn't repeated.
+      // Related drops join the Links row after the doc's own links; their links stay in their own drops.
       const links = await frame.locator('dl.cfm > div[data-key="links"] dd a').allTextContents()
-      assert.deepEqual(links, ["PR #212", "Before and after", "ACM-7"])
+      assert.deepEqual(links, ["PR #212", "Before and after"])
+      assert.equal(await frame.locator(".drop-links-toggle").count(), 0, "a short row shows every link")
 
       // See more unfolds the facts, which stay out of reach while folded.
       const facts = frame.locator("drop-doc-facts")
@@ -231,7 +224,7 @@ test(
       // A copy the viewer made (its shortcut) shows on the button too; a second header doesn't add links again.
       await page.evaluate(() => window.tell({ type: "doc-copied" }))
       assert.equal(await copy.getAttribute("data-copied"), "")
-      assert.equal(await frame.locator('dl.cfm > div[data-key="links"] dd a').count(), 3)
+      assert.equal(await frame.locator('dl.cfm > div[data-key="links"] dd a').count(), 2)
 
       // Paper gets the doc, not the buttons.
       await page.emulateMedia({ media: "print" })
@@ -244,6 +237,62 @@ test(
     }
   },
 )
+
+// portal#1254's doc listed six links and thirteen related drops, and its Links row filled half a screen.
+test("a long Links row shows its first links and opens the rest behind N more", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const own = Array.from({ length: 6 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `PR #${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, own)
+    const chips = frame.locator('dl.cfm > div[data-key="links"] dd a.cp')
+    const visible = () => chips.evaluateAll((all) => all.filter((a) => a.checkVisibility()).map((a) => a.textContent))
+    assert.equal(await frame.locator(".drop-links-toggle").count(), 0, "six links fit")
+
+    const related = Array.from({ length: 5 }, (_, i) => ({
+      id: `rel00${i}`,
+      title: `Related ${i + 1}`,
+      href: `https://drop.test/drops/rel00${i}`,
+      icon: "https://drop.test/favicon.ico",
+    }))
+    await page.evaluate((header) => window.tell(header), { ...HEADER, related })
+    const toggle = frame.locator(".drop-links-toggle")
+    await toggle.waitFor()
+    assert.deepEqual(
+      await visible(),
+      own.map((r) => r.title),
+      "the doc's own links come first",
+    )
+    assert.equal(await toggle.innerText(), "5 more")
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false")
+    const folded = await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)
+
+    await toggle.click()
+    assert.equal((await visible()).length, 11)
+    assert.equal(await toggle.innerText(), "Show less")
+    assert.equal(await toggle.getAttribute("aria-label"), "Show fewer links")
+    await frame.waitForFunction(() => !document.querySelector('div[data-key="links"] > dd').getAnimations().length)
+    assert.ok((await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)) >= folded)
+
+    // Another header keeps it open; the row folds again from the button.
+    await page.evaluate((header) => window.tell(header), { ...HEADER, related: related.slice(0, 4) })
+    assert.equal((await visible()).length, 10)
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    assert.deepEqual(
+      await visible(),
+      own.map((r) => r.title),
+    )
+    assert.equal(await frame.locator(".drop-links-toggle").innerText(), "4 more")
+
+    // Paper gets every link.
+    await page.emulateMedia({ media: "print" })
+    assert.equal((await visible()).length, 10)
+  } finally {
+    await browser.close()
+  }
+})
 
 test("Copy says so in the frame when the Markdown doesn't load", { timeout: 30000 }, async () => {
   const browser = await chromium.launch()

@@ -1,7 +1,9 @@
 // A Markdown doc's header in the viewer: the properties box at the top (withDocProperties in
 // server/utils/markdown-document.ts) takes what the review dock used to hold. Its links are comark-chips' chips with
-// their site's icon (from Drop, server/utils/favicons.ts), the drops related to this one join its Links row as more chips, Copy as Markdown, Download and Export as PDF sit at its top right, and the
-// read-only facts (views, file, who dropped it, folder) fold under its last row behind See more.
+// their site's icon (from Drop, server/utils/favicons.ts), the drops related to this one join its Links row as more chips
+// after them, and a row of more than LINKS_ALL chips shows its first LINKS_SHOWN behind "N more". Copy as Markdown,
+// Download and Export as PDF sit at its top right, and the read-only facts (views, file, who dropped it, folder) fold
+// under its last row behind See more.
 //
 // The frame is on another origin than Drop, so the viewer sends what to show ("doc-header", DocHeader) and the buttons
 // ask the viewer to act ("doc-action", "doc-open" in ./frame-messages). Everything goes after the box's own rows, so
@@ -38,8 +40,6 @@ export type DocHeader = {
   facts: DocHeaderFact[]
   /** Drops related to this one through the pages they link to (server/utils/related.ts), opened in the viewer. */
   related: { id: string; title: string; href: string; icon: string }[]
-  /** Those drops' links that this doc doesn't list yet. */
-  links: { url: string; label: string; icon: string }[]
 }
 /** A row of the folder list ("doc-folder-items"); `at` is already words, such as "3 days ago", with `tip` the date. */
 type DocHeaderFolderItem = {
@@ -154,19 +154,29 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
   drop-doc-facts > div > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; }
 }
-@media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop { transition: none; } }
-@media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop { display: none !important; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
+.drop-head .cp.drop-folded { display: none; }
+.drop-links-toggle { display: inline-flex; align-items: center; gap: .25rem; height: 1.5rem; padding: 0 .375rem 0 .5rem; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: var(--muted-foreground); font: 400 .8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; vertical-align: middle; cursor: pointer; transition: background-color .12s, color .12s, transform .12s; }
+.drop-links-toggle:hover { background: var(--accent); color: var(--foreground); }
+.drop-links-toggle:active { transform: scale(.97); }
+.drop-links-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.drop-links-toggle svg { width: .875rem; height: .875rem; transition: transform .24s cubic-bezier(.23,1,.32,1); }
+.drop-links-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop, .drop-links-toggle svg { transition: none; } }
+@media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop, .drop-links-toggle { display: none !important; } .drop-head .cp.drop-folded { display: inline-flex; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
 ${ICON_SWAP_CSS.replace(/\/\*[\s\S]*?\*\//g, "")}
 `
 
 /** How long Copy shows its check, as Drop's other copy buttons (COPY_MS in app/composables/usePreferences.ts). */
 const COPIED_MS = 1400
+/** A Links row of up to LINKS_ALL chips shows them all; a longer one shows its first LINKS_SHOWN, so "N more" never hides one or two. */
+const LINKS_ALL = 8
+const LINKS_SHOWN = 6
 
 /** Runs in a Markdown doc's frame (planDocument in ./documents). */
 export const DOC_HEADER_SCRIPT = String.raw`(() => {
   const box = document.querySelector("article > dl.cfm");
   if (!box) return;
-  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS};
+  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
   const style = document.createElement("style");
   style.textContent = ${JSON.stringify(CSS)};
   document.head.appendChild(style);
@@ -414,11 +424,43 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     place();
   }
 
+  // A long Links row: its first LINKS_SHOWN chips, the doc's own ahead of related drops, then "N more", which opens the
+  // rest. The row grows to its new height and the chips it reveals fade in; it stays open when the related drops change.
+  let linksOpen = false;
+  const ease = "cubic-bezier(.23,1,.32,1)";
+  function foldLinks() {
+    box.querySelectorAll(".drop-links-toggle").forEach((node) => node.remove());
+    const dd = box.querySelector(':scope > div[data-key="links"] > dd');
+    if (!dd) return;
+    const chips = Array.from(dd.querySelectorAll("a.cp"));
+    const extra = chips.length > LINKS_ALL ? chips.slice(LINKS_SHOWN) : [];
+    for (const a of chips) a.classList.remove("drop-folded");
+    if (!extra.length) return;
+    const label = el("span");
+    const toggle = el("button", { type: "button", className: "drop-links-toggle" }, label, icon("chevron"));
+    const show = () => {
+      for (const a of extra) a.classList.toggle("drop-folded", !linksOpen);
+      label.textContent = linksOpen ? "Show less" : extra.length + " more";
+      toggle.setAttribute("aria-expanded", String(linksOpen));
+      toggle.setAttribute("aria-label", linksOpen ? "Show fewer links" : "Show " + extra.length + " more links");
+    };
+    toggle.addEventListener("click", () => {
+      const from = dd.offsetHeight;
+      linksOpen = !linksOpen;
+      show();
+      place();
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const to = dd.offsetHeight;
+      if (from !== to) dd.animate([{ height: from + "px", overflow: "clip" }, { height: to + "px", overflow: "clip" }], { duration: 240, easing: ease });
+      if (linksOpen) extra.forEach((a, i) => a.animate([{ opacity: 0, transform: "translateY(-2px)" }, { opacity: 1, transform: "none" }], { duration: 180, delay: Math.min(i, 8) * 15, easing: ease, fill: "backwards" }));
+    });
+    dd.append(toggle);
+    show();
+  }
+
   // Related drops open in the viewer; with a modifier key, in a new tab as any link.
-  function renderRelated(related, links) {
+  function renderRelated(related) {
     box.querySelectorAll("[data-drop-added]").forEach((node) => node.remove());
-    if (!related.length && !links.length) return;
-    const has = new Set(Array.from(box.querySelectorAll("a[href]"), (a) => a.href));
     const tags = [];
     for (const drop of related) {
       const a = chip(drop.href, drop.title, drop.icon);
@@ -429,8 +471,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
       });
       tags.push(a);
     }
-    for (const link of links) if (!has.has(new URL(link.url).href)) tags.push(chip(link.url, link.label, link.icon));
-    if (!tags.length) return;
+    if (!tags.length) return foldLinks();
     let dd = box.querySelector(':scope > div[data-key="links"] > dd');
     // One link the box showed becomes several.
     if (dd && /^\s*Link\s*$/.test(dd.previousElementSibling.textContent)) dd.previousElementSibling.textContent = " Links";
@@ -443,6 +484,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
       box.insertBefore(row, actions);
     }
     dd.append(...tags);
+    foldLinks();
     place();
   }
 
@@ -461,10 +503,10 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     }
     if (m.type !== "doc-header") return;
     renderActions(Array.isArray(m.actions) ? m.actions.filter((a) => ACTION_ICONS[a.id]) : []);
-    const related = JSON.stringify([m.related, m.links]);
+    const related = JSON.stringify(m.related);
     if (related !== shownRelated) {
       shownRelated = related;
-      renderRelated(Array.isArray(m.related) ? m.related : [], Array.isArray(m.links) ? m.links : []);
+      renderRelated(Array.isArray(m.related) ? m.related : []);
     }
     const factsKey = JSON.stringify(m.facts);
     if (factsKey !== shownFacts) {
@@ -473,4 +515,5 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     }
   });
   renderFolder();
+  foldLinks();
 })()`
