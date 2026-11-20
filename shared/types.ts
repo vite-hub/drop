@@ -2,6 +2,7 @@
 import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
+import type { Ink } from "./schemas"
 import type { DropMode, Share } from "./share"
 
 export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board", "link"] as const
@@ -162,7 +163,7 @@ export interface DropDetail extends DropSummary {
   html?: string
   /** Where the raw file is served, for images and other files. */
   url?: string
-  /** An app's text files keyed by path: all of them, or only its pages when its origin serves the rest (contentGrant). */
+  /** An app's text files keyed by path, unless its origin serves them all (contentGrant): the frame reads pages there. */
   files?: Record<string, string>
   /** Apps: each file's size in bytes, keyed by path. */
   sizes?: Record<string, number>
@@ -254,6 +255,8 @@ export interface DropComment {
   at: number | null
   /** On a PDF's page: its number, from 1. `ox`/`oy`/`ow`/`oh` are then thousandths of the page. */
   pdfPage: number | null
+  /** From the Marker: its strokes, which the page draws over the area. */
+  ink: Ink | null
   label: string | null
   page: string | null
   body: string
@@ -309,7 +312,7 @@ export interface CommentAttachment {
   filename: string
   contentType: string
   size: number
-  /** Where ViteHub Comments serves it (`/api/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
+  /** Where ViteHub Comments serves it (`/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
   url: string
 }
 

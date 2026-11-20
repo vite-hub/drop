@@ -1,10 +1,12 @@
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
+import { encodeInk } from "#shared/ink"
 import { CommentSchema } from "#shared/schemas"
 import { imageParent, readCommentBody, withImages } from "../../../utils/comment-images"
 import { actorOf, addThread, authorOf, mentionedIn, toComment } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 /**
@@ -23,7 +25,7 @@ export default defineHandler(async (event) => {
   if (!input.body && !images.length && input.suggestion === undefined)
     throw new HTTPError({ status: 400, statusText: "Write a comment." })
   const author = authorOf(who, who?.name ?? "Guest")
-  const { body, quote, label, page, mentions, ...anchor } = input
+  const { body, quote, label, page, mentions, ink, ...anchor } = input
   // Comments numbers the thread in the same statement that adds it, so two comments can't take the same number.
   const { row, attachments } = await withImages(
     images.length ? await imageParent(drop) : null,
@@ -34,6 +36,8 @@ export default defineHandler(async (event) => {
         fields: {
           ...anchor,
           quote: quote ?? null,
+          // Too detailed to keep even simplified: the comment keeps its box and its picture.
+          ink: ink ? encodeInk(ink) : null,
           label: label ?? null,
           page: page ?? null,
           elementX: null,
@@ -47,5 +51,6 @@ export default defineHandler(async (event) => {
       }),
     (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
   )
+  logDrop(event, drop, { change: "comment" })
   return toComment(row, who, new Map(attachments.map((file) => [file.id, file])), await mentionedIn([row]))
 })

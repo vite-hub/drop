@@ -3,6 +3,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
 import { readCommentBody, withImages } from "../../../../utils/comment-images"
 import { authorOf, findCommentByNumber, replyTo } from "../../../../utils/comments"
+import { logDrop } from "../../../../utils/logs"
 import { routeNumber } from "../../../../utils/review-params"
 import { reviewApi, reviewSession } from "../../../../utils/review"
 
@@ -26,5 +27,6 @@ export default reviewApi(async (event) => {
     (ids) => replyTo(thread, author, input.body, { attachments: ids }),
     (row) => ({ commentId: thread.messages[0]!.id, replyId: row.id }),
   )
+  logDrop(event, site, { change: "reply" })
   return { ok: true }
 })

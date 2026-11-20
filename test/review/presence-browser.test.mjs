@@ -56,7 +56,7 @@ async function open(browser, { presence = true } = {}) {
     if (url.origin !== DROP) return route.abort()
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
-    if (url.pathname === "/review-presence.js") {
+    if (url.pathname === "/review-presence.js" && url.searchParams.get("v") === "2") {
       seen.client++
       return route.fulfill({ contentType: "text/javascript", headers: CORS, body: CLIENT })
     }
@@ -296,7 +296,8 @@ test("review.js shows who else is on the review and their cursors on this page",
       (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "a" }),
       BEN,
     )
-    await page.waitForTimeout(100)
+    for (let tries = 0; seen.threads === before && tries < 20; tries++) await page.waitForTimeout(50)
+    assert.ok(seen.threads > before, "a comment elsewhere loads this page's threads")
     const afterFirst = seen.threads
     await page.evaluate(
       (ben) => window.__presence.set(2, ben, { active: true, at: "https://site.test/", comments: "b" }),
@@ -304,7 +305,6 @@ test("review.js shows who else is on the review and their cursors on this page",
     )
     for (let tries = 0; seen.threads === afterFirst && tries < 20; tries++) await page.waitForTimeout(50)
     assert.ok(seen.threads > afterFirst, "a new comment elsewhere loads this page's threads")
-    assert.ok(afterFirst >= before)
 
     // Ben leaves: no faces.
     await page.evaluate(() => window.__presence.leave(2))

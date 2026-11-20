@@ -5,7 +5,7 @@
 const { wide = false } = defineProps<{ wide?: boolean }>()
 
 const route = useRoute()
-const { signedIn, signInWithGitHub } = useGitHubSignIn()
+const { signedIn, signInHref } = useGitHubSignIn()
 const dev = import.meta.dev
 </script>
 
@@ -72,7 +72,8 @@ const dev = import.meta.dev
           variant="outline"
           size="sm"
           label="Sign in"
-          @click="signInWithGitHub"
+          :to="signInHref"
+          external
         />
       </div>
     </div>

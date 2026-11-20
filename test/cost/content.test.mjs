@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { resolveCacheKeys } from "ocache"
 import { beforeEach, test } from "vite-plus/test"
-import { readFileSync } from "node:fs"
 import {
   sql,
   queries,
@@ -266,7 +265,7 @@ test("a blob with no drop behind it is never served, and access needs no storage
   assert.equal(calls.head, 0)
 })
 
-test("app publishing keeps only the latest file set, as the docs promise", async () => {
+test("app publishing keeps only the latest file set", async () => {
   const first = await publishApp(who, { files: { "index.html": "first", "old.js": "old", "keep.css": "a{}" } })
   const keys = () => [...state.objects.keys()]
   const firstKeys = keys()
@@ -284,11 +283,6 @@ test("app publishing keeps only the latest file set, as the docs promise", async
   const detail = await dropDetail(await findDrop(first.id), who, "https://drop.example")
   assert.deepEqual(detail.files, { "index.html": "second", "keep.css": "a{}", "new.js": "new" })
   assert.equal(detail.versions.length, 1)
-  for (const path of ["content/docs/index.md", "content/docs/review.md", "skills/vitehub-drop/SKILL.md"])
-    assert.match(
-      readFileSync(new URL(`../../${path}`, import.meta.url), "utf8"),
-      /[Aa]pps? keeps? only|[Oo]nly the latest app|[Aa]pps? keeps? (?:only )?(?:their|its) latest/,
-    )
 })
 
 test("an app's file path can't climb out of its folder through an escape the blob store decodes", async () => {

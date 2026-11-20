@@ -12,6 +12,8 @@ const host = useTemplateRef<HTMLElement>("host")
 const colorMode = useColorMode()
 const state = ref<"loading" | "ready" | "failed">("loading")
 const saving = ref(false)
+// Why the last save failed, shown until one goes through.
+const unsaved = ref<string>()
 const readOnly = ref(true)
 
 type Excalidraw = typeof import("@excalidraw/excalidraw")
@@ -81,7 +83,7 @@ onMounted(async () => {
     // Excalidraw follows Drop's theme; re-rendering only passes the new prop, the scene stays.
     watch(() => colorMode.value, render)
   } catch (error) {
-    console.error(error)
+    reportClientError("board-load", error, { drop: id })
     state.value = "failed"
   }
 })
@@ -163,13 +165,20 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   // The version of each element the server has, and the elements changed here that it doesn't have yet.
   const known = new Map(initial.map((element) => [element.id, element.version]))
   const pending = new Map<string, BoardElement>()
+  // The version each pending element had when it was queued: Excalidraw changes elements in place, so the queued
+  // element's own version can't say whether a change is new.
+  const queued = new Map<string, number>()
 
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let imageTimer: ReturnType<typeof setTimeout> | undefined
   let busy: Promise<unknown> = Promise.resolve()
-  const schedule = () => {
+  // Failed saves in a row, for the wait before the next (saveRetryDelay). After stop(), nothing is scheduled again.
+  let failures = 0
+  let stopped = false
+  const schedule = (delay = 700) => {
+    if (stopped) return
     clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => (busy = busy.then(save)), 700)
+    saveTimer = setTimeout(() => (busy = busy.then(save)), delay)
   }
   // Excalidraw calls this on every change, the pointer's and the selection's too: only elements with a version the
   // server hasn't seen go out.
@@ -181,13 +190,19 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       measure()
     }
     if (!canEdit) return
+    // Only a version newer than the one already queued counts: pointer and selection changes don't restart a save
+    // that's waiting after a failure.
     let any = false
     for (const element of elements)
-      if (element.version > (known.get(element.id) ?? 0)) {
+      if (element.version > (queued.get(element.id) ?? known.get(element.id) ?? 0)) {
         pending.set(element.id, element)
+        queued.set(element.id, element.version)
         any = true
       }
-    if (any) schedule()
+    if (any) {
+      failures = 0
+      schedule()
+    }
   }
 
   async function save() {
@@ -199,14 +214,27 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     try {
       // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- a save, from Excalidraw's callbacks in the browser
       await $fetch(`/api/drops/${id}/board`, { method: "POST", body: { elements } })
-      for (const element of elements)
+      for (const element of elements) {
         if (element.version > (known.get(element.id) ?? 0)) known.set(element.id, element.version)
+        if (!pending.has(element.id)) queued.delete(element.id)
+      }
+      failures = 0
+      unsaved.value = undefined
       clearTimeout(imageTimer)
-      imageTimer = setTimeout(() => void images(), 4000)
+      if (!stopped) imageTimer = setTimeout(() => void images(), 4000)
     } catch (error) {
       // Kept for the next save, unless something newer replaced them meanwhile.
       for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
-      console.error("Board save failed", error)
+      reportClientError("board-save", error, { drop: id })
+      // A permanent refusal (no longer allowed to draw, too big) waits for the next change; rate limits try
+      // again, less often each time, down to once a minute.
+      const status = httpStatus(error)
+      if (status !== undefined && status >= 400 && status < 500 && status !== 429)
+        unsaved.value = `Not saved: ${errorText(error)}`
+      else {
+        schedule(saveRetryDelay(++failures))
+        unsaved.value = "Not saved. Trying again…"
+      }
     } finally {
       saving.value = false
     }
@@ -216,7 +244,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   async function pull() {
     if (document.hidden) return
     await busy
-    const data = await $fetch<{ snapshot: Board }>(`/api/drops/${id}/board`).catch(() => null)
+    const data = await $fetch<{ snapshot: Board }>(`/api/drops/${id}/board`).catch((error: unknown) => {
+      reportClientError("board-pull", error, { drop: id })
+      return null
+    })
     if (!data) return
     const local = new Map(api.getSceneElementsIncludingDeleted().map((element) => [element.id, element.version]))
     const newer = data.snapshot.elements.filter((element) => element.version > (local.get(element.id) ?? 0))
@@ -237,7 +268,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     measure()
     // An agent's edit shows in its next view_board too.
     clearTimeout(imageTimer)
-    imageTimer = setTimeout(() => void images(), 4000)
+    if (!stopped) imageTimer = setTimeout(() => void images(), 4000)
   }
   // doctor-disable-next-line vue/lifecycle/require-cleanup -- the returned stop() clears it, from onBeforeUnmount
   const poll = setInterval(() => void pull(), 3000)
@@ -322,7 +353,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       // doctor-disable-next-line nuxt/fetch/no-raw-fetch-in-setup -- an upload, from Excalidraw's callbacks in the browser
       await $fetch(`/api/drops/${id}/board/images`, { method: "POST", body: { images: out } })
     } catch (error) {
-      console.error("Board images failed", error)
+      reportClientError("board-images", error, { drop: id })
     }
   }
   // The first person to open a board an agent made gives agents its first images.
@@ -334,6 +365,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
   return {
     onChange,
     stop: () => {
+      stopped = true
       window.removeEventListener("pagehide", flush)
       clearInterval(poll)
       clearTimeout(imageTimer)
@@ -356,10 +388,11 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     </div>
     <div
       v-if="state === 'ready'"
-      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs text-dimmed"
+      class="pointer-events-none absolute top-3 left-1/2 z-[300] -translate-x-1/2 text-xs"
+      :class="unsaved && !readOnly ? 'text-error' : 'text-dimmed'"
       aria-live="polite"
     >
-      {{ readOnly ? "View only" : saving ? "Saving…" : "" }}
+      {{ readOnly ? "View only" : saving ? "Saving…" : (unsaved ?? "") }}
     </div>
   </div>
 </template>

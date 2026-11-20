@@ -42,13 +42,14 @@ body {
    doc (its .cr root) is 50rem wide. A doc with threads widens by the margin, so its text keeps the column's width beside
    the cards. On a narrow screen the margin stays shut and a bubble opens its card under the line. The viewer's review
    comments take the same margin (data-drop-rail, set by ANNOTATOR_SCRIPT in plan-runtime.ts); once it's open, a doc
-   without threads of its own leaves it as padding. */
+   without threads of its own leaves it as a transparent border. Not padding: comark-outline's side outline starts
+   after the text's padding, and would land on the cards. */
 :root:is(:has(.cr), [data-drop-rail]) {
   --drop-rail: 19.5rem;
 }
 
 :root[data-drop-rail="open"] .typeset:not(:has(.cr)) {
-  padding-right: var(--drop-rail);
+  border-right: var(--drop-rail) solid transparent;
 }
 
 /* The Pin comment style puts each comment's pin in the gutter right of the text. On a page too narrow for that gutter
@@ -218,15 +219,19 @@ p.render-error {
 }
 
 /* comark-ui's wide blocks (data-wide: a before/after compare, a Mermaid diagram or a table wider than the text) take
-   the room beside the text column, up to their own width and 72rem, so screenshots read at about twice the size, a
-   diagram's labels keep their size, and a table's columns stop wrapping every few words. The column sits --drop-shift
-   left of the page's middle. Each side gets its own room, 1.5rem clear of the page's left edge and of what covers its
-   right (--drop-right: the viewer's floating panel and the outline's column), so a block beside the panel grows into
-   the empty space on the left. OUTLINE_SCRIPT moves the text and the outline aside for them. comark-ui widens a
-   heading right above a compare to match, so it reads as the compare's title. */
+   the room beside the text column, up to their own width, so screenshots read at about twice the size, a diagram's
+   labels keep their size, and a table's columns stop wrapping every few words. A compare or a diagram stops at
+   comark-ui's 72rem; a table can grow to its own width (up to 96em), since Drop leaves --comark-wide-max unset, and
+   stacks its prose under the short columns where the room runs out. The column sits --drop-shift left of the page's
+   middle. Each side gets its own room, 1.5rem clear of the page's left edge and of what covers its right (--drop-right,
+   the viewer's floating panel, and --comark-rail-width, the side outline's column when it needs one), so a block
+   beside the panel grows into the empty space on the left. comark-ui widens a heading right above a compare to match,
+   so it reads as the compare's title. */
 .typeset {
   --comark-wide-start: calc((100vw - var(--drop-shift, 0px) - 100%) / 2 - 1.5rem);
-  --comark-wide-end: calc((100vw + var(--drop-shift, 0px) - 100%) / 2 - var(--drop-right, 0px) - 1.5rem);
+  --comark-wide-end: calc(
+    (100vw + var(--drop-shift, 0px) - 100%) / 2 - var(--drop-right, 0px) - var(--comark-rail-width, 0px) - 1.5rem
+  );
   /* The doc keeps the page's system font rather than the app's Geist, and Drop paints the app's grain on the whole
      frame (DOCUMENT_EXTRA_CSS), not again on the text. */
   --comark-font: var(--font-body);
@@ -238,6 +243,99 @@ p.render-error {
 :is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) {
   --comark-wide-start: 0px;
   --comark-wide-end: 0px;
+}
+
+:is(.typeset, .typeset > .cr) > div:is([data-width], [data-fit])[data-fold][data-cols] > table > * > tr > [data-row] {
+  min-width: calc(8em * var(--_ty-side, 1));
+  overflow-wrap: anywhere;
+}
+
+/* The preview pin encodes the folded column count and prose position in data-stack. Give that track, not the
+   individual prose cells, a minimum on screen where the wrapper can scroll. In print it would clip columns. */
+@media screen {
+  :is(.typeset, .typeset > .cr) > div[data-stack] {
+    --drop-prose-track: minmax(12em, 1fr);
+
+    &[data-stack$="-1"] {
+      --drop-track-1: var(--drop-prose-track);
+    }
+    &[data-stack$="-2"] {
+      --drop-track-2: var(--drop-prose-track);
+    }
+    &[data-stack$="-3"] {
+      --drop-track-3: var(--drop-prose-track);
+    }
+    &[data-stack$="-4"] {
+      --drop-track-4: var(--drop-prose-track);
+    }
+    &[data-stack$="-5"] {
+      --drop-track-5: var(--drop-prose-track);
+    }
+    &[data-stack$="-6"] {
+      --drop-track-6: var(--drop-prose-track);
+    }
+
+    &[data-stack^="2-"] {
+      --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content);
+    }
+    &[data-stack^="3-"] {
+      --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content);
+    }
+    &[data-stack^="4-"] {
+      --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+        var(--drop-track-4, min-content);
+    }
+    &[data-stack^="5-"] {
+      --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+        var(--drop-track-4, min-content) var(--drop-track-5, min-content);
+    }
+    &[data-stack^="6-"] {
+      --_ty-stacked: var(--drop-track-1, min-content) var(--drop-track-2, min-content) var(--drop-track-3, min-content)
+        var(--drop-track-4, min-content) var(--drop-track-5, min-content) var(--drop-track-6, min-content);
+    }
+  }
+}
+
+@container (max-width: 31.99em) {
+  :is(.typeset, .typeset > .cr) > div[data-width][data-cols] > table[data-drop-scroll-table] {
+    display: table;
+    width: max-content;
+    min-width: 100%;
+
+    & > :is(thead, tbody, tfoot),
+    & > * > tr {
+      display: revert;
+    }
+
+    & > thead > tr {
+      position: static;
+      width: auto;
+      height: auto;
+      overflow: visible;
+      clip-path: none;
+    }
+
+    & > * > tr > :is(th, td) {
+      padding: 0.65em 0.75em;
+      white-space: nowrap;
+    }
+  }
+}
+
+@media screen and (min-width: 64rem) {
+  .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) {
+    display: block;
+    position: static;
+    width: auto !important;
+    max-height: none;
+    margin: 1.5rem 0;
+  }
+
+  .typeset:has(> [data-wide] > table) > .cto-rail:not([data-fits]) > ul {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    mask-image: none;
+  }
 }
 
 /* A zoomed screenshot keeps clear of the viewer's floating panel, which would cover its marks and its close button.

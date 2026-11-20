@@ -51,7 +51,7 @@ watch(
     <div
       v-bind="$attrs"
       ref="root"
-      class="pointer-events-none inset-x-2 bottom-[max(1rem,env(safe-area-inset-bottom))] flex max-h-[calc(100%-2rem)] flex-col items-center gap-2 sm:inset-x-4"
+      class="@container/review-dock pointer-events-none inset-x-2 bottom-[max(1rem,env(safe-area-inset-bottom))] flex max-h-[calc(100%-2rem)] flex-col items-center gap-2 sm:inset-x-4"
       :class="overlay ? 'fixed z-[60]' : 'absolute z-30'"
     >
       <!-- Rises out of the bar it opens from; closing is quicker and quieter, since the reader has moved on. -->

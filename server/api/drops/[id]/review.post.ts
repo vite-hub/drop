@@ -5,6 +5,7 @@ import { siteMatches } from "#shared/review"
 import { siteCoversDrop } from "../../../utils/content-origin"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 import { addReviewComment, readReviewComment } from "../../../utils/review"
 
@@ -36,6 +37,7 @@ export default defineHandler(async (event) => {
     origin,
     images,
   )
+  logDrop(event, site, { change: "comment" })
   useLogger(event).set({
     review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true },
   })

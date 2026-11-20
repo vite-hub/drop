@@ -1,5 +1,4 @@
 import { and, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database"
 import { drops, dropTexts, dropVersions } from "../databases/default/index"
@@ -193,7 +192,8 @@ export function textStatements(row: { id: string; kind: string }, source: string
 /**
  * Indexes latest text docs that have no text yet: the ones published before search read their words, or whose index
  * write failed. Run by the hourly schedule in small batches; a doc whose file is gone gets an empty text, so the batch
- * doesn't retry it forever. Returns how many it indexed.
+ * doesn't retry it forever. One whose file couldn't be read is left for the next run. Returns how many it indexed, and
+ * the ones it couldn't read, for the run's event.
  */
 export async function indexMissingTexts(limit = 100) {
   const missing = await db
@@ -203,21 +203,25 @@ export async function indexMissingTexts(limit = 100) {
     .where(and(isNull(dropTexts.dropId), inArray(drops.kind, [...SEARCH_KINDS]), isNotNull(drops.blobKey)))
     .limit(limit)
   let indexed = 0
+  const failed: { drop: string; error: string }[] = []
   for (const doc of missing) {
     const [error, file] = await blob.get(doc.blobKey!)
     if (error && error.code !== "BLOB_NOT_FOUND") {
-      log.error({ action: "search-index", drop: doc.id, error: error.message })
+      failed.push({ drop: doc.id, error: error.message })
       continue
     }
     let source = ""
     try {
       source = file ? new TextDecoder("utf-8").decode(await file.arrayBuffer()) : ""
-    } catch {}
+    } catch (failure) {
+      failed.push({ drop: doc.id, error: failure instanceof Error ? failure.message : String(failure) })
+      continue
+    }
     await db
       .insert(dropTexts)
       .values({ dropId: doc.id, text: searchableText(doc.kind, source) })
       .onConflictDoNothing()
     indexed++
   }
-  return indexed
+  return { indexed, ...(failed.length ? { failed } : {}) }
 }

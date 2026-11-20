@@ -325,11 +325,10 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             v-model="note"
             aria-label="Comment"
             autofocus
-            autoresize
             class="w-full"
-            :maxrows="8"
             placeholder="What should change here?"
             :rows="3"
+            :ui="{ base: 'field-sizing-content min-h-[calc(3lh+--spacing(3))] max-h-[calc(8lh+--spacing(3))]' }"
             @keydown.meta.enter="send"
             @keydown.ctrl.enter="send"
             @paste="paste"

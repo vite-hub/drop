@@ -13,7 +13,7 @@ afterEach(() => {
 
 test("R2 missing heads and reads preserve null with /f serving enabled", async () => {
   setBlobRuntimeConfig({
-    store: { driver: "cloudflare-r2", binding: "BLOB", bucketName: "drop" },
+    store: { driver: "cloudflare", binding: "BLOB", bucketName: "drop" },
     serve: { route: "/f", store: "default" },
   })
   setActiveCloudflareEnv({ BLOB: { head: async () => null, get: async () => null } })
@@ -24,7 +24,7 @@ test("R2 missing heads and reads preserve null with /f serving enabled", async (
 test("R2 failures remain errors and existing heads retain their served URL", async () => {
   const cause = new Error("R2 unavailable")
   setBlobRuntimeConfig({
-    store: { driver: "cloudflare-r2", binding: "BLOB", bucketName: "drop" },
+    store: { driver: "cloudflare", binding: "BLOB", bucketName: "drop" },
     serve: { route: "/f", store: "default" },
   })
   setActiveCloudflareEnv({
@@ -55,7 +55,7 @@ test("serve answers a byte range with 206 so videos can seek", async () => {
     httpMetadata: { contentType: "video/mp4" },
   }
   setBlobRuntimeConfig({
-    store: { driver: "cloudflare-r2", binding: "BLOB", bucketName: "drop" },
+    store: { driver: "cloudflare", binding: "BLOB", bucketName: "drop" },
     serve: { route: "/f", store: "default" },
   })
   setActiveCloudflareEnv({

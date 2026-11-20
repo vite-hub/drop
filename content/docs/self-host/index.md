@@ -24,9 +24,9 @@ Then set these on the deployment:
 ::docs-env
 ::
 
-Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_GITHUB_ORG`, which wins when both are set. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
+Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_MODE`, which wins when both are set. `VITEHUB_MEMBERS` is owned by ViteHub Auth and only reads that name; `VITEHUB_DROP_MEMBERS` is unsupported. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
 
-- **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_MEMBERS` lets in only the people whose emails it lists, plus the admins, for publishing and viewing, shared links and MCP included. Like `DROP_ADMINS`, it compares emails a sign-in method verified, so it keeps working if you swap GitHub for another provider. Take someone off and restart, and they're out. `DROP_GITHUB_ORG` requires active membership of that organization instead; sign-in then asks for `read:org`. With both, a person needs both.
+- **Who signs in.** Anyone with a GitHub account, as a Member. `VITEHUB_MEMBERS` lets in only the people it lists, plus the admins, for publishing and viewing, shared links and MCP included. Each entry is a GitHub account (`github:22072217`), an email a sign-in method verified, an email domain (`@example.com`), or a GitHub organization (`github-org:your-org`), which makes sign-in ask for `read:org`. Matching any entry is enough. Take someone off, and they can't sign in again and lose their session within five minutes. It's [ViteHub Auth's member list](https://vitehub.dev/docs/auth/configure#choose-who-can-sign-in).
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
 - **Roles come only from that list.** Admins open **Console** in the sidebar, which opens this Drop in the [ViteHub Console](https://console.vitehub.dev), to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. Link the Drop there once and set the `VITEHUB_CONSOLE_KEY_<NAME>` variable it shows; the Console then lets in only people whose email is in `DROP_ADMINS`. On Node/VPS, build with `DROP_PUBLIC_URL=https://drop.example.com`; signed calls require this trusted origin at build time. For Docker, build your deployment image with `docker build --build-arg DROP_PUBLIC_URL=https://drop.example.com -t my-drop .` instead of using the generic prebuilt image for Console access. Rebuild when the public origin changes. The ingress must pass `POST /_vitehub/rpc` and its subpaths unchanged. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
@@ -36,7 +36,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 ## Team mode {#team-mode}
 
-A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `DROP_MEMBERS`, `DROP_GITHUB_ORG`, or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
+A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `VITEHUB_MEMBERS` or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
 
 - New drops start shared with the Team.
 - The sidebar leads with the **Team** tab: the team's folders, then teammates' drops shared with the team.
@@ -47,7 +47,7 @@ A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, a
 ```sh
 DROP_MODE=team
 DROP_ADMINS=you@example.com
-DROP_GITHUB_ORG=your-org
+VITEHUB_MEMBERS=github-org:your-org
 DROP_PUBLIC_LINK_DAYS=7
 ```
 
@@ -106,14 +106,29 @@ Shortening the window applies to existing drops at once.
 | Setting or page | What it does |
 | --- | --- |
 | `DROP_SHARE_APPROVAL=true` | A member's public links wait until an admin approves that member on `/admin/review`. On a team Drop, a waiting link still reaches the team. Admins skip the wait, and links shared before you turn it on stay shared. |
-| `/report` | Anyone reports a shared link. Admins see reports on `/admin/reports` and dismiss them, quarantine the drop, or ban its owner, which takes down all their drops. Each report logs a high-severity event; Drop sends no email. |
+| `/report` | Anyone reports a shared link. Admins see reports on `/admin/reports` and dismiss them, quarantine the drop, or ban its owner, which takes down all their drops. Each report logs an audit event; Drop sends no email. |
 | `DROP_ABUSE_EMAIL` | Adds a public contact address to the abuse page. |
 
 Before you open your Drop to the public, adapt `app/pages/terms.vue`, `acceptable-use.vue`, and `abuse.vue` to your jurisdiction, with a DMCA contact if you need one. Drops and their files are kept out of search engines.
 
 ## Logs {#logs}
 
-Drop writes one structured [evlog](https://www.evlog.dev) event per request: who called, which agent, what it did, and why it failed. MCP tool calls, purges from the Trash, and abuse reports land there too. On Cloudflare they're in Workers Logs; elsewhere, in the host's log output.
+Drop writes one structured [evlog](https://www.evlog.dev) event per request: who called, which agent, what it did, and why it failed. On Cloudflare they're in Workers Logs; elsewhere, in the host's log output.
+
+| Field | What it holds |
+| --- | --- |
+| `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
+| `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
+| `auth.denied` | Why Drop refused a session: `banned` or `not-member`. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
+| `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
+| `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
+
+**Kept events.** Every event is kept today. Failures, requests slower than a second, and audits are kept even if you lower the sampling rate.
+
+**Left out.** The health check and static files write no event. Upload URLs and password reset links lose their token, and IP addresses are masked.
+
+**The hourly cleanup** writes one event a run, `schedule: "cleanup"`, with what each step did, how long it took, and the steps that failed.
 
 ## Database and migrations {#database}
 

@@ -6,6 +6,7 @@ import { boardOutline } from "#shared/board"
 import { findDropByRef, permissions } from "../../utils/drops"
 import { writeBoard } from "../../utils/boards"
 import { requireIdentity } from "../../utils/identity"
+import { logDrop } from "../../utils/logs"
 import { BoardEdgeInput, BoardItemInput } from "../board"
 
 export default defineMcpTool({
@@ -42,6 +43,7 @@ export default defineMcpTool({
     if (drop.head || drop.expired)
       throw new HTTPError({ status: 409, message: "That's an older version of the board; edit the latest one." })
     const { board, changed } = await writeBoard(drop, { edit, who })
+    logDrop(event, drop, { change: "board" })
     return {
       content: [
         { type: "text" as const, text: `Changed ${changed} elements. The board now:\n\n${boardOutline(board)}` },
