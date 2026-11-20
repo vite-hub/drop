@@ -938,15 +938,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const railedHere = bubbles.has(m.id);
         textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
-        const rects = range.getClientRects(), last = rects[rects.length - 1];
-        if (!last) {
+        if (article) {
           const end = range.endContainer;
           const element = end.nodeType === 1 ? end : end.parentElement;
-          const folded = article && element?.closest(".drop-head a.cp.drop-folded");
+          const folded = element?.closest(".drop-head a.cp.drop-folded");
           const toggle = folded && folded.parentElement.querySelector(':scope > .drop-links-toggle[aria-expanded="false"]');
-          if (toggle) pinOnStand(m, toggle);
-          continue;
+          if (toggle) { pinOnStand(m, toggle); continue; }
         }
+        const rects = range.getClientRects(), last = rects[rects.length - 1];
+        if (!last) continue;
         // Outlined like an area, one box per line: a highlight alone can't draw a border, and its tint barely shows on
         // colored code. A line's pieces (one per token in highlighted code) join into one box.
         const lines = [];

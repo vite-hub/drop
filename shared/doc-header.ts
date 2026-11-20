@@ -159,7 +159,8 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
   .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; }
 }
 .drop-head .cp.drop-folded { display: none; }
-.drop-links-toggle { display: inline-flex; align-items: center; gap: .25rem; height: 1.5rem; padding: 0 .375rem 0 .5rem; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: var(--muted-foreground); font: 400 .8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; vertical-align: middle; cursor: pointer; transition: background-color .12s, color .12s, transform .12s; }
+.drop-links-toggle { display: inline-flex; align-items: center; gap: .25rem; height: 1.5rem; padding: 0 .375rem 0 .5rem; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: var(--muted-foreground); font: 400 .8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; vertical-align: middle; cursor: pointer; user-select: none; transition: background-color .12s, color .12s, transform .12s; }
+.drop-links-toggle::before { content: attr(data-label); }
 .drop-links-toggle:hover { background: var(--accent); color: var(--foreground); }
 .drop-links-toggle:active { transform: scale(.97); }
 .drop-links-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
@@ -453,11 +454,10 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     const extra = chips.length > LINKS_ALL ? chips.slice(LINKS_SHOWN) : [];
     for (const a of chips) a.classList.remove("drop-folded");
     if (!extra.length) return linksLayout();
-    const label = el("span");
-    const toggle = el("button", { type: "button", className: "drop-links-toggle" }, label, icon("chevron"));
+    const toggle = el("button", { type: "button", className: "drop-links-toggle" }, icon("chevron"));
     const show = () => {
       for (const a of extra) a.classList.toggle("drop-folded", !linksOpen);
-      label.textContent = linksOpen ? "Show less" : extra.length + " more";
+      toggle.dataset.label = linksOpen ? "Show less" : extra.length + " more";
       toggle.setAttribute("aria-expanded", String(linksOpen));
       toggle.setAttribute("aria-label", linksOpen ? "Show fewer links" : "Show " + extra.length + " more links");
       linksLayout();

@@ -272,13 +272,14 @@ test("a long Links row shows its first links and opens the rest behind N more", 
     }))
     await page.evaluate((header) => window.tell(header), { ...HEADER, related })
     const toggle = frame.locator(".drop-links-toggle")
+    const label = () => toggle.evaluate((button) => getComputedStyle(button, "::before").content)
     await toggle.waitFor()
     assert.deepEqual(
       await visible(),
       own.map((r) => r.title),
       "the doc's own links come first",
     )
-    assert.equal(await toggle.innerText(), "5 more")
+    assert.equal(await label(), '"5 more"')
     assert.equal(await toggle.getAttribute("aria-expanded"), "false")
     const folded = await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)
 
@@ -287,7 +288,7 @@ test("a long Links row shows its first links and opens the rest behind N more", 
     await page.keyboard.press("Tab")
     assert.equal(await frame.evaluate(() => document.activeElement.textContent), "Related 1")
     assert.equal((await visible()).length, 11)
-    assert.equal(await toggle.innerText(), "Show less")
+    assert.equal(await label(), '"Show less"')
     assert.equal(await toggle.getAttribute("aria-label"), "Show fewer links")
     await frame.waitForFunction(() => !document.querySelector('div[data-key="links"] > dd').getAnimations().length)
     assert.ok((await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)) >= folded)
@@ -300,7 +301,7 @@ test("a long Links row shows its first links and opens the rest behind N more", 
       await visible(),
       own.map((r) => r.title),
     )
-    assert.equal(await frame.locator(".drop-links-toggle").innerText(), "4 more")
+    assert.equal(await label(), '"4 more"')
 
     // Paper gets every link.
     await page.emulateMedia({ media: "print" })
@@ -336,6 +337,58 @@ test("comments on folded links have a pin by the disclosure", { timeout: 30000 }
 
     await toggle.click()
     await expandedPin.waitFor()
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    await foldedPin.waitFor()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a quote across two links stays anchored when the disclosure appears", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, index) => ({
+      url: `https://github.com/acme/app/pull/${index + 1}`,
+      title: `Resource ${index + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    const selector = 'dl.cfm div[data-key="links"] dd'
+    const selectQuote = () =>
+      frame.locator(selector).evaluate((row) => {
+        const links = row.querySelectorAll("a.cp")
+        const range = document.createRange()
+        range.setStart(links[5], 0)
+        range.setEnd(links[6], links[6].childNodes.length)
+        const selection = getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+        const quote = selection.toString().replace(/\s+/g, "")
+        selection.removeAllRanges()
+        return quote
+      })
+    const quote = "Resource 6 Resource 7"
+    assert.equal(await selectQuote(), "Resource6Resource7")
+
+    await page.evaluate(
+      ({ selector, quote }) => {
+        window.tell({ type: "markers", markers: [{ id: "cross", kind: "text", selector, quote, n: 1 }] })
+      },
+      { selector, quote },
+    )
+    const pin = frame.locator('drop-comments [data-slot="comment-mark-pin"][data-id="cross"]')
+    const foldedPin = pin.and(frame.locator(".away"))
+    const expandedPin = pin.and(frame.locator(":not(.away)"))
+    await expandedPin.waitFor()
+
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    await toggle.waitFor()
+    assert.equal(await pin.count(), 1, "the late related drop must not unplace the comment")
+    await foldedPin.waitFor()
+    await toggle.click()
+    await expandedPin.waitFor()
+    assert.equal(await selectQuote(), "Resource6Resource7")
     await frame.getByRole("button", { name: "Show fewer links" }).click()
     await foldedPin.waitFor()
   } finally {
