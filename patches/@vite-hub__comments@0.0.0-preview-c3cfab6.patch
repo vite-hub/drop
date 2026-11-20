@@ -72,16 +72,22 @@ diff --git a/dist/client.js b/dist/client.js
  		sendId = void 0;
  		thread = void 0;
  		if (status.retryAt !== void 0 && status.retryAt > Date.now()) return limited(status.retryAt);
-@@ -1203,7 +1213,7 @@
+@@ -1203,7 +1213,13 @@
  	const refresh = async () => {
  		const at = step;
  		const status = await transport.status();
 -		if (at !== step || state.status === "pairing" || state.status === "confirm" || state.status === "sending") return;
-+		if (at !== step || state.status === "pairing" || state.status === "confirm" || state.status === "sending" || state.status === "failed") return;
++		if (at !== step || state.status === "pairing" || state.status === "confirm" || state.status === "sending") return;
++		if (state.status === "failed") {
++			if (retry !== "send") return;
++			count = status.count;
++			agent = status.agent;
++			if (count) return count !== state.count && set({ ...state, count });
++		}
  		apply(status);
  	};
  	const settle = (result, paired) => {
-@@ -1222,7 +1232,9 @@
+@@ -1222,7 +1238,9 @@
  			count,
  			inbox: inbox()
  		});
@@ -92,7 +98,7 @@ diff --git a/dist/client.js b/dist/client.js
  	};
  	const deliver = async (request, paired) => {
  		set({
-@@ -1267,9 +1279,19 @@
+@@ -1267,9 +1285,19 @@
  	const pair = async (copy) => {
  		if (fetching) return;
  		fetching = true;
@@ -113,7 +119,7 @@ diff --git a/dist/client.js b/dist/client.js
  		try {
  			const next = await pairing;
  			const ok = await copied;
-@@ -1284,6 +1306,8 @@
+@@ -1284,6 +1312,8 @@
  			}
  			if (code) drop(code);
  			code = next.code;
@@ -122,7 +128,7 @@ diff --git a/dist/client.js b/dist/client.js
  			set({
  				status: "pairing",
  				count,
-@@ -1330,7 +1354,7 @@
+@@ -1330,7 +1360,7 @@
  				if (event.type === "working") {
  					sendId = event.id;
  					thread = event.thread;
@@ -131,7 +137,7 @@ diff --git a/dist/client.js b/dist/client.js
  					return;
  				}
  				if (event.id === sendId && (state.status === "working" || state.status === "sent")) refresh().catch(working);
-@@ -1350,7 +1374,13 @@
+@@ -1350,7 +1380,14 @@
  			if (fetching) return;
  			if (state.status !== "idle" && state.status !== "failed" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
@@ -142,10 +148,12 @@ diff --git a/dist/client.js b/dist/client.js
 +			}
  			if (!agent) return pair(copy);
 +			retry = "send";
- 			return deliver(() => transport.send());
+-			return deliver(() => transport.send());
++			await deliver(() => transport.send());
++			if (state.status === "failed") await refresh().catch(() => void 0);
  		},
  		async pairAnother(copy) {
-@@ -1361,7 +1391,9 @@
+@@ -1361,7 +1398,9 @@
  			if (state.status !== "confirm" || !code) return;
  			const used = code;
  			code = void 0;
@@ -156,7 +164,7 @@ diff --git a/dist/client.js b/dist/client.js
  		},
  		async copyAgain(copy) {
  			if (state.status !== "pairing" || !state.reason) return;
-@@ -1545,7 +1577,7 @@
+@@ -1545,7 +1584,7 @@
  		status: async () => (await request(`/send/status?page=${page()}`)).data,
  		startPairing: async () => (await request(`/send/start?page=${page()}`, post())).data,
  		pollPairing: async (value) => (await request(`/send/pair/${code(value)}`)).data,

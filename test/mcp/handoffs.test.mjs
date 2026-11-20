@@ -339,6 +339,44 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   }
 }, 3000)
 
+test("a failed ordinary Send updates its count and clears when the comments are answered", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+  state.who = ana
+  const transport = transportFor(doc.id)
+  const client = createCommentSend(transport)
+  try {
+    await client.refresh()
+    rejectDelivery = true
+    await client.send()
+    assert.equal(client.state.status, "failed")
+    assert.equal(client.state.count, 2)
+
+    state.who = agentOf(ana)
+    assert.equal(
+      (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
+      undefined,
+    )
+    state.who = ana
+    await client.refresh()
+    assert.equal(client.state.status, "failed")
+    assert.equal(client.state.count, 1)
+
+    state.who = agentOf(bob)
+    assert.equal(
+      (await call(reply, { id: doc.id, comment: theirs.n, body: "The freeze has moved." })).isError,
+      undefined,
+    )
+    state.who = ana
+    assert.equal((await transport.status()).count, 0)
+    await client.refresh()
+    assert.deepEqual(client.state, { status: "idle", count: 0, inbox: true })
+    assert.equal(delivered.length, 1)
+  } finally {
+    client.start()()
+  }
+})
+
 test("an admin's revision does not forward the owner's handoff to the admin", async () => {
   const { doc } = await reviewed()
   state.who = agentOf({ ...bob, role: "admin" })
