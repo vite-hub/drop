@@ -33,12 +33,13 @@ export async function sendSubject(path: string, route: string): Promise<CommentS
 
 /**
  * The `data` of each delivery: the drop, the version to publish on as `base`, and the session that published it, so
- * a T3 inbox thread can hand the send on to the thread that wrote the drop.
+ * a T3 inbox thread can hand the send on to the thread that wrote the drop. The session goes only to the drop's owner,
+ * as read_drop's Versions show it: a teammate's send carries none, so their agent never acts on the owner's thread.
  */
-export async function handoffData(subject: CommentSubject): Promise<CommentSendData> {
+export async function handoffData(subject: CommentSubject, sender: string): Promise<CommentSendData> {
   const drop = subject.kind === "drop" || subject.kind === "site" ? await findDrop(subject.id) : null
   if (!drop) return null
-  const session = drop.agent?.session
+  const session = drop.ownerId === sender ? drop.agent?.session : null
   return {
     drop: drop.id,
     version: drop.version,
@@ -59,6 +60,8 @@ interface HandoffThread {
 
 export interface Handoff {
   id: string
+  /** The member who pressed Send, the only one who may read it. */
+  sender: string
   state: HandoffState
   drop: DropRow
   threads: HandoffThread[]
@@ -97,7 +100,7 @@ export async function openHandoff(id: string, who: Identity): Promise<Handoff | 
       .where(and(eq(commentSends.id, row.id), eq(commentSends.state, "sent")))
     state = "working"
   }
-  return { id: row.id, state, drop, threads: threadsOf(row), createdAt: row.createdAt }
+  return { id: row.id, sender: row.member, state, drop, threads: threadsOf(row), createdAt: row.createdAt }
 }
 
 /** At most this many handoffs in a list. */
@@ -114,7 +117,18 @@ export async function listHandoffs(who: Identity): Promise<Handoff[]> {
   const listed = await Promise.all(
     rows.map(async (row) => {
       const drop = await dropOf(row, who)
-      return drop ? [{ id: row.id, state: row.state, drop, threads: threadsOf(row), createdAt: row.createdAt }] : []
+      return drop
+        ? [
+            {
+              id: row.id,
+              sender: row.member,
+              state: row.state,
+              drop,
+              threads: threadsOf(row),
+              createdAt: row.createdAt,
+            },
+          ]
+        : []
     }),
   )
   return listed.flat()

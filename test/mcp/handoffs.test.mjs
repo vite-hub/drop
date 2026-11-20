@@ -138,9 +138,9 @@ async function reviewed() {
   return { doc, mine, theirs, answered }
 }
 
-/** Ana pairs Claude Code's inbox and sends what waits on the doc. */
-async function pairAndSend(doc) {
-  state.who = ana
+/** `person` (Ana unless named) pairs Claude Code's inbox and sends what waits on the doc. */
+async function pairAndSend(doc, person = ana) {
+  state.who = person
   const page = `?page=${encodeURIComponent(`/d/${doc.id}/plan`)}`
   assert.equal((await send(`/status${page}`)).body.data.count, 2)
   const { code } = (await send(`/start${page}`, { method: "POST" })).body.data
@@ -150,7 +150,7 @@ async function pairAndSend(doc) {
     (await send("/pair", { method: "POST", body: { code, inbox: "Claude Code" }, origin: null })).status,
     200,
   )
-  state.who = ana
+  state.who = person
   const sent = (await send(`/allow${page}`, { method: "POST", body: { code } })).body.data
   assert.equal(sent.status, "sent")
   return sent.id
@@ -174,6 +174,18 @@ test("Send carries the drop, the version to build on, and the publishing session
   assert.equal(body.read, null, "the agent reads through Drop's MCP, not a token")
   assert.doesNotMatch(JSON.stringify(body), /Friday|final/)
   assert.ok(!body.threads.includes(answered.id))
+})
+
+test("a teammate's Send carries no publishing session, since only the drop's owner sees it", async () => {
+  const { doc } = await reviewed()
+  const id = await pairAndSend(doc, bob)
+  const [{ owner, body }] = delivered
+  assert.equal(owner, "bob")
+  assert.deepEqual(body.data, { drop: doc.id, version: 1, base: 1, session: null })
+
+  state.who = agentOf(bob)
+  const read = await call(readDrop, { handoff: id })
+  assert.doesNotMatch(read.content[0].text, /thread-p|feat\/plan/)
 })
 
 test("read_drop with a handoff returns its threads as asks and quotes and marks it working; another member gets nothing", async () => {
@@ -202,6 +214,10 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   assert.equal(read.structuredContent.id, doc.id)
   const text = read.content[0].text
   assert.match(text, new RegExp(`## Handoff ${id} \\(working, `))
+  assert.match(
+    text,
+    /published from session harness "T3 Code", thread "thread-p", branch "feat\/plan"\. If that isn't your session/,
+  )
   assert.match(text, new RegExp(`### Asks: the user's own\\n${mine.n}\\. .+\\n {3}Why Friday\\?`))
   assert.match(
     text,

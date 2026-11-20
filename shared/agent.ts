@@ -6,26 +6,32 @@ const label = v.pipe(v.string(), v.minLength(1), v.maxLength(160), v.regex(/\S/)
  * An identifier for one session field: one line, so it can't start lines of its own in read_drop's text. One regex
  * says both that and label's "not blank": JSON Schema has room for one pattern, and tools/list fails on a second.
  */
-const identifier = v.pipe(
-  v.string(),
-  v.minLength(1),
-  v.maxLength(160),
-  // oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
-  v.regex(/^(?!\s{1,160}$)[^\u0000-\u001f\u007f\u2028\u2029]{1,160}$/),
-)
+const identifier = (max: number) =>
+  v.pipe(
+    v.string(),
+    v.minLength(1),
+    v.maxLength(max),
+    // oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
+    v.regex(new RegExp(`^(?!\\s{1,${max}}$)[^\\u0000-\\u001f\\u007f\\u2028\\u2029]{1,${max}}$`)),
+  )
 
 /**
  * Where the publishing agent runs, so the next round's comments can reach the same session. Identifiers only, never
  * credentials or content.
  */
 const AgentSessionSchema = v.object({
-  harness: v.optional(v.pipe(identifier, v.description("The app that runs the session, e.g. T3 Code."))),
+  harness: v.optional(v.pipe(identifier(160), v.description("The app that runs the session, e.g. T3 Code."))),
   thread: v.optional(
-    v.pipe(identifier, v.description("The id of the thread or conversation this publish comes from.")),
+    v.pipe(
+      identifier(320),
+      v.description(
+        "The thread or conversation this publish comes from: in T3 Code its t3-thread://v2/<environment>/<thread> link, elsewhere its id.",
+      ),
+    ),
   ),
-  project: v.optional(v.pipe(identifier, v.description("The project's name or id in that app."))),
-  worktree: v.optional(v.pipe(identifier, v.description("The working directory or worktree the agent works in."))),
-  branch: v.optional(v.pipe(identifier, v.description("The git branch it works on."))),
+  project: v.optional(v.pipe(identifier(160), v.description("The project's name or id in that app."))),
+  worktree: v.optional(v.pipe(identifier(160), v.description("The working directory or worktree the agent works in."))),
+  branch: v.optional(v.pipe(identifier(160), v.description("The git branch it works on."))),
 })
 
 /** Self-reported for this publish. Omit values the agent's runtime does not expose. */

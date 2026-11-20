@@ -88,7 +88,7 @@ export default defineComments({
    * The agent reads them through Drop's MCP, `read_drop({ handoff })`, as the member, so a send carries no read token.
    * Each delivery says which drop and version to publish on, and the session that published it.
    */
-  send: { grant: false, payload: ({ subject }) => handoffData(subject) },
+  send: { grant: false, payload: ({ subject, user }) => handoffData(subject, user.id) },
 
   // Send asks about the drop whose page it's on. Everything else, the toolbar on Drop's pages included, keeps `page`.
   page: ({ url, event }) =>
