@@ -96,6 +96,8 @@ Comments stay anchored to what they point at, per page for apps. Click a pin to 
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
+**Copy prompt** in the review toolbar copies every open thread waiting for an answer as a prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
+
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 
 ### Review toolbar {#toolbar}

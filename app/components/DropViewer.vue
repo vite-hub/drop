@@ -14,7 +14,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
-import { feedbackMarkdown, promptMarkdown } from "#shared/feedback"
+import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
@@ -1003,11 +1003,21 @@ watch(
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
 const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
-// Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
-// It steps aside while they comment, so the comment actions keep the pill to one row.
-const awaiting = computed(() => awaitingAnswer(comments.value))
+// Once a thread waits on an answer, from anyone, the pill hands the waiting threads to an agent: a signed-in member's
+// Send gives them to their own agent, and everyone else copies a prompt with them, the reader's as asks and others' as
+// quotes. A guest has no account, so their own threads are the ones marked `mine`. Both step aside while the reader
+// comments, so the comment actions keep the pill to one row.
+const readerId = computed(
+  () =>
+    me.value?.id ??
+    comments.value.flatMap((comment) => [comment, ...comment.replies]).find((item) => item.mine)?.authorId ??
+    "",
+)
+const waiting = computed(() => waitingForAnswer(comments.value, { me: readerId.value }))
+const sendOn = useRuntimeConfig().public.send
+const canSend = computed(() => sendOn && Boolean(me.value))
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const prompt = () => promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value)
+const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1807,9 +1817,19 @@ watch(
                 @page="commentOnPage"
                 @pins="toggleOverlay('pins')"
               >
-                <template v-if="awaiting.length && !lightbox && !commentMode" #tools>
+                <template #tools>
+                  <!-- v-show, so a pairing in progress outlasts a comment or the lightbox. -->
+                  <ViewerCommentSend
+                    v-if="canSend"
+                    v-show="!lightbox && !commentMode"
+                    :comments="comments"
+                    :drop="drop.id"
+                    :me="readerId"
+                    :send="dropSend"
+                  />
                   <UTooltip
-                    :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
+                    v-else-if="waiting.length && !lightbox && !commentMode"
+                    :text="`Copy a prompt with ${waiting.length === 1 ? 'the comment' : `the ${waiting.length} comments`} that wait for an answer, for your agent`"
                   >
                     <DropCopyButton
                       aria-label="Copy prompt for your agent"
