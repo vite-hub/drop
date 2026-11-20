@@ -126,7 +126,7 @@ test(
         await frame
           .locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
           .evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src"))),
-        ["/api/favicons/github.com", "https://drop.test/icon.png"],
+        ["https://drop.test/api/favicons/github.com", "https://drop.test/icon.png"],
       )
       assert.equal((await frame.locator('dl.cfm > div[data-key="links"] > dt').innerText()).trim(), "Links")
       // Related drops join the Links row after the doc's own links; their links stay in their own drops.
