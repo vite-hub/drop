@@ -29,11 +29,11 @@ function providers(known, type = "image/png") {
 const tileText = (icon) => atob(icon.body)
 
 test("a host without an icon of its own takes the first domain above it that has one", async () => {
-  providers({ google: ["example.com"] })
-  const icon = await siteIcon("pr42.preview.example.com")
+  providers({ google: ["favicon-fixture.com"] })
+  const icon = await siteIcon("pr42.preview.favicon-fixture.com")
   assert.deepEqual(
     asked.filter((line) => line.startsWith("google")),
-    ["google pr42.preview.example.com", "google preview.example.com", "google example.com"],
+    ["google pr42.preview.favicon-fixture.com", "google preview.favicon-fixture.com", "google favicon-fixture.com"],
   )
   assert.equal(icon.type, "image/png")
   assert.equal(icon.missing, undefined)
@@ -57,27 +57,52 @@ test("DuckDuckGo finds a public preview Google has never crawled, and Google win
   assert.equal((await siteIcon("both.example.io")).type, "image/png")
 })
 
+test("Google's icon does not wait for DuckDuckGo", async () => {
+  const fallback = Promise.withResolvers()
+  vi.stubGlobal("fetch", async (url) => {
+    const host = new URL(url).hostname
+    asked.push(host)
+    return host === "www.google.com"
+      ? new Response(PNG, { headers: { "content-type": "image/png" } })
+      : fallback.promise
+  })
+  const lookup = siteIcon("fast.favicon-fixture.com")
+  try {
+    const icon = await Promise.race([lookup, new Promise((resolve) => setImmediate(() => resolve(null)))])
+    assert.deepEqual(asked, ["www.google.com", "icons.duckduckgo.com"])
+    assert.equal(icon?.type, "image/png")
+  } finally {
+    fallback.resolve(new Response(null, { status: 404 }))
+    await lookup
+  }
+})
+
 test("a site under a public suffix never takes the suffix's icon, and gets its own letter tile", async () => {
   providers({ google: ["netlify.app"], duckduckgo: ["netlify.app"] })
   const icon = await siteIcon("acme.netlify.app")
   assert.deepEqual(asked, ["google acme.netlify.app", "duckduckgo acme.netlify.app"], "netlify.app isn't asked")
   assert.equal(icon.type, "image/svg+xml")
   assert.equal(icon.missing, true)
-  assert.match(tileText(icon), />A<\/text>/)
+  const { siteTile } = await import("../../shared/site-tile.ts")
+  assert.equal(tileText(icon), siteTile("acme"))
 })
 
 test("no icon anywhere, or one that isn't a raster image, is the site's letter tile", async () => {
   providers({})
-  const none = await siteIcon("nothing.example.org")
+  const none = await siteIcon("nothing.favicon-fixture.org")
   assert.equal(none.type, "image/svg+xml")
-  assert.match(tileText(none), />E<\/text>/, "example's E, not nothing's N: the tile names the site")
-  providers({ google: ["svg.example.net"], duckduckgo: ["svg.example.net"] }, "image/svg+xml")
-  const icon = await siteIcon("svg.example.net")
+  assert.match(tileText(none), />F<\/text>/, "the site's F, not nothing's N")
+  providers({ google: ["svg.favicon-fixture.net"], duckduckgo: ["svg.favicon-fixture.net"] }, "image/svg+xml")
+  const icon = await siteIcon("svg.favicon-fixture.net")
   assert.equal(icon.missing, true, "Drop's own tile, never the site's SVG")
   assert.doesNotMatch(tileText(icon), /<script/)
-  // A name with no site to ask about is never sent to a provider.
-  asked.length = 0
-  assert.match(tileText(await siteIcon("intranet")), />I<\/text>/)
+})
+
+test("private-network and special-use hosts get local tiles without asking either provider", async () => {
+  providers({})
+  for (const host of ["intranet", "project.localhost", "svc.corp.internal", "127.0.0.1", "router.home.arpa"]) {
+    assert.equal((await siteIcon(host)).missing, true, host)
+  }
   assert.deepEqual(asked, [])
 })
 
@@ -95,6 +120,6 @@ test("a host name is all the endpoint takes, and a doc's icons point at Drop", (
     assert.ok(!FAVICON_HOST.test(bad), bad)
   assert.equal(
     absoluteFavicons('<img class="cp-img" src="/api/favicons/github.com">', "https://drop.example"),
-    '<img class="cp-img" src="https://drop.example/api/favicons/github.com">',
+    '<img class="cp-img" src="https://drop.example/api/favicons/github.com" data-drop-site="github">',
   )
 })

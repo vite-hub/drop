@@ -197,8 +197,8 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
 
   // A chip's icon that doesn't load (a sign-in proxy in front of Drop's /api/favicons/, a host that's down) takes its
   // site's letter tile, as the server draws one for a site without an icon, instead of an empty space before the
-  // words. The frame has no public suffix list: the site's name is the label before the last, or before a
-  // two-letter country's co/com/org/net/gov/ac/edu. An agent's logo that fails goes, leaving its name. Images that
+  // words. The server supplies the canonical name for favicon chips; other chips fall back to a hostname guess.
+  // An agent's logo that fails goes, leaving its name. Images that
   // failed before this script ran are caught up at once.
   const siteTile = ${siteTile.toString()};
   function siteName(href) {
@@ -209,7 +209,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
   }
   function brokenImage(img) {
     const chip = img.matches("img.cp-img") && img.closest("a[href]");
-    if (chip && !img.src.startsWith("data:")) img.src = "data:image/svg+xml," + encodeURIComponent(siteTile(siteName(chip.href)));
+    if (chip && !img.src.startsWith("data:")) img.src = "data:image/svg+xml," + encodeURIComponent(siteTile(img.dataset.dropSite || siteName(chip.href)));
     else if (img.matches(".drop-who img")) img.remove();
   }
   document.addEventListener("error", (e) => { if (e.target instanceof HTMLImageElement) brokenImage(e.target); }, true);

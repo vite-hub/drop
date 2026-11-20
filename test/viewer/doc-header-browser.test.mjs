@@ -5,6 +5,8 @@ import { frameAllow, previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
 
 const { withDocProperties, renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
+const { absoluteFavicons } = await import("../../server/utils/favicons.ts")
+const { siteTile } = await import("../../shared/site-tile.ts")
 
 const HEADER = {
   type: "doc-header",
@@ -76,10 +78,10 @@ async function open(
 ) {
   const source = "---\nstatus: Ready\n---\n\n# Plan\n\nLaunch on November 18.\n"
   const { html } = await renderMarkdownCached("doc-header.md", async () => source)
-  const body = await withDocProperties(html, {
-    resources,
-    updatedAt: Date.UTC(2026, 10, 16),
-  })
+  const body = absoluteFavicons(
+    await withDocProperties(html, { resources, updatedAt: Date.UTC(2026, 10, 16) }),
+    "https://drop.test",
+  )
   const escaped = planDocument("markdown", source, false, body).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   // Firefox needs no permission to write in a click, and Playwright's Firefox grants none.
   const context = await browser.newContext(
@@ -88,6 +90,8 @@ async function open(
   const page = await context.newPage()
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
+    if (signIn && url.hostname === "drop.test" && url.pathname === "/oauth2/start")
+      return route.fulfill({ contentType: "text/html", body: "Sign in" })
     if (url.hostname === "drop.test" && /^\/(api\/favicons|agents)\/|^\/icon\.png$/.test(url.pathname))
       return signIn
         ? route.fulfill({ status: 302, headers: { location: "https://drop.test/oauth2/start" } })
@@ -432,16 +436,22 @@ test("reopening Links mid-collapse animates to the expanded height", { timeout: 
 test("a site icon that doesn't load shows its site's letter tile", { timeout: 30000 }, async () => {
   const browser = await chromium.launch()
   try {
-    const { page, frame } = await open(browser, { signIn: true })
+    const { page, frame } = await open(browser, {
+      signIn: true,
+      resources: [{ url: "https://github.com/acme/app/pull/212" }, { url: "https://acme.netlify.app/" }],
+    })
     await page.evaluate((header) => window.tell(header), HEADER)
     const icons = frame.locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
     await frame.waitForFunction(() =>
-      Array.from(document.querySelectorAll("img.cp-img")).every((img) => img.src.startsWith("data:")),
+      Array.from(document.querySelectorAll("img.cp-img")).every(
+        (img) => img.src.startsWith("data:") && img.naturalWidth,
+      ),
     )
-    assert.ok((await icons.evaluateAll((all) => all.map((img) => img.naturalWidth))).every((w) => w > 0))
     // Each takes its site's letter tile: GitHub's G for the doc's pull request.
     const first = decodeURIComponent(await icons.first().getAttribute("src"))
     assert.match(first, />G<\/text>/)
+    const tenant = decodeURIComponent(await icons.nth(1).getAttribute("src"))
+    assert.equal(tenant, `data:image/svg+xml,${siteTile("acme")}`)
     // The agent's logo, also blocked, goes; its name stays.
     await frame.getByRole("button", { name: "See more" }).click()
     const who = frame.locator(".drop-who")

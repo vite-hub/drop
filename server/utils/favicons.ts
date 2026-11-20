@@ -1,5 +1,5 @@
 import { defineCachedFunction } from "nitro/cache"
-import { getDomain, getDomainWithoutSuffix } from "tldts"
+import { parse } from "tldts"
 import { FAVICON_PATH } from "#shared/resources"
 import { siteTile } from "#shared/site-tile"
 
@@ -38,16 +38,12 @@ function base64(bytes: Uint8Array) {
   return btoa(binary)
 }
 
-/** Each provider's address for a host's icon. Both answer a host they don't know with a 404 and a placeholder. */
-const PROVIDERS = [
-  (host: string) => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`,
-  (host: string) => `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
-]
-
 /** One host's own icon from the first provider that has it, or null when none does or none can be reached. */
 async function ownIcon(host: string): Promise<Favicon | null> {
-  const found = await Promise.all(PROVIDERS.map((provider) => providerIcon(provider(host))))
-  return found.find((icon) => icon !== null) ?? null
+  const encoded = encodeURIComponent(host)
+  const google = providerIcon(`https://www.google.com/s2/favicons?domain=${encoded}&sz=64`)
+  const duckduckgo = providerIcon(`https://icons.duckduckgo.com/ip3/${encoded}.ico`)
+  return (await google) ?? (await duckduckgo)
 }
 
 async function providerIcon(url: string): Promise<Favicon | null> {
@@ -62,33 +58,32 @@ async function providerIcon(url: string): Promise<Favicon | null> {
   }
 }
 
-const PUBLIC_SUFFIXES = { allowPrivateDomains: true }
+const PUBLIC_SUFFIXES = { allowPrivateDomains: true, detectSpecialUse: true }
+const publicSite = (host: string) => {
+  const site = parse(host, PUBLIC_SUFFIXES)
+  return !site.isSpecialUse && (site.isIcann || site.isPrivate) ? site : null
+}
+const tileName = (host: string, site = publicSite(host)) => site?.domainWithoutSuffix || host
 
 /**
  * The host, then each domain above it down to the site's own. A host that isn't under a public suffix (localhost, an
  * IP address, an intranet name) has no icon to ask for.
  */
-function hostsOf(host: string) {
-  const site = getDomain(host, PUBLIC_SUFFIXES)
+function hostsOf(host: string, site: string | null | undefined) {
   if (!site) return []
   const labels = host.split(".")
   const depth = labels.length - site.split(".").length
   return labels.slice(0, depth + 1).map((_, start) => labels.slice(start).join("."))
 }
 
-/** The site's letter tile: github for gist.github.com, acme for acme.netlify.app, the host itself without a site. */
-function tile(host: string): Favicon {
-  const name = getDomainWithoutSuffix(host, PUBLIC_SUFFIXES) || host
-  return { type: "image/svg+xml", body: btoa(siteTile(name)), missing: true }
-}
-
 export const siteIcon = defineCachedFunction(
   async (host: string): Promise<Favicon> => {
-    for (const candidate of hostsOf(host)) {
+    const site = publicSite(host)
+    for (const candidate of hostsOf(host, site?.domain)) {
       const icon = await ownIcon(candidate)
       if (icon) return icon
     }
-    return tile(host)
+    return { type: "image/svg+xml", body: btoa(siteTile(tileName(host, site))), missing: true }
   },
   {
     name: "favicons",
@@ -101,6 +96,13 @@ export const siteIcon = defineCachedFunction(
   },
 )
 
-/** A rendered doc's icons, which render with Drop-relative addresses, pointed at Drop's origin for the viewer's frame. */
+/** Point a rendered doc's icons at Drop and give the frame their fallback tile names without bundling the suffix list. */
 export const absoluteFavicons = (html: string, origin: string) =>
-  html.replaceAll(`src="${FAVICON_PATH}`, `src="${origin}${FAVICON_PATH}`)
+  html.replace(
+    new RegExp(`(\\s)src="(${FAVICON_PATH}([^"]*))"`, "g"),
+    (_attribute, space: string, src: string, requested: string) => {
+      const host = requested.toLowerCase().replace(/:\d{1,5}$/, "")
+      const name = FAVICON_HOST.test(host) ? tileName(host) : null
+      return `${space}src="${origin}${src}"${name ? ` data-drop-site="${name}"` : ""}`
+    },
+  )
