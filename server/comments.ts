@@ -7,7 +7,7 @@ import { db } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
 import { pageImageType, storeCommentFile, storePageImage } from "./utils/comment-images"
 import { findDrop, permissions } from "./utils/drops"
-import { handoffData, isSendRoute, sendSubject } from "./utils/handoffs"
+import { handoffData, isSendRoute, publishingThread, sendSubject } from "./utils/handoffs"
 import { type Identity, identify, identityOf } from "./utils/identity"
 
 /**
@@ -86,9 +86,14 @@ export default defineComments({
   /**
    * Send in the review pill hands the threads that wait for an answer to the member's own agent (server/utils/handoffs.ts).
    * The agent reads them through Drop's MCP, `read_drop({ handoff })`, as the member, so a send carries no read token.
-   * Each delivery says which drop and version to publish on, and the session that published it.
+   * Each delivery says which drop and version to publish on, and the session that published it. The owner's send goes
+   * to the T3 thread that published the drop when they paired it.
    */
-  send: { grant: false, payload: ({ subject, user }) => handoffData(subject, user.id) },
+  send: {
+    grant: false,
+    payload: ({ subject, user }) => handoffData(subject, user.id),
+    address: ({ subject, user }) => publishingThread(subject, user.id),
+  },
 
   // Send asks about the drop whose page it's on. Everything else, the toolbar on Drop's pages included, keeps `page`.
   page: ({ url, event }) =>

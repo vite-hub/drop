@@ -1,15 +1,3 @@
-CREATE TABLE `vitehub_comment_send_codes` (
-	`id` text PRIMARY KEY,
-	`member` text NOT NULL,
-	`state` text NOT NULL,
-	`agent` text,
-	`host` text,
-	`thread` text,
-	`sealed` text NOT NULL,
-	`expires_at` integer NOT NULL,
-	`created_at` integer NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE `vitehub_comment_sends` (
 	`id` text PRIMARY KEY,
 	`member` text NOT NULL,
@@ -54,6 +42,7 @@ CREATE TABLE `vitehub_webhook_endpoints` (
 	`owner_name` text,
 	`owner_email` text,
 	`name` text NOT NULL,
+	`address` text DEFAULT '' NOT NULL,
 	`kind` text NOT NULL,
 	`agent` text,
 	`host` text,
@@ -64,7 +53,17 @@ CREATE TABLE `vitehub_webhook_endpoints` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `vitehub_comment_send_codes_member` ON `vitehub_comment_send_codes` (`member`);
+CREATE TABLE `vitehub_webhook_pairings` (
+	`id` text PRIMARY KEY,
+	`owner` text NOT NULL,
+	`state` text NOT NULL,
+	`agent` text,
+	`host` text,
+	`address` text,
+	`sealed` text NOT NULL,
+	`expires_at` integer NOT NULL,
+	`created_at` integer NOT NULL
+);
 --> statement-breakpoint
 CREATE INDEX `vitehub_comment_sends_member` ON `vitehub_comment_sends` (`member`,`created_at`);
 --> statement-breakpoint
@@ -76,4 +75,6 @@ CREATE INDEX `vitehub_webhook_deliveries_webhook` ON `vitehub_webhook_deliveries
 --> statement-breakpoint
 CREATE INDEX `vitehub_webhook_deliveries_state` ON `vitehub_webhook_deliveries` (`state`,`due_at`);
 --> statement-breakpoint
-CREATE UNIQUE INDEX `vitehub_webhook_endpoints_owner` ON `vitehub_webhook_endpoints` (`owner`);
+CREATE UNIQUE INDEX `vitehub_webhook_endpoints_owner` ON `vitehub_webhook_endpoints` (`owner`,`address`);
+--> statement-breakpoint
+CREATE INDEX `vitehub_webhook_pairings_owner` ON `vitehub_webhook_pairings` (`owner`);

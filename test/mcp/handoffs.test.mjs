@@ -4,7 +4,9 @@ import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { installComments } from "vite-hub/comments/server"
 import { createCommentsHandler } from "vite-hub/comments/runtime"
-import { checkWebhookUrl } from "vite-hub/webhooks"
+import * as realWebhooks from "vite-hub/webhooks"
+import { createDrizzleWebhookEndpointStore, createDrizzleWebhookStore } from "vite-hub/webhooks/database"
+import { installWebhooks } from "vite-hub/webhooks/runtime"
 import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
@@ -13,40 +15,29 @@ const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: comments } = await import("../../server/comments.ts")
 
-// Send end to end on Drop's side: ViteHub Comments' Send routes with `send` from server/comments.ts, over the Webhooks
-// a member pairs, and then Drop's MCP opening what was sent. Webhooks is a stand-in that keeps endpoints and
-// deliveries in memory; its URL guard is the real one.
-const endpoints = new Map()
+// Send end to end on Drop's side: ViteHub Comments' Send routes with `send` from server/comments.ts, over real Webhooks
+// pairing and endpoints, and then Drop's MCP opening what was sent. Only the delivery is a stand-in: it records what
+// would go out.
 const delivered = []
 const webhooks = {
-  checkWebhookUrl,
-  sealWebhooksText: async (_label, text) => [undefined, text],
-  unsealWebhooksText: async (_label, text) => [undefined, text],
-  createMemberEndpoint: async ({ owner, ownerEmail, name, agent, kind, url }) => {
-    const endpoint = {
-      id: `ep_${owner}`,
-      owner,
-      ownerEmail: ownerEmail ?? null,
-      name,
-      agent,
-      kind,
-      host: url ? new URL(url).host : null,
-      disabledAt: null,
-    }
-    endpoints.set(owner, endpoint)
-    return [undefined, endpoint]
-  },
-  getMemberEndpoint: async (owner) => [undefined, endpoints.get(owner) ?? null],
-  sendToMemberEndpoint: async (owner, body) => {
-    delivered.push({ owner, body })
-    return [
-      undefined,
-      { id: `dl_${delivered.length}`, status: endpoints.get(owner)?.kind === "inbox" ? "inbox" : "sent" },
-    ]
+  ...realWebhooks,
+  sendToMemberEndpoint: async (owner, body, options) => {
+    delivered.push({ owner, body, address: options.address })
+    const [, endpoint] = await realWebhooks.getMemberEndpoint(owner, { address: options.address })
+    return [undefined, { id: `dl_${delivered.length}`, status: endpoint?.kind === "inbox" ? "inbox" : "sent" }]
   },
 }
+/** The member's newest endpoint, as the table holds it. */
+const endpointOf = (owner) =>
+  sql.prepare("SELECT * FROM vitehub_webhook_endpoints WHERE owner = ? ORDER BY created_at DESC").get(owner)
 
 migrate({ comments: false })
+process.env.VITEHUB_WEBHOOKS_KEY ??= btoa(String.fromCharCode(...new Uint8Array(32).fill(7)))
+installWebhooks({
+  webhooks: {},
+  store: createDrizzleWebhookStore(state.db),
+  endpoints: createDrizzleWebhookEndpointStore(state.db),
+})
 installComments(comments, { database: state.db, webhooks: async () => webhooks })
 const handler = createCommentsHandler({ comments, realtime: false })
 
@@ -56,8 +47,9 @@ const agentOf = (person) => ({ ...person, actorKind: "agent", actorName: "Claude
 
 beforeEach(() => {
   reset()
-  sql.exec("DELETE FROM vitehub_comment_sends; DELETE FROM vitehub_comment_send_codes")
-  endpoints.clear()
+  sql.exec(
+    "DELETE FROM vitehub_comment_sends; DELETE FROM vitehub_webhook_pairings; DELETE FROM vitehub_webhook_endpoints; DELETE FROM vitehub_webhook_deliveries",
+  )
   delivered.length = 0
   state.who = agentOf(ana)
 })
@@ -176,11 +168,23 @@ test("Send carries the drop, the version to build on, and the publishing session
   assert.ok(!body.threads.includes(answered.id))
 })
 
-test("a teammate's Send carries no publishing session, since only the drop's owner sees it", async () => {
+test("the owner's Send goes to the thread that published the drop; a teammate's carries no session and no address", async () => {
+  const owners = await reviewed()
+  await pairAndSend(owners.doc)
+  // Allow sends to the agent it just paired; the next Send asks for the publishing thread.
+  assert.equal(delivered[0].address, undefined)
+  await comment(owners.doc.id, ana, "And the date?")
+  state.who = ana
+  const again = await send(`?page=${encodeURIComponent(`/d/${owners.doc.id}`)}`, { method: "POST", body: {} })
+  assert.equal(again.body.data.status, "sent")
+  assert.equal(delivered[1].address, "thread-p")
+
+  delivered.length = 0
   const { doc } = await reviewed()
   const id = await pairAndSend(doc, bob)
-  const [{ owner, body }] = delivered
+  const [{ owner, body, address }] = delivered
   assert.equal(owner, "bob")
+  assert.equal(address, undefined)
   assert.deepEqual(body.data, { drop: doc.id, version: 1, base: 1, session: null })
 
   state.who = agentOf(bob)
@@ -250,9 +254,9 @@ test("Allow keeps the member's verified email with their endpoint, so their Cons
     return (await send(`/allow${page}`, { method: "POST", body: { code } })).status
   }
   assert.equal(await allow(verified), 200)
-  assert.equal(endpoints.get("owner").ownerEmail, "owner@example.com")
+  assert.equal(endpointOf("owner").owner_email, "owner@example.com")
   assert.equal(await allow({ ...bob, emailVerified: false }), 200)
-  assert.equal(endpoints.get("bob").ownerEmail, null)
+  assert.equal(endpointOf("bob").owner_email, null)
   // Outside Send the Comments user carries no email: the toolbar and presence name people without it.
   state.who = verified
   const session = await handler.fetch(
@@ -275,7 +279,7 @@ test("the pair route refuses a code nobody issued and a receiver off the T3 rela
     origin: null,
   })
   assert.deepEqual([elsewhere.status, elsewhere.body.reason], [422, "refused"])
-  assert.equal(endpoints.size, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM vitehub_webhook_endpoints").get().n, 0)
 })
 
 test("Send stays off the ViteHub toolbar's page threads and off pages that aren't a drop's", async () => {

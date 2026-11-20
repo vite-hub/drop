@@ -5034,7 +5034,7 @@
       "entityType": "checks"
     },
     {
-      "name": "vitehub_comment_send_codes",
+      "name": "vitehub_webhook_pairings",
       "entityType": "tables"
     },
     {
@@ -5050,7 +5050,7 @@
       "entityType": "tables"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "id",
       "type": "text",
       "notNull": false,
@@ -5060,8 +5060,8 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
-      "name": "member",
+      "table": "vitehub_webhook_pairings",
+      "name": "owner",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -5070,7 +5070,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "state",
       "type": "text",
       "notNull": true,
@@ -5080,7 +5080,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "agent",
       "type": "text",
       "notNull": false,
@@ -5090,7 +5090,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "host",
       "type": "text",
       "notNull": false,
@@ -5100,8 +5100,8 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
-      "name": "thread",
+      "table": "vitehub_webhook_pairings",
+      "name": "address",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -5110,7 +5110,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "sealed",
       "type": "text",
       "notNull": true,
@@ -5120,7 +5120,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "expires_at",
       "type": "integer",
       "notNull": true,
@@ -5130,7 +5130,7 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
+      "table": "vitehub_webhook_pairings",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -5511,6 +5511,16 @@
     },
     {
       "table": "vitehub_webhook_endpoints",
+      "name": "address",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
       "name": "kind",
       "type": "text",
       "notNull": true,
@@ -5590,11 +5600,11 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_send_codes",
-      "name": "vitehub_comment_send_codes_member",
+      "table": "vitehub_webhook_pairings",
+      "name": "vitehub_webhook_pairings_owner",
       "columns": [
         {
-          "value": "member",
+          "value": "owner",
           "isExpression": false
         }
       ],
@@ -5704,6 +5714,10 @@
         {
           "value": "owner",
           "isExpression": false
+        },
+        {
+          "value": "address",
+          "isExpression": false
         }
       ],
       "isUnique": true,
@@ -5712,8 +5726,8 @@
       "entityType": "indexes"
     },
     {
-      "table": "vitehub_comment_send_codes",
-      "name": "vitehub_comment_send_codes_pk",
+      "table": "vitehub_webhook_pairings",
+      "name": "vitehub_webhook_pairings_pk",
       "columns": [
         "id"
       ],

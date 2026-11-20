@@ -11,7 +11,6 @@ const identifier = (max: number) =>
     v.string(),
     v.minLength(1),
     v.maxLength(max),
-    // oxlint-disable-next-line no-control-regex -- the control characters are what it refuses
     v.regex(new RegExp(`^(?!\\s{1,${max}}$)[^\\u0000-\\u001f\\u007f\\u2028\\u2029]{1,${max}}$`)),
   )
 

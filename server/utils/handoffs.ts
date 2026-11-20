@@ -48,6 +48,15 @@ export async function handoffData(subject: CommentSubject, sender: string): Prom
   }
 }
 
+/**
+ * Where Send reaches the drop's owner: the thread that published it. An owner who paired that T3 thread gets the send
+ * there; otherwise it goes to the agent they paired last. Teammates send to their own last agent.
+ */
+export async function publishingThread(subject: CommentSubject, sender: string): Promise<string | null> {
+  const drop = subject.kind === "drop" || subject.kind === "site" ? await findDrop(subject.id) : null
+  return drop && drop.ownerId === sender ? (drop.agent?.session?.thread ?? null) : null
+}
+
 type SendRow = typeof commentSends.$inferSelect
 
 type HandoffState = SendRow["state"]
