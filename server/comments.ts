@@ -7,7 +7,7 @@ import { db } from "vite-hub/database"
 import { user as users } from "./databases/default/index"
 import { pageImageType, storeCommentFile, storePageImage } from "./utils/comment-images"
 import { findDrop, permissions } from "./utils/drops"
-import { handoffData, sendSubject } from "./utils/handoffs"
+import { handoffData, isSendRoute, sendSubject } from "./utils/handoffs"
 import { type Identity, identify, identityOf } from "./utils/identity"
 
 /**
@@ -99,7 +99,12 @@ export default defineComments({
     const request = event instanceof H3Event ? event : new H3Event(event["~standard"].req, event.context)
     const who = await identify(request)
     if (!who) return null
-    return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), identity: who }
+    // Allow stores a verified email with the member's endpoint, so their ViteHub Console account may redeliver to it.
+    // Only Send gets it: on other routes the user also names people in Realtime presence.
+    const email = isSendRoute(request.url.pathname)
+      ? { email: who.email, emailVerified: who.emailVerified === true }
+      : {}
+    return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), ...email, identity: who }
   },
 
   async authorize({ user, action, thread, subject, console: admitted }) {

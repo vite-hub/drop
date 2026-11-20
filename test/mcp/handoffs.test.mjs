@@ -22,10 +22,11 @@ const webhooks = {
   checkWebhookUrl,
   sealWebhooksText: async (_label, text) => [undefined, text],
   unsealWebhooksText: async (_label, text) => [undefined, text],
-  createMemberEndpoint: async ({ owner, name, agent, kind, url }) => {
+  createMemberEndpoint: async ({ owner, ownerEmail, name, agent, kind, url }) => {
     const endpoint = {
       id: `ep_${owner}`,
       owner,
+      ownerEmail: ownerEmail ?? null,
       name,
       agent,
       kind,
@@ -218,6 +219,30 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   state.who = ana
   assert.equal((await send(`/status${page}`)).body.data.working, undefined)
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
+})
+
+test("Allow keeps the member's verified email with their endpoint, so their Console account may redeliver; an unverified one stays off", async () => {
+  const { doc } = await reviewed()
+  const verified = { ...ana, emailVerified: true }
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  const allow = async (person) => {
+    state.who = person
+    const { code } = (await send(`/start${page}`, { method: "POST" })).body.data
+    state.who = null
+    await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
+    state.who = person
+    return (await send(`/allow${page}`, { method: "POST", body: { code } })).status
+  }
+  assert.equal(await allow(verified), 200)
+  assert.equal(endpoints.get("owner").ownerEmail, "owner@example.com")
+  assert.equal(await allow({ ...bob, emailVerified: false }), 200)
+  assert.equal(endpoints.get("bob").ownerEmail, null)
+  // Outside Send the Comments user carries no email: the toolbar and presence name people without it.
+  state.who = verified
+  const session = await handler.fetch(
+    new Request(`https://drop.example/_vitehub/comments/session?page=${encodeURIComponent(`/d/${doc.id}`)}`),
+  )
+  assert.doesNotMatch(await session.text(), /owner@example\.com/)
 })
 
 test("the pair route refuses a code nobody issued and a receiver off the T3 relay", async () => {

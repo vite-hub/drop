@@ -17,15 +17,15 @@ import type { Identity } from "./identity"
 /** A drop's page: `/d/<id>` with any slug or app path after it, or `/drops/<id>`. */
 const DROP_PAGE = /^\/d(?:rops)?\/([^/]+)/
 
-/** Send's routes ask about the drop whose page Send is on. Every other route keeps Comments' page subject. */
-const SEND_ROUTE = "/_vitehub/comments/send"
+/** Whether a request is one of Send's routes, such as `POST /_vitehub/comments/send/allow`. */
+export const isSendRoute = (route: string) => route.startsWith("/_vitehub/comments/send")
 
 /**
  * The subject of a drop's page for Send, `drop:<id>` or `site:<id>` as its threads have. Nothing for any other page,
  * and nothing outside Send's routes: the ViteHub toolbar on a drop's page keeps its own `page` threads.
  */
 export async function sendSubject(path: string, route: string): Promise<CommentSubject | null> {
-  if (!route.startsWith(SEND_ROUTE)) return null
+  if (!isSendRoute(route)) return null
   const id = DROP_PAGE.exec(path)?.[1]
   const drop = id ? await findDrop(decodeURIComponent(id)) : null
   return drop ? { kind: drop.kind === "site" ? "site" : "drop", id: drop.id } : null
