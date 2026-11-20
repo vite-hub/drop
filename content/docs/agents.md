@@ -17,6 +17,8 @@ For drop.vitehub.dev, the Drop plugin adds the server and the [skills](#skill) i
 - **Claude Code:** Run `claude plugin marketplace add vite-hub/drop`, then `claude plugin install drop@drop`. In Claude Code, open `/mcp`, select the Drop plugin server, and authenticate in your browser.
 - **Codex:** Run `codex plugin marketplace add vite-hub/drop`, then `codex plugin add drop@drop`. Run `codex mcp login drop` and finish signing in through your browser.
 
+Then `/drop:feedback` in Claude Code, or `$feedback` in Codex, lists the comments you sent with [Send](/docs/review) and answers the one you pick. To have Send reach it, run Send once on a drop, paste the setup prompt it copies, and press **Allow and send** when the pill asks.
+
 ## How sign-in works {#sign-in}
 
 Drop is an OAuth 2.1 authorization server for its own MCP endpoint. When a client first connects:
