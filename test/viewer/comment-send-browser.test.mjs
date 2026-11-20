@@ -148,26 +148,34 @@ const page = `<style>${styles}</style>
   <p>We announce on Tuesday 24 November, open the waitlist that morning, and turn on billing a week later.</p></article>
   <div id="app"></div><script type="module" src="/fixture.js"></script>`
 
+async function openFixture(browser, options) {
+  const context = await browser.newContext(options)
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "https://drop.test" })
+  const tab = await context.newPage()
+  const errors = []
+  tab.on("pageerror", (error) => errors.push(error.message))
+  await tab.route("**/*", (route) =>
+    route.fulfill(
+      new URL(route.request().url()).pathname === "/fixture.js"
+        ? { contentType: "text/javascript", body: script }
+        : { contentType: "text/html", body: page },
+    ),
+  )
+  await tab.goto("https://drop.test/")
+  const segment = tab.locator('[data-slot="comment-send"]')
+  const control = (name, ...args) => tab.evaluate(([name, args]) => window.drop.send[name](...args), [name, args])
+  return { tab, segment, control, errors }
+}
+
 test("Send walks every In place state in the pill, one row each, through the stub", async () => {
   if (shots) mkdirSync(shots, { recursive: true })
   const browser = await chromium.launch()
   try {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 360 }, deviceScaleFactor: 2 })
-    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "https://drop.test" })
-    const tab = await context.newPage()
-    const errors = []
-    tab.on("pageerror", (error) => errors.push(error.message))
-    await tab.route("**/*", (route) =>
-      route.fulfill(
-        new URL(route.request().url()).pathname === "/fixture.js"
-          ? { contentType: "text/javascript", body: script }
-          : { contentType: "text/html", body: page },
-      ),
-    )
-    await tab.goto("https://drop.test/")
+    const { tab, segment, control, errors } = await openFixture(browser, {
+      viewport: { width: 1280, height: 360 },
+      deviceScaleFactor: 2,
+    })
     const toolbar = tab.getByRole("group", { name: "Document tools" })
-    const segment = tab.locator('[data-slot="comment-send"]')
-    const control = (name, ...args) => tab.evaluate(([name, args]) => window.drop.send[name](...args), [name, args])
     const step = async (name, state) => {
       await tab.waitForSelector(`[data-slot="comment-send"][data-state="${state}"]`)
       await tab.evaluate(() =>
@@ -258,3 +266,68 @@ test("Send walks every In place state in the pill, one row each, through the stu
     await browser.close()
   }
 }, 60_000)
+
+test.each([320, 390])(
+  "pairing instructions and touch targets fit the marked dock at %ipx",
+  async (width) => {
+    const browser = await chromium.launch()
+    try {
+      const { tab, segment, control, errors } = await openFixture(browser, {
+        viewport: { width, height: 640 },
+        hasTouch: true,
+        reducedMotion: "reduce",
+      })
+      await tab.evaluate(() => {
+        const mark = document.createElement("vitehub-tools-off")
+        mark.setAttribute("edge", "bottom")
+        document.documentElement.append(mark)
+      })
+      const assertReachable = async (locator, label) => {
+        await locator.waitFor()
+        const fits = await locator.evaluate((element) => {
+          const dock = element.closest('[aria-label="Document tools"]').getBoundingClientRect()
+          const box = element.getBoundingClientRect()
+          const inside = ({ left, top, right, bottom }) =>
+            left >= Math.max(0, dock.left) &&
+            right <= Math.min(innerWidth, dock.right) &&
+            top >= 0 &&
+            bottom <= innerHeight
+          if (element instanceof HTMLButtonElement)
+            return (
+              inside(box) && element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2))
+            )
+          const text = document.createRange()
+          text.selectNodeContents(element)
+          return inside(box) && [...text.getClientRects()].every(inside)
+        })
+        assert.equal(fits, true, `${label} fits inside the dock and viewport`)
+      }
+
+      const send = segment.getByRole("button", { name: "Send: 3 comments" })
+      const message = segment.locator('[data-slot="comment-send-message"]')
+      await send.tap()
+      await assertReachable(message, "Setup prompt instructions")
+      const cancel = segment.getByRole("button", { name: "Cancel connect" })
+      await assertReachable(cancel, "Cancel pairing")
+      await cancel.tap()
+
+      await send.tap()
+      await cancel.waitFor()
+      await tab.evaluate(() => window.drop.comment("bob"))
+      await control("pair", { name: "T3 Code", logo: "t3", host: "relay.t3.codes" })
+      const allow = segment.getByRole("button", { name: "Allow and send 4" })
+      await allow.waitFor({ timeout: 4000 })
+      await assertReachable(message, "Agent confirmation instructions")
+      await assertReachable(segment.getByRole("button", { name: "Don't allow" }), "Cancel confirmation")
+      await assertReachable(allow, "Allow and send 4")
+      await allow.tap()
+      await tab.waitForSelector('[data-slot="comment-send"][data-state="sent"]')
+      await control("finish")
+      await tab.waitForFunction(() => document.querySelector('[data-slot="comment-send"]')?.hidden)
+      assert.deepEqual(errors, [])
+    } finally {
+      await browser.close()
+    }
+  },
+  15_000,
+)

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createCommentSend } from "vite-hub/comments/client"
 import { test } from "vite-plus/test"
 import { createStubSend } from "../../app/utils/comment-send.ts"
 
@@ -40,4 +41,47 @@ test("Send N counts every open thread that waits for an answer, others' too, unt
   assert.equal((await transport.status()).count, 2)
   assert.equal((await transport.send()).status, "sent")
   assert.equal((await transport.status()).count, 0)
+})
+
+test("pairing confirms the current count and carries only that batch even if delivery takes time", async () => {
+  const send = createStubSend()
+  const comments = [thread(1, "ada"), thread(2, "bob"), thread(3, "ada")]
+  const transport = send.transport({ drop: "abc", me: "ada", comments: () => comments })
+  const client = createCommentSend(transport, { pairingInterval: 1 })
+  const stop = client.start()
+  try {
+    await client.refresh()
+    await client.send()
+    assert.equal(client.state.status, "pairing")
+    comments.push(thread(4, "bob"))
+    await client.refresh()
+
+    const { promise, resolve } = Promise.withResolvers()
+    const unwatch = client.onChange(() => {
+      if (client.state.status === "confirm") resolve()
+    })
+    send.controls.pair({ name: "T3 Code", logo: "t3", host: "relay.t3.codes" })
+    await promise
+    unwatch()
+    assert.equal(client.state.count, 4)
+
+    comments.push(thread(5, "bob"))
+    await client.refresh()
+    assert.equal(client.state.count, 5)
+    send.controls.hold()
+    const delivery = client.allow()
+    comments[0].replies.push(reply("ada"))
+    comments.push(thread(6, "bob"))
+    await client.refresh()
+    send.controls.release()
+    await delivery
+    assert.equal(client.state.status, "sent")
+    assert.equal((await transport.status()).count, 2)
+    assert.equal(
+      (await send.transport({ drop: "abc", me: "ada", comments: () => comments.slice(1, 5) }).status()).count,
+      0,
+    )
+  } finally {
+    stop()
+  }
 })
