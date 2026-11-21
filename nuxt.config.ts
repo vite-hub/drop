@@ -38,7 +38,9 @@ const release = {
 }
 const liveEditing = host === "cloudflare" || host === "vps"
 
-const files = { serve: { route: "/f", access: "public", headers: { "Cache-Control": "private, no-cache" } } } as const
+const files = {
+  serve: { route: "/f", authorize: true, anonymous: true, headers: { "Cache-Control": "private, no-cache" } },
+} as const
 
 const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
 

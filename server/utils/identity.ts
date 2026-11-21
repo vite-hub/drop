@@ -14,7 +14,6 @@ declare module "h3" {
   interface H3EventContext {
     dropIdentity?: Promise<Identity | null>
     dropPage?: H3Event
-    dropAccessChecked?: boolean
     dropSessionCookies?: string[]
   }
 }

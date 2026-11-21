@@ -215,6 +215,12 @@ export function event(path, method = "GET") {
   request.context.log = { set() {}, error() {}, warn() {} }
   return request
 }
+/** A request to the Blob serve route at /f, with the raw catch-all Nitro gives the route as `params._`. */
+export function served(pathname, method = "GET", path = `/f/${pathname}`) {
+  const request = event(path, method)
+  request.context.params = { _: pathname }
+  return request
+}
 export function reset() {
   sql.exec(
     "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comment_messages; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_counters; DELETE FROM drop_pins; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",

@@ -12,6 +12,7 @@ import {
   insertVersion,
   who,
   event,
+  served,
   planOf,
 } from "./harness.mjs"
 const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versionsOf, deleteDrop, publishApp } =
@@ -19,12 +20,15 @@ const { createDocDrop, dropDetail, findDrop, findDropByBlob, listDrops, versions
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 const { default: accessMiddleware } = await import("../../server/middleware/0.drop-access.ts")
 const { default: markdownMiddleware } = await import("../../server/middleware/1.markdown-documents.ts")
+const { authorize: blobAuthorize } = await import("../../server/blob.ts")
 const { default: detailHandler } = await import("../../server/api/drops/[id].get.ts")
 const { createCodeImage } = await import("../../server/utils/code-image-store.ts")
 
 migrate()
 beforeEach(reset)
 const missing = (action) => assert.rejects(action, (error) => error.status === 404)
+const serveFile = (pathname, method, path) =>
+  blobAuthorize({ event: served(pathname, method, path), session: null, user: null })
 
 test("a drop's versions take one indexed query, at most 100 of them", async () => {
   insertDrop("doc", { version: 150 })
@@ -85,7 +89,6 @@ test("a warm markdown file and detail render never fetch R2 source", async () =>
   assert.equal(second.content, first.content)
   assert.equal(second.html, first.html)
   const request = event(`/f/${key}`)
-  await accessMiddleware(request)
   const document = await markdownMiddleware(request)
   assert.match(document, /Source/)
   assert.equal(calls.get, 1)
@@ -100,8 +103,11 @@ test("a banned owner's shared doc, downloads, page, app, and code image all retu
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
   sql.exec("UPDATE user SET banned = 1 WHERE id = 'owner'")
-  for (const path of [`/f/${key}`, `/f/${key}?raw`, `/f/${imageKey}`, "/f/apps/app/file.html", "/d/doc", "/d/app"])
-    for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
+  for (const method of ["GET", "HEAD", "POST"]) {
+    for (const [pathname, path] of [[key], [key, `/f/${key}?raw`], [imageKey], ["apps/app/file.html"]])
+      await missing(() => serveFile(pathname, method, path))
+    for (const path of ["/d/doc", "/d/app"]) await missing(() => accessMiddleware(event(path, method)))
+  }
   // The address a share page settles on, with the doc's slug, passes the same gate.
   await missing(() => accessMiddleware(event("/d/doc/the-doc")))
   // A malformed escape is a 404 too, not an unhandled URIError.
@@ -190,8 +196,10 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
     sql.exec(blocked)
     for (const identity of [null, who, { ...who, role: "admin" }]) {
       state.who = identity
-      for (const path of [`/f/${key}`, `/f/${key}?raw`, "/d/doc", "/d/app"])
-        for (const method of ["GET", "HEAD", "POST"]) await missing(() => accessMiddleware(event(path, method)))
+      for (const method of ["GET", "HEAD", "POST"]) {
+        for (const path of [`/f/${key}`, `/f/${key}?raw`]) await missing(() => serveFile(key, method, path))
+        for (const path of ["/d/doc", "/d/app"]) await missing(() => accessMiddleware(event(path, method)))
+      }
       await missing(() => markdownMiddleware(event(`/f/${key}`)))
       for (const id of ["doc", "app"])
         await missing(async () => dropDetail(await findDrop(id), identity, "https://drop.example"))
@@ -235,7 +243,7 @@ test("failed blob deletion never turns a private file public, and retries remove
   assert.equal(await findDrop("doc"), null)
   assert.ok(state.objects.has("doc.md"))
   assert.equal(state.entries.size, 0)
-  await missing(() => accessMiddleware(event("/f/doc.md")))
+  await missing(() => serveFile("doc.md"))
   assert.equal(calls.head, 0)
   state.failDelete = false
   await publishApp(who, { files: { "index.html": "new app" } })
@@ -248,7 +256,7 @@ test("cache deletion failure leaves content inaccessible and retryable", async (
   await dropDetail(await findDrop("doc"), who, "https://drop.example")
   state.failCacheDelete = true
   await deleteDrop(await findDrop("doc"))
-  await missing(() => accessMiddleware(event("/f/doc.md")))
+  await missing(() => serveFile("doc.md"))
   assert.ok(state.entries.size > 0)
   state.failCacheDelete = false
   await publishApp(who, { files: { "index.html": "new app" } })
