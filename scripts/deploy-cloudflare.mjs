@@ -18,11 +18,21 @@ function deploy(env, secretsFile) {
   return run("sh", args, { cwd: ".output", env })
 }
 
+function loadEnvWithoutLogging(loadEnv) {
+  const write = process.stderr.write.bind(process.stderr)
+  process.stderr.write = () => true
+  try {
+    return loadEnv("production", process.cwd(), "")
+  } finally {
+    process.stderr.write = write
+  }
+}
+
 async function main() {
   if (!envFiles.some((file) => existsSync(file))) return deploy(process.env)
 
   const { loadEnv } = await import("vite-plus")
-  const env = { ...loadEnv("production", process.cwd(), ""), ...process.env }
+  const env = { ...loadEnvWithoutLogging(loadEnv), ...process.env }
   const built = run("pnpm", ["build"], { env: { ...env, DROP_HOST: "cloudflare" } })
   if (built !== 0) return built
 
