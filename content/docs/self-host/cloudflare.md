@@ -48,10 +48,10 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    ```sh
    cp .env.example .env
    ```
-4. Deploy. It builds, applies the D1 migrations, and publishes the Worker with `.env` as its secrets:
+4. Deploy. With a `.env`, `pnpm run deploy` builds, applies the D1 migrations, and publishes the Worker. It uploads only nonempty runtime values allowed by the generated deployment manifest. `CLOUDFLARE_API_TOKEN` is used by Wrangler and is not uploaded, even if a previous deploy left a secret with that name on the Worker. Unspecified Worker secrets are left unchanged. Console is optional:
 
    ```sh
-   pnpm build && pnpm run deploy
+   pnpm run deploy
    ```
 5. Add your domain to the Worker (Workers and Pages, your Worker, Settings, Domains and Routes), and make sure the GitHub app's callback uses it.
 6. Run the smoke test:
@@ -87,7 +87,7 @@ To [give apps their own domain](/docs/self-host#content-origin), add a proxied w
 
 ## Database {#database}
 
-D1. `pnpm run deploy` applies new migrations before it publishes; `pnpm db:migrate:remote` applies them on their own.
+D1. `pnpm run deploy` applies new migrations before it publishes. Without a local `.env`, as in Workers Builds, it runs the deploy command of the last `pnpm build` and keeps the Worker's secrets as they are.
 
 After deploying a database change, confirm the new migration appears in the remote `d1_migrations` ledger, then exercise a lookup that uses the changed schema on the deployed Worker. The pull request migration check cannot verify either step.
 
