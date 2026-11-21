@@ -5,7 +5,7 @@
 // and × to stop. On a phone the segment takes its own row above the pill's. With `pins`, the eye that hides the
 // comments on the page sits against Comments, the thing it hides. With `style` (a Markdown doc), the segment opens with
 // two icons that pick how comments on the text show, Cards or Pins (useCommentStyle).
-// The `tools` slot adds buttons that act on the same comments, such as Copy prompt, to the track Comments sits in.
+// The `tools` slot adds buttons that act on the same comments, such as Send or Copy prompt, to the track Comments sits in.
 import type { CommentStyle } from "~/composables/usePreferences"
 
 const on = defineModel<boolean>("on", { required: true })
@@ -31,7 +31,7 @@ const item =
 </script>
 
 <template>
-  <!-- Comments, the eye, and Copy prompt act on the same comments, so they share one track inside the pill. -->
+  <!-- Comments, the eye, and Send or Copy prompt act on the same comments, so they share one track inside the pill. -->
   <div
     class="comment-track @max-3xl/review-dock:contents flex shrink-0 items-center gap-0.5 rounded-lg"
     role="group"

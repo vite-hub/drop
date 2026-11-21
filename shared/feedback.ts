@@ -105,7 +105,7 @@ const quoted = (text: string) => text.replace(/^/gm, "> ")
  * A prompt that hands an agent the threads waiting on an answer, with their words, so it can start without Drop, and
  * the tool calls that resolve them where it has Drop's MCP server. The reader's own come first, as what they ask; the
  * threads `waitingForAnswer` marks `quote` follow as others' words, quoted, never as the reader's instructions. A
- * comment with no mark is the reader's own, as `awaitingAnswer` gives them.
+ * comment with no mark is the reader's own.
  */
 export function promptMarkdown(
   drop: PromptDrop,

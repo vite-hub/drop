@@ -86,19 +86,6 @@ export function needsLook({ resolved, resolvedAt, replies }: DropComment) {
   return !resolved || (resolvedAt !== null && replies.some((reply) => reply.createdAt > resolvedAt))
 }
 
-/**
- * Threads the agent can read and resolve as open, where the last word is the reader's own, not an agent's.
- */
-export function awaitingAnswer(comments: DropComment[]) {
-  return comments
-    .filter((comment) => {
-      if (comment.resolved) return false
-      const last = comment.replies.at(-1) ?? comment
-      return last.mine && !last.agent
-    })
-    .sort((a, b) => a.n - b.n)
-}
-
 /** The comments' images by their key, for the name and type the parts show. */
 export function attachmentsOf(comments: DropComment[]) {
   const files = new Map<string, CommentAttachment>()

@@ -18,7 +18,7 @@ export function useSignOut() {
     }
     // Also forgets whose comments they were, so the next person in this browser doesn't see them held.
     await outbox.clear()
-    await signOut()
+    await Promise.resolve(signOut())
     // Leave first: cleared data would flash the dashboard's empty defaults for a frame. /home, not /: / sends whoever
     // it still thinks is signed in to their drops.
     await navigateTo("/home")

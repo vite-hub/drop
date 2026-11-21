@@ -14,9 +14,9 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
-import { feedbackMarkdown, promptMarkdown } from "#shared/feedback"
+import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
-import { faviconUrl, resourceLabel } from "#shared/resources"
+import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
@@ -35,6 +35,7 @@ const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
+const publishedComments = computed(() => state.comments.data.value)
 // With the ones that wait in the outbox, each marked by its `delivery` (useDrop).
 const comments = computed(() => state.list.value)
 
@@ -68,7 +69,7 @@ const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
 // The pill's "N waiting": what's still on its way after its quiet start, so a send on a working network never shows it.
 const second = useNow({ interval: 1000 })
-const waiting = computed(() => waitingCount(comments.value, second.value.getTime()))
+const deliveryCount = computed(() => waitingCount(comments.value, second.value.getTime()))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -910,7 +911,6 @@ const docHeader = computed<DocHeader | null>(() => {
     ...(folder ? [{ icon: "folder" as const, label: "Folder", value: folder, folder: docFolder.value?.id }] : []),
   ]
   const origin = import.meta.client ? location.origin : ""
-  const listed = new Set((d.resources ?? []).map((resource) => resource.url))
   return {
     actions: [
       ...(copiesMarkdown.value ? [{ id: "markdown" as const, label: "Copy as Markdown", kbd: "M" }] : []),
@@ -924,14 +924,6 @@ const docHeader = computed<DocHeader | null>(() => {
       href: `${origin}/drops/${item.id}`,
       icon: `${origin}/favicon.ico`,
     })),
-    links: related.value
-      .flatMap((item) => item.links)
-      .filter((resource) => !listed.has(resource.url))
-      .map((resource) => ({
-        url: resource.url,
-        label: resourceLabel(resource),
-        icon: faviconUrl(resource.url, origin),
-      })),
   }
 })
 watch(
@@ -1015,11 +1007,21 @@ watch(
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
 const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
-// Once the reader has a comment waiting on an answer, the pill offers a prompt that hands those comments to an agent.
-// It steps aside while they comment, so the comment actions keep the pill to one row.
-const awaiting = computed(() => awaitingAnswer(comments.value))
+// Once a thread waits on an answer, from anyone, the pill hands the waiting threads to an agent: a signed-in member's
+// Send gives them to their own agent, and everyone else copies a prompt with them, the reader's as asks and others' as
+// quotes. A guest has no account, so their own threads are the ones marked `mine`. Both step aside while the reader
+// comments, so the comment actions keep the pill to one row.
+const readerId = computed(
+  () =>
+    me.value?.id ??
+    publishedComments.value.flatMap((comment) => [comment, ...comment.replies]).find((item) => item.mine)?.authorId ??
+    "",
+)
+const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
+const sendOn = useRuntimeConfig().public.send
+const canSend = computed(() => sendOn && Boolean(me.value))
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const prompt = () => promptMarkdown(drop.value, link.value, awaiting.value, screenshots.value)
+const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
 // opens the page showing (`?path=`).
 function copyLink(announce?: string) {
@@ -1808,7 +1810,7 @@ watch(
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
-                :waiting="waiting"
+                :waiting="deliveryCount"
                 :list-open="commentsOpen && !popover"
                 :pins="!lightbox && !shownVersion && (framed || pdf) && pinned.length > 0"
                 :pins-shown="overlays.pins"
@@ -1817,9 +1819,19 @@ watch(
                 @page="commentOnPage"
                 @pins="toggleOverlay('pins')"
               >
-                <template v-if="awaiting.length && !lightbox && !commentMode" #tools>
+                <template #tools>
+                  <!-- v-show, so a pairing in progress outlasts a comment or the lightbox. -->
+                  <ViewerCommentSend
+                    v-if="canSend"
+                    v-show="!lightbox && !commentMode"
+                    :comments="publishedComments"
+                    :drop="drop.id"
+                    :me="readerId"
+                    :send="dropSend"
+                  />
                   <UTooltip
-                    :text="`Copy a prompt with your ${awaiting.length === 1 ? 'comment' : `${awaiting.length} comments`} for your agent`"
+                    v-else-if="waiting.length && !lightbox && !commentMode"
+                    :text="`Copy a prompt with ${waiting.length === 1 ? 'the comment' : `the ${waiting.length} comments`} that wait for an answer, for your agent`"
                   >
                     <DropCopyButton
                       aria-label="Copy prompt for your agent"
