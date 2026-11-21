@@ -35,7 +35,18 @@ One self-contained HTML page. Each item is a `<section>` directly inside `<body>
 - Drop listens for keys on the page too: Esc closes what Drop has open, and C, E and single letters pick its tools. When an item uses one of those keys itself, such as Esc to close its own menu, call `event.preventDefault()` in that handler so Drop leaves the key alone.
 - Put everything visible inside a section. Draw no switcher, bar, or picker of your own, and paste no picker script: Drop runs its own on every page with `data-variant` items.
 
-Canvas details (URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item shows a deployed page, has a popover, or animates.
+### A flow: rows of screens with arrows
+
+When the question is how someone moves through screens (an app's session, a checkout), show it as one item that holds the screens in rows, next to one live item to try it:
+
+- One row per path through the screens, such as "Pay with card" or "Card declined". A short title above each row is the only text.
+- Arrows start at the button you press and end at the screen it opens. Give each one a label of a word or two: the button's own text, or what happens ("time's up").
+- Show real states in every screen: the numbers, timers and toasts that screen would show at that moment.
+- No captions under screens, no intro heading or paragraph, no legend. When a row needs a sentence to explain it, the screens are wrong.
+
+Drop draws the arrows: mark each screen `data-screen` and give the button `data-go` with the id of the screen it leads to, and `data-label`. The markup and a row layout are in [references/canvas.md](references/canvas.md#flows-rows-of-screens-with-arrows).
+
+Canvas details (flows, URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page, has a popover, or animates.
 
 If you can open a browser, open the page and check every item renders and the console is clean.
 

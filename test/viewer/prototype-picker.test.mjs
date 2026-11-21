@@ -590,3 +590,101 @@ test("inside Drop's viewer the page reports to Drop's bar and takes its commands
     await browser.close()
   }
 })
+
+test("a control with data-go draws a labelled arrow to its screen, routed by where that screen lies", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1200, height: 800 } })
+    const screen = (id, go = "") =>
+      `<div data-screen id="${id}" style="width:200px;height:300px;background:#fff">${go}</div>`
+    const flows = `<section id="v-flows" data-variant="Flows" data-width="900" style="padding:60px">
+      <div style="display:grid;grid-template-columns:200px 200px;gap:120px 200px">
+        ${screen("v-flows-a", '<button id="v-flows-pay" data-go="v-flows-b" data-label="Pay" style="margin:100px 20px">Pay</button><button id="v-flows-help" data-go="v-flows-c" data-label="Help">Help</button>')}
+        ${screen("v-flows-b", '<button id="v-flows-back" data-go="v-flows-a" data-label="Back">Back</button>')}
+        ${screen("v-flows-c")}
+      </div></section><section id="v-other" data-variant="Other">other</section>`
+    await tab.route("https://picker.test/flows", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: injectRuntime(`<!doctype html><html><body style="margin:0">${flows}</body></html>`, false, 0, true),
+      }),
+    )
+    await tab.goto("https://picker.test/flows")
+    // Arrows are measured in the item's own pixels, so the canvas zoom doesn't move them.
+    const arrows = () =>
+      tab.evaluate(() => {
+        const el = document.getElementById("v-flows"),
+          k = el.getBoundingClientRect().width / el.offsetWidth
+        const box = (id) => {
+          const s = el.getBoundingClientRect(),
+            r = document.getElementById(id).getBoundingClientRect()
+          return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k }
+        }
+        const layer = el.querySelector("[data-drop-flow]")
+        return {
+          paths: [...layer.querySelectorAll("g path")].map((p) => {
+            const t = p.getTotalLength()
+            return [p.getPointAtLength(0), p.getPointAtLength(t)].map(({ x, y }) => [Math.round(x), Math.round(y)])
+          }),
+          labels: [...layer.querySelectorAll("span")].map((s) => s.textContent),
+          a: box("v-flows-a"),
+          b: box("v-flows-b"),
+          c: box("v-flows-c"),
+          pay: box("v-flows-pay"),
+        }
+      })
+    await tab.waitForFunction(() => document.querySelectorAll("#v-flows [data-drop-flow] g path").length === 3)
+    for (const read of [
+      await arrows(),
+      await (async () => {
+        await tab.keyboard.press("1")
+        await tab.waitForTimeout(100)
+        return arrows()
+      })(),
+    ]) {
+      const {
+        paths: [pay, help, back],
+        labels,
+        a,
+        b,
+        c,
+        pay: button,
+      } = read
+      assert.deepEqual(labels, ["Pay", "Help", "Back"])
+      // Pay leaves its button's right edge and ends at B's left edge.
+      assert.ok(
+        Math.abs(pay[0][0] - (button.x + button.w + 6)) <= 1 && Math.abs(pay[0][1] - (button.y + button.h / 2)) <= 1,
+        JSON.stringify(pay),
+      )
+      assert.ok(Math.abs(pay[1][0] - (b.x - 8)) <= 1 && pay[1][1] > b.y && pay[1][1] < b.y + b.h, JSON.stringify(pay))
+      // Help goes down to C, below A, entering from the top.
+      assert.ok(
+        Math.abs(help[1][0] - (c.x + c.w / 2)) <= 1 && Math.abs(help[1][1] - (c.y - 8)) <= 1,
+        JSON.stringify(help),
+      )
+      // Back runs over the top and comes down into A.
+      assert.ok(
+        back[1][0] > a.x && back[1][0] < a.x + a.w && Math.abs(back[1][1] - (a.y - 8)) <= 1,
+        JSON.stringify(back),
+      )
+    }
+    // Hovering a control lights its arrow and dims the others.
+    await tab.hover("#v-flows-pay")
+    assert.deepEqual(
+      await tab.evaluate(() =>
+        [...document.querySelectorAll("#v-flows [data-drop-flow] g")].map((g) => g.getAttribute("class") || ""),
+      ),
+      ["on", "off", "off"],
+    )
+    assert.equal(await tab.getAttribute("#v-flows-pay", "data-go-on"), "")
+    // A control added later gets its arrow.
+    await tab.evaluate(() =>
+      document
+        .getElementById("v-flows-c")
+        .insertAdjacentHTML("beforeend", '<button data-go="v-flows-b" data-label="Retry">Retry</button>'),
+    )
+    await tab.waitForFunction(() => document.querySelectorAll("#v-flows [data-drop-flow] g path").length === 4)
+  } finally {
+    await browser.close()
+  }
+})
