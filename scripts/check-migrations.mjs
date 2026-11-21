@@ -1,5 +1,6 @@
 // Fails when a change edits, renames or deletes a migration that is already on the base branch. D1 and SQLite record a
-// migration by name once it runs, so an edited one never runs again where it has shipped (drop#28).
+// migration by name once it runs, so an edited one never runs again where it has shipped (drop#28). A snapshot.json may
+// change: no database runs it, and Drizzle Kit only diffs the schema against it.
 // Usage: node scripts/check-migrations.mjs [base], default origin/main. Compares the working tree with the merge base.
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
@@ -13,7 +14,9 @@ const changed = git("diff", "--name-status", "--no-renames", base, "--", directo
   .split("\n")
   .filter(Boolean)
   .map((line) => line.split("\t"))
-  .filter(([status, path]) => status !== "A" && path !== manifest)
+  .filter(
+    ([status, path]) => status !== "A" && path !== manifest && !(status === "M" && path.endsWith("/snapshot.json")),
+  )
 
 const changedMappings = []
 if (git("ls-tree", "--name-only", base, "--", manifest)) {

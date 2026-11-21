@@ -9,7 +9,7 @@
     "lint": "vp lint",
     "lint:fix": "vp lint --fix",
     "knip": "knip",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "vitehub database generate",
     "db:migrate": "vitehub database migrate",
     "db:migrate:d1": "node --env-file-if-exists=.env scripts/migrate-d1.mjs",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote --config .output/server/wrangler.json",

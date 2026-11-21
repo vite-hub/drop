@@ -3590,15 +3590,10 @@
       "table": "blob_cleanup",
       "name": "blob_cleanup_blob_key_unique",
       "columns": [
-        {
-          "value": "blob_key",
-          "isExpression": false
-        }
+        "blob_key"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "code_images",
@@ -3866,15 +3861,10 @@
       "table": "oauth_access_token",
       "name": "oauth_access_token_token_unique",
       "columns": [
-        {
-          "value": "token",
-          "isExpression": false
-        }
+        "token"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "oauth_access_token",
@@ -3950,15 +3940,10 @@
       "table": "oauth_client",
       "name": "oauth_client_client_id_unique",
       "columns": [
-        {
-          "value": "client_id",
-          "isExpression": false
-        }
+        "client_id"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "oauth_client",
@@ -4034,15 +4019,10 @@
       "table": "oauth_refresh_token",
       "name": "oauth_refresh_token_token_unique",
       "columns": [
-        {
-          "value": "token",
-          "isExpression": false
-        }
+        "token"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "oauth_refresh_token",
@@ -4104,15 +4084,10 @@
       "table": "oauth_resource",
       "name": "oauth_resource_identifier_unique",
       "columns": [
-        {
-          "value": "identifier",
-          "isExpression": false
-        }
+        "identifier"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "organization",
@@ -4196,15 +4171,10 @@
       "table": "session",
       "name": "session_token_unique",
       "columns": [
-        {
-          "value": "token",
-          "isExpression": false
-        }
+        "token"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "session",
@@ -4252,15 +4222,10 @@
       "table": "user",
       "name": "user_email_unique",
       "columns": [
-        {
-          "value": "email",
-          "isExpression": false
-        }
+        "email"
       ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
+      "nameExplicit": false,
+      "entityType": "uniques"
     },
     {
       "table": "verification",
@@ -4915,7 +4880,7 @@
     {
       "table": "code_images",
       "name": "code_images_size",
-      "value": "\"code_images\".\"size\" >= 0",
+      "value": "\"size\" >= 0",
       "entityType": "checks"
     }
   ],

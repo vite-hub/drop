@@ -159,7 +159,7 @@ Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFL
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 
-The first folder creates a new database, and each later one changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/default/`, `pnpm db:generate` writes the next folder. `d1-migrations.json` gives each folder the file name D1 records it by, such as `0000_init.sql`. The next Cloudflare build adds the new folder's name there: commit it, and never rename one.
+The first folder creates a new database, and each later one changes it. Never edit a migration a database has already applied: it won't run again there. After you change the schema in `server/databases/default/`, `pnpm db:generate` (ViteHub's `vitehub database generate`) writes the next folder and adds it to `d1-migrations.json`, which gives each folder the file name D1 records it by, such as `0000_init.sql`. Commit both, and never rename one.
 
 ## Update {#update}
 
