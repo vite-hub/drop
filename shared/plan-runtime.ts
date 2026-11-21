@@ -2312,7 +2312,6 @@ function withPicker(html: string): string {
     : marked + picker
 }
 
-// `version` names what the reader sees, so the canvas fits a new version instead of keeping the last camera.
 export const withVariantBar = (document: string, version?: string) =>
   prependToHead(
     document,

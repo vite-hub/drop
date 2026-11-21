@@ -43,7 +43,7 @@ Drop's skills come with the server through the MCP Skills extension (`skills/lis
 - `learning` keeps a model of what you know per topic in a `learning` folder, with the answers behind it and when each concept is due for review, so a lesson starts where your knowledge stops. It also quizzes you, in chat or in a doc, to place you on a new topic or review what's due. The first time, it suggests the folders to create.
 - `skill-hub` shares agent skills through a Drop folder: it publishes a skill from your disk into the folder, and installs one from it into the agents you pick. See [Share skills from a folder](#skill-hub).
 
-The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there so this Drop instance no longer serves it. This does not change the skills bundled in the Git plugin.
+The **Skills** page lists the skills this Drop serves, each with its source on GitHub. An admin can switch a skill off there so this Drop instance no longer serves it. The same switches are in the ViteHub Console under **Served skills**, and in `vitehub served-skills`. Other server instances see a change within a minute. This does not change the skills bundled in the Git plugin.
 
 To install them into agents that don't load skills over MCP, run the [skills CLI](https://github.com/vercel-labs/skills) with this Drop's address. It asks which skills and which agents, and copies each skill where those agents read it:
 
