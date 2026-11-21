@@ -11,6 +11,8 @@ export type DetailsAction = {
   icon: string
   kbd?: string
   destructive?: boolean
+  /** A toggle that's on, like Pin on a pinned drop: the button shows pressed. */
+  pressed?: boolean
   to?: string | { path: string; query?: Record<string, string> }
   press?: () => void
 }
@@ -108,7 +110,14 @@ const popoverUi = {
         <NuxtLink v-if="action.to" :aria-label="action.label" :class="square" :to="action.to">
           <UIcon :name="action.icon" class="size-4" />
         </NuxtLink>
-        <button v-else :aria-label="action.label" :class="square" type="button" @click="action.press?.()">
+        <button
+          v-else
+          :aria-label="action.label"
+          :aria-pressed="action.pressed"
+          :class="square"
+          type="button"
+          @click="action.press?.()"
+        >
           <UIcon :name="action.icon" class="size-4" />
         </button>
       </UTooltip>

@@ -53,7 +53,7 @@ const screenshots = computed(() => new Map((siteReview?.data.value ?? []).map((i
 const route = useRoute()
 const notify = useNotify()
 const { copy, copyLoading, copied } = useCopy()
-const { remove, restore } = useDropActions()
+const { remove, restore, setPinned } = useDropActions()
 const [DefineDetails, ReuseDetails] = createReusableTemplate()
 const [DefineHistory, ReuseHistory] = createReusableTemplate()
 const [DefineComposer, ReuseComposer] = createReusableTemplate()
@@ -958,7 +958,22 @@ const detailsChip = computed(() => {
 })
 // What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
 // Download, Copy as Markdown and Export as PDF are in its header (docHeader).
+// Anyone signed in pins a drop they can open, for their Drops page's Pinned view and ⌘K. Nobody else sees it.
+const canPin = computed(() => Boolean(me.value) && !trashed.value)
+const togglePin = (quiet = false) => void setPinned(drop.value, !drop.value.pinned, { quiet })
 const detailsActions = computed<DetailsAction[]>(() => [
+  ...(canPin.value
+    ? [
+        {
+          id: "pin",
+          // A toggle: "Pinned" and pressed while it's on, as a tool left on shows.
+          label: drop.value.pinned ? "Pinned" : "Pin",
+          icon: drop.value.pinned ? "i-mingcute-pin-fill" : "i-mingcute-pin-line",
+          pressed: Boolean(drop.value.pinned),
+          press: () => togglePin(true),
+        },
+      ]
+    : []),
   ...(drop.value.url && drop.value.kind !== "markdown"
     ? [{ id: "download", label: "Download original", icon: "i-mingcute-download-2-line", kbd: "D", press: download }]
     : []),
@@ -1326,6 +1341,13 @@ usePaletteOffer("drop", () => {
       : []),
     { label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["L"], onSelect: () => copyLink("Link copied") },
+    ...(canPin.value
+      ? [
+          drop.value.pinned
+            ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: () => togglePin() }
+            : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: () => togglePin() },
+        ]
+      : []),
     ...(drop.value.url
       ? [{ label: "Download original", icon: "i-mingcute-download-2-line", kbds: ["D"], onSelect: download }]
       : []),

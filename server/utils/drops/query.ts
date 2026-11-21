@@ -38,7 +38,7 @@ import { resourcesOf } from "../resources"
 import { answerable, quizOf } from "../answers"
 import { viewsOf } from "../views"
 import { dropExcerpt } from "../og"
-import { dropFiles, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
+import { dropFiles, dropPins, drops, dropVersions, dropVisits, user } from "../../databases/default/index"
 import type { Identity } from "../identity"
 import { logDrop, logError } from "../logs"
 import type { DropRow } from "./types"
@@ -99,7 +99,13 @@ async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
 async function summarize(
   rows: DropRow[],
   days: number,
-  options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
+  options: {
+    ownerId?: string
+    path?: boolean
+    below?: string
+    snippets?: Map<string, string | undefined>
+    folderIds?: SQL
+  } = {},
 ) {
   // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
   // round trip to D1.
@@ -111,7 +117,11 @@ async function summarize(
           .innerJoin(drops, eq(drops.id, dropFiles.dropId))
           .where(eq(drops.ownerId, options.ownerId))
       : [],
-    itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))),
+    itemCounts(
+      rows.some((row) => row.kind === "folder") && options.folderIds
+        ? options.folderIds
+        : rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])),
+    ),
   ])
   const pathsOf = (id: string) =>
     files
@@ -396,6 +406,72 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
 }
 
 /**
+ * The drops you pinned that you can still open, most recently pinned first: yours and other people's, at any depth. A
+ * pin to a drop in the Trash, expired, quarantined, or no longer shared with you doesn't list. Other people's drops say
+ * whose they are, and every drop in a folder says where it sits.
+ */
+export async function listPinned(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const pinnedIds = sql`SELECT ${dropPins.dropId} FROM ${dropPins} WHERE ${dropPins.userId} = ${who.userId}`
+  const rows = await db
+    .select({ drop: drops, owner: user })
+    .from(dropPins)
+    .innerJoin(drops, eq(drops.id, dropPins.dropId))
+    .innerJoin(user, eq(user.id, drops.ownerId))
+    .where(and(eq(dropPins.userId, who.userId), isNull(drops.trashedAt)))
+    .orderBy(desc(dropPins.at), desc(dropPins.dropId))
+  const { days } = expiryPolicy(event)
+  const owners = new Map(rows.map(({ drop, owner }) => [drop.id, owner]))
+  const dropsToResolve = rows.map(({ drop }) => drop)
+  const ancestorRows = dropsToResolve.some((drop) => drop.parentId)
+    ? await db
+        .select()
+        .from(drops)
+        .where(inArray(drops.id, withAncestors(pinnedIds)))
+    : []
+  const ancestors = walkUp(dropsToResolve, new Map(ancestorRows.map((drop) => [drop.id, drop])))
+  const resolved = dropsToResolve.map((drop) => resolveNode(drop, ancestors.get(drop.id) ?? [], days))
+  const nodes = (
+    await Promise.all(
+      resolved.map((node) => {
+        const owner = owners.get(node.id)!
+        return currentReview({ ...node, ownerBanned: Boolean(owner.banned) }, owner, event)
+      }),
+    )
+  ).filter((node) => canPinDrop(node, who))
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  return (await summarize(nodes, days, { ownerId: who.userId, folderIds: sql`(${pinnedIds})` })).map((summary) => {
+    const node = byId.get(summary.id)!
+    const path = openableAncestors(node, who, days)
+    return {
+      ...summary,
+      pinned: true,
+      ...(path.length ? { path } : {}),
+      ...(node.ownerId === who.userId || summary.teamFolder
+        ? {}
+        : { owner: { name: owners.get(node.id)!.name, image: owners.get(node.id)!.image } }),
+    }
+  })
+}
+
+export const canPinDrop = (drop: DropRow, who: Identity) =>
+  !drop.expired && !isAttachment(drop) && permissions(drop, who).view
+
+/** Whether `who` pinned the drop. */
+async function isPinned(dropId: string, who: Identity) {
+  const [row] = await db
+    .select({ at: dropPins.at })
+    .from(dropPins)
+    .where(and(eq(dropPins.userId, who.userId), eq(dropPins.dropId, dropId)))
+  return Boolean(row)
+}
+
+/** Pins the drop for `who`, or unpins it. Pinning twice keeps the first pin's place. */
+export async function setPinned(dropId: string, who: Identity, pinned: boolean) {
+  if (pinned) await db.insert(dropPins).values({ userId: who.userId, dropId, at: Date.now() }).onConflictDoNothing()
+  else await db.delete(dropPins).where(and(eq(dropPins.userId, who.userId), eq(dropPins.dropId, dropId)))
+}
+
+/**
  * Other people's drops you can open that match a search: what Shared with me lists, and everything inside the folders
  * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
  * owner, and admins find no one's private drops here. A path shows only the folders you may open.
@@ -576,7 +652,7 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz, gallery, owner] = await Promise.all([
+  const [versions, body, attachments, views, quiz, gallery, owner, pinned] = await Promise.all([
     versionsOf(row, who),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
@@ -585,6 +661,7 @@ export async function dropDetail(
     galleryOf(row, who, days),
     // Whose it is, for signed-in readers only: a public link doesn't name the person who shared it.
     who ? (row.ownerProfile ?? ownerProfileOf(row.ownerId)) : null,
+    who && canPinDrop(row, who) ? isPinned(row.id, who) : false,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -612,6 +689,7 @@ export async function dropDetail(
   if (gallery) detail.gallery = gallery
   // Who dropped it, for a doc's header: the person, beside the agent that published the version.
   if (owner) detail.owner = owner
+  if (pinned) detail.pinned = true
   return detail
 }
 

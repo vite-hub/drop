@@ -305,6 +305,7 @@ export const DropsQuerySchema = v.object({
   trash: v.optional(v.string()),
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
+  pinned: v.optional(v.string()),
   /** With `folder`: at most this many of its newest drops. */
   limit: v.optional(v.pipe(v.string(), v.regex(/^[1-9]\d{0,2}$/))),
 })
