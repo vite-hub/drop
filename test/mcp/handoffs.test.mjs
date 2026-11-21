@@ -264,24 +264,66 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
 })
 
-test("a quote-only handoff stays working until the quoted thread is answered", async () => {
+test("reopening a handoff skips asks resolved or answered in another session", async () => {
+  const { doc, mine } = await reviewed()
+  const answered = await comment(doc.id, ana, "What is the rollout plan?")
+  const waiting = await comment(doc.id, ana, "Who owns follow-up?")
+  state.who = ana
+  const transport = transportFor(doc.id)
+  const { code, selection, count } = await transport.startPairing()
+  assert.equal(count, 4)
+  assert.equal((await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })).status, 200)
+  const { id, status } = await transport.allow(code, selection)
+  assert.equal(status, "sent")
+
+  state.who = agentOf(ana)
+  assert.equal((await call(readDrop, { handoff: id })).structuredContent.handoff.state, "working")
+  assert.equal(
+    (await call(reply, { id: doc.id, comment: mine.n, body: "Moved to Monday.", resolve: true })).isError,
+    undefined,
+  )
+  assert.equal((await call(reply, { id: doc.id, comment: answered.n, body: "Staged rollout." })).isError, undefined)
+  const resumed = await call(readDrop, { handoff: id, resolved: true })
+  assert.deepEqual(resumed.structuredContent.handoff.asks, [waiting.n])
+  assert.ok(resumed.structuredContent.comments.some((comment) => comment.n === mine.n && comment.resolved))
+  const asks = resumed.content[0].text.split("### Asks:")[1].split("### Quotes:")[0]
+  assert.match(asks, /Who owns follow-up\?/)
+  assert.doesNotMatch(asks, /Why Friday|rollout plan/)
+
+  assert.equal((await call(reply, { id: doc.id, comment: waiting.n, body: "I do." })).isError, undefined)
+  const complete = await call(readDrop, { handoff: id })
+  assert.deepEqual(complete.structuredContent.handoff.asks, [])
+  assert.deepEqual(complete.structuredContent.handoff.quotes, [], "completed asks don't turn quotes into requests")
+})
+
+test("a quote-only handoff stays working until the quoted threads are answered", async () => {
   const { doc, mine, theirs } = await reviewed()
   assert.equal(
     (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
     undefined,
   )
 
+  const waiting = await comment(doc.id, bob, "Can we review it on Monday?")
   state.who = ana
   const transport = transportFor(doc.id)
   const { code, selection, count } = await transport.startPairing()
-  assert.equal(count, 1)
+  assert.equal(count, 2)
   assert.equal((await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })).status, 200)
   const { id, status } = await transport.allow(code, selection)
   assert.equal(status, "sent")
 
   state.who = agentOf(ana)
   const read = await call(readDrop, { handoff: id })
-  assert.deepEqual(read.structuredContent.handoff, { id, state: "working", asks: [], quotes: [theirs.n] })
+  const handoff = read.structuredContent.handoff
+  assert.deepEqual(
+    { ...handoff, quotes: new Set(handoff.quotes) },
+    {
+      id,
+      state: "working",
+      asks: [],
+      quotes: new Set([waiting.n, theirs.n]),
+    },
+  )
   assert.equal((await call(listHandoffs, {})).structuredContent.handoffs[0].id, id)
   state.who = ana
   assert.equal((await transport.status()).working.id, id)
@@ -291,6 +333,9 @@ test("a quote-only handoff stays working until the quoted thread is answered", a
     (await call(reply, { id: doc.id, comment: theirs.n, body: "Thanks; I'll check the freeze." })).isError,
     undefined,
   )
+  const resumed = await call(readDrop, { handoff: id })
+  assert.deepEqual(resumed.structuredContent.handoff.quotes, [waiting.n])
+  assert.equal((await call(reply, { id: doc.id, comment: waiting.n, body: "Yes." })).isError, undefined)
   state.who = ana
   assert.equal((await transport.status()).working, undefined)
   state.who = agentOf(ana)

@@ -5,6 +5,8 @@ import { frameAllow, previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
 
 const { withDocProperties, renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
+const { absoluteFavicons } = await import("../../server/utils/favicons.ts")
+const { siteTile } = await import("../../shared/site-tile.ts")
 
 const HEADER = {
   type: "doc-header",
@@ -42,15 +44,7 @@ const HEADER = {
       id: "abc123",
       title: "Before and after",
       href: "https://drop.test/drops/abc123",
-      icon: "https://drop.test/favicon.ico",
-    },
-  ],
-  links: [
-    { url: "https://linear.app/acme/issue/ACM-7", label: "ACM-7", icon: "https://drop.test/api/favicons/linear.app" },
-    {
-      url: "https://github.com/acme/app/pull/212",
-      label: "acme/app#212",
-      icon: "https://drop.test/api/favicons/github.com",
+      icon: "https://drop.test/icon.png",
     },
   ],
 }
@@ -72,13 +66,22 @@ const FOLDER = {
   ],
 }
 
-async function open(browser) {
+// A 1×1 PNG for the site icons and logos Drop serves (Playwright never routes /favicon.ico, so related drops use /icon.png here), unless a test sends them to a sign-in page as a proxy would.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+)
+
+async function open(
+  browser,
+  { resources = [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }], signIn = false } = {},
+) {
   const source = "---\nstatus: Ready\n---\n\n# Plan\n\nLaunch on November 18.\n"
   const { html } = await renderMarkdownCached("doc-header.md", async () => source)
-  const body = await withDocProperties(html, {
-    resources: [{ url: "https://github.com/acme/app/pull/212", title: "PR #212" }],
-    updatedAt: Date.UTC(2026, 10, 16),
-  })
+  const body = absoluteFavicons(
+    await withDocProperties(html, { resources, updatedAt: Date.UTC(2026, 10, 16) }),
+    "https://drop.test",
+  )
   const escaped = planDocument("markdown", source, false, body).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   // Firefox needs no permission to write in a click, and Playwright's Firefox grants none.
   const context = await browser.newContext(
@@ -87,6 +90,12 @@ async function open(browser) {
   const page = await context.newPage()
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
+    if (signIn && url.hostname === "drop.test" && url.pathname === "/oauth2/start")
+      return route.fulfill({ contentType: "text/html", body: "Sign in" })
+    if (url.hostname === "drop.test" && /^\/(api\/favicons|agents)\/|^\/icon\.png$/.test(url.pathname))
+      return signIn
+        ? route.fulfill({ status: 302, headers: { location: "https://drop.test/oauth2/start" } })
+        : route.fulfill({ contentType: "image/png", body: PNG })
     if (url.hostname !== "drop.test" || url.pathname !== "/") return route.abort()
     return route.fulfill({
       contentType: "text/html; charset=utf-8",
@@ -112,17 +121,18 @@ test(
       await page.evaluate((header) => window.tell(header), HEADER)
       await frame.locator("drop-doc-actions button").first().waitFor()
 
-      // Every link is a chip with its site's icon from Drop, the doc's own and the ones the viewer adds alike.
+      // Every link is a chip with its site's icon from Drop, the doc's own and the related drops the viewer adds alike.
       assert.deepEqual(
         await frame
           .locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
           .evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src"))),
-        ["/api/favicons/github.com", "https://drop.test/favicon.ico", "https://drop.test/api/favicons/linear.app"],
+        ["https://drop.test/api/favicons/github.com", "https://drop.test/icon.png"],
       )
       assert.equal((await frame.locator('dl.cfm > div[data-key="links"] > dt').innerText()).trim(), "Links")
-      // Related drops and their links join the Links row; a link the doc lists already isn't repeated.
+      // Related drops join the Links row after the doc's own links; their links stay in their own drops.
       const links = await frame.locator('dl.cfm > div[data-key="links"] dd a').allTextContents()
-      assert.deepEqual(links, ["PR #212", "Before and after", "ACM-7"])
+      assert.deepEqual(links, ["PR #212", "Before and after"])
+      assert.equal(await frame.locator(".drop-links-toggle").count(), 0, "a short row shows every link")
 
       // See more unfolds the facts, which stay out of reach while folded.
       const facts = frame.locator("drop-doc-facts")
@@ -231,7 +241,7 @@ test(
       // A copy the viewer made (its shortcut) shows on the button too; a second header doesn't add links again.
       await page.evaluate(() => window.tell({ type: "doc-copied" }))
       assert.equal(await copy.getAttribute("data-copied"), "")
-      assert.equal(await frame.locator('dl.cfm > div[data-key="links"] dd a').count(), 3)
+      assert.equal(await frame.locator('dl.cfm > div[data-key="links"] dd a').count(), 2)
 
       // Paper gets the doc, not the buttons.
       await page.emulateMedia({ media: "print" })
@@ -244,6 +254,213 @@ test(
     }
   },
 )
+
+// portal#1254's doc listed six links and thirteen related drops, and its Links row filled half a screen.
+test("a long Links row shows its first links and opens the rest behind N more", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const own = Array.from({ length: 6 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `PR #${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources: own })
+    const chips = frame.locator('dl.cfm > div[data-key="links"] dd a.cp')
+    const visible = () => chips.evaluateAll((all) => all.filter((a) => a.checkVisibility()).map((a) => a.textContent))
+    assert.equal(await frame.locator(".drop-links-toggle").count(), 0, "six links fit")
+
+    const related = Array.from({ length: 5 }, (_, i) => ({
+      id: `rel00${i}`,
+      title: `Related ${i + 1}`,
+      href: `https://drop.test/drops/rel00${i}`,
+      icon: "https://drop.test/icon.png",
+    }))
+    await page.evaluate((header) => window.tell(header), { ...HEADER, related })
+    const toggle = frame.locator(".drop-links-toggle")
+    const label = () => toggle.evaluate((button) => getComputedStyle(button, "::before").content)
+    await toggle.waitFor()
+    assert.deepEqual(
+      await visible(),
+      own.map((r) => r.title),
+      "the doc's own links come first",
+    )
+    assert.equal(await label(), '"5 more"')
+    assert.equal(await toggle.getAttribute("aria-expanded"), "false")
+    const folded = await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)
+
+    await toggle.focus()
+    await page.keyboard.press("Enter")
+    await page.keyboard.press("Tab")
+    assert.equal(await frame.evaluate(() => document.activeElement.textContent), "Related 1")
+    assert.equal((await visible()).length, 11)
+    assert.equal(await label(), '"Show less"')
+    assert.equal(await toggle.getAttribute("aria-label"), "Show fewer links")
+    await frame.waitForFunction(() => !document.querySelector('div[data-key="links"] > dd').getAnimations().length)
+    assert.ok((await frame.locator('dl.cfm > div[data-key="links"] > dd').evaluate((dd) => dd.offsetHeight)) >= folded)
+
+    // Another header keeps it open; the row folds again from the button.
+    await page.evaluate((header) => window.tell(header), { ...HEADER, related: related.slice(0, 4) })
+    assert.equal((await visible()).length, 10)
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    assert.deepEqual(
+      await visible(),
+      own.map((r) => r.title),
+    )
+    assert.equal(await label(), '"4 more"')
+
+    // Paper gets every link.
+    await page.emulateMedia({ media: "print" })
+    assert.equal((await visible()).length, 10)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("comments on folded links have a pin by the disclosure", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `Resource ${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.evaluate((header) => {
+      window.tell(header)
+      window.tell({
+        type: "markers",
+        markers: [{ id: "c1", kind: "text", selector: 'dl.cfm div[data-key="links"] dd', quote: "Resource 7", n: 1 }],
+      })
+    }, HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    const pin = frame.locator('drop-comments [data-slot="comment-mark-pin"][data-id="c1"]')
+    const foldedPin = pin.and(frame.locator(".away"))
+    const expandedPin = pin.and(frame.locator(":not(.away)"))
+    await foldedPin.waitFor()
+    await page.evaluate(() => window.tell({ type: "focus", id: "c1", open: true }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "marker" && m.id === "c1" && m.focused))
+
+    await toggle.click()
+    await expandedPin.waitFor()
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    await foldedPin.waitFor()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a quote across two links stays anchored when the disclosure appears", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, index) => ({
+      url: `https://github.com/acme/app/pull/${index + 1}`,
+      title: `Resource ${index + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    const selector = 'dl.cfm div[data-key="links"] dd'
+    const selectQuote = () =>
+      frame.locator(selector).evaluate((row) => {
+        const links = row.querySelectorAll("a.cp")
+        const range = document.createRange()
+        range.setStart(links[5], 0)
+        range.setEnd(links[6], links[6].childNodes.length)
+        const selection = getSelection()
+        selection.removeAllRanges()
+        selection.addRange(range)
+        const quote = selection.toString().replace(/\s+/g, "")
+        selection.removeAllRanges()
+        return quote
+      })
+    const quote = "Resource 6 Resource 7"
+    assert.equal(await selectQuote(), "Resource6Resource7")
+
+    await page.evaluate(
+      ({ selector, quote }) => {
+        window.tell({ type: "markers", markers: [{ id: "cross", kind: "text", selector, quote, n: 1 }] })
+      },
+      { selector, quote },
+    )
+    const pin = frame.locator('drop-comments [data-slot="comment-mark-pin"][data-id="cross"]')
+    const foldedPin = pin.and(frame.locator(".away"))
+    const expandedPin = pin.and(frame.locator(":not(.away)"))
+    await expandedPin.waitFor()
+
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    await toggle.waitFor()
+    assert.equal(await pin.count(), 1, "the late related drop must not unplace the comment")
+    await foldedPin.waitFor()
+    await toggle.click()
+    await expandedPin.waitFor()
+    assert.equal(await selectQuote(), "Resource6Resource7")
+    await frame.getByRole("button", { name: "Show fewer links" }).click()
+    await foldedPin.waitFor()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("reopening Links mid-collapse animates to the expanded height", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const resources = Array.from({ length: 8 }, (_, i) => ({
+      url: `https://github.com/acme/app/pull/${i + 1}`,
+      title: `A long resource label ${i + 1}`,
+    }))
+    const { page, frame } = await open(browser, { resources })
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const toggle = frame.getByRole("button", { name: "Show 3 more links" })
+    await toggle.click()
+    const row = frame.locator('dl.cfm > div[data-key="links"] > dd')
+    await frame.waitForFunction(
+      () => !document.querySelector('dl.cfm > div[data-key="links"] > dd').getAnimations().length,
+    )
+    const { target, expanded } = await row.evaluate((dd) => {
+      const button = dd.querySelector(".drop-links-toggle")
+      const expanded = dd.offsetHeight
+      button.click()
+      const [collapse] = dd.getAnimations()
+      collapse.pause()
+      collapse.currentTime = 120
+      button.click()
+      const [reopen] = dd.getAnimations()
+      return { target: reopen?.effect.getKeyframes().at(-1).height, expanded }
+    })
+    assert.equal(target, `${expanded}px`)
+  } finally {
+    await browser.close()
+  }
+})
+
+// Quiver's oauth2-proxy answered /api/favicons/ with its sign-in page, and every chip lost its icon to an empty space.
+test("a site icon that doesn't load shows its site's letter tile", { timeout: 30000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, {
+      signIn: true,
+      resources: [{ url: "https://github.com/acme/app/pull/212" }, { url: "https://acme.netlify.app/" }],
+    })
+    await page.evaluate((header) => window.tell(header), HEADER)
+    const icons = frame.locator('dl.cfm > div[data-key="links"] a.cp > img.cp-img')
+    await frame.waitForFunction(() =>
+      Array.from(document.querySelectorAll("img.cp-img")).every(
+        (img) => img.src.startsWith("data:") && img.naturalWidth,
+      ),
+    )
+    // Each takes its site's letter tile: GitHub's G for the doc's pull request.
+    const first = decodeURIComponent(await icons.first().getAttribute("src"))
+    assert.match(first, />G<\/text>/)
+    const tenant = decodeURIComponent(await icons.nth(1).getAttribute("src"))
+    assert.equal(tenant, `data:image/svg+xml,${siteTile("acme")}`)
+    // The agent's logo, also blocked, goes; its name stays.
+    await frame.getByRole("button", { name: "See more" }).click()
+    const who = frame.locator(".drop-who")
+    await frame.waitForFunction(() => !document.querySelector(".drop-who .drop-logo"))
+    assert.match(await who.innerText(), /Claude Code/)
+  } finally {
+    await browser.close()
+  }
+})
 
 test("Copy says so in the frame when the Markdown doesn't load", { timeout: 30000 }, async () => {
   const browser = await chromium.launch()
