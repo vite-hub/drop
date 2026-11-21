@@ -45,7 +45,6 @@ const preset = comarkUi({
     maxSource: 200_000,
   },
   time: false,
-  // Its runtime is one more inline script for the CSP; Drop's documents keep their blocks still until it's adopted.
   motion: false,
   typeset: false,
   zoom: { images: false },

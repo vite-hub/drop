@@ -67,7 +67,14 @@ test("every comark-ui package Drop renders has a section in the Markdown referen
   // motion has no syntax to write, and Drop turns it off.
   const packages = Object.keys(preset.dependencies).filter(
     (name) =>
-      !["comark-include", "comark-magic-move", "comark-motion", "comark-pele", "comark-reading-time", "comark-time"].includes(name),
+      ![
+        "comark-include",
+        "comark-magic-move",
+        "comark-motion",
+        "comark-pele",
+        "comark-reading-time",
+        "comark-time",
+      ].includes(name),
   )
   const missing = packages.filter(
     // comark-mathml is published under that name, since npm refused comark-math, and documented at /math/.
