@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { sql, state, migrate, reset, insertDrop, who } from "../cost/harness.mjs"
+import { sql, state, event, migrate, reset, insertDrop, who } from "../cost/harness.mjs"
 
 const { listPinned, setPinned, dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 
@@ -73,4 +73,46 @@ test("a drop's detail says whether you pinned it", async () => {
   const anonymous = await dropDetail(await findDrop("doc"), null, "https://drop.example")
   assert.equal(anonymous.pinned, undefined)
   assert.equal(anonymous.owner, undefined)
+})
+
+test("an adopted attachment no longer appears in Pinned or reports its former pin", async () => {
+  insertDrop("doc")
+  insertDrop("image", { kind: "image", filename: "image.png" })
+  await setPinned("image", who, true)
+  assert.deepEqual(await titles(who), ["image"])
+  sql.prepare("UPDATE drops SET parent_id = 'doc' WHERE id = 'image'").run()
+  assert.deepEqual(await titles(who), [])
+  const detail = await dropDetail(await findDrop("image"), who, "https://drop.example")
+  assert.equal(detail.pinned, undefined)
+})
+
+test("Pinned and detail both honor the current share approval policy", async () => {
+  insertDrop("shared", { owner_id: "mate", visibility: "public", share_review: "pending" })
+  await setPinned("shared", who, true)
+  const request = event("/api/drops?pinned")
+  state.shareApproval = true
+  assert.deepEqual(await listPinned(who, request), [])
+  state.shareApproval = false
+  const detail = await dropDetail(await findDrop("shared", request), who, request.url.origin, request)
+  assert.equal(detail.pinned, true)
+  assert.deepEqual(
+    (await listPinned(who, request)).map((drop) => drop.id),
+    ["shared"],
+  )
+})
+
+test("200 newer pins do not crowd out an older pin, whether hidden or openable", async () => {
+  insertDrop("old", { owner_id: "mate", visibility: "public" })
+  const pin = sql.prepare("INSERT INTO drop_pins (user_id, drop_id, at) VALUES (?, ?, ?)")
+  pin.run(who.userId, "old", 1)
+  for (let index = 0; index < 200; index++) {
+    const id = `new-${index}`
+    insertDrop(id, { owner_id: "mate", visibility: "private" })
+    pin.run(who.userId, id, index + 2)
+  }
+  assert.deepEqual(await titles(who), ["old"])
+  sql.exec("UPDATE drops SET share = 'public'")
+  const openable = await titles(who)
+  assert.equal(openable.length, 201)
+  assert.equal(openable.at(-1), "old")
 })

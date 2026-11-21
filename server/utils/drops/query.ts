@@ -402,24 +402,26 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
  */
 export async function listPinned(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const rows = await db
-    .select({ drop: drops, ownerName: user.name, ownerImage: user.image, ownerBanned: user.banned })
+    .select({ drop: drops, owner: user })
     .from(dropPins)
     .innerJoin(drops, eq(drops.id, dropPins.dropId))
     .innerJoin(user, eq(user.id, drops.ownerId))
     .where(and(eq(dropPins.userId, who.userId), isNull(drops.trashedAt)))
-    .orderBy(desc(dropPins.at))
-    .limit(200)
+    .orderBy(desc(dropPins.at), desc(dropPins.dropId))
   const { days } = expiryPolicy(event)
-  const banned = new Set(rows.filter((row) => row.ownerBanned).map((row) => row.drop.id))
-  const owners = new Map(rows.map((row) => [row.drop.id, { name: row.ownerName, image: row.ownerImage }]))
-  const nodes = (
-    await resolveRows(
-      rows.map((row) => row.drop),
-      days,
-    )
+  const owners = new Map(rows.map(({ drop, owner }) => [drop.id, owner]))
+  const resolved = await resolveRows(
+    rows.map(({ drop }) => drop),
+    days,
   )
-    .map((node) => ({ ...node, ownerBanned: banned.has(node.id) }))
-    .filter((node) => !node.expired && !node.quarantinedAt && permissions(node, who).view)
+  const nodes = (
+    await Promise.all(
+      resolved.map((node) => {
+        const owner = owners.get(node.id)!
+        return currentReview({ ...node, ownerBanned: Boolean(owner.banned) }, owner, event)
+      }),
+    )
+  ).filter((node) => canPinDrop(node, who))
   const byId = new Map(nodes.map((node) => [node.id, node]))
   return (await summarize(nodes, days, { ownerId: who.userId })).map((summary) => {
     const node = byId.get(summary.id)!
@@ -428,10 +430,15 @@ export async function listPinned(who: Identity, event?: H3Event): Promise<DropSu
       ...summary,
       pinned: true,
       ...(path.length ? { path } : {}),
-      ...(node.ownerId === who.userId || summary.teamFolder ? {} : { owner: owners.get(summary.id)! }),
+      ...(node.ownerId === who.userId || summary.teamFolder
+        ? {}
+        : { owner: { name: owners.get(node.id)!.name, image: owners.get(node.id)!.image } }),
     }
   })
 }
+
+export const canPinDrop = (drop: DropRow, who: Identity) =>
+  !drop.expired && !isAttachment(drop) && permissions(drop, who).view
 
 /** Whether `who` pinned the drop. */
 async function isPinned(dropId: string, who: Identity) {
@@ -638,7 +645,7 @@ export async function dropDetail(
     galleryOf(row, who, days),
     // Whose it is, for signed-in readers only: a public link doesn't name the person who shared it.
     who ? (row.ownerProfile ?? ownerProfileOf(row.ownerId)) : null,
-    who && !isAttachment(row) ? isPinned(row.id, who) : false,
+    who && canPinDrop(row, who) ? isPinned(row.id, who) : false,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)

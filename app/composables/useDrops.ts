@@ -4,6 +4,7 @@ import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
 import type { DropDetail, DropSummary, DropTree, Viewer } from "#shared/types"
+import { keys } from "../utils/keys"
 
 /**
  * Your drops, every one: the Drops page's list, and the sidebar's once it's loaded. The actions (useDropActions) patch it
@@ -96,7 +97,7 @@ export function useDropActions() {
   const { data: cached } = useNuxtData<DropSummary[]>(keys.drops)
   const { data: tree } = useNuxtData<DropTree>(keys.tree)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
-  const { data: pinnedList } = useNuxtData<DropSummary[]>(keys.pinned)
+  const pinWrites = useState<string[]>("pin-writes", () => [])
   /** Changes both lists (LISTS) the same way. */
   const edit = (change: (list: DropSummary[]) => DropSummary[]) => {
     if (cached.value) cached.value = change(cached.value)
@@ -112,10 +113,10 @@ export function useDropActions() {
   const patch = (id: string, change: Partial<DropSummary>) =>
     edit((list) => list.map((drop) => (drop.id === id ? { ...drop, ...change } : drop)))
   /** Changes the drop's own page too (useDrop), when one has it loaded. */
-  function editDetail(id: string, change: (detail: DropDetail) => DropDetail) {
-    if (!(keys.drop(id) in nuxtApp.payload.data)) return
+  function editDetail(key: string, change: (detail: DropDetail) => DropDetail) {
+    if (!(key in nuxtApp.payload.data)) return
     const scope = effectScope(true)
-    const data = scope.run(() => useNuxtData<DropDetail>(keys.drop(id)).data)!
+    const data = scope.run(() => useNuxtData<DropDetail>(key).data)!
     const before = data.value
     if (before) data.value = change(before)
     scope.stop()
@@ -161,20 +162,25 @@ export function useDropActions() {
     const before = [...(cached.value ?? []), ...(tree.value?.drops ?? [])].find((item) => item.id === drop.id)?.share
     patch(drop.id, { share })
     // In a folder that shares it wider, the pick is its own share; what it ends up with waits for the server.
-    const shown = editDetail(drop.id, (detail) => ({
+    const shown = editDetail(keys.drop(drop.id), (detail) => ({
       ...detail,
       ...(detail.sharedFrom ? { ownShare: share } : { share }),
     }))
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
       patch(drop.id, result)
-      editDetail(drop.id, (detail) => ({ ...detail, sharedFrom: undefined, ownShare: undefined, ...result }))
+      editDetail(keys.drop(drop.id), (detail) => ({ ...detail, sharedFrom: undefined, ownShare: undefined, ...result }))
       // A folder's page lists its drops, whose shares follow it.
-      void refreshNuxtData([keys.sharedWithMe, ...folders(), ...(result.kind === "folder" ? [keys.drop(drop.id)] : [])])
+      void refreshNuxtData([
+        keys.sharedWithMe,
+        keys.pinned,
+        ...folders(),
+        ...(result.kind === "folder" ? [keys.drop(drop.id)] : []),
+      ])
       return true
     } catch (error) {
       if (before) patch(drop.id, { share: before })
-      if (shown) editDetail(drop.id, () => shown)
+      if (shown) editDetail(keys.drop(drop.id), (detail) => ({ ...shown, pinned: detail.pinned }))
       notify.fail("Couldn't change sharing", error)
       return false
     }
@@ -185,7 +191,7 @@ export function useDropActions() {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: change })
       patch(drop.id, result)
-      await refreshNuxtData(keys.drop(drop.id))
+      await refreshNuxtData([keys.drop(drop.id), keys.pinned])
       return true
     } catch (error) {
       notify.fail("Couldn't change this drop's lifetime", error)
@@ -212,32 +218,31 @@ export function useDropActions() {
   }
 
   /**
-   * Pins the drop to your Pinned view, or unpins it. Optimistic: the drop's page and the Pinned list change at once and
-   * roll back if the server says no. From a control that shows the change itself (the +'s pressed pin), `quiet` skips
-   * the note; from ⌘K or a card's menu, which close, the note says it and offers Undo.
+   * Pins the drop for every version. All controls share the same in-flight guard; only a confirmed write changes the
+   * cache. `quiet` skips the note for controls that show the new state themselves.
    */
   async function setPinned(drop: DropSummary, pinned: boolean, { quiet = false } = {}) {
-    const shown = editDetail(drop.id, (detail) => ({ ...detail, pinned }))
-    const list = pinnedList.value
-    if (list)
-      pinnedList.value = pinned
-        ? [{ ...drop, pinned }, ...list.filter((item) => item.id !== drop.id)]
-        : list.filter((item) => item.id !== drop.id)
+    if (pinWrites.value.includes(drop.id)) return false
+    pinWrites.value = [...pinWrites.value, drop.id]
     try {
       await $fetch(`/api/drops/${drop.id}/pin`, { method: pinned ? "PUT" : "DELETE" })
-      if (!quiet)
-        notify.say(pinned ? "Pinned" : "Unpinned", {
-          icon: pinned ? "i-mingcute-pin-fill" : "i-mingcute-pin-line",
-          action: { label: "Undo", onClick: () => void setPinned(drop, !pinned) },
-        })
-      void refreshNuxtData(keys.pinned)
-      return true
     } catch (error) {
-      if (shown) editDetail(drop.id, () => shown)
-      if (list) pinnedList.value = list
       notify.fail(pinned ? "Couldn't pin it" : "Couldn't unpin it", error)
       return false
+    } finally {
+      pinWrites.value = pinWrites.value.filter((id) => id !== drop.id)
     }
+    const currentKey = keys.drop(drop.id)
+    for (const key of Object.keys(nuxtApp.payload.data)) {
+      if (key === currentKey || key.startsWith(`${currentKey}@`)) editDetail(key, (detail) => ({ ...detail, pinned }))
+    }
+    void refreshNuxtData(keys.pinned)
+    if (!quiet)
+      notify.say(pinned ? "Pinned" : "Unpinned", {
+        icon: pinned ? "i-mingcute-pin-fill" : "i-mingcute-pin-line",
+        action: { label: "Undo", onClick: () => void setPinned(drop, !pinned) },
+      })
+    return true
   }
 
   /** Moves a drop to the Trash at once, with an undo: nothing is lost for 15 days. */
@@ -404,7 +409,7 @@ export function useDropActions() {
     try {
       await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { folder: folder?.id ?? null } })
       const around = [drop.parentId, folder?.id].flatMap((id) => (id == null ? [] : [keys.drop(id)]))
-      await refreshNuxtData([...LISTS, keys.drop(drop.id), ...around, ...folders()])
+      await refreshNuxtData([...LISTS, keys.pinned, keys.drop(drop.id), ...around, ...folders()])
       notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top")
       return true
     } catch (error) {

@@ -148,7 +148,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
 
   // A new version adds bytes and a write, so the lists and the plan usage move too.
   const reloadVersion = () =>
-    Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.usage])])
+    Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage])])
 
   /**
    * Puts a suggestion's words into the doc as its next version and resolves it. The drop keeps its id, so the page
@@ -165,7 +165,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       await Promise.allSettled([
         drop.refresh(),
         comments.refresh(),
-        refreshNuxtData([keys.drops, keys.tree, keys.usage]),
+        refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage]),
       ])
       notify.fail("Couldn't accept the suggestion", error)
       return false
@@ -181,7 +181,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       await Promise.allSettled([
         drop.refresh(),
         comments.refresh(),
-        refreshNuxtData([keys.drops, keys.tree, keys.usage]),
+        refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage]),
       ])
       notify.fail("Couldn't undo the suggestion", error)
     }

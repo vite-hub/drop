@@ -22,7 +22,7 @@ const slugOf = (name: string) =>
 /** The link someone opens to join: Drop sends no email, so whoever invites shares it. */
 export const inviteLink = (id: string) => `${useRequestURL().origin}/teams/join/${id}`
 
-const reload = () => refreshNuxtData([keys.me, keys.sharedWithMe])
+const reload = () => refreshNuxtData([keys.me, keys.sharedWithMe, keys.pinned])
 
 /** One of the team's folders, which its owner and admins make. */
 async function addFolder(id: string, folder: { title: string; description?: string }) {

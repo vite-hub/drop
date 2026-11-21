@@ -1,6 +1,5 @@
 import { defineHandler, HTTPError, noContent } from "h3"
-import { findDrop, permissions, setPinned } from "../../../utils/drops"
-import { isAttachment } from "../../../utils/nodes"
+import { canPinDrop, findDrop, setPinned } from "../../../utils/drops"
 import { requireIdentity } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
@@ -8,7 +7,7 @@ import { routeId } from "../../../utils/params"
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const drop = await findDrop(await routeId(event), event)
-  if (!drop || !permissions(drop, who).view || isAttachment(drop))
+  if (!drop || !canPinDrop(drop, who))
     throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
   await setPinned(drop.id, who, true)
   return noContent()

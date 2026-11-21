@@ -33,7 +33,7 @@ const folderDialog = useFolderDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const { data: trash } = useTrash()
-const { data: pinned, status: pinnedStatus } = usePinned()
+const { data: pinned, status: pinnedStatus, error: pinnedError, refresh: refreshPinned } = usePinned()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not here.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
@@ -63,6 +63,7 @@ const searchQuery = computed(() => v.parse(SearchQuery, route.query))
 const query = computed(() => searchQuery.value.q.trim())
 const kind = computed(() => searchQuery.value.kind)
 const searching = computed(() => Boolean(query.value || kind.value) && !place.value)
+const showingPinned = computed(() => current.value === "pinned" && !searching.value)
 const {
   data: found,
   status: searchStatus,
@@ -300,8 +301,9 @@ async function newTeamFolder() {
             <ul
               v-if="
                 !place &&
-                ((status === 'pending' && !drops.length) ||
-                  (current === 'pinned' && !searching && pinnedStatus === 'pending' && !pinned.length))
+                (showingPinned
+                  ? (pinnedStatus === 'idle' || pinnedStatus === 'pending') && !pinned.length
+                  : status === 'pending' && !drops.length)
               "
               aria-hidden="true"
               class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-6"
@@ -314,14 +316,22 @@ async function newTeamFolder() {
             </ul>
 
             <div
-              v-else-if="error"
+              v-else-if="showingPinned ? pinnedError : error"
               class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
               role="alert"
             >
               <UIcon name="i-mingcute-warning-line" class="size-6 text-error" />
-              <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
+              <p class="mt-3 font-medium text-highlighted">
+                {{ showingPinned ? "Couldn't load your pins" : "Couldn't load your drops" }}
+              </p>
               <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
-              <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
+              <UButton
+                class="mt-5"
+                color="neutral"
+                label="Try again"
+                variant="outline"
+                @click="showingPinned ? refreshPinned() : refresh()"
+              />
             </div>
 
             <div
@@ -356,14 +366,14 @@ async function newTeamFolder() {
 
             <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
             <GetStarted
-              v-else-if="!place && !searching && !drops.length && !getStartedHidden && !uploading"
+              v-else-if="!place && !searching && !showingPinned && !drops.length && !getStartedHidden && !uploading"
               :drops="drops"
               @site="newSite()"
               @upload="openPicker()"
             />
 
             <div
-              v-else-if="!place && !searching && !drops.length && !uploading"
+              v-else-if="!place && !searching && !showingPinned && !drops.length && !uploading"
               class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
             >
               <UIcon name="i-mingcute-layers-line" class="size-6 text-dimmed" />
@@ -384,7 +394,7 @@ async function newTeamFolder() {
             </div>
 
             <div
-              v-else-if="current === 'pinned' && !searching && !pinned.length && !showsUploads"
+              v-else-if="showingPinned && pinnedStatus === 'success' && !pinned.length && !showsUploads"
               class="mb-8 rounded-lg border border-dashed border-default px-6 py-16 text-center"
             >
               <UIcon name="i-mingcute-pin-line" class="size-6 text-dimmed" />
