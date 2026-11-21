@@ -7,6 +7,7 @@ import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
 import { background } from "../utils/logs.ts"
+import { isMembershipOutage } from "../utils/members.ts"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
 const theme = `${THEME_CSS.replace(":root.dark {", "@media (prefers-color-scheme: dark) { :root {")}\n}`
@@ -50,7 +51,12 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
   const path = event.url.pathname
   if (!path.startsWith("/f/") && !path.startsWith("/d/")) return
   event.context.logClosed = true
-  const status = error.status >= 400 && error.status <= 599 ? error.status : 500
+  const status =
+    path.startsWith("/f/") && isMembershipOutage(error.cause)
+      ? 503
+      : error.status >= 400 && error.status <= 599
+        ? error.status
+        : 500
   let identity: Awaited<ReturnType<typeof signedIn>> = null
   try {
     identity = await signedIn(event)

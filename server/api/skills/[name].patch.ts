@@ -4,7 +4,7 @@ import * as v from "valibot"
 import { SkillPatchSchema } from "#shared/schemas"
 import { requireAdmin } from "../../utils/identity"
 import { logAudit } from "../../utils/logs"
-import { findSkill, setSkillEnabled } from "../../utils/skills"
+import settings from "../../skills"
 
 const Params = v.object({ name: v.pipe(v.string(), v.regex(/^[a-z0-9-]{1,64}$/)) })
 
@@ -13,9 +13,10 @@ export default defineValidatedHandler({
   async handler(event) {
     const who = await requireAdmin(event)
     const { name } = await getValidatedRouterParams(event, Params)
-    if (!findSkill(name)) throw new HTTPError({ status: 404, statusText: "No skill with that name." })
     const { enabled } = await event.req.json()
-    await setSkillEnabled(name, enabled, who.userId)
+    const [error] = await settings.set(name, enabled)
+    if (error?.code === "SKILL_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "No skill with that name." })
+    if (error) throw error
     useLogger(event).set({ skill: { name, enabled } })
     logAudit(event, who, enabled ? "skill.enable" : "skill.disable", { type: "skill", id: name })
     return { ok: true }

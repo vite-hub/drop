@@ -242,6 +242,42 @@ test("a prototype opens on the canvas; an item opens in focus and comes back as 
   }
 })
 
+test("the canvas keeps its camera for the version it was moved on, and a new version opens fitted", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("").replaceAll("<section ", '<section data-width="800" data-height="500" '),
+      false,
+      0,
+      true,
+    )
+    let version = "d1@1"
+    await tab.route("https://picker.test/versions", (route) =>
+      route.fulfill({ contentType: "text/html", body: withVariantBar(html, version) }),
+    )
+    const scale = () =>
+      tab.evaluate(() => document.getElementById("v-one").style.transform.match(/scale\(([\d.]+)\)/)?.[1])
+    const open = async () => {
+      await tab.goto("https://picker.test/versions")
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+      await tab.waitForTimeout(300)
+    }
+    await open()
+    assert.notEqual(await scale(), "1", "the first visit fits all three items")
+    await tab.keyboard.press("0")
+    await tab.waitForFunction(() => document.getElementById("v-one").style.transform.endsWith("scale(1)"))
+    await tab.waitForTimeout(300)
+    await open()
+    assert.equal(await scale(), "1", "the same version comes back where it was left")
+    version = "d1@2"
+    await open()
+    assert.notEqual(await scale(), "1", "a new version opens fitted")
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the canvas camera stops before the last item leaves the screen, and the minimap moves it", async () => {
   const browser = await chromium.launch()
   try {

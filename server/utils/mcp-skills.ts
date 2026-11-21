@@ -8,9 +8,9 @@ import {
 } from "h3-mcp"
 import { defineMcpResource } from "nitro-mcp-toolkit"
 import { skillsMcp } from "vite-hub/skills"
-import { enabledSkills } from "./skills"
+import settings from "../skills"
 
-const skills = skillsMcp(enabledSkills)
+const skills = skillsMcp(settings.enabled)
 
 export function mcpSkills(): ExtensionPlugin {
   return {

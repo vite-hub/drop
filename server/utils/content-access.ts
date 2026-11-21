@@ -17,7 +17,7 @@ export async function requireBlobAccess(event: H3Event, key: string) {
   if (key.startsWith("code-images/")) {
     if (isExpiredCodeImage(key, new Date())) throw notFound()
     const [image] = await db
-      .select({ ownerId: user.id, banned: user.banned, quarantined: rawFileQuarantine(event.url.pathname) })
+      .select({ ownerId: user.id, banned: user.banned, quarantined: rawFileQuarantine(key) })
       .from(codeImages)
       .leftJoin(user, eq(user.id, codeImages.ownerId))
       .where(eq(codeImages.blobKey, key))

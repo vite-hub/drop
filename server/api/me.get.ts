@@ -7,7 +7,7 @@ import type { Viewer } from "#shared/types"
 import { expiryPolicy } from "../utils/expiry"
 import { identify } from "../utils/identity"
 import { sharePolicy } from "../utils/share"
-import { enabledSkills } from "../utils/skills"
+import settings from "../skills"
 import { billingConfig, teamBilling, teamsEnabled } from "../utils/teams"
 
 export default defineHandler(async (event): Promise<Viewer | null> => {
@@ -23,7 +23,7 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
           .from(organization)
           .where(inArray(organization.id, ids))
       : [],
-    enabledSkills().then((enabled) => enabled.length),
+    settings.enabled().then((enabled) => enabled.length),
     billing.enabled ? teamBilling(ids) : { paid: new Set<string>(), pastDue: new Set<string>() },
   ])
   const teams = rows
