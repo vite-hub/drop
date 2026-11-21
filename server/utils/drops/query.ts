@@ -674,6 +674,7 @@ export async function dropDetail(
     canEdit: liveEditable(row, who),
     versions,
     ancestors: openableAncestors(row, who, days),
+    ...(row.kind === "image" && row.ancestors?.[0]?.kind === "site" ? { siteScreenshot: true } : {}),
     ...body,
   }
   if (detail.canEdit && row.kind === "markdown" && !(await liveEditorKeeps(row.blobKey, detail.content ?? ""))) {

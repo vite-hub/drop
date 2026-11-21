@@ -30,6 +30,12 @@ const PRESENCE_ROOM = /^\/(?:api\/)?_vitehub\/realtime\/presence\/[^/]+$/
 const VITEHUB_DATA =
   /^\/_vitehub\/(?:comments(?!\/assets\/)|realtime|browser-errors|console\/(?:status|logs|usage))(?:\/|$)/
 
+/**
+ * Send's pair route: a member's agent posts its setup code from its own machine, with no session. The one-use code is
+ * its only key, and ViteHub checks it (server/comments.ts).
+ */
+const SEND_PAIR = /^\/(?:api\/)?_vitehub\/comments\/send\/pair$/
+
 /** Members-only Drops serve anonymous visitors only the drops shared publicly; the rest of the app needs a member. */
 export default defineHandler(async (event) => {
   if (!membersOnly()) return
@@ -40,7 +46,7 @@ export default defineHandler(async (event) => {
   if (path.startsWith("/api/favicons/")) return
   // A site's review script sends no session, only a review token, which carries a member and is checked there. Before
   // it has one, the related route tells the page only whether a drop links to it.
-  if (REVIEW_SCRIPT.test(path) || PRESENCE_ROOM.test(path)) return
+  if (REVIEW_SCRIPT.test(path) || PRESENCE_ROOM.test(path) || SEND_PAIR.test(path)) return
   // An upload URL sends no session either: its ticket carries the member, who must still be one (readUpload).
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
   if (/^\/(?:api|[dfi])(?:\/|$)/.test(path) || VITEHUB_DATA.test(path)) {

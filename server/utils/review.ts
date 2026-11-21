@@ -455,6 +455,7 @@ export async function createSiteDrop(
       actorKind: who.actorKind,
       actorName: who.actorName,
       agent: who.actorKind === "agent" ? (input.agent ?? null) : null,
+      sessionPublisherId: who.actorKind === "agent" && input.agent?.session ? who.userId : null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,

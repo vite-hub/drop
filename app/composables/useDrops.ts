@@ -80,7 +80,7 @@ export function useDropPin(drop: () => DropSummary) {
   const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
   return computed(() => {
     const { id, pinned } = drop()
-    return confirmed.value[id]?.pinned ?? (pinned ?? Boolean(pins.value?.some((item) => item.id === id)))
+    return confirmed.value[id]?.pinned ?? pinned ?? Boolean(pins.value?.some((item) => item.id === id))
   })
 }
 

@@ -2,7 +2,7 @@
   "dialect": "sqlite",
   "id": "fb3beb83-3fdf-4dcb-9add-0f8599e6cab6",
   "prevIds": [
-    "bd8e0af0-6d25-47dd-a5e6-31995899d920"
+    "5eaed1a7-6353-4769-a9f6-0c4c05c06af2"
   ],
   "version": "7",
   "ddl": [
@@ -5105,6 +5105,744 @@
       "name": "code_images_size",
       "value": "\"code_images\".\"size\" >= 0",
       "entityType": "checks"
+    },
+    {
+      "table": "drops",
+      "name": "session_publisher_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "name": "vitehub_webhook_pairings",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_comment_sends",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_webhook_deliveries",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_webhook_endpoints",
+      "entityType": "tables"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "owner",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "agent",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "host",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "address",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "sealed",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "member",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "subject_kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "subject_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "page",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "threads",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "delivery",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "endpoint",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "thread",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "sender",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "token_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "webhook",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "event",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "body",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "revision",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "attempts",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "last_status",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "last_error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "due_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "sent_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "owner",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "owner_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "owner_email",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "address",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "''",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "agent",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "host",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "sealed",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "disabled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "disabled_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "vitehub_webhook_pairings_owner",
+      "columns": [
+        {
+          "value": "owner",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "vitehub_comment_sends_member",
+      "columns": [
+        {
+          "value": "member",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "vitehub_comment_sends_subject",
+      "columns": [
+        {
+          "value": "subject_kind",
+          "isExpression": false
+        },
+        {
+          "value": "subject_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "vitehub_webhook_deliveries_pending",
+      "columns": [
+        {
+          "value": "webhook",
+          "isExpression": false
+        },
+        {
+          "value": "key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'pending'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "vitehub_webhook_deliveries_webhook",
+      "columns": [
+        {
+          "value": "webhook",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "vitehub_webhook_deliveries_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "due_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "vitehub_webhook_endpoints_owner",
+      "columns": [
+        {
+          "value": "owner",
+          "isExpression": false
+        },
+        {
+          "value": "address",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "vitehub_webhook_pairings_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "vitehub_comment_sends_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_webhook_deliveries",
+      "name": "vitehub_webhook_deliveries_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_webhook_endpoints",
+      "name": "vitehub_webhook_endpoints_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
     }
   ],
   "renames": []
