@@ -2,6 +2,8 @@ import { HTTPError } from "h3"
 import { checkGitHubOrgMember } from "vite-hub/auth"
 import { useServerEnv } from "vite-hub/env"
 
+export const PROXY_TOKEN_HEADER = "x-auth-request-access-token"
+
 const proxyOrganization = () =>
   useServerEnv()
     .drop.members?.unseal()
