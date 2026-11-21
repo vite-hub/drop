@@ -4,6 +4,7 @@ import { textValue } from "#shared/utils/text"
 import { createDocDrop, dropPageUrl, findDrop, MAX_FILE_BYTES, permissions } from "../utils/drops"
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
+import { readFormWithin } from "../utils/params"
 
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
@@ -11,13 +12,13 @@ export default defineHandler(async (event) => {
     throw error
   })
   requireContentType(event, "multipart/form-data")
-  if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
-    throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 
   let form: FormData
   try {
-    form = await event.req.formData()
-  } catch {
+    form = await readFormWithin(event, MAX_FILE_BYTES + 64 * 1024)
+  } catch (error) {
+    if (HTTPError.isError(error) && error.status === 413)
+      throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
     throw new HTTPError({ status: 400, statusText: "Exactly one file is required." })
   }
   const file = form.get("file")

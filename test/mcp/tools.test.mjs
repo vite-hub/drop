@@ -23,6 +23,7 @@ const { addThread } = await import("../../server/utils/comments.ts")
 const { default: comments } = await import("../../server/comments.ts")
 const { deleteDrop, findDrop } = await import("../../server/utils/drops.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
+const { publishUploadOnce } = await import("../../server/utils/uploads.ts")
 const { default: uploadFile } = await import("../../server/api/files.post.ts")
 const { default: publishDraft } = await import("../../server/api/drops/[id]/versions.post.ts")
 const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
@@ -93,6 +94,33 @@ async function call(tool, input, protocolVersion = "2025-06-18") {
   const result = body.result
   return result.isError ? { isError: true, message: result.content.map((block) => block.text).join(" ") } : result
 }
+
+test("an upload streamed with no length is cut off at the limit, not read whole", async () => {
+  state.who = who
+  const boundary = "drop-test"
+  let chunks = 0
+  const head = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\nContent-Type: text/plain\r\n\r\n`
+  const endless = new ReadableStream({
+    pull: (stream) =>
+      chunks++ === 0
+        ? stream.enqueue(new TextEncoder().encode(head))
+        : chunks < 64
+          ? stream.enqueue(new Uint8Array(1024 * 1024).fill(120))
+          : stream.close(),
+  })
+  const event = new H3Event(
+    new Request("https://drop.example/api/files", {
+      method: "POST",
+      body: endless,
+      duplex: "half",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+    }),
+  )
+  event.context.log = { set() {}, error() {}, warn() {} }
+  await assert.rejects(uploadFile(event), { status: 413, statusText: "The file exceeds the 4 MiB limit." })
+  assert.ok(chunks < 10, `read ${chunks} chunks`)
+  assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0)
+})
 
 test("read_drop delivers a person's private upload as image bytes to their agent", async () => {
   const png = Buffer.from(
@@ -1027,8 +1055,7 @@ test("read_drop shows the errors people's browsers reported for the current app 
     await call(publish, { files: { "index.html": "<script>boom()</script>" }, note: "v1", lifetime: "temporary" })
   ).structuredContent
   const report = { kind: "error", message: "ReferenceError: boom is not defined", source: "/:1", page: "index.html" }
-  await recordRuntimeErrors(app.id, 1, [report])
-  await recordRuntimeErrors(app.id, 1, [report])
+  await Promise.all([recordRuntimeErrors(app.id, 1, [report]), recordRuntimeErrors(app.id, 1, [report])])
   const read = await call(readDrop, { id: app.id })
   assert.equal(read.structuredContent.errors.length, 1)
   assert.equal(read.structuredContent.errors[0].count, 2)
@@ -1037,8 +1064,14 @@ test("read_drop shows the errors people's browsers reported for the current app 
     /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/,
   )
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
-  await recordRuntimeErrors(app.id, 1, [report])
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
+  const newReport = { ...report, message: "Only in v2" }
+  await Promise.all([recordRuntimeErrors(app.id, 2, [newReport]), recordRuntimeErrors(app.id, 1, [report])])
+  const latest = (await call(readDrop, { id: app.id })).structuredContent.errors
+  assert.deepEqual(
+    latest.map(({ message, count }) => [message, count]),
+    [["Only in v2", 1]],
+  )
 })
 
 test("read_drop tells the owner's agents how many viewed the drop, and nobody else's", async () => {
@@ -1549,6 +1582,96 @@ test("a file without base64 gets an upload URL; curl -T creates the drop once, a
     await assert.rejects(put(tampered), /run out or isn't valid/)
   } finally {
     state.authSecret = undefined
+  }
+})
+
+test("two PUTs racing on one upload URL publish once, and a failed publish frees the URL for a retry", async () => {
+  state.authSecret = "test-secret"
+  const put = (url, text) => {
+    const body = new TextEncoder().encode(text)
+    const event = new H3Event(
+      new Request(url, { method: "PUT", body, headers: { "content-length": String(body.length) } }),
+    )
+    event.context.log = { set() {}, error() {}, warn() {} }
+    event.context.params = { ticket: new URL(url).pathname.split("/").pop() }
+    return uploadPut(event)
+  }
+  const { put: blobPut } = state.blob
+  try {
+    const ticket = (await call(publish, { file: { name: "race.md" }, note: "Race", lifetime: "review" }))
+      .structuredContent
+    state.who = null
+    const results = await Promise.allSettled([put(ticket.uploadUrl, "# One\n"), put(ticket.uploadUrl, "# Two\n")])
+    assert.deepEqual(results.map((result) => result.status).sort(), ["fulfilled", "rejected"])
+    const lost = results.find((result) => result.status === "rejected").reason
+    assert.equal(lost.status, 409)
+    assert.match(lost.message, /already used/)
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 1)
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const retry = (await call(publish, { file: { name: "retry.md" }, note: "Retry", lifetime: "review" }))
+      .structuredContent
+    state.who = null
+    state.blob.put = async () => {
+      throw new Error("injected blob put failure")
+    }
+    await assert.rejects(put(retry.uploadUrl, "# Retry\n"), /injected blob put failure/)
+    state.blob.put = blobPut
+    assert.equal((await put(retry.uploadUrl, "# Retry\n")).title, "Retry")
+  } finally {
+    state.blob.put = blobPut
+    state.who = who
+    state.authSecret = undefined
+  }
+})
+
+test("two claims on one upload, both in flight at once, run the publish once", async () => {
+  let open
+  const gate = new Promise((resolve) => (open = resolve))
+  let runs = 0
+  const publishOnce = () =>
+    publishUploadOnce("race", Date.now() + 60_000, async () => {
+      runs++
+      await gate
+      return { id: "drop" }
+    })
+  const first = publishOnce()
+  const second = publishOnce()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  open()
+  const results = await Promise.all([first, second])
+  assert.equal(runs, 1)
+  assert.deepEqual(
+    results.filter(Boolean).map((result) => result.value),
+    [{ id: "drop" }],
+  )
+  assert.equal(await publishOnce(), null, "a later PUT finds the URL used")
+})
+
+test("a slow publish holds the claim for the ticket's lifetime", async () => {
+  const now = Date.now()
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now)
+  const started = Promise.withResolvers()
+  const finish = Promise.withResolvers()
+  const expiresAt = now + 15 * 60_000
+  const first = publishUploadOnce("slow", expiresAt, async () => {
+    started.resolve()
+    await finish.promise
+    return "first"
+  })
+  try {
+    await Promise.race([started.promise, first])
+    clock.mockReturnValue(now + 5 * 60_000)
+    assert.equal(await publishUploadOnce("slow", expiresAt, async () => "second"), null)
+    clock.mockReturnValue(expiresAt)
+    await assert.rejects(
+      publishUploadOnce("slow", expiresAt, async () => "late"),
+      { status: 403 },
+    )
+  } finally {
+    finish.resolve()
+    clock.mockRestore()
+    await first
   }
 })
 

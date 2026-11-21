@@ -3,6 +3,15 @@ import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../../shared/types.ts"
 
+export interface DropRuntimeError {
+  kind: "error" | "rejection" | "console" | "load"
+  message: string
+  source?: string
+  page?: string
+  count: number
+  lastAt: number
+}
+
 export const drops = sqliteTable(
   "drops",
   {
@@ -178,6 +187,15 @@ export const suggestionAcceptances = sqliteTable(
   },
   (table) => [index("suggestion_acceptances_drop").on(table.dropId)],
 )
+
+export const dropRuntimeErrors = sqliteTable("drop_runtime_errors", {
+  dropId: text("drop_id")
+    .primaryKey()
+    .references(() => drops.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  errors: text("errors", { mode: "json" }).$type<DropRuntimeError[]>().notNull(),
+  updatedAt: integer("updated_at").notNull(),
+})
 
 export const codeImages = sqliteTable(
   "code_images",

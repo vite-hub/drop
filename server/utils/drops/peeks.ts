@@ -1,10 +1,9 @@
 import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import type { DropPeek, DropPeeks } from "#shared/types"
 import { dropTexts, drops } from "../../databases/default/index"
 import { ancestorsOf } from "../nodes"
 import { SEARCH_KINDS } from "../search"
-import { d1Chunks } from "../d1"
 
 export const PEEK_TEXT = 360
 export const PEEK_INSIDE = 3
@@ -34,7 +33,7 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
   const inside = folders.length ? await newestInside(ownerId, folders) : []
   const texted = [...rows, ...inside].flatMap((row) => (hasText(row.kind) ? [row.id] : []))
   const texts = new Map<string, string>()
-  for (const chunk of d1Chunks(texted))
+  for (const chunk of chunkParameters(texted, { reserved: 10 }))
     for (const row of await db
       .select({ id: dropTexts.dropId, text: sql<string>`substr(${dropTexts.text}, 1, ${PEEK_TEXT})` })
       .from(dropTexts)

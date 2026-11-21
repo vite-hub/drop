@@ -17,7 +17,10 @@ const modules: Record<string, string> = {
 }
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
-  "vite-hub/database": "export const db = globalThis.dropTest.db; export const defineDatabase = v => v",
+  // ViteHub's real helpers, on the test database: a copy with no Databases of its own reads them from this global.
+  "vite-hub/database": `globalThis[Symbol.for("vitehub.database.runtime")] = () => ({ databases: { default: { db: globalThis.dropTest.db } }, configured: new Set(["default"]) })
+export { chunkParameters, withIdempotency } from "@vite-hub/database"
+export const db = globalThis.dropTest?.db; export const defineDatabase = v => v`,
   "vite-hub/blob":
     'export { detectContentType } from "@vite-hub/blob/client"; export const blob = globalThis.dropTest.blob',
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
@@ -37,7 +40,7 @@ export const checkRateLimit = async (_event, bucket, options) => {
 export const requireRateLimit = async (...args) => {
   const [, decision] = await checkRateLimit(...args)
   if (decision.allowed) return
-  throw new HTTPError({ status: 429, message: "burst limit", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
+  throw new HTTPError({ status: 429, statusText: "Too Many Requests", message: args[2].message ?? "Rate limit exceeded.", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
 }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.

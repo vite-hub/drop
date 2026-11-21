@@ -1,11 +1,10 @@
 import { and, desc, eq, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm"
 import type { H3Event } from "h3"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import { siteAddressesFor, siteMatches } from "#shared/review"
 import { isPublic } from "#shared/share"
 import type { DropResource } from "#shared/types"
 import { drops, dropVisits } from "../databases/default/index"
-import { d1Chunks } from "./d1"
 import { type DropRow, findDrop, permissions, reaches } from "./drops"
 import type { Identity } from "./identity"
 import { listedNode } from "./nodes"
@@ -89,7 +88,7 @@ async function findableMatches(
 
 async function linkingDrops(targets: LinkTarget[], skip: Set<string>, who: Identity, event?: H3Event) {
   const found = new Map<string, DropRow>()
-  for (const chunk of d1Chunks(targets))
+  for (const chunk of chunkParameters(targets, { reserved: 10 }))
     for (const drop of await findableMatches(
       linking(chunk),
       (candidate) => resourcesOf(candidate).some((resource) => targets.some((target) => hits(resource.url, target))),
@@ -111,7 +110,7 @@ async function reviewingSites(targets: LinkTarget[], skip: Set<string>, who: Ide
   ]
   const addresses = [...new Set(origins.flatMap(siteAddressesFor))]
   const found = new Map<string, DropRow>()
-  for (const chunk of d1Chunks(addresses))
+  for (const chunk of chunkParameters(addresses, { reserved: 10 }))
     for (const drop of await findableMatches(
       and(
         eq(drops.kind, "site"),
@@ -188,7 +187,9 @@ export async function findableBy(who: Identity, found: DropRow[], event?: H3Even
   if (sharePolicy(event).mode === "team") return viewable.filter((drop) => shared.has(drop) || linked.has(drop))
   const now = Date.now()
   const visited = new Set<string>()
-  for (const ids of d1Chunks([...new Set([...linked].flatMap((drop) => publicPathOf(drop, now)))]))
+  for (const ids of chunkParameters([...new Set([...linked].flatMap((drop) => publicPathOf(drop, now)))], {
+    reserved: 10,
+  }))
     for (const row of await db
       .select({ id: dropVisits.dropId })
       .from(dropVisits)

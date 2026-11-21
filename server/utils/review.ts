@@ -294,7 +294,17 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
         const value = event.res.headers.get(name)
         if (value) headers.set(name, value)
       }
-      const body = error instanceof DropQuotaError ? error.quotaBody : { message: error.statusText || error.message }
+      if (error.status === 429) {
+        const retryAfter = error.headers?.get("retry-after")
+        if (retryAfter) {
+          headers.set("Retry-After", retryAfter)
+          if (headers.has("Access-Control-Allow-Origin")) headers.set("Access-Control-Expose-Headers", "Retry-After")
+        }
+      }
+      const body =
+        error instanceof DropQuotaError
+          ? error.quotaBody
+          : { message: error.status === 429 ? error.message : error.statusText || error.message }
       return new Response(JSON.stringify(body), { status: error.status, headers })
     }
   })
