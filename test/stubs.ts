@@ -17,7 +17,10 @@ const modules: Record<string, string> = {
 }
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
-  "vite-hub/database": "export const db = globalThis.dropTest.db; export const defineDatabase = v => v",
+  // ViteHub's real helpers, on the test database: a copy with no Databases of its own reads them from this global.
+  "vite-hub/database": `globalThis[Symbol.for("vitehub.database.runtime")] = () => ({ databases: { default: { db: globalThis.dropTest.db } }, configured: new Set(["default"]) })
+export { chunkParameters, withIdempotency } from "@vite-hub/database"
+export const db = globalThis.dropTest?.db; export const defineDatabase = v => v`,
   "vite-hub/blob":
     'export { detectContentType } from "@vite-hub/blob/client"; export const blob = globalThis.dropTest.blob',
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".

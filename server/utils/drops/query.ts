@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import type {
   DropAttachment,
   DropCrumb,
@@ -43,7 +43,6 @@ import type { Identity } from "../identity"
 import { logDrop, logError } from "../logs"
 import type { DropRow } from "./types"
 import { permissions, toCrumb, toSummary } from "./access"
-import { d1Chunks } from "../d1"
 import { liveEditorKeeps } from "../live-editor"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
@@ -235,7 +234,7 @@ export async function listFolder(
   if (!folder.teamFolder) return summaries
   const ownerIds = [...new Set(listed.map((row) => row.ownerId).filter((id) => id !== options.who?.userId))]
   const owners = new Map<string, { name: string; image: string | null }>()
-  for (const chunk of d1Chunks(ownerIds))
+  for (const chunk of chunkParameters(ownerIds, { reserved: 10 }))
     for (const row of await db
       .select({ id: user.id, name: user.name, image: user.image })
       .from(user)
@@ -435,7 +434,7 @@ async function searchShared(
   ).filter((node) => !node.expired && !node.quarantinedAt && permissions(node, who).view)
   const ownerIds = [...new Set(nodes.map((node) => node.ownerId))]
   const owners = new Map<string, { name: string; image: string | null }>()
-  for (const chunk of d1Chunks(ownerIds))
+  for (const chunk of chunkParameters(ownerIds, { reserved: 10 }))
     for (const row of await db
       .select({ id: user.id, name: user.name, image: user.image })
       .from(user)
