@@ -552,6 +552,13 @@ function nextWidth() {
   const at = widths.findIndex((item) => item.value === docWidth.value)
   docWidth.value = widths[(at + 1) % widths.length]!.value
 }
+// Zen mode, the reader's on every drop (the + segment's Zen, Z, or ⌘K): a Markdown doc reads without its outline, and
+// the pill folds to a small handle while nothing needs it (pillNeeded). The handle's press shows the pill for a while,
+// a peek, without leaving zen. Turning it on folds the pill at once, the + it was turned on from too.
+const zen = useZen()
+const peek = ref(false)
+const toggleZen = () => (zen.value = !zen.value)
+watch(zen, (on) => on && (detailsOpen.value = false))
 
 // An image in a folder moves along the folder's other images (useGallery).
 const gallery = useGallery(drop, publicView)
@@ -574,6 +581,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
       return hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0
     }),
     width: docWidth,
+    zen,
     annotations,
     clickComments: commentMode,
     threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
@@ -607,6 +615,9 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
       if (!ok) reportClientError("copy", new Error(`The doc header's Copy: ${error ?? "refused"}`))
     },
     openDrop: (id) => void router.push(`/drops/${id}`),
+    palette: usePaletteOpener(),
+    toggleZen,
+    escape: leaveZen,
   })
 /** A prototype's canvas is in the bar (ViewerVariants), where its Move and Hand tools are. */
 const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
@@ -700,12 +711,7 @@ function present() {
 defineShortcuts({
   // With text selected in the page, C and E work on it, as the bar over it says.
   c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
-  e: () => {
-    if (selection.value) return commentOnSelection(true)
-    if (editing.value || !showEditTool.value) return
-    if (drop.value.canEdit) startEdit()
-    else editNoteOpen.value = true
-  },
+  e: () => (selection.value ? commentOnSelection(true) : edit()),
   // On a prototype's canvas H is the Hand tool, as in Figma; History is still in Details.
   h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
   i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
@@ -726,6 +732,7 @@ defineShortcuts({
   d: () => !editing.value && download(),
   m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
   w: () => widens.value && nextWidth(),
+  z: toggleZen,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
 })
 // The Marker's size and Done, while it's on and nothing is being typed.
@@ -742,6 +749,10 @@ onKeyStroke(["[", "]", "Enter"], (event) => {
   }
   annotations.resize(event.key === "[" ? -1 : 1)
 })
+// An Escape pressed in a dialog or a menu, such as ⌘K's palette, closed that, though it still reaches the document here.
+const inLayer = (event: KeyboardEvent) =>
+  event.target instanceof Element &&
+  Boolean(event.target.closest('[role="dialog"], [role="menu"], [role="listbox"], [data-reka-popper-content-wrapper]'))
 // Dialogs and menus consume Escape first. Only handle it here when it reaches the document unhandled.
 onKeyStroke("Escape", (event) => {
   if (event.defaultPrevented || shareOpen.value || lightbox.value || editing.value) return
@@ -754,6 +765,7 @@ onKeyStroke("Escape", (event) => {
     if (performance.now() - detailsPopClosedAt > 100) detailsOpen.value = false
     return
   }
+  if (!inLayer(event) && leaveZen()) return
   closeChanges()
   if (popover.value) popover.value = null
   else if (commentsOpen.value) closeComments()
@@ -1073,6 +1085,12 @@ function sizeMark(index: number) {
 }
 // Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
 const editNoteOpen = ref(false)
+/** E and the palette's Edit together: the live editor, or the note that says why this doc can't take it. */
+function edit() {
+  if (editing.value || !showEditTool.value) return
+  if (drop.value.canEdit) startEdit()
+  else editNoteOpen.value = true
+}
 const showEditTool = computed(
   () =>
     !lightbox.value &&
@@ -1241,83 +1259,93 @@ async function deleteDrop() {
 
 const moveTo = useMoveDialog()
 
-// ⌘K offers the same actions as the review dock and Details.
+// ⌘K offers everything the review pill does, under the same conditions, each with the pill's key: the drop's actions,
+// then its comments, the Marker, the + segment's tools and views, the lifetime, a prototype's or a folder's images,
+// and the links it lists. What's on (a mode, a view, the choice made) is `active`, as the palette marks the theme.
+// Each group keeps to Nuxt UI's 12 items. Picking one does what pressing its control does.
+const lifetime = useLifetime(() => drop.value)
+// The Marker's inks as Tailwind classes, which Tailwind only builds from whole names in the source: MARK_COLORS are
+// these four.
+const INK_CLASSES: Record<MarkColor, string> = {
+  pink: "text-pink-500",
+  amber: "text-amber-500",
+  blue: "text-blue-600",
+  green: "text-green-600",
+}
+const deviceSize = useDeviceSize()
+/** When the version on screen was published, or the drop dropped, against the page's clock. */
+const shownAt = computed(() => {
+  const version = shownVersion.value?.version ?? drop.value.version
+  return drop.value.versions.find((item) => item.version === version)?.createdAt ?? drop.value.updatedAt
+})
 usePaletteOffer("drop", () => {
   if (visitor.value) return null
+  const title = drop.value.title
   if (editing.value)
     return {
-      title: drop.value.title,
-      items: [
+      groups: [
         {
-          label: "Publish the draft",
-          icon: "i-mingcute-upload-line",
-          kbds: ["meta", "s"],
-          onSelect: () => void live.publish(),
+          id: "actions",
+          label: title,
+          items: [
+            {
+              label: "Publish the draft",
+              icon: "i-mingcute-upload-line",
+              kbds: ["meta", "s"],
+              onSelect: () => void live.publish(),
+            },
+          ],
         },
       ],
     }
   if (trashed.value)
     return {
-      title: drop.value.title,
-      items: owner.value
-        ? [{ label: "Restore", icon: "i-mingcute-back-2-line", onSelect: () => void restoreDrop() }]
-        : [],
+      groups: [
+        {
+          id: "actions",
+          label: title,
+          items: owner.value
+            ? [{ label: "Restore", icon: "i-mingcute-back-2-line", onSelect: () => void restoreDrop() }]
+            : [],
+        },
+      ],
     }
-  const items: CommandPaletteItem[] = [
-    ...(drop.value.canEdit && !lightbox.value && !shownVersion.value
-      ? [{ label: "Edit together", icon: "i-mingcute-edit-2-line", kbds: ["e"], onSelect: startEdit }]
-      : []),
-    ...(hasComments.value
-      ? [{ label: "Comments", icon: "i-mingcute-chat-1-line", kbds: ["c"], onSelect: showComments }]
-      : []),
-    ...(canMarkArea.value
+  const actions: CommandPaletteItem[] = [
+    ...(showEditTool.value
       ? [
           {
-            label: "Comment on an area",
-            icon: "i-mingcute-message-1-line",
-            kbds: ["r"],
-            onSelect: toggleCommentArea,
+            label: "Edit together",
+            icon: "i-mingcute-pencil-line",
+            kbds: ["E"],
+            // The note why this doc can't be edited opens from its Edit in the + segment, so the segment opens first.
+            onSelect: () => {
+              if (!drop.value.canEdit) showDetails()
+              edit()
+            },
           },
         ]
       : []),
-    ...(hasHistory.value
-      ? [{ label: "History", icon: "i-mingcute-history-line", kbds: ["h"], onSelect: () => showDetails(true) }]
-      : []),
-    {
-      label: "Details",
-      icon: "i-mingcute-information-line",
-      kbds: ["i"],
-      onSelect: () => showDetails(Boolean(detailsChip.value)),
-    },
-    { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["l"], onSelect: () => copyLink("Link copied") },
+    { label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) },
+    { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["L"], onSelect: () => copyLink("Link copied") },
     ...(drop.value.url
-      ? [{ label: "Download", icon: "i-mingcute-download-2-line", kbds: ["d"], onSelect: download }]
+      ? [{ label: "Download original", icon: "i-mingcute-download-2-line", kbds: ["D"], onSelect: download }]
       : []),
-    ...(printsPdf.value ? [{ label: "Export as PDF", icon: "i-mingcute-pdf-line", onSelect: exportPdf }] : []),
-    ...(slidev.value && contentOrigin.value
-      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
-      : []),
-    ...(presents.value && !slidev.value
-      ? [{ label: "Open in new window", icon: "i-mingcute-presentation-2-line", onSelect: openWindow }]
-      : []),
-    ...(drop.value.resources ?? []).map((resource) => ({
-      label: `Open ${resourceLabel(resource)}`,
-      icon: "i-mingcute-external-link-line",
-      to: resource.url,
-      target: "_blank",
-    })),
     ...(copiesMarkdown.value
       ? [
           {
             label: "Copy as Markdown",
             icon: "i-mingcute-markdown-line",
-            kbds: ["m"],
+            kbds: ["M"],
             onSelect: () => void copyMarkdown("Markdown copied"),
           },
         ]
       : []),
-    ...(owner.value
-      ? [{ label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) }]
+    ...(printsPdf.value ? [{ label: "Export as PDF", icon: "i-mingcute-pdf-line", onSelect: exportPdf }] : []),
+    ...(slidev.value && contentOrigin.value && !lightbox.value && !shownVersion.value
+      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
+      : []),
+    ...(presents.value && !slidev.value
+      ? [{ label: "Open in new window", icon: "i-mingcute-external-link-line", onSelect: openWindow }]
       : []),
     ...(owner.value
       ? [
@@ -1332,7 +1360,323 @@ usePaletteOffer("drop", () => {
       ? [{ label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => void deleteDrop() }]
       : []),
   ]
-  return { title: drop.value.title, items }
+
+  // The Comments segment, which the Marker's controls take the place of while it draws.
+  const reviewing = hasComments.value && !marking.value
+  const listOpen = commentsOpen.value && !popover.value
+  const review: CommentStyle | undefined = reviewing ? commentStyleModel.value : undefined
+  const commenting: CommandPaletteItem[] = reviewing
+    ? [
+        ...(canUseCommentMode.value
+          ? [
+              {
+                label: "Comment mode",
+                description: "Click or drag on the page to comment there",
+                icon: "i-mingcute-chat-3-line",
+                kbds: ["C"],
+                active: commentMode.value,
+                onSelect: toggleCommentMode,
+              },
+            ]
+          : []),
+        {
+          label: "All comments",
+          icon: "i-mingcute-list-check-line",
+          kbds: canUseCommentMode.value ? undefined : ["C"],
+          active: listOpen,
+          onSelect: toggleComments,
+        },
+        ...(canCommentOnPage.value
+          ? [{ label: "Comment on the whole page", icon: "i-mingcute-file-line", onSelect: () => void commentOnPage() }]
+          : []),
+        ...(canMarkArea.value
+          ? [
+              {
+                label: "Comment on an area",
+                icon: "i-mingcute-message-1-line",
+                kbds: ["R"],
+                onSelect: toggleCommentArea,
+              },
+            ]
+          : []),
+        ...(review
+          ? (
+              [
+                { value: "card", label: "Cards beside the text", icon: "i-mingcute-layout-right-line" },
+                { value: "pin", label: "Pins beside the text", icon: "i-mingcute-map-pin-line" },
+              ] as const
+            ).map((style) => ({
+              label: style.label,
+              icon: style.icon,
+              active: review === style.value,
+              onSelect: () => (commentStyleModel.value = style.value),
+            }))
+          : []),
+        // Like the eye: on means hidden, the state that changes the page.
+        ...(!lightbox.value && !shownVersion.value && framed.value && pinned.value.length > 0
+          ? [
+              {
+                label: "Hide comments",
+                icon: overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",
+                active: !overlays.pins,
+                onSelect: () => toggleOverlay("pins"),
+              },
+            ]
+          : []),
+      ]
+    : []
+
+  // The Marker's tips while it's down, then, while it draws, its ink, its size, Undo, and Done. Browse puts it down.
+  const marker: CommandPaletteItem[] =
+    hasComments.value && canMark.value && !lightbox.value
+      ? [
+          // SAFETY: MARK_TIPS is a literal object whose keys are MarkTip; Object.entries widens them to string.
+          ...(Object.entries(MARK_TIPS) as [MarkTip, (typeof MARK_TIPS)[MarkTip]][]).map(([id, tip]) => ({
+            label: tip.label,
+            icon: tip.icon,
+            kbds: [tip.key],
+            active: marking.value && pen.tip === id,
+            onSelect: () => annotations.mark(id),
+          })),
+          ...(marking.value
+            ? [
+                ...Object.entries(INK_CLASSES).map(([name, ink]) => ({
+                  label: `${name.charAt(0).toUpperCase()}${name.slice(1)} ink`,
+                  icon: "i-mingcute-round-fill",
+                  ui: { itemLeadingIcon: ink },
+                  active: pen.color === name,
+                  // SAFETY: INK_CLASSES is keyed by MarkColor; Object.entries widens its keys to string.
+                  onSelect: () => colorMark(name as MarkColor),
+                })),
+                {
+                  label: "Smaller",
+                  icon: "i-mingcute-minimize-line",
+                  kbds: ["["],
+                  onSelect: () => annotations.resize(-1),
+                },
+                {
+                  label: "Larger",
+                  icon: "i-mingcute-fullscreen-line",
+                  kbds: ["]"],
+                  onSelect: () => annotations.resize(1),
+                },
+                { label: "Undo", icon: "i-mingcute-back-line", kbds: ["meta", "z"], onSelect: undoMark },
+                {
+                  label: "Done",
+                  description: "Send the snapshot and its strokes as a comment",
+                  icon: "i-mingcute-check-line",
+                  kbds: ["enter"],
+                  disabled: !annotations.marks.value || annotations.finishing.value,
+                  onSelect: finishMark,
+                },
+              ]
+            : []),
+        ]
+      : []
+
+  // The + segment's tools and views, its width and History chips, and who's here.
+  const tooled = hasComments.value && !marking.value && !lightbox.value && !shownVersion.value
+  const views: CommandPaletteItem[] = [
+    ...(tool.value !== "browse"
+      ? [{ label: "Browse", icon: "i-mingcute-cursor-3-line", kbds: ["V"], onSelect: () => (tool.value = "browse") }]
+      : []),
+    ...(tooled && previewTools.value.length
+      ? [
+          {
+            label: "Measure",
+            icon: "i-mingcute-aiming-2-line",
+            kbds: ["S"],
+            active: tool.value === "measure",
+            onSelect: () => setTool("measure"),
+          },
+        ]
+      : []),
+    ...(tooled && measurable.value
+      ? [
+          {
+            label: "Rulers and guides",
+            icon: "i-mingcute-ruler-line",
+            kbds: ["U"],
+            active: overlays.rulers,
+            onSelect: () => toggleOverlay("rulers"),
+          },
+        ]
+      : []),
+    ...(tooled && inspectsPage.value
+      ? [
+          {
+            label: "X-ray",
+            icon: "i-mingcute-layout-grid-line",
+            kbds: ["X"],
+            active: overlays.xray,
+            onSelect: () => toggleOverlay("xray"),
+          },
+        ]
+      : []),
+    ...(tooled && (sizable.value || siteRef.value?.canDraw)
+      ? [
+          {
+            label: "Device mode",
+            icon: "i-mingcute-device-line",
+            active: deviceSize.value.on,
+            onSelect: () => (deviceSize.value = { ...deviceSize.value, on: !deviceSize.value.on }),
+          },
+        ]
+      : []),
+    {
+      label: "Zen mode",
+      description: "Hide the outline and fold the pill to a handle",
+      icon: "i-mingcute-zazen-line",
+      kbds: ["Z"],
+      active: zen.value,
+      onSelect: toggleZen,
+    },
+    ...(widens.value
+      ? widths.map((width) => ({
+          label: width.label,
+          suffix: "Reading width",
+          icon: "i-mingcute-text-line",
+          kbds: ["W"],
+          active: docWidth.value === width.value,
+          onSelect: () => (docWidth.value = width.value),
+        }))
+      : []),
+    ...(presence.people.value.length
+      ? [
+          {
+            label: "Show cursors",
+            icon: "i-mingcute-cursor-2-line",
+            active: presence.showCursors.value,
+            onSelect: () => (presence.showCursors.value = !presence.showCursors.value),
+          },
+        ]
+      : []),
+    ...(hasHistory.value
+      ? [
+          {
+            label: "History",
+            suffix: `v${shownVersion.value?.version ?? drop.value.version} · ${timeAgo(shownAt.value, now.value)}`,
+            icon: "i-mingcute-history-line",
+            // On a prototype's canvas H is the Hand tool, so History goes without its key there.
+            kbds: canvasShown.value ? undefined : ["H"],
+            onSelect: () => showDetails(true),
+          },
+        ]
+      : []),
+    {
+      label: "Details",
+      suffix: [detailsChip.value, `dropped ${timeAgo(drop.value.createdAt, now.value)}`].filter(Boolean).join(" · "),
+      icon: "i-mingcute-information-line",
+      kbds: ["I"],
+      onSelect: () => showDetails(Boolean(detailsChip.value)),
+    },
+  ]
+
+  // The lifetime chip's menu (ViewerLifetime), for its owner.
+  const folder = lifetime.folder.value
+  const lifetimes: CommandPaletteItem[] =
+    owner.value && lifetime.choosable.value
+      ? [
+          ...lifetime.choices.value.map((choice) => ({
+            label: choice.label,
+            suffix: folder ? `Lifetime of ${folder.title}` : "Lifetime",
+            icon: "i-mingcute-time-line",
+            active: choice.on,
+            disabled: choice.disabled,
+            onSelect: choice.select,
+          })),
+          ...(lifetime.reset.value
+            ? [
+                {
+                  label: lifetime.reset.value.label,
+                  suffix: folder ? `Lifetime of ${folder.title}` : "Lifetime",
+                  icon: "i-mingcute-refresh-2-line",
+                  disabled: lifetime.reset.value.disabled,
+                  onSelect: lifetime.reset.value.select,
+                },
+              ]
+            : []),
+        ]
+      : []
+
+  // A prototype's bar (ViewerVariants): its camera on the canvas, or a step either way in focus, then each item.
+  const prototype = variants.value && !lightbox.value && !shownVersion.value ? variants.value : null
+  const camera: CommandPaletteItem[] = prototype
+    ? prototype.canvas
+      ? [
+          // The canvas's Move and Hand tools (ViewerVariants), the one in use marked.
+          {
+            label: "Move",
+            icon: "i-mingcute-cursor-3-line",
+            kbds: ["V"],
+            active: (prototype.tool ?? "move") === "move",
+            onSelect: () => canvasTool("move"),
+          },
+          {
+            label: "Hand",
+            icon: "i-mingcute-hand-line",
+            kbds: ["H"],
+            active: prototype.tool === "hand",
+            onSelect: () => canvasTool("hand"),
+          },
+          { label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbds: ["−"], onSelect: () => picker("zoom-out") },
+          { label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbds: ["+"], onSelect: () => picker("zoom-in") },
+          { label: "Fit", icon: "i-mingcute-fullscreen-2-line", kbds: ["shift", "1"], onSelect: () => picker("fit") },
+          { label: "Reset zoom", icon: "i-mingcute-refresh-2-line", kbds: ["0"], onSelect: () => picker("reset") },
+        ]
+      : [
+          { label: "Previous item", icon: "i-mingcute-left-line", kbds: ["←"], onSelect: () => picker("prev") },
+          { label: "Next item", icon: "i-mingcute-right-line", kbds: ["→"], onSelect: () => picker("next") },
+          { label: "Canvas", icon: "i-mingcute-grid-line", kbds: ["Esc"], onSelect: () => picker("canvas") },
+        ]
+    : []
+  const prototypeItems: CommandPaletteItem[] = (prototype?.variants ?? []).map((variant, index) => ({
+    label: variant.label || variant.id || `Item ${index + 1}`,
+    suffix: variant.note || undefined,
+    icon: "i-mingcute-layout-line",
+    kbds: index < 9 ? [String(index + 1)] : undefined,
+    active: !prototype?.canvas && prototype?.current === index,
+    onSelect: () => picker("show", index),
+  }))
+  // A folder's images (ViewerGallery).
+  const images: CommandPaletteItem[] = galleryShown.value
+    ? [
+        {
+          label: "Previous image",
+          icon: "i-mingcute-left-line",
+          kbds: ["←"],
+          disabled: galleryAt.value <= 0,
+          onSelect: () => gallery.step(-1),
+        },
+        {
+          label: "Next image",
+          icon: "i-mingcute-right-line",
+          kbds: ["→"],
+          disabled: galleryAt.value >= galleryItems.value.length - 1,
+          onSelect: () => gallery.step(1),
+        },
+      ]
+    : []
+  const links: CommandPaletteItem[] = (drop.value.resources ?? []).map((resource) => ({
+    label: `Open ${resourceLabel(resource)}`,
+    icon: "i-mingcute-external-link-line",
+    to: resource.url,
+    target: "_blank",
+  }))
+
+  return {
+    groups: [
+      { id: "actions", label: title, items: actions },
+      { id: "comments", label: "Comments", items: commenting },
+      { id: "marker", label: "Marker", items: marker },
+      { id: "view", label: "View", items: views },
+      { id: "lifetime", label: "Lifetime", items: lifetimes },
+      { id: "prototype", label: "Prototype", items: camera },
+      { id: "prototype-items", label: "Prototype items", items: prototypeItems },
+      { id: "images", label: "Images in this folder", items: images },
+      { id: "links", label: "Links", items: links },
+    ],
+  }
 })
 
 // Areas drawn over an image in the page anchor to that image, so the lightbox shows them too. A video's frame shows
@@ -1418,6 +1762,50 @@ watch(
   },
 )
 watch(pinThread, (shown) => shown && (awaitingSpot.value = false))
+
+/**
+ * What the reader is doing with the pill, which zen can't fold away: editing, a tool (the Marker, Measure, an area),
+ * comments (the mode, the list, a thread or a composer, one waiting for its place or a site's), Share, the + segment
+ * and its popovers, a version's changes, and the lightbox. Each is left with Escape, so Escape leaves zen only once none
+ * is on (leaveZen).
+ */
+const reviewing = computed(
+  () =>
+    editing.value ||
+    tool.value !== "browse" ||
+    commentMode.value ||
+    commentsOpen.value ||
+    Boolean(popover.value) ||
+    awaitingSpot.value ||
+    Boolean(siteRef.value?.pending) ||
+    shareOpen.value ||
+    detailsOpen.value ||
+    editNoteOpen.value ||
+    Boolean(shownVersion.value) ||
+    Boolean(lightbox.value),
+)
+// A prototype's bar stands in for the picker the prototype draws itself (variantBar), so it is part of the page: folding
+// it would leave the variants out of reach.
+const pillNeeded = computed(() => reviewing.value || Boolean(variants.value && !lightbox.value && !shownVersion.value))
+/** Escape's last step, once nothing else is open: a peek folds, then zen ends. Whether it did either. */
+function leaveZen() {
+  if (reviewing.value || selection.value) return false
+  if (peek.value) peek.value = false
+  else if (zen.value) zen.value = false
+  else return false
+  return true
+}
+// The handle names what the folded pill would show: comments still open, and who else is here.
+const handleLabel = computed(() => {
+  const people = presence.people.value.length
+  return [
+    "Show tools",
+    openCount.value ? `${openCount.value} open ${openCount.value === 1 ? "comment" : "comments"}` : "",
+    people ? `${people} ${people === 1 ? "person" : "people"} here` : "",
+  ]
+    .filter(Boolean)
+    .join(", ")
+})
 // The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => (commentsOpen.value ? threadComment.value?.n : undefined),
@@ -1669,9 +2057,26 @@ watch(
           :overlay="Boolean(lightbox)"
           :settle="whenHeld"
           :heading="popover?.type === 'new' || siteRef?.pending ? 'row' : 'none'"
+          v-model:peek="peek"
+          :folded="zen && !pillNeeded"
+          :handle-label="handleLabel"
           title="New comment"
           @close="closeComments"
         >
+          <template #handle>
+            <DropMark class="h-3.5 w-5" />
+            <span v-if="openCount" aria-hidden="true" class="inline-flex items-center gap-0.5">
+              <UIcon name="i-mingcute-chat-1-line" class="size-3" />{{ openCount }}
+            </span>
+            <span v-if="presence.people.value.length" aria-hidden="true" class="flex -space-x-0.5">
+              <span
+                v-for="person in presence.people.value.slice(0, 3)"
+                :key="person.id"
+                class="size-1.5 rounded-full ring-1 ring-(--ui-bg)"
+                :style="{ backgroundColor: person.color }"
+              />
+            </span>
+          </template>
           <template #panel>
             <ReuseComposer v-if="!floating" />
             <ViewerComments
@@ -1902,9 +2307,16 @@ watch(
                 :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
                 @width="nextWidth"
               >
-                <template v-if="hasComments && !trashed && !marking" #tools>
+                <template #tools>
                   <ViewerToolbar
-                    v-if="!lightbox && !shownVersion && (measurable || sizable || siteRef?.canDraw)"
+                    v-if="
+                      hasComments &&
+                      !trashed &&
+                      !marking &&
+                      !lightbox &&
+                      !shownVersion &&
+                      (measurable || sizable || siteRef?.canDraw)
+                    "
                     :overlays="overlays"
                     :sizable="sizable || Boolean(siteRef?.canDraw)"
                     :tool="tool"
@@ -1913,7 +2325,11 @@ watch(
                     @toggle="toggleOverlay"
                     @tool="setTool"
                   />
-                  <UTooltip v-if="showEditTool && drop.canEdit" :kbds="['E']" text="Edit together">
+                  <UTooltip
+                    v-if="hasComments && !trashed && !marking && showEditTool && drop.canEdit"
+                    :kbds="['E']"
+                    text="Edit together"
+                  >
                     <UButton
                       size="xs"
                       color="neutral"
@@ -1925,12 +2341,24 @@ watch(
                     />
                   </UTooltip>
                   <LazyViewerEditNote
-                    v-else-if="showEditTool && drop.editNote"
+                    v-else-if="hasComments && !trashed && !marking && showEditTool && drop.editNote"
                     v-model:open="editNoteOpen"
                     :can-comment="drop.canComment"
                     :note="drop.editNote"
                     @copy="copyMarkdown('Markdown copied')"
                   />
+                  <!-- Every drop has it, a folder too: the pill folds on any. -->
+                  <UTooltip :kbds="['Z']" text="Zen mode: no outline, the pill folded to a handle">
+                    <UButton
+                      size="xs"
+                      :aria-pressed="zen"
+                      color="neutral"
+                      icon="i-mingcute-zazen-line"
+                      label="Zen"
+                      variant="ghost"
+                      @click="toggleZen"
+                    />
+                  </UTooltip>
                 </template>
                 <template v-if="drop.isOwner" #lifetime><ViewerLifetime :drop="drop" /></template>
                 <template #details><ReuseDetails /></template>

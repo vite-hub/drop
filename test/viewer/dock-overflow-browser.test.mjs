@@ -8,6 +8,21 @@ import { ModuleKind, transpileModule } from "typescript"
 import { build } from "vite-plus"
 import { test } from "vite-plus/test"
 import { compileScript, compileStyle, parse } from "vue/compiler-sfc"
+import { PREVIEW_SANDBOX } from "../../app/utils/feedback.ts"
+import { injectRuntime } from "../../shared/plan-runtime.ts"
+
+const frameHtml = injectRuntime(
+  `<!doctype html><button id="trigger">Open tooltip</button>
+  <div role="tooltip" hidden>Demand tooltip</div><script>
+    const trigger = document.querySelector('#trigger');
+    const tip = document.querySelector('[role=tooltip]');
+    trigger.addEventListener('click', () => { tip.hidden = false; });
+    trigger.addEventListener('blur', () => { tip.hidden = true; });
+  </script>`,
+  false,
+  0,
+  true,
+)
 
 // Mount the real dock, details segment and nested preview toolbar with their production CSS.
 const require = createRequire(import.meta.url)
@@ -64,12 +79,17 @@ const entry = `
   const app = Vue.createApp({
     setup() {
       const open = Vue.ref(false)
-      const withPrompt = new URL(location.href).searchParams.has("prompt")
+      const params = new URL(location.href).searchParams
+      const withPrompt = params.has("prompt")
+      const zen = params.has("zen")
       const button = label => Vue.h("button", null, label)
-      const fixture = new URLSearchParams(location.search)
-      const hasCanvas = fixture.has("canvas")
+      if (zen) return () => Vue.h(Dock, { open: false, heading: "none", overlay: true, folded: true }, {
+        handle: () => "Tools",
+        toolbar: () => Vue.h("button", { onClick: () => frames[0].postMessage({ __drop: true, type: "tool", tool: "comment" }, "*") }, "Comment"),
+      })
+      const hasCanvas = params.has("canvas")
       const dock = Vue.ref(null)
-      const hand = Vue.ref(fixture.has("hand"))
+      const hand = Vue.ref(params.has("hand"))
       const spacer = () => Vue.h("span", { "aria-hidden": true, class: "w-1 shrink-0 max-sm:hidden" })
       return () => [Vue.h(Dock, { ref: dock, open: false, heading: "none", overlay: true }, {
         toolbar: () => withPrompt ? [
@@ -89,7 +109,7 @@ const entry = `
             }),
             spacer(),
             Vue.h(Toolbar, { tool: "browse", sizable: false, tools: ["mark"], views: [] }),
-            Vue.h(Comments, { on: false, count: fixture.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: fixture.has("pins"), pinsShown: false }),
+            Vue.h(Comments, { on: false, count: params.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: params.has("pins"), pinsShown: false }),
             spacer(),
             Vue.h("button", { "aria-label": "Share drop", class: "inline-flex shrink-0 items-center" }, [Vue.h("span", { class: "iconify" }), Vue.h("span", { class: "review-share-label" }, "Share")]),
           ] : []),
@@ -177,23 +197,39 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
   }
 }, 30_000)
 
-test("the phone canvas dock reports its top after the ViteHub mark changes edge", async () => {
+test("the phone canvas dock reports its top as a bottom ViteHub mark appears, moves, or disappears", async () => {
   const browser = await chromium.launch()
   try {
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true })
-    await openDock(page, "?canvas")
+    await openDock(page, "?canvas&noMark")
     const toolbar = page.getByRole("group", { name: "Document tools" })
     await toolbar.getByRole("button", { name: "Zoom, 100%", exact: true }).waitFor()
-    const raised = await toolbar.boundingBox()
-    assert.ok(raised)
-    for (const edge of ["bottom", "right", "bottom"]) {
-      await page.locator("vitehub-pill").evaluate((mark, edge) => mark.setAttribute("edge", edge), edge)
+    const initial = await toolbar.boundingBox()
+    assert.ok(initial)
+    async function expectTop(offset) {
       const bounds = await toolbar.boundingBox()
       assert.ok(bounds)
-      assert.equal(bounds.y, raised.y + (edge === "right" ? 48 : 0))
-      assert.equal(bounds.width, raised.width)
-      assert.equal(bounds.height, raised.height)
-      await page.waitForFunction((top) => Number(document.querySelector("#dock-top").textContent) === top, bounds.y)
+      assert.equal(bounds.y, initial.y + offset)
+      assert.equal(bounds.width, initial.width)
+      assert.equal(bounds.height, initial.height)
+      await page.waitForFunction((top) => Number(document.querySelector("#dock-top").textContent) === top, bounds.y, {
+        timeout: 3000,
+      })
+    }
+    await expectTop(0)
+    for (const tag of ["vitehub-tools-off", "vitehub-pill"]) {
+      await page.evaluate((tag) => {
+        const mark = document.createElement(tag)
+        mark.setAttribute("edge", "bottom")
+        document.documentElement.appendChild(mark)
+      }, tag)
+      await expectTop(-48)
+      for (const edge of ["right", "bottom"]) {
+        await page.locator(tag).evaluate((mark, edge) => mark.setAttribute("edge", edge), edge)
+        await expectTop(edge === "right" ? 0 : -48)
+      }
+      await page.locator(tag).evaluate((mark) => mark.remove())
+      await expectTop(0)
     }
   } finally {
     await browser.close()
@@ -206,16 +242,67 @@ async function openDock(page, path = "") {
     route.fulfill(
       new URL(route.request().url()).pathname === "/fixture.js"
         ? { contentType: "text/javascript", body: script }
-        : {
-            contentType: "text/html",
-            body: `<style>${styles}</style><div id="app"></div>
-          <script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>
+        : new URL(route.request().url()).pathname === "/frame"
+          ? { contentType: "text/html; charset=utf-8", body: frameHtml }
+          : {
+              contentType: "text/html",
+              body: `<style>${styles}</style><div id="app"></div>
+          ${path === "?zen" ? `<button id="outside">Outside</button><iframe title="Preview" sandbox="${PREVIEW_SANDBOX}" src="/frame"></iframe>` : ""}
+          <script>window.posts = []; addEventListener("message", (event) => {
+            if (event.source === frames[0] && event.data?.__drop) window.posts.push(event.data);
+          });</script>
+          ${new URLSearchParams(path).has("noMark") ? "" : "<script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>"}
           <script type="module" src="/fixture.js"></script>`,
-          },
+            },
     ),
   )
   await page.goto(`https://drop.test/${path}`)
 }
+
+test("revealing Zen tools preserves a tooltip while starting a comment", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ reducedMotion: "reduce" })
+    await openDock(page, "?zen")
+    const frame = page.frameLocator("iframe")
+    const tip = frame.getByRole("tooltip")
+    const trigger = frame.getByRole("button", { name: "Open tooltip" })
+    await page.waitForFunction(() => window.posts.some((message) => message.type === "ready"))
+    await trigger.click()
+    await tip.waitFor({ state: "visible" })
+    await page.getByRole("button", { name: "Show tools" }).click()
+    assert.equal(await trigger.evaluate((button) => button === document.activeElement), true)
+    assert.equal(await tip.isVisible(), true)
+    await page.getByRole("button", { name: "Comment" }).click()
+    await page.waitForFunction(() =>
+      window.posts.some((message) => message.type === "tool" && message.tool === "comment"),
+    )
+    await page.getByRole("button", { name: "Outside" }).focus()
+    assert.equal(await tip.isVisible(), true)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("a keyboard peek keeps toolbar focus until focus leaves", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ reducedMotion: "reduce" })
+    await openDock(page, "?zen")
+    const handle = page.getByRole("button", { name: "Show tools" })
+    await handle.press("Enter")
+    const comment = page.getByRole("button", { name: "Comment" })
+    await comment.hover()
+    const outside = page.getByRole("button", { name: "Outside" })
+    await outside.hover()
+    assert.equal(await comment.evaluate((button) => button === document.activeElement), true)
+    await outside.focus()
+    await handle.waitFor({ state: "visible" })
+    assert.equal(await comment.count(), 0)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
 
 test("comment tools wrap independently on phones and share a track on wider docks", async () => {
   const browser = await chromium.launch()
