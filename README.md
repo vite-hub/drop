@@ -61,6 +61,8 @@ codex mcp login drop
 
 Finish signing in through the browser before using Drop tools. The plugin connects to drop.vitehub.dev; for a Drop you host, add its `/mcp` as step 2 above says.
 
+`/drop:feedback` in Claude Code (`$feedback` in Codex) pulls the comments people sent you with Send in a drop's review pill, and answers them.
+
 ## Install the skills
 
 **data-explorer** turns a CSV, a JSON export or an API into one interactive dashboard page: findings, charts and tables behind tabs, with a filter sidebar. It needs no Drop account, and it's MIT.

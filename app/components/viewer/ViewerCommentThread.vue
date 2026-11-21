@@ -51,7 +51,7 @@ const lookup = async (query: string) => {
 }
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
-const busy = computed(() => Boolean(draft && (draft.sending.value || draft.waiting.value)))
+const busy = computed(() => Boolean(draft?.waiting.value))
 // The composer's files are the draft's picks, so the viewer's own pictures show and go with the rest.
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
@@ -240,7 +240,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
     >
       <template #actions>
         <UTooltip
-          v-if="canAccept && comment.suggestion !== null && !comment.resolved"
+          v-if="canAccept && !comment.delivery && comment.suggestion !== null && !comment.resolved"
           text="Publish a new version with this change"
         >
           <UButton
@@ -254,7 +254,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
           />
         </UTooltip>
         <!-- Deleting the thread is the first message's Delete, which asks first. -->
-        <UTooltip text="Copy link">
+        <UTooltip v-if="!comment.delivery" text="Copy link">
           <UButton
             aria-label="Copy link"
             color="neutral"
@@ -284,6 +284,9 @@ const edit = (messageId: string, text: string, ids: string[]) =>
             {{ comment.quote }}
           </p>
         </div>
+      </template>
+      <template #status="{ message, delivery }">
+        <ViewerDeliveryStatus :delivery="delivery" :message="message" />
       </template>
       <template v-if="screenshot" #after>
         <ViewerReviewScreenshot :comment="comment" :screenshot="screenshot" />

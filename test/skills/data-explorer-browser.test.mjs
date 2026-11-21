@@ -10,7 +10,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { chromium } from "playwright"
-import { afterAll, test } from "vite-plus/test"
+import { afterAll, expect, test } from "vite-plus/test"
 
 const skill = fileURLToPath(new URL("../../skills/data-explorer/", import.meta.url))
 const dir = mkdtempSync(join(tmpdir(), "data-explorer-clicks-"))
@@ -23,6 +23,9 @@ const vega = {
   "vega@6": join(dirname(from.resolve("vega")), "vega.min.js"),
   "vega-lite@6": join(dirname(from.resolve("vega-lite")), "vega-lite.min.js"),
 }
+
+const opacities = (locator) =>
+  locator.evaluateAll((nodes) => nodes.map((node) => Number(getComputedStyle(node).opacity)))
 
 const months = ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01"]
 const teams = { Alpha: 30, Beta: 18, Gamma: 6 }
@@ -228,7 +231,6 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       // A bin's label starts with its range under the histogram's `xTitle`.
       const bin = (range) => chart("Hours per issue").locator(`.role-mark path[aria-label^="Hours: ${range};"]`)
       const press = (locator) => (phone ? locator.tap() : locator.click())
-      const opacity = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).opacity))
       const matching = () => page.locator("h3", { hasText: "Issues" }).locator(".rp-muted").textContent()
 
       await page.goto(`file://${join(dir, "spread.html")}#spread`)
@@ -239,10 +241,9 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       await drawn()
       assert.equal(await matching(), " 10 matching")
       assert.equal(await chart("Hours per issue").locator(".role-mark path").count(), 4)
-      assert.deepEqual(
-        await Promise.all(["0 – 10", "10 – 20", "20 – 30", "30 – 40"].map((range) => opacity(bin(range)))),
-        [0.2, 1, 0.2, 0.2],
-      )
+      await expect
+        .poll(() => Promise.all(["0 – 10", "10 – 20", "20 – 30", "30 – 40"].map((range) => opacities(bin(range)))))
+        .toEqual([[0.2], [1], [0.2], [0.2]])
       assert.match(await page.locator(".rp-side").textContent(), /Hours\s*Clear\s*10 – 20/)
       if (phone)
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no sideways scroll")
@@ -265,10 +266,9 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       await press(page.getByRole("button", { name: "Log", exact: true }))
       await drawn()
       assert.equal(await matching(), " 10 matching")
-      const logBins = await chart("Hours per issue")
-        .locator(".role-mark path")
-        .evaluateAll((paths) => paths.map((path) => Number(getComputedStyle(path).opacity)))
-      assert.ok(logBins.includes(1) && logBins.includes(0.2))
+      await expect
+        .poll(() => opacities(chart("Hours per issue").locator(".role-mark path")))
+        .toEqual(expect.arrayContaining([1, 0.2]))
       await press(page.getByRole("button", { name: "Clear", exact: true }))
       await drawn()
 
@@ -279,8 +279,12 @@ test("a click on a histogram bin filters by its range, and a click on a vega mar
       assert.equal(await matching(), " 14 matching")
       const bars = chart("Issues per team").locator(".role-mark path")
       assert.equal(await bars.count(), 3)
-      assert.equal(await opacity(chart("Issues per team").locator('.role-mark path[aria-label*="team: Alpha"]')), 0.2)
-      assert.equal(await opacity(chart("Issues per team").locator('.role-mark path[aria-label*="team: Beta"]')), 1)
+      await expect
+        .poll(() => opacities(chart("Issues per team").locator('.role-mark path[aria-label*="team: Alpha"]')))
+        .toEqual([0.2])
+      await expect
+        .poll(() => opacities(chart("Issues per team").locator('.role-mark path[aria-label*="team: Beta"]')))
+        .toEqual([1])
       await press(chart("Issues per team").locator(".role-axis-label text", { hasText: "Gamma" }))
       await page.waitForFunction(() => location.hash.includes("team=Gamma"))
       assert.deepEqual(errors, [])
@@ -336,7 +340,6 @@ test("Vega legends, axes and marks filter by their own encoding", async () => {
     })
     await page.route("https://fonts.googleapis.com/**", (route) => route.abort())
     const chart = (title) => page.locator(`.rp-chart[aria-label="${title}"][data-state="ok"] svg`)
-    const opacity = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).opacity))
     const hash = async () => new URLSearchParams((await page.evaluate(() => location.hash)).split("?")[1])
     const points = chart("Points")
     const axes = chart("Independent axes")
@@ -344,8 +347,8 @@ test("Vega legends, axes and marks filter by their own encoding", async () => {
     await points.locator(".role-legend-label text", { hasText: "Open" }).click()
     await page.waitForFunction(() => location.hash.includes("status=Open"))
     assert.deepEqual(Object.fromEntries(await hash()), { status: "Open" })
-    assert.equal(await opacity(points.locator(".role-legend-label text", { hasText: "Done" })), 0.2)
-    assert.equal(await opacity(points.locator(".role-legend-label text", { hasText: "Beta" })), 1)
+    await expect.poll(() => opacities(points.locator(".role-legend-label text", { hasText: "Done" }))).toEqual([0.2])
+    await expect.poll(() => opacities(points.locator(".role-legend-label text", { hasText: "Beta" }))).toEqual([1])
 
     await axes.locator('.role-mark path[aria-label^="status: Done;"]').click()
     await page.waitForFunction(() => location.hash.includes("status=Done"))

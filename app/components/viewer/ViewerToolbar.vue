@@ -7,7 +7,7 @@ const {
   tool,
   overlays = { rulers: false, xray: false, pins: true },
   sizable,
-  tools = ["browse", "measure"],
+  tools = ["measure"],
   views = ["rulers", "xray", "pins"],
 } = defineProps<{
   tool: ViewerTool
@@ -22,7 +22,6 @@ type Item = { id: string; label: string; icon: string; kbd?: string; on: boolean
 
 const toolItems = computed<Item[]>(() =>
   [
-    { value: "browse" as const, label: "Browse", icon: "i-mingcute-cursor-3-line", kbd: "V" },
     { value: "measure" as const, label: "Measure", icon: "i-mingcute-aiming-2-line", kbd: "S" },
     { value: "mark" as const, label: "Marker", icon: "i-mingcute-mark-pen-line", kbd: "B" },
   ].flatMap((item) =>

@@ -28,6 +28,8 @@ export interface Identity {
   userId: string
   name: string
   email: string
+  /** Whether a sign-in method verified `email`. Send stores a verified email so the ViteHub Console knows its owner. */
+  emailVerified?: boolean
   image: string | null
   role: Role
   actorKind: ActorKind
@@ -150,6 +152,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
     userId: user.id,
     name: user.name,
     email: user.email,
+    emailVerified: user.emailVerified,
     image: user.image ?? null,
     role: roleOf(user),
     actorKind: caller.kind,
@@ -171,6 +174,7 @@ export async function identityOf(userId: string): Promise<Identity | null> {
     userId: person.id,
     name: person.name,
     email: person.email,
+    emailVerified: person.emailVerified,
     image: person.image ?? null,
     role: roleOf(person),
     actorKind: "browser",

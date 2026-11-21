@@ -26,11 +26,19 @@ const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
 const storage = () => ({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
 export const defineCachedFunction = (fn, options) => define(fn, { storage, group: "nitro/functions", ...options })`,
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
-  "vite-hub/rate-limit": `export const checkRateLimit = async (_event, bucket, options) => {
+  // Like ViteHub's: a 429 says Retry-After only when the limiter knows it. `burstRetryAfter: undefined` is
+  // Cloudflare's binding, which doesn't.
+  "vite-hub/rate-limit": `import { HTTPError } from "h3"
+export const checkRateLimit = async (_event, bucket, options) => {
   globalThis.dropTest.bursts.push({ bucket, ...options })
-  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
+  const retryAfter = "burstRetryAfter" in globalThis.dropTest ? globalThis.dropTest.burstRetryAfter : 42
+  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
 }
-export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
+export const requireRateLimit = async (...args) => {
+  const [, decision] = await checkRateLimit(...args)
+  if (decision.allowed) return
+  throw new HTTPError({ status: 429, message: "burst limit", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
+}`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":

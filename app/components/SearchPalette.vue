@@ -1,8 +1,11 @@
 <script setup lang="ts">
 // The ⌘K palette on every dashboard page: drops you can open (yours at any depth, then teammates'), matched by name or
 // by a doc's words on the server, and, matched here, what you can do with the drop open, new drops to make, the app's
-// pages, the theme, and signing out. The sidebar's search button opens it too, and a folder's search box opens it with
-// `in:<folder>` typed in. `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
+// pages, the theme, and signing out. The sidebar's search button opens it too, a folder's search box opens it with
+// `in:<folder>` typed in, and a drop's frame passes ⌘K on while the page in it has the focus (useViewerFrame,
+// ViewerSiteFrame). `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
+// The drop open offers everything its review pill does (DropViewer's usePaletteOffer), each with the pill's key, and a
+// mode or a view that's on, or the choice made, as `active`, as the Theme group marks the theme.
 import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
 import { DROP_KINDS, type DropSummary } from "#shared/types"
 
@@ -269,9 +272,11 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
         },
       ]
     : []),
-  ...(current.value?.items.length && !filtered.value
-    ? [{ id: "drop", label: current.value.title, items: current.value.items }]
-    : []),
+  ...(filtered.value
+    ? []
+    : (current.value?.groups ?? [])
+        .filter((group) => group.items.length)
+        .map((group) => ({ id: `drop-${group.id}`, label: group.label, items: group.items }))),
   ...(filtered.value
     ? []
     : term.value.trim()

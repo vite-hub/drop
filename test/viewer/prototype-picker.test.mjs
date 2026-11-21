@@ -405,6 +405,63 @@ test("the Hand tool pans from over an item, which gets no clicks, and Space does
   }
 })
 
+test("initial fit and Zoom to fit keep tall phone variants above the raised dock", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true })
+    const prototype = `<!doctype html><html><head></head><body>
+      <section id="v-one" data-variant="First phone screen with a long title" data-note="A long note for the first prototype screen that wraps below its title" data-width="360" data-height="1800">
+        <button id="target" style="position:absolute;bottom:12px;left:40px" onclick="this.textContent = 'Tapped'">Tap</button>
+      </section>
+      <section id="v-two" data-variant="Second phone screen" data-width="360" data-height="1800"></section>
+      </body></html>`
+    const frame = withVariantBar(injectRuntime(prototype, false, 0, true))
+    await tab.route("https://picker.test/**", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body:
+          new URL(route.request().url()).pathname === "/phone"
+            ? frame
+            : `<!doctype html><iframe src="/phone" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe>
+             <div id="dock" style="position:fixed;inset:auto 2px 64px;height:50px;background:#222"></div>`,
+      }),
+    )
+    await tab.goto("https://picker.test/viewer")
+    const phone = tab.frame({ url: "https://picker.test/phone" })
+    await phone.waitForFunction(() => document.querySelector("#v-one").getBoundingClientRect().height < 900)
+    const dock = await tab.locator("#dock").boundingBox()
+    const send = (message) =>
+      tab.evaluate((message) => {
+        document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+      }, message)
+    const assertFits = async () => {
+      await phone.waitForFunction(
+        (top) =>
+          [...document.querySelectorAll("section[data-variant]")].every((item) => {
+            const rect = item.getBoundingClientRect()
+            return rect.top >= 56 && rect.bottom <= top
+          }),
+        dock.y,
+        { timeout: 2500 },
+      )
+      const target = phone.locator("#target")
+      await target.tap()
+      await phone.getByRole("button", { name: "Tapped" }).waitFor()
+      await target.evaluate((button) => {
+        button.textContent = "Tap"
+      })
+    }
+    await send({ type: "inset", right: 0, bottom: 852 - dock.y })
+    await assertFits()
+    await send({ type: "picker", do: "reset" })
+    await phone.waitForFunction(() => document.querySelector("#v-one").getBoundingClientRect().height === 1800)
+    await send({ type: "picker", do: "fit" })
+    await assertFits()
+  } finally {
+    await browser.close()
+  }
+})
+
 test("inside Drop's viewer the page reports to Drop's bar and takes its commands, even with a trimmed copy pasted", async () => {
   const browser = await chromium.launch()
   try {

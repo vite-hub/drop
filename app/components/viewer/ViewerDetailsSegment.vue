@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // The review pill's + (I), at its right end: it grows the pill to the right, the + turning into a ×, with what the pill
-// keeps out of sight. First the preview tools and Edit (#tools), then the lifetime chip (#lifetime), a chip with the size
-// and views that opens the details (#details) in a popover, the version chip (H) that opens History (#history), the
-// width button (W) that steps the reading width, and the drop's actions as icons with tooltips. The two chips show their words, so they have no
-// tooltip (one inside a popover's trigger loses its provider). Escape closes the popover first, then the segment. On a
-// phone the segment takes its own rows above the pill's, wrapping rather than hiding anything.
+// keeps out of sight. First the preview tools and Edit (#tools), then the lifetime chip (#lifetime), one chip (H) with
+// the version or size and the views that opens the details (#details) above History (#history) in a popover, the width
+// button (W) that steps the reading width, and the drop's actions as icons with tooltips. The chips show their words, so
+// they have no tooltip (one inside a popover's trigger loses its provider). Escape closes the popover first, then the
+// segment. On a phone the segment takes its own rows above the pill's, wrapping rather than hiding anything.
 export type DetailsAction = {
   id: string
   label: string
@@ -16,26 +16,26 @@ export type DetailsAction = {
 }
 
 const open = defineModel<boolean>("open", { required: true })
-const pop = defineModel<"meta" | "history" | null>("pop", { required: true })
+const pop = defineModel<boolean>("pop", { required: true })
 const props = defineProps<{
-  /** The details chip's words; none hides it, as on a Markdown doc whose header already holds its facts. */
-  meta?: string
-  version?: string
+  /** The chip's words, such as "v4 · 34 views"; none hides it. */
+  chip?: string
+  /** What its popover holds: the details (none on a Markdown doc, whose header has its facts) and History. */
+  details: boolean
+  history: boolean
   width?: string
   actions: DetailsAction[]
 }>()
 const emit = defineEmits<{ width: [] }>()
 
-const popOpen = (name: "meta" | "history") =>
-  computed({
-    get: () => open.value && pop.value === name,
-    set: (value: boolean) => (pop.value = value ? name : pop.value === name ? null : pop.value),
-  })
-const metaOpen = popOpen("meta")
-const historyOpen = popOpen("history")
+const popOpen = computed({ get: () => open.value && pop.value, set: (value: boolean) => (pop.value = value) })
+const chipLabel = computed(() => {
+  const what = props.details && props.history ? "Details and history" : props.history ? "History" : "Details"
+  return `${what}, ${props.chip}`
+})
 const main = computed(() => props.actions.filter((action) => !action.destructive))
 const danger = computed(() => props.actions.filter((action) => action.destructive))
-watch(open, (value) => !value && (pop.value = null))
+watch(open, (value) => !value && (pop.value = false))
 // The row wraps on a narrow pill, but only once it has grown: while it is closed or easing open its width is too small
 // for anything, and wrapping then would stack every button into a tall column.
 const grown = ref(false)
@@ -48,7 +48,7 @@ watch(open, (value) => {
 })
 onBeforeUnmount(() => clearTimeout(growing))
 
-const chip =
+const chipClass =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned tabular-nums transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-inverted aria-expanded:text-inverted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
 const square =
   "grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -79,20 +79,21 @@ const popoverUi = {
       <slot name="tools" />
       <span v-if="$slots.tools" aria-hidden="true" class="w-1 shrink-0" />
       <slot name="lifetime" />
-      <UPopover v-if="meta" v-model:open="metaOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
-        <button aria-label="Details" :class="chip" type="button">
-          <UIcon name="i-mingcute-document-2-line" class="size-3.5" />{{ meta }}
+      <UPopover v-if="chip" v-model:open="popOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
+        <button :aria-keyshortcuts="history ? 'H' : undefined" :aria-label="chipLabel" :class="chipClass" type="button">
+          <UIcon :name="history ? 'i-mingcute-history-line' : 'i-mingcute-document-2-line'" class="size-3.5" />{{
+            chip
+          }}
         </button>
-        <template #content><slot name="details" /></template>
-      </UPopover>
-      <UPopover v-if="version" v-model:open="historyOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
-        <button aria-keyshortcuts="H" :aria-label="`History, ${version}`" :class="chip" type="button">
-          <UIcon name="i-mingcute-history-line" class="size-3.5" />{{ version }}
-        </button>
-        <template #content><slot name="history" /></template>
+        <template #content>
+          <div class="divide-y divide-default">
+            <slot v-if="details" name="details" />
+            <slot v-if="history" name="history" />
+          </div>
+        </template>
       </UPopover>
       <UTooltip v-if="width" text="Reading width" :kbds="['W']" :content="{ side: 'top', sideOffset: 8 }">
-        <button aria-keyshortcuts="W" :class="chip" type="button" @click="emit('width')">
+        <button aria-keyshortcuts="W" :class="chipClass" type="button" @click="emit('width')">
           <UIcon name="i-mingcute-text-line" class="size-3.5" /><span class="sr-only">Reading width: </span>{{ width }}
         </button>
       </UTooltip>

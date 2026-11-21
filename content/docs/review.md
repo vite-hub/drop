@@ -53,7 +53,7 @@ A built app, such as a Vite `dist/` folder, a prerendered Nuxt site, or a Slidev
 
 An app's link opens at any of its pages with `?path=`: `/d/<key>/<slug>?path=/guide/setup#install` opens the app at `/guide/setup`, scrolled to `#install`, and so does `/d/<key>/<slug>/guide/setup#install`. The address bar follows the app as you move through it, so **Copy link** and a copied address open the page you were on. An address the app doesn't have shows its own `404.html`, or its `index.html` for a single-page app. `publish` and `read_drop` give agents each page with its link.
 
-To present a Slidev deck, press **Present** in the review bar at the bottom of the drop. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. Any other app or HTML page opens alone with **Open in new window** under the review toolbar's **+**.
+To present a Slidev deck, press **Present** in the review bar at the bottom of the drop. The deck opens alone in a new window for the projector, and the drop's page turns into Slidev's presenter view, with your notes, the next slide, and a timer; it drives the other window. For any other app or HTML page, choose **Open in new window** in the command palette (**⌘K** or **Ctrl+K**), or under the review toolbar's **+** if you're signed out.
 
 An app with server code, like API routes, sign-in, or a database, isn't a drop. Deploy it to a preview and review it as a [site](/docs/sites).
 
@@ -90,13 +90,28 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
 | The whole page | Write in the box at the bottom of the Comments panel. |
 
-A comment shows the moment you send it. If it doesn't go through, it comes back to its box with the reason.
+A comment shows the moment you send it, images too, with a clock on its pin until Drop has it. **With no network** it waits in the browser, stays through a reload, and goes out once the network is back. After a couple of seconds it says **Waiting to send**, and the toolbar counts what waits. Closing the tab or signing out while one hasn't gone out asks first.
 
-Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread.
+When Drop refuses one, its words stay, and the line under them says why:
+
+| It says | What you can do |
+| --- | --- |
+| **Sign in to send** | Sign in again; it goes out then. Or **Discard** it. |
+| The plan's limit | **Send again** once the plan has room. |
+| **This drop no longer takes comments** | **Copy** the words, or **Discard** them. |
+| Why, such as an image that's too large | **Edit** it, and it goes out again, or **Discard** it. |
+
+Open **Unsent comments** to recover a comment or reply even if its drop no longer opens. If your session ends, the queue hides your text and images until you sign back in with the same account. You can still discard the browser's copy without signing in.
+
+Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread. A guest's comments show as theirs in the browser they wrote them in, but resolving or deleting one needs someone signed in.
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
-**Copy prompt** in the review toolbar copies every open thread waiting for an answer as a prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
+**Send** hands your own agent every open thread that waits for an answer, yours and everyone else's, in one click. It sits in the toolbar under the page as **Send 3**, with the number of waiting threads, and turns into its status: Sending, Sent (or In inbox), then Working once your agent opens the handoff. A paired T3 link appears as **Open thread** while the agent works. If the send doesn't arrive, it says **Not delivered**, with **Retry**. The first Send copies a setup prompt: paste it in a T3 Code thread, or follow the [plugin's inbox setup](/docs/agents#plugin) for `/drop:feedback` in Claude Code or `$feedback` in Codex. Then confirm **Allow and send 3** in Drop. The **Agents** page shows the default destination: **Test default** checks it, and **Disconnect all** removes all of your Send destinations, including paired publishing threads.
+
+The agent gets ids and fixed words, never what people wrote, and reads the threads through Drop's MCP as you, with `read_drop` and the send's id. A delivery names the drop and the version to build on. It includes the publishing session only when you own the drop and published the latest version; for teammates or versions with no verified publisher, `session` is `null`. Send clears when the threads it tracks have been answered or resolved: your asks if there are any, otherwise the quoted threads. For a handoff with only quotes, the feedback skill asks which threads you want addressed before acting.
+
+Signed out, as a guest, where you can't comment, or on an individual live-site screenshot, **Copy prompt** in the review toolbar copies every open thread waiting for an answer as a prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 
@@ -115,6 +130,8 @@ Docs and apps show a toolbar under the page. **Comments** and the Marker sit in 
 | Hide comments | | The eye beside **Comments**. Hides the pins and highlights while you look at the page. |
 
 :kbd[Esc] unpicks the measured element, closes an open comment box, then returns to Browse.
+
+**Zen** under the **+**, or :kbd[Z], is for reading: a Markdown doc loses its outline, and the toolbar folds to a small handle with Drop's mark, a count of open comments, and a dot for each person here. Press the handle to show the toolbar while you need it. Comments, editing, the Marker, and Share bring it back on their own. Press **Zen** or :kbd[Z] again, or :kbd[Esc] once nothing else is open, to leave. Drop remembers it in this browser, for every drop.
 
 ### Marker {#marker}
 

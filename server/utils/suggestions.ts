@@ -8,6 +8,7 @@ import { applySuggestion } from "#shared/suggestion"
 import { suggestionAcceptances } from "../databases/default/index"
 import { type DropThread, setResolved } from "./comments"
 import { createDocDrop, type DropRow, findDropAt, permissions, readText } from "./drops"
+import { restoreReopenedHandoffs } from "./handoffs"
 import type { Identity } from "./identity"
 
 const acceptedNote = (thread: DropThread) => `Accepted suggestion #${thread.n}`
@@ -81,15 +82,21 @@ export async function undoSuggestion(
   event: H3Event,
 ) {
   const { drop, thread, who } = requireSuggestion(row, found, identity)
-  if (thread.status !== "resolved")
-    throw new HTTPError({ status: 409, statusText: "This suggestion's version isn't the latest anymore." })
   const accepted = await acceptanceOf(drop, thread)
-  // Reopening can fail after the reversal committed too. Never publish that reversal a second time.
+  // Reopening or restoring the handoff can fail after the reversal committed. Never publish it twice.
   if (accepted?.undoneVersion != null) {
-    await setResolved(thread, false, who)
-    return drop
+    if (thread.status === "resolved") {
+      await setResolved(thread, false, who)
+      return drop
+    }
+    if (await restoreReopenedHandoffs(thread)) return drop
   }
-  if (drop.note !== acceptedNote(thread) || drop.version < 2 || (accepted && accepted.version !== drop.version))
+  if (
+    thread.status !== "resolved" ||
+    drop.note !== acceptedNote(thread) ||
+    drop.version < 2 ||
+    (accepted && accepted.version !== drop.version)
+  )
     throw new HTTPError({ status: 409, statusText: "This suggestion's version isn't the latest anymore." })
   await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
   const before = await findDropAt(drop.id, drop.version - 1, event)

@@ -2,8 +2,10 @@
 // A site under review, open inside Drop: the page in a frame, an address bar above it, and Comment, which draws a box
 // over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
 // so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
-// are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way.
+// are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way. They
+// go through the drop's outbox (useDrop), so a comment written offline waits with its screenshot and goes out once.
 // The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
+import { parseReviewScriptMessage } from "#shared/frame-messages"
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
@@ -19,7 +21,6 @@ const deviceBottom = computed(() =>
 )
 
 const notify = useNotify()
-// The others in the review's presence room load the new comment at once (usePresence).
 const state = injectDrop()
 const capture = useTabCapture()
 
@@ -43,6 +44,16 @@ useEventListener("keydown", (event: KeyboardEvent) => {
       new URL(open.value).origin,
     )
 })
+// The other way, the site's review script passes ⌘K on while the site has the focus, for the palette. It does once
+// Drop says it holds the frame, in answer to the script's "review-ready" on each page load.
+const openPalette = usePaletteOpener()
+useEventListener("message", (event: MessageEvent) => {
+  const frame = siteFrame.value?.contentWindow
+  if (!frame || event.source !== frame || event.origin !== new URL(open.value).origin) return
+  const message = parseReviewScriptMessage(event.data)
+  if (message?.type === "review-ready") frame.postMessage({ __drop: true, type: "hello" }, event.origin)
+  if (message?.type === "key") openPalette()
+})
 
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
@@ -65,7 +76,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const { body: note, images, sending, beginSend } = injectReviewDraft()!
+const { body: note, images, clear, scope, waiting } = injectReviewDraft()!
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -117,6 +128,7 @@ async function up() {
   if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   capturing.value = true
+  const owner = scope.value
   box.value = null
   try {
     if (!capture.supported()) {
@@ -136,6 +148,7 @@ async function up() {
       width: visible.right - visible.left,
       height: visible.bottom - visible.top,
     })
+    if (scope.value !== owner) return
     const url = new URL(open.value)
     pending.value = {
       blob,
@@ -167,40 +180,33 @@ const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
 async function send() {
   const shot = pending.value
-  if (!shot || !note.value.trim()) return
+  if (!shot || !note.value.trim() || !state || waiting.value) return
   const { box: b, size } = shot
   const ox = thousandths(b.left, size.width),
     oy = thousandths(b.top, size.height)
-  const form = new FormData()
-  form.append(
-    "data",
-    JSON.stringify({
-      body: note.value.trim(),
-      page: shot.page,
-      ox,
-      oy,
-      ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
-      oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
-      viewport: size,
-    }),
-  )
-  form.append("screenshot", shot.blob, "screenshot")
-  for (const file of files.value) form.append("image", file, file.name || "image")
-  const finish = beginSend()
-  if (!finish) return
+  const body = note.value.trim()
+  const attached = [shot.blob, ...files.value]
+  waiting.value = true
   try {
-    await sendSiteComment(props.drop.id, shot.origin, form)
-    notify.done("Comment sent")
-    finish(true)
-    if (pending.value === shot) discard()
-    // By key, not by an event: someone can go back while the upload is still running, and an unmounted component's
-    // events go nowhere.
-    void refreshNuxtData([keys.review(props.drop.id), keys.comments(props.drop.id)])
-    state?.wrote()
-  } catch (error) {
-    notify.fail("Couldn't send the comment", error)
+    const kept = await state.addSiteComment(
+      shot.origin,
+      {
+        page: shot.page,
+        ox,
+        oy,
+        ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
+        oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
+        viewport: size,
+      },
+      body,
+      attached,
+    )
+    if (kept && pending.value === shot) {
+      clear()
+      discard()
+    }
   } finally {
-    finish(false)
+    waiting.value = false
   }
 }
 
@@ -212,6 +218,7 @@ watch(drawing, (active) => {
   if (!active) cancelDrawing()
 })
 onBeforeUnmount(discard)
+watch(scope, discard, { flush: "sync" })
 defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
 </script>
 
@@ -326,6 +333,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             aria-label="Comment"
             autofocus
             class="w-full"
+            :disabled="waiting"
             placeholder="What should change here?"
             :rows="3"
             :ui="{ base: 'field-sizing-content min-h-[calc(3lh+--spacing(3))] max-h-[calc(8lh+--spacing(3))]' }"
@@ -341,6 +349,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 aria-label="Add images"
                 class="mr-auto"
                 color="neutral"
+                :disabled="waiting"
                 icon="i-mingcute-pic-line"
                 variant="ghost"
                 @click="pickImages"
@@ -350,11 +359,12 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             <UButton
               class="hidden in-[#drop-comments]:inline-flex"
               color="neutral"
+              :disabled="waiting"
               label="Remove area"
               variant="ghost"
               @click="discard"
             />
-            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="sending" type="submit" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="waiting" type="submit" />
           </div>
         </form>
       </Teleport>

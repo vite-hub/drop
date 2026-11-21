@@ -1,6 +1,7 @@
 import { MAX_REVIEW_PAGE } from "#shared/review"
 import { ReviewCommentsQuerySchema } from "#shared/schemas"
 import { defineValidatedHandler } from "h3"
+import { readerOf } from "../../utils/comments"
 import { reviewApi, reviewPage, reviewSession, reviewThreads, siteItems } from "../../utils/review"
 
 /**
@@ -12,9 +13,14 @@ export default reviewApi(
   defineValidatedHandler({
     validate: { query: ReviewCommentsQuerySchema },
     async handler(event) {
-      const { site, claims, who } = await reviewSession(event)
+      const { site, claims, who, guest } = await reviewSession(event)
       const page = event.url.searchParams.get("page")?.slice(0, MAX_REVIEW_PAGE)
-      const items = await siteItems(site, who, event.url.origin, page ? reviewPage(site, claims.o, page) : undefined)
+      const items = await siteItems(
+        site,
+        readerOf(who, guest),
+        event.url.origin,
+        page ? reviewPage(site, claims.o, page) : undefined,
+      )
       return { open: items.filter((item) => !item.resolved).length, threads: reviewThreads(site, who, items) }
     },
   }),

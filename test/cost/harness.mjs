@@ -221,6 +221,7 @@ export function reset() {
   )
   state.bursts.length = 0
   state.failBurst = false
+  delete state.burstRetryAfter
   state.ogRenders.length = 0
   state.refreshedLinks.length = 0
   state.ogBrowser = true
