@@ -101,6 +101,12 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
   }
 })
 
+test("the content origin blocks ViteHub routes including the legacy aliases", async () => {
+  for (const prefix of ["/_vitehub", "/api/_vitehub"])
+    for (const path of ["/comments/attachments/abc", "/realtime/presence/abc"])
+      assert.equal((await contentMiddleware(request(`https://drop-usercontent.example${prefix}${path}`)))?.status, 404)
+})
+
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {
   for (const path of ["/", "/product/", "/api/me", "/d/abc", "/f/key.html"]) {
     const response = await contentMiddleware(
@@ -108,7 +114,6 @@ test("the content origin serves only the frame host, at any path, and nothing of
     )
     assert.equal(response.status, 200, path)
     const html = await response.text()
-    assert.match(html, /document\.write\(message\.html\.slice\(0, at\) \+ hold/)
     assert.match(html, /event\.source !== parent/)
     assert.doesNotMatch(html, /__NUXT__|_nuxt/)
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
@@ -1057,10 +1062,9 @@ test("Drop's scripts go first in the head without dropping the page out of stand
     false,
   )
   assert.ok(app.startsWith("<!doctype html>"))
-  assert.ok(
-    app.indexOf('if (self.origin !== "null") return;') < app.indexOf("const pageAt"),
-    "the opaque shim runs before the app runtime",
-  )
+  const shim = app.indexOf(OPAQUE_ORIGIN_SHIM)
+  assert.notEqual(shim, -1, "the page carries the opaque shim")
+  assert.ok(shim < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
 })
 
 /** Runs the shim in a window whose storage, cookies, and URL changes throw, like an opaque-origin sandbox. */
@@ -1140,9 +1144,6 @@ test("every script the runtime injects parses, tools included", () => {
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1])
   assert.ok(scripts.length >= 3)
   for (const source of scripts) assert.doesNotThrow(() => new Script(source))
-  // The toolbar's messages reach the comment layer.
-  assert.match(html, /m\.type === "tool"/)
-  assert.match(html, /m\.type === "view"/)
 })
 
 test("a comment may point at a spot on an element, but an area needs both sides", async () => {

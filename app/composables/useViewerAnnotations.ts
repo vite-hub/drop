@@ -270,12 +270,22 @@ export function useViewerAnnotations(options: {
       const marked = tool.value === "mark"
       if (marked) tool.value = "browse"
       if (commenting.value) {
-        const { kind = "area", selector, label, ox, oy, ow, oh, quote } = message
+        const { kind = "area", selector, label, ox, oy, ow, oh, quote, ink } = message
         // The comment written before kept its place; this one's comes from the frame right after.
         draftPlace.value = null
         popover.value = {
           type: "new",
-          pending: { kind, selector, label, ox, oy, ow, oh, ...(marked && quote ? { quote } : {}) },
+          pending: {
+            kind,
+            selector,
+            label,
+            ox,
+            oy,
+            ow,
+            oh,
+            ...(marked && quote ? { quote } : {}),
+            ...(marked && ink ? { ink } : {}),
+          },
           x: x(message.rect.left),
           y: y(message.rect.bottom),
         }

@@ -14,8 +14,8 @@ ARG DROP_DATABASE
 ARG DROP_PUBLIC_URL
 ENV DROP_PUBLIC_URL=$DROP_PUBLIC_URL
 # The commit /api/health reports. The build context has no .git.
-ARG DROP_COMMIT
-ENV DROP_COMMIT=$DROP_COMMIT
+ARG VITEHUB_BUILD_COMMIT
+ENV VITEHUB_BUILD_COMMIT=$VITEHUB_BUILD_COMMIT
 ENV DROP_HOST=vps
 # The image has no git, so `prepare` (vp config) skips the git hooks.
 ENV VP_GIT_HOOKS=0

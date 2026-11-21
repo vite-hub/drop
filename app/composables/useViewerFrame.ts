@@ -72,6 +72,10 @@ export function useViewerFrame(options: {
   heading?: (id: string, copy: boolean) => void
   /** A button in a Markdown doc's header (#shared/doc-header), or a related drop it lists, by id. */
   docAction?: (action: "markdown" | "download" | "pdf") => void
+  /** The pointer or focus reached the header's Copy, or its folder: load what it will need. */
+  docIntent?: (what: "markdown" | "folder") => void
+  /** The header's own Copy, as it went. */
+  docCopied?: (ok: boolean, error?: string) => void
   openDrop?: (id: string) => void
 }) {
   const {
@@ -91,7 +95,10 @@ export function useViewerFrame(options: {
   const { base64: imageData } = useBase64(imageBlob)
   onMounted(async () => {
     if (drop.value.kind !== "image" || !drop.value.url) return
-    imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch(() => undefined)
+    imageBlob.value = await $fetch<Blob>(drop.value.url, { responseType: "blob" }).catch((error: unknown) => {
+      reportClientError("image-load", error, { drop: drop.value.id })
+      return undefined
+    })
   })
 
   const attached = useAttachmentData(drop)
@@ -224,7 +231,7 @@ export function useViewerFrame(options: {
   const unplaced = ref(new Set<string>())
 
   // What the page reports going wrong goes to the server in batches, for the agent's read_drop. Only apps and HTML pages
-  // run their own code; a Markdown doc's errors would be Drop's.
+  // run their own code; any other doc's errors are Drop's, so they go to Drop's logs instead.
   let runtimeReports: RuntimeReport[] = []
   const flushRuntimeReports = useDebounceFn(() => {
     const errors = runtimeReports.splice(0, 20)
@@ -233,7 +240,7 @@ export function useViewerFrame(options: {
       $fetch(`/api/drops/${drop.value.id}/errors`, {
         method: "POST",
         body: { version: drop.value.version, errors },
-      }).catch(() => {})
+      }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: drop.value.id }))
   }, 2000)
 
   /**
@@ -279,6 +286,13 @@ export function useViewerFrame(options: {
         if (drop.value.kind === "markdown") quiz.receive(message)
         return
       case "runtime-error":
+        // Every other kind (Markdown, spreadsheets, images) runs only Drop's code. A file that didn't load is the doc's
+        // own link, though, not Drop's failure.
+        if (!isApp.value && drop.value.kind !== "html" && message.kind !== "load" && message.message)
+          reportClientError(`frame-${message.kind}`, message.message, {
+            drop: drop.value.id,
+            ...(message.source ? { source: message.source } : {}),
+          })
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
           runtimeReports.push({
             kind: message.kind,
@@ -333,6 +347,15 @@ export function useViewerFrame(options: {
         return
       case "doc-open":
         if (drop.value.kind === "markdown") options.openDrop?.(message.id)
+        return
+      case "doc-intent":
+        if (drop.value.kind === "markdown") options.docIntent?.("markdown")
+        return
+      case "doc-folder":
+        if (drop.value.kind === "markdown") options.docIntent?.("folder")
+        return
+      case "doc-copied":
+        if (drop.value.kind === "markdown") options.docCopied?.(message.ok, message.error)
         return
       case "pointer":
         return options.presence?.point(message.at)
@@ -422,6 +445,7 @@ export function useViewerFrame(options: {
             oh,
             quote,
             suggestion,
+            ink,
             label,
             resolved,
             version,
@@ -440,6 +464,7 @@ export function useViewerFrame(options: {
             oh,
             quote,
             suggestion,
+            ink,
             label,
             resolved,
             earlier: version < drop.value.version,

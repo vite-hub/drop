@@ -4,6 +4,7 @@ import { MAX_FILE_BYTES } from "#shared/schemas"
 import { findDrop, permissions } from "../../../../utils/drops"
 import { storeBoardImages } from "../../../../utils/boards"
 import { identify } from "../../../../utils/identity"
+import { logDrop } from "../../../../utils/logs"
 import { routeId } from "../../../../utils/params"
 
 const BoardImages = v.object({
@@ -27,6 +28,7 @@ export default defineValidatedHandler({
     if (!drop || drop.kind !== "board" || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't draw on this board." })
     await storeBoardImages(drop, (await event.req.json()).images)
+    logDrop(event, drop, { change: "board-images" })
     return { ok: true }
   },
 })

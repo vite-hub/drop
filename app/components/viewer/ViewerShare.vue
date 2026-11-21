@@ -10,7 +10,7 @@ const props = defineProps<{ drop: DropDetail }>()
 const open = defineModel<boolean>("open", { default: false })
 const notify = useNotify()
 const { setShare } = useDropActions()
-const { copy, copied } = useCopy()
+const { copy } = useCopy()
 const { data: me } = useMe()
 const shared = computed(() => props.drop.share !== "private")
 // A folder above may share it wider than its own share; the choice changes its own.
@@ -135,20 +135,16 @@ function focusPanel(event: Event) {
               :class="{ 'text-dimmed': drop.isOwner && !shared }"
               >{{ url }}</span
             >
-            <UButton
-              :aria-label="copied() ? 'Link copied' : 'Copy link'"
+            <DropCopyButton
+              aria-label="Copy link"
               class="hover:bg-inverted/8 active:bg-inverted/12"
-              color="neutral"
               :disabled="drop.isOwner && !shared"
-              :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-              :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
               size="sm"
-              variant="ghost"
-              @click="copy(url)"
+              :value="url"
             />
           </div>
           <p aria-live="polite" class="mt-1.5 min-h-lh px-1 text-xs text-muted">
-            {{ linkNote }}<span class="sr-only">{{ copied() ? " Link copied." : "" }}</span>
+            {{ linkNote }}
           </p>
         </div>
       </div>

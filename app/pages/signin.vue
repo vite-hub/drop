@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { signInPath } from "#shared/sign-in"
+
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
 // Both requests at once: the page waits for the slower one, not the two in turn.
@@ -16,13 +18,13 @@ async function connect() {
     if (method.value?.proxy) {
       // One navigation: oauth2-proxy clears its cookie, then starts a fresh login. Signing out over fetch first
       // let the session refetch start a second login that overwrote this one's CSRF cookie.
-      const start = `/oauth2/start?rd=${encodeURIComponent(next.value)}`
+      const start = signInPath(next.value, { proxy: true })
       await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
       return
     }
     if (me.value) {
       const result = await signOut()
-      if (result.error) throw new Error(result.error.message ?? "Couldn't sign out.")
+      if (result.error) throw answerError(result.error.message ?? "Couldn't sign out.", result.error.status)
       clearNuxtData()
     }
     const result = await signIn.social({
@@ -30,8 +32,9 @@ async function connect() {
       callbackURL: next.value,
       additionalParams: { prompt: "select_account" },
     })
-    if (result.error) throw new Error(result.error.message ?? "Couldn't start GitHub sign-in.")
+    if (result.error) throw answerError(result.error.message ?? "Couldn't start GitHub sign-in.", result.error.status)
   } catch (cause) {
+    reportClientError("signin", cause)
     error.value = errorText(cause)
     // Only a failure frees the button: on success the page is leaving, and a second press would start a second login.
     pending.value = false

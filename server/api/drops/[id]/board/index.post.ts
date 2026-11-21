@@ -4,6 +4,7 @@ import * as v from "valibot"
 import { findDrop, permissions } from "../../../../utils/drops"
 import { writeBoard } from "../../../../utils/boards"
 import { identify } from "../../../../utils/identity"
+import { logDrop } from "../../../../utils/logs"
 import { routeId } from "../../../../utils/params"
 
 // Each element is checked in writeBoard (isBoardElement); here only that it's a list of objects.
@@ -20,6 +21,7 @@ export default defineValidatedHandler({
     await requireRateLimit(event, "board", { key: who?.userId, limit: 120, window: "1m" })
     const { elements } = await event.req.json()
     const { updatedAt } = await writeBoard(drop, { elements, who })
+    logDrop(event, drop, { change: "board" })
     return { updatedAt }
   },
 })

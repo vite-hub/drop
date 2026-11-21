@@ -4,6 +4,7 @@ import { CommentEditSchema } from "#shared/schemas"
 import { editMessage, findMessage, toReply, wroteMessage } from "../../utils/comments"
 import { findDrop, permissions } from "../../utils/drops"
 import { identify } from "../../utils/identity"
+import { logDrop } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 
 /**
@@ -21,6 +22,7 @@ export default defineValidatedHandler({
     await requireRateLimit(event, "comment", { key: who.userId, limit: 20, window: "1m" })
     const { body, mentions } = await event.req.json()
     const edited = await editMessage(found.message, body, mentions)
+    logDrop(event, drop, { change: "comment-edit" })
     return toReply(edited, who, new Map())
   },
 })

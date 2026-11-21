@@ -2,10 +2,12 @@ import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import { HTTPError } from "h3"
 import { defineMcpTool } from "nitro-mcp-toolkit"
 import * as v from "valibot"
-import { addReply, findCommentByNumber, setResolved, wroteThread } from "../../utils/comments"
+import { addReply, findCommentByNumber, openByPage, setResolved, wroteThread } from "../../utils/comments"
 import { permissions } from "../../utils/drops"
-import { findDropOrSite, mayResolveSite } from "../../utils/review"
+import { isSitePattern } from "#shared/review"
+import { findDropOrSite, mayResolveSite, originOf } from "../../utils/review"
 import { requireIdentity } from "../../utils/identity"
+import { logDrop } from "../../utils/logs"
 
 export default defineMcpTool({
   name: "reply",
@@ -32,7 +34,7 @@ export default defineMcpTool({
     const who = await requireIdentity(event)
     const text = body.trim()
     if (!text) throw new HTTPError({ status: 400, message: "Write the reply." })
-    const { drop } = await findDropOrSite(id, who, event)
+    const { drop, page } = await findDropOrSite(id, who, event)
     if (!drop || !permissions(drop, who).comment)
       throw new HTTPError({ status: 404, message: `No drop with id ${id} you can comment on.` })
     const thread = await findCommentByNumber(drop, n)
@@ -44,9 +46,35 @@ export default defineMcpTool({
     const reply = await addReply(thread, who, text)
     const resolved = Boolean(resolve) && thread.status === "open"
     if (resolved) await setResolved(thread, true, who)
+    logDrop(event, drop, { change: resolved ? "reply-resolve" : "reply" })
+    const within = page && drop.kind === "site" && isSitePattern(drop.siteUrl!) ? originOf(page) : undefined
+    // What's left, so an agent never says it's done while pins it didn't answer stay on the page. The reply is saved
+    // either way: a failed count says so instead of failing the call, which would only get the reply sent twice.
+    const open = await openByPage(drop, within).then(
+      (pages) => [...pages].flatMap(([where, list]) => list.map((item) => ({ ...item, page: where || "/" }))),
+      () => null,
+    )
+    const replied = `Replied to #${n}${resolved ? " and resolved it" : ""}.`
     return {
-      content: [{ type: "text" as const, text: `Replied to #${n}${resolved ? " and resolved it" : ""}.` }],
-      structuredContent: { comment: n, reply, ...(resolve ? { resolved } : {}) },
+      content: [
+        { type: "text" as const, text: `${replied} ${open ? stillOpen(open, drop.kind === "site") : UNCOUNTED}` },
+      ],
+      structuredContent: { comment: n, reply, ...(resolve ? { resolved } : {}), stillOpen: open },
     }
   },
 })
+
+const UNCOUNTED = "What's still open couldn't be read just now: read the drop again before you say the review is done."
+
+/** The open comments with no answer from an agent, and the ones waiting on the reviewer after one. */
+function stillOpen(open: { n: number; answered: boolean; page: string }[], site: boolean) {
+  const numbers = (list: typeof open) => list.map((item) => `#${item.n}${site ? ` on ${item.page}` : ""}`).join(", ")
+  const owed = open.filter((item) => !item.answered)
+  const waiting = open.filter((item) => item.answered)
+  return [
+    owed.length
+      ? `Still open with no answer from you: ${numbers(owed)}. Answer each before you say the review is done.`
+      : "Every open comment has your answer.",
+    ...(waiting.length ? [`Waiting on the reviewer after your reply: ${numbers(waiting)}.`] : []),
+  ].join(" ")
+}

@@ -1,5 +1,4 @@
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm"
-import { log } from "evlog"
 import { type H3Event } from "h3"
 import { db } from "vite-hub/database"
 import { drops, dropVersions } from "../../databases/default/index"
@@ -11,6 +10,7 @@ import { deleteRetainedDrop } from "../quota-deletion"
 import { commentCleanupFor, drainCommentCleanup } from "../comments"
 import { expiryPolicy } from "../expiry"
 import type { Identity } from "../identity"
+import { logAudit } from "../logs"
 import type { DropRow } from "./types"
 import { listDrops, findDrop } from "./query"
 import { drainBlobCleanup, deleteBlobKeys } from "./write"
@@ -55,21 +55,28 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
     const row = await findDrop(summary.id, event)
     if (row) await deleteDrop(row)
   }
+  logAudit(event, who, "trash.empty", { type: "user", id: who.userId, deleted: trashed.length })
   return trashed.length
 }
 
 /**
  * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops at the top past their window move to
  * the Trash as of when they expired (the drops below follow them); drops 15 days into the Trash, with everything below
- * them, and nodes whose parent is gone, are deleted.
+ * them, and nodes whose parent is gone, are deleted. `note` hears of each deletion as it happens, so a run that fails
+ * halfway still says what it deleted.
  */
-export async function deleteExpiredDrops(now: Date, limit = 50) {
+export async function deleteExpiredDrops(
+  now: Date,
+  limit = 50,
+  note: (deleted: { id: string; owner: string; reason: string | null }) => void = () => {},
+) {
   const at = now.getTime()
   const { days } = expiryPolicy()
+  let expired = 0
   if (days) {
     const temporary = Math.min(TEMPORARY_DAYS, days)
     const lastSeen = sql`coalesce(${drops.lastAccessedAt}, ${drops.createdAt})`
-    await db
+    const moved = await db
       .update(drops)
       .set({
         trashedAt: sql`${lastSeen} + (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`,
@@ -83,6 +90,8 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
           sql`${lastSeen} <= ${at} - (CASE ${drops.lifetime} WHEN 'temporary' THEN ${temporary} ELSE ${days} END) * ${DAY_MS}`,
         ),
       )
+      .returning({ id: drops.id })
+    expired = moved.length
   }
   const due = await db
     .select()
@@ -96,12 +105,16 @@ export async function deleteExpiredDrops(now: Date, limit = 50) {
     .limit(limit)
   await drainBlobCleanup()
   await drainCommentCleanup()
+  // Drops whose Trash time ran out, then drops whose parent was gone.
   for (const row of due) {
     await deleteDrop(row)
-    log.info({ action: "drop-purged", drop: row.id, owner: row.ownerId, reason: row.trashReason })
+    note({ id: row.id, owner: row.ownerId, reason: row.trashReason })
   }
-  for (const row of orphans) await deleteDrop(row)
-  return due.length + orphans.length
+  for (const row of orphans) {
+    await deleteDrop(row)
+    note({ id: row.id, owner: row.ownerId, reason: "orphan" })
+  }
+  return { expired, purged: due.length, orphans: orphans.length }
 }
 
 /** The drop's share link, which opens its latest version. */

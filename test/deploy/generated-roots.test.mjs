@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, mkdir, writeFile, access, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, access, rm } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -26,12 +26,15 @@ async function fixture(run) {
 for (const command of ["build", "serve"]) {
   test(`Rate Limit generates Nitro files at the project root during ${command}`, () =>
     fixture(async (root) => {
-      const plugin = hubRateLimit({ provider: "memory" })
+      const plugin = hubRateLimit({ driver: "memory" })
       const config = { root: join(root, "app"), command, nitro: {}, plugins: [], build: {} }
       await plugin.config.handler(config, { command })
       await plugin.configResolved(config)
       for (const file of ["nitro/rate-limit/plugin.ts", "rate-limit/manifest.json"])
         await access(join(root, ".vitehub", file))
+      const hints = JSON.parse(await readFile(join(root, ".vitehub/hints.json"), "utf8"))
+      assert.equal(hints.command, command)
+      assert.deepEqual(hints.hints, [])
       for (const file of config.nitro.plugins) await access(file)
       assert.ok(config.nitro.plugins.includes(join(root, ".vitehub/nitro/rate-limit/plugin.ts")))
       await assert.rejects(access(join(root, "app/.vitehub")), { code: "ENOENT" })

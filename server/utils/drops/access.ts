@@ -27,7 +27,7 @@ export function permissions(drop: DropRow, who: Identity | null) {
       view: false,
       comment: false,
       edit: false,
-      manage: Boolean(who && (who.userId === drop.ownerId || admin)),
+      manage: Boolean(!drop.draftImage && who && (who.userId === drop.ownerId || admin)),
       trash: false,
     }
   const owner = Boolean(who && who.userId === drop.ownerId)
@@ -40,6 +40,19 @@ export function permissions(drop: DropRow, who: Identity | null) {
   const level = drop.expired ? -1 : Math.max(-1, ...grants.map((grant) => levelFor(grant, drop, who)))
   const available = !drop.ownerBanned
   const live = available && !drop.expired
+  if (drop.draftImage)
+    return {
+      owner,
+      view:
+        live &&
+        drop.ancestors?.[0]?.kind === "markdown" &&
+        who?.actorKind === "browser" &&
+        (owner || admin || level >= 2),
+      comment: false,
+      edit: false,
+      manage: false,
+      trash: false,
+    }
   // A team folder's owner and admins keep it in the browser, like they make it (../folders.ts): what their agents read could
   // steer them to make the team's folders public.
   const manage = drop.teamFolder ? admin || (who?.actorKind === "browser" && runsTeam(team, who)) : owner || admin

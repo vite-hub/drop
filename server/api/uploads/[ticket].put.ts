@@ -3,6 +3,7 @@ import { assertBodySize, defineHandler, getRouterParam, HTTPError } from "h3"
 import { MIB } from "#shared/quotas"
 import { MAX_ARCHIVE_BYTES } from "../../utils/app-archive"
 import { MAX_FILE_BYTES } from "../../utils/drops"
+import { logActor } from "../../utils/logs"
 import { publishInput } from "../../utils/publish"
 import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
 
@@ -45,11 +46,8 @@ export default defineHandler(async (event) => {
     })
   try {
     const { result } = await publishInput(upload.who, upload.input, event, bytes)
-    useLogger(event).set({
-      user: { id: upload.who.userId },
-      actor: { kind: upload.who.actorKind, name: upload.who.actorName },
-      drop: { id: "id" in result ? result.id : undefined, size: bytes.byteLength },
-    })
+    logActor(event, upload.who)
+    useLogger(event).set({ drop: { id: "id" in result ? result.id : undefined, size: bytes.byteLength } })
     event.res.headers.set("Cache-Control", "no-store")
     return result
   } catch (error) {

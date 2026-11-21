@@ -46,28 +46,39 @@ for (const name of [
   for (const match of descriptor.template.content.matchAll(/class="([^"]*)"/g))
     candidates.push(...match[1].split(/\s+/))
 }
-const utilities = await compile("@theme { --spacing: .25rem; --breakpoint-sm: 40rem; } @tailwind utilities;")
+const utilities = await compile(
+  "@theme { --spacing: .25rem; --breakpoint-sm: 40rem; --container-3xl: 48rem; } @tailwind utilities;",
+)
 styles += utilities.build([...candidates, "absolute", "z-30", "fixed", "z-[60]"])
 
 const entry = `
   import * as Vue from "vue"
   import * as VueUse from "@vueuse/core"
   import Dock from "ViewerReviewDock"
+  import Comments from "ViewerCommentsSegment"
   import Details from "ViewerDetailsSegment"
   import Toolbar from "ViewerToolbar"
   import Variants from "ViewerVariants"
-  import Comments from "ViewerCommentsSegment"
   Object.assign(window, Vue, VueUse)
   window.useHead = () => {}
   const app = Vue.createApp({
     setup() {
       const open = Vue.ref(false)
+      const withPrompt = new URL(location.href).searchParams.has("prompt")
+      const button = label => Vue.h("button", null, label)
       const fixture = new URLSearchParams(location.search)
       const hasCanvas = fixture.has("canvas")
       const hand = Vue.ref(fixture.has("hand"))
       const spacer = () => Vue.h("span", { "aria-hidden": true, class: "w-1 shrink-0 max-sm:hidden" })
       return () => Vue.h(Dock, { open: false, heading: "none", overlay: true }, {
-        toolbar: () => [
+        toolbar: () => withPrompt ? [
+          ...["Drop", "View", "Mark"].map(label => Vue.h("button", { style: { width: "44px" } }, label)),
+          Vue.h(Comments, { on: false, count: 1, listOpen: false, canComment: true, canUseMode: true, pins: true, pinsShown: true }, {
+            tools: () => Vue.h("button", { "aria-label": "Copy prompt" }),
+          }),
+          ...["Share", "Tools", "More"].map(label => Vue.h("button", { style: { width: "44px" } }, label)),
+        ] : [
+          ...["Marker", "Comments", "Share"].map(button).filter(() => !hasCanvas),
           ...(hasCanvas ? [
             Vue.h("a", { href: "/", "aria-label": "Drop", "data-review-home": "", class: "inline-flex items-center justify-center" }, "D"),
             spacer(),
@@ -80,7 +91,7 @@ const entry = `
             Vue.h(Comments, { on: false, count: fixture.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: fixture.has("pins"), pinsShown: false }),
             spacer(),
             Vue.h("button", { "aria-label": "Share drop", class: "inline-flex shrink-0 items-center" }, [Vue.h("span", { class: "iconify" }), Vue.h("span", { class: "review-share-label" }, "Share")]),
-          ] : ["Marker", "Comments", "Share"].map(label => Vue.h("button", null, label))),
+          ] : []),
           Vue.h(Details, {
             open: open.value, "onUpdate:open": value => open.value = value,
             pop: false, chip: "v2 · 42 views", details: true, history: true,
@@ -128,22 +139,10 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
       hasTouch: true,
       reducedMotion: "reduce",
     })
-    await page.route("**/*", (route) =>
-      route.fulfill(
-        new URL(route.request().url()).pathname === "/fixture.js"
-          ? { contentType: "text/javascript", body: script }
-          : {
-              contentType: "text/html",
-              body: `<!doctype html><style>${styles}</style><div id="app"></div>
-                <script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>
-                <script type="module" src="/fixture.js"></script>`,
-            },
-      ),
-    )
-    for (const width of [320, 393, 430]) {
+    for (const width of [320, 375, 393, 430]) {
       await page.setViewportSize({ width, height: 600 })
       for (const hand of [false, true]) {
-        await page.goto(`https://drop.test/?canvas${hand ? "&hand" : ""}`)
+        await openDock(page, `?canvas${hand ? "&hand" : ""}`)
         const dock = page.getByRole("group", { name: "Document tools" })
         await dock.getByRole("button", { name: "More", exact: true }).waitFor()
         const bounds = []
@@ -156,7 +155,7 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
           "More",
           ...(hand ? ["Hand"] : []),
         ]) {
-          const control = dock.getByLabel(label, { exact: true })
+          const control = dock.getByRole(label === "Drop" ? "link" : "button", { name: label, exact: true })
           const rect = await control.boundingBox()
           assert.ok(rect && rect.width >= 44 && rect.height >= 44, `${width}px: ${label} has a full touch target`)
           assert.ok(rect.x >= 0 && rect.x + rect.width <= width, `${width}px: ${label} is within the viewport`)
@@ -177,24 +176,50 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
   }
 }, 30_000)
 
+async function openDock(page, path = "") {
+  await page.unroute("**/*")
+  await page.route("**/*", (route) =>
+    route.fulfill(
+      new URL(route.request().url()).pathname === "/fixture.js"
+        ? { contentType: "text/javascript", body: script }
+        : {
+            contentType: "text/html",
+            body: `<style>${styles}</style><div id="app"></div>
+          <script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>
+          <script type="module" src="/fixture.js"></script>`,
+          },
+    ),
+  )
+  await page.goto(`https://drop.test/${path}`)
+}
+
+test("comment tools wrap independently on phones and share a track on wider docks", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 600 }, hasTouch: true })
+    await openDock(page, "?prompt")
+    const toolbar = page.getByRole("group", { name: "Document tools" })
+    const copy = toolbar.getByRole("button", { name: "Copy prompt" })
+    await copy.waitFor()
+    const rows = await toolbar
+      .getByRole("button")
+      .evaluateAll((buttons) => new Set(buttons.map((button) => button.getBoundingClientRect().top)).size)
+    assert.equal(rows, 2)
+    const track = toolbar.locator(".comment-track")
+    assert.equal(await track.evaluate((el) => getComputedStyle(el).display), "contents")
+    await page.setViewportSize({ width: 1280, height: 600 })
+    assert.equal(await track.evaluate((el) => getComputedStyle(el).display), "flex")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
 for (const width of [320, 640, 667, 1440])
   test(`expanded dock actions remain tappable at ${width}px with history and the bottom mark`, async () => {
     const browser = await chromium.launch()
     try {
       const page = await browser.newPage({ viewport: { width, height: 600 }, hasTouch: true, reducedMotion: "reduce" })
-      await page.route("**/*", (route) =>
-        route.fulfill(
-          new URL(route.request().url()).pathname === "/fixture.js"
-            ? { contentType: "text/javascript", body: script }
-            : {
-                contentType: "text/html",
-                body: `<style>${styles}</style><div id="app"></div>
-          <script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>
-          <script type="module" src="/fixture.js"></script>`,
-              },
-        ),
-      )
-      await page.goto("https://drop.test/")
+      await openDock(page)
       await page.getByRole("button", { name: "More", exact: true }).click()
       for (const label of [
         "Measure",

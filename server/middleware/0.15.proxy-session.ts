@@ -2,9 +2,10 @@ import { and, eq } from "drizzle-orm"
 import { defineHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
-import { authFor } from "../utils/identity"
-import { isGitHubMember } from "../utils/github-membership"
+import { authFor, sessionOf } from "../utils/identity"
+import { requestLog } from "../utils/logs"
 import { authProxy } from "../utils/proxy-auth"
+import { isProxyMember } from "../utils/proxy-auth-config"
 
 /** Establish the same session Drop's browser UI and OAuth consent already use, without a second login. */
 export default defineHandler(async (event) => {
@@ -19,14 +20,20 @@ export default defineHandler(async (event) => {
   }
   const token = event.req.headers.get("x-auth-request-access-token")
   if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
-  if (!(await isGitHubMember(token)))
+  if (!(await isProxyMember(token)))
     throw new HTTPError({
       status: 403,
       statusText: "Active organization membership required.",
       data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
     })
   const auth = authFor(event)
-  const current = await auth.api.getSession({ headers: event.req.headers }).catch(() => null)
+  // A failed lookup signs in again through the proxy; the wide event keeps why.
+  const current = await sessionOf(event).catch((error: unknown) => {
+    requestLog(event)?.warn("Session lookup failed", {
+      auth: { session: error instanceof Error ? error.message : String(error) },
+    })
+    return null
+  })
   if (current) {
     const [github] = await db
       .select({ token: account.accessToken })

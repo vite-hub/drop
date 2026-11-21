@@ -52,7 +52,11 @@ test("a doc's links, its preview deploy too, and its version's day join its fron
     merged,
     /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a><a class="cp" href="https:\/\/linear\.app\/acme\/issue\/ACM-7" data-kind="favicon"><img class="cp-img" src="\/api\/favicons\/linear\.app" alt="">ACM-7<\/a><\/dd>/,
   )
-  assert.match(merged, /<dt>Updated<\/dt><dd><time datetime="2026-11-05">Nov 5, 2026<\/time><\/dd>/)
+  assert.match(
+    merged,
+    /<dt>Updated<\/dt><dd><time class="ctm" datetime="2026-11-05T15:00:00(\.000)?Z"[^>]*>Nov 5, 2026<span class="ctm-tip"/,
+    "the version's instant, which the box's script writes as relative words with the full date in a tooltip",
+  )
   assert.ok(merged.indexOf('class="cfm"') < merged.indexOf("<h1"), "at the top, above the title")
 })
 
@@ -94,7 +98,7 @@ test("the doc the viewer gets carries them; its source and cached render don't",
   const detail = await dropDetail(await findDrop(row.id), who, "https://drop.example")
   assert.match(
     strip(detail.html),
-    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" data-drop-site="github" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" data-drop-site="pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
   )
   assert.equal(detail.content, "# Plan\n\nText.\n")
   assert.deepEqual(
@@ -112,4 +116,23 @@ test("a front matter resources list feeds the doc's links and isn't a row of its
   assert.match(merged, /data-key="status".*data-key="links".*data-key="updated"/)
   assert.doesNotMatch(merged, /data-key="resources"/)
   assert.equal(merged.match(/github\.com\/acme\/portal\/pull\/42/g).length, 1)
+})
+
+test("the Updated row brings the date script to a box without a date, once, and the CSP allows it", async () => {
+  const { RENDERER_SCRIPTS } = await import("../../server/utils/markdown-document.ts")
+  const scriptsOf = (html) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, script]) => script)
+  for (const [name, source] of [
+    ["undated", `---\nstatus: Ready\n---\n\n# Plan\n`],
+    ["dated", `---\nstatus: Ready\ndate: 2026-10-23\n---\n\n# Plan\n`],
+    ["bare", "# Plan\n"],
+  ]) {
+    const { html } = await renderMarkdownCached(`props-script-${name}.md`, async () => source)
+    const merged = await withDocProperties(html, { resources: [], updatedAt: at })
+    const scripts = scriptsOf(merged)
+    assert.equal(scripts.length, 2, `${name}: the relative dates and comark-time's Escape, once each`)
+    for (const script of scripts) assert.ok(RENDERER_SCRIPTS.includes(script), `${name}: the CSP allows it`)
+    // The relative-dates script reads the box right before it.
+    assert.match(merged, /<\/dl><script>/, name)
+    assert.equal(merged.match(/<style data-comark-time>/g)?.length, 1, `${name}: comark-time's styles once`)
+  }
 })
