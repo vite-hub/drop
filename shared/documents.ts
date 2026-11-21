@@ -20,8 +20,8 @@ const DOCUMENT_EXTRA_CSS = `
    of the panel too (--comark-inset-end), and when it needs a column of its own beside wide blocks it sets
    data-comark-rail, which gives --comark-rail-width; a wide block keeps clear of both (document-shell.css). */
 :root { --comark-inset-end: var(--drop-inset, 0px); }
-:root[data-drop-zen] { --comark-rail-width: 0px; }
-:root[data-drop-zen] .cto-rail { display: none !important; }
+html:root.drop-zen { --comark-rail-width: 0px; }
+:root.drop-zen .cto-rail { display: none !important; }
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
   --drop-right: var(--drop-inset, 0px);
   --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) + var(--drop-rail, 0px) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
@@ -216,7 +216,7 @@ export function planDocument(
   const relay = globalThis.location ? ` data-quiz-relay="${escapeHtml(globalThis.location.origin)}"` : ""
   // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
-    `<!doctype html><html lang="en"${relay}${zen ? " data-drop-zen" : ""} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_HEADING_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
+    `<!doctype html><html lang="en"${relay}${zen ? ' class="drop-zen"' : ""} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_HEADING_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
     dark,
     inset,
   )

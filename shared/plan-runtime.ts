@@ -2094,8 +2094,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "print") { if (typeof m.title === "string" && m.title) document.title = m.title; print(); }
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
-    // The reader's zen mode: a Markdown doc's outline hides and gives its column back (shared/documents.ts).
-    if (m.type === "zen") { document.documentElement.toggleAttribute("data-drop-zen", m.on === true); render(); }
+    // A root class hides the outline in Zen and tells comark-outline to recalculate its placement.
+    if (m.type === "zen") { document.documentElement.classList.toggle("drop-zen", m.on === true); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
     if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
