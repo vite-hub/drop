@@ -1,6 +1,6 @@
 {
   "dialect": "sqlite",
-  "id": "f061b40c-c2eb-4438-b805-c1a532e16f53",
+  "id": "b50487af-3b34-42ae-9a59-14e923f85511",
   "prevIds": [
     "3e2162ab-fcef-43e5-ab16-24ec6f3a8ae1"
   ],
@@ -2782,7 +2782,7 @@
       "table": "skill_settings",
       "name": "updated_by",
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -3677,6 +3677,24 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "abuse_reports",
+      "name": "abuse_reports_file_target_idx",
+      "columns": [
+        {
+          "value": "'/f/' || ltrim(substr(\"target\", 4), '/')",
+          "isExpression": true
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"target\" glob '/f/*'",
       "origin": "manual",
       "entityType": "indexes"
     },

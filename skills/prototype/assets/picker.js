@@ -12,6 +12,7 @@
 //   jump, Esc or C go back to the canvas, centred on that item.
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
 // The page remembers the canvas camera and item positions (never content); the URL hash (#v-…) names the item in focus.
+// Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
 // on document each frame the camera or an item moves.
@@ -139,11 +140,13 @@
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
+  // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
+  const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
   const saved = { camera: null, positions: {} };
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
-      const c = doc.camera;
+      const c = (doc.version ?? null) === version ? doc.camera : null;
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
       for (const [id, p] of Object.entries(doc.positions || {})) if (ids.has(id) && Array.isArray(p) && finite(p[0]) && finite(p[1])) saved.positions[id] = [p[0], p[1]];
@@ -353,7 +356,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, version };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {

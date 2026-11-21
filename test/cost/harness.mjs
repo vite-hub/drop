@@ -147,8 +147,8 @@ export const state = (globalThis.dropTest = {
       const stream = request.method === "HEAD" ? null : body.slice(start, end + 1).stream()
       return new Response(stream, { status: range ? 206 : 200, headers })
     },
-    put: async (key, body) => {
-      objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
+    put: async (key, body, options = {}) => {
+      objects.set(key, { body: new Blob([body], { type: options.contentType ?? "" }), uploadedAt: new Date() })
       return [null, { url: `/f/${key}` }]
     },
     delete: async (keys) => {
@@ -213,6 +213,12 @@ export const threads = () =>
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method, headers: { accept: "text/html" } }))
   request.context.log = { set() {}, error() {}, warn() {} }
+  return request
+}
+/** A request to the Blob serve route at /f, with the raw catch-all Nitro gives the route as `params._`. */
+export function served(pathname, method = "GET", path = `/f/${pathname}`) {
+  const request = event(path, method)
+  request.context.params = { _: pathname }
   return request
 }
 export function reset() {
