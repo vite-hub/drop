@@ -4,13 +4,14 @@ import { dropPath } from "#shared/links"
 
 /**
  * What a drop listed on the Drops page can do, the same from a row (DropRow), a card (DropCard) or a line (DropLine):
- * its share and the choices for it, copying its link, and its ⋯ menu. In a team folder (`inTeam`) anyone may move a
+ * its share and the choices for it, copying its link, pinning it, and its ⋯ menu. In a team folder (`inTeam`) anyone may move a
  * teammate's drop to the Trash; `trash` does that.
  */
 export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => boolean; trash: () => void }) {
   const now = useRelativeNow()
   const { copy } = useCopy()
-  const { setShare } = useDropActions()
+  const { setShare, setPinned } = useDropActions()
+  const pinned = useDropPin(drop)
   const moveTo = useMoveDialog()
   const { data: me } = useMe()
   const shared = computed(() => drop().share !== "private")
@@ -66,6 +67,13 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
       linkChoices.value
         ? { label: "Copy link", icon: "i-mingcute-link-line", children: linkChoices.value }
         : { label: "Copy link", icon: "i-mingcute-link-line", onSelect: () => void copyLink("Link copied") },
+      ...(drop().trashedAt
+        ? []
+        : [
+            pinned.value
+              ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: () => void setPinned(drop(), false) }
+              : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: () => void setPinned(drop(), true) },
+          ]),
     ],
     ...(changeable.value
       ? [
@@ -83,5 +91,5 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
         : []),
   ])
 
-  return { shared, theirs, changeable, choices, status, pick, link, copyLink, linkChoices, menu }
+  return { shared, theirs, changeable, choices, status, pinned, pick, link, copyLink, linkChoices, menu }
 }

@@ -51,13 +51,13 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
 }
 
 /**
- * The id `hit` selects (a query for at most one id) and the ids of every node above it, so a lookup reads a drop and its
- * ancestors in one query instead of two in a row. `walkUp` walks them the way `ancestorsOf` does.
+ * The ids `hits` selects and the ids of every node above them, without binding each id or reading each ancestor chain
+ * separately. `walkUp` walks them the way `ancestorsOf` does.
  */
-export const withAncestors = (hit: SQL) => sql`(
+export const withAncestors = (hits: SQL) => sql`(
   WITH RECURSIVE up(id, depth) AS (
-    SELECT id, 0 FROM drops WHERE id = (${hit})
-    UNION ALL SELECT d.parent_id, up.depth + 1 FROM drops d JOIN up ON d.id = up.id WHERE d.parent_id IS NOT NULL AND up.depth < ${MAX_WALK}
+    SELECT id, 0 FROM drops WHERE id IN (${hits})
+    UNION SELECT d.parent_id, up.depth + 1 FROM drops d JOIN up ON d.id = up.id WHERE d.parent_id IS NOT NULL AND up.depth < ${MAX_WALK}
   ) SELECT id FROM up
 )`
 
@@ -216,9 +216,9 @@ export const touchFolder = (id: string, now = Date.now()) =>
   db.update(drops).set({ updatedAt: now }).where(eq(drops.id, id))
 
 /** How many drops sit directly in each folder, Trash aside. */
-export async function itemCounts(ids: string[]) {
+export async function itemCounts(ids: string[] | SQL) {
   const counts = new Map<string, number>()
-  for (const chunk of d1Chunks(ids)) {
+  for (const chunk of Array.isArray(ids) ? d1Chunks(ids) : [ids]) {
     const rows = await db
       .select({ parentId: drops.parentId, count: sql<number>`count(*)`.mapWith(Number) })
       .from(drops)

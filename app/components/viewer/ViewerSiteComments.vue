@@ -120,8 +120,15 @@ function pageLabel(comment: DropComment) {
           >
             <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="3xs" />
             <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
-            <span class="shrink-0 font-mono text-xs text-muted"
-              >#{{ comment.n }} · <RelativeTime format="short" :at="comment.createdAt"
+            <!-- A comment still in the outbox has no number yet: a clock takes its place. -->
+            <span class="flex shrink-0 items-center gap-1 font-mono text-xs text-muted"
+              ><UIcon
+                v-if="comment.delivery"
+                :aria-label="waitingLabel(comment.delivery)"
+                class="size-3.5"
+                name="i-mingcute-time-line"
+                role="img" /><template v-else>#{{ comment.n }}</template> ·
+              <RelativeTime format="short" :at="comment.createdAt"
             /></span>
             <span
               v-if="comment.page"
@@ -151,7 +158,7 @@ function pageLabel(comment: DropComment) {
                 Review this page
               </button>
               <button
-                v-if="canManage || comment.mine"
+                v-if="canManage || (comment.mine && !comment.authorId.startsWith('guest:'))"
                 class="min-h-6 cursor-pointer hover:text-highlighted pointer-coarse:min-h-11"
                 type="button"
                 @click="emit('resolve', comment.id, !comment.resolved)"

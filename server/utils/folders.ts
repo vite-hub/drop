@@ -143,6 +143,7 @@ export async function createFolder(
       actorKind: who.actorKind,
       actorName: who.actorName,
       agent: null,
+      sessionPublisherId: null,
       createdAt: now,
       updatedAt: now,
       lastAccessedAt: now,

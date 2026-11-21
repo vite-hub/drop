@@ -48,9 +48,11 @@ const entry = `
   window.useDeviceSize = () => device
   window.useHead = () => {}
   window.useNotify = () => ({})
+  window.paletteOpened = 0
+  window.usePaletteOpener = () => () => window.paletteOpened++
   window.injectDrop = () => undefined
   window.useTabCapture = () => ({ active: Vue.ref(false), exact: Vue.ref(true) })
-  window.injectReviewDraft = () => ({ body: Vue.ref(""), sending: Vue.ref(false), images: { picks: Vue.ref([]) } })
+  window.injectReviewDraft = () => ({ body: Vue.ref(""), clear() {}, images: { picks: Vue.ref([]) }, scope: Vue.ref("site"), waiting: Vue.ref(false) })
   const app = Vue.createApp({
     setup() {
       const dock = Vue.ref(null)
@@ -198,6 +200,45 @@ test("under Comments, scroll keys in Drop's window scroll the site through its r
     await page.keyboard.press("Home")
     await page.waitForTimeout(200)
     assert.notEqual(await site.evaluate(() => scrollY), 0)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("Ctrl+K on the site under review opens Drop's palette once Drop answers its review script", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1200, height: 800 } })
+    await context.route("**/*", (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname === "site.test")
+        return route.fulfill({
+          contentType: "text/html",
+          body: '<p>Page</p><script src="https://drop.test/review.js"></script>',
+        })
+      if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
+      if (url.pathname === "/fixture.js") return route.fulfill({ contentType: "text/javascript", body: script })
+      if (url.pathname !== "/") return route.fulfill({ status: 404 })
+      return route.fulfill({
+        contentType: "text/html",
+        body: `<style>${styles} #app{display:flex;flex-direction:column;height:100vh}</style><div id="app"></div>
+        <script type="module" src="/fixture.js"></script>`,
+      })
+    })
+    const page = await context.newPage()
+    await page.goto("https://drop.test/")
+    await page.locator("iframe").waitFor({ timeout: 5000 })
+    const site = page.frames().find((frame) => frame.url().startsWith("https://site.test"))
+    await site.waitForFunction(() => window.__dropReview === true, null, { timeout: 5000 })
+    await site.click("p")
+    // The script's "review-ready" and Drop's "hello" cross while the page settles.
+    await page.waitForTimeout(300)
+    // Headless Chromium isn't a Mac, so the palette's key is Ctrl+K.
+    await page.keyboard.press("Control+k")
+    await page.waitForFunction(() => window.paletteOpened === 1, null, { timeout: 5000 })
+    await page.keyboard.press("k")
+    await page.waitForTimeout(200)
+    assert.equal(await page.evaluate(() => window.paletteOpened), 1)
   } finally {
     await browser.close()
   }

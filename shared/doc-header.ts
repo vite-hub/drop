@@ -12,7 +12,7 @@
 // Copy writes the clipboard here, in the click that asked for it: the frame has the click's activation, and the
 // viewer's Markdown arrives ahead of it ("doc-intent" on hover or focus, answered with "doc-markdown"). Before it has
 // arrived, the write takes a promise of it. A frame without the Clipboard API asks the viewer to copy instead.
-import ICON_SWAP_CSS from "@vite-hub/ui/icon-swap.css?raw"
+import COPY_ICON_CSS from "./copy-icon.css?raw"
 import { siteTile } from "./site-tile"
 
 type DocHeaderAction = { id: "markdown" | "download" | "pdf"; label: string; kbd?: string }
@@ -165,7 +165,7 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
 .drop-links-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop, .drop-links-toggle svg { transition: none; } }
 @media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop, .drop-links-toggle { display: none !important; } .drop-head .cp.drop-folded { display: inline-flex; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
-${ICON_SWAP_CSS.replace(/\/\*[\s\S]*?\*\//g, "")}
+${COPY_ICON_CSS}
 `
 
 /** How long Copy shows its check, as Drop's other copy buttons (COPY_MS in app/composables/usePreferences.ts). */

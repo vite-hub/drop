@@ -6,6 +6,7 @@ import {
   effectScope,
   h,
   nextTick,
+  onMounted,
   onScopeDispose,
   reactive,
   ref,
@@ -23,6 +24,7 @@ for (const [name, value] of Object.entries({
   ref,
   shallowRef,
   watch,
+  onMounted,
   onScopeDispose,
   createInjectionState,
   useFileDialog,
@@ -34,7 +36,7 @@ for (const [name, value] of Object.entries({
 const { provideReviewDraft, injectReviewDraft } = await import("../../app/composables/useReviewDraft.ts")
 const scopes = []
 afterEach(() => scopes.splice(0).forEach((scope) => scope.stop()))
-function viewer(kind = "markdown") {
+function viewer(kind = "markdown", optionsOverride = {}) {
   const scope = effectScope()
   scopes.push(scope)
   const shots = []
@@ -45,9 +47,34 @@ function viewer(kind = "markdown") {
     reviewOpen: ref(false),
     shot: (file) => shots.push(file),
     shots,
+    ...optionsOverride,
   }
   return { ...options, ...scope.run(() => useViewerAnnotations(options)) }
 }
+
+test("entering a prototype canvas clears inspection and blocks toolbar and frame shortcuts", () => {
+  const canvas = ref(false)
+  const state = viewer("html", { canvas })
+  state.setTool("measure")
+  state.toggleOverlay("xray")
+  assert.equal(state.frameTool.value, "measure")
+  assert.equal(state.overlays.xray, true)
+
+  canvas.value = true
+  assert.equal(state.frameTool.value, "browse")
+  assert.equal(state.overlays.xray, false)
+
+  state.setTool("measure")
+  state.toggleOverlay("xray")
+  for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
+  assert.equal(state.frameTool.value, "browse")
+  assert.equal(state.overlays.xray, false)
+
+  canvas.value = false
+  for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
+  assert.equal(state.frameTool.value, "measure")
+  assert.equal(state.overlays.xray, true)
+})
 const frame = { left: 0, top: 0, scale: 1 }
 const area = {
   type: "area",
@@ -191,6 +218,14 @@ test("text, mentions and attached images survive plain/area composer replacement
   })
   const mode = ref("plain")
   let draft, composer
+  const author = ref({ id: "ada" })
+  const stored = new Map()
+  vi.stubGlobal("useMe", () => ({ data: author, status: ref("success") }))
+  vi.stubGlobal("localStorage", {
+    getItem: (key) => stored.get(key),
+    setItem: (key, value) => stored.set(key, value),
+    removeItem: (key) => stored.delete(key),
+  })
   const Composer = {
     setup() {
       composer = injectReviewDraft()
@@ -199,7 +234,7 @@ test("text, mentions and attached images survive plain/area composer replacement
   }
   const app = renderer.createApp({
     setup() {
-      draft = provideReviewDraft()
+      draft = provideReviewDraft(() => "shared-drop")
       return () => h(Composer, { key: mode.value })
     },
   })
@@ -222,41 +257,31 @@ test("text, mentions and attached images survive plain/area composer replacement
     assert.deepEqual(composer.images.files.value, [image])
     assert.equal((await fetch(preview)).status, 200)
   }
-  const finish = composer.beginSend()
-  mode.value = "area"
-  await nextTick()
-  assert.equal(composer.sending.value, true)
-  assert.equal(composer.beginSend(), undefined)
-  composer.body.value = "New feedback while uploading"
-  const secondImage = new File(["second"], "second.png", { type: "image/png" })
-  composer.images.drop({ dataTransfer: { files: [secondImage] }, preventDefault() {} })
-  const secondPreview = composer.images.picks.value[1].url
-  assert.equal(finish(true), false)
-  assert.equal(composer.body.value, "New feedback while uploading")
-  assert.deepEqual(composer.images.files.value, [image, secondImage])
-  assert.equal((await fetch(secondPreview)).status, 200)
-
-  // Failure retains the draft; a stale completion cannot release a later request.
-  const failed = composer.beginSend()
-  assert.equal(failed(false), false)
-  assert.deepEqual(composer.mentions.value, ["ana"])
-  const accepted = composer.beginSend()
-  finish(true)
-  assert.equal(composer.sending.value, true)
-  assert.equal(accepted(true), true)
-  assert.equal(composer.body.value, "")
+  // A send empties the draft at once: the comment waits in the outbox, and the next one can start.
+  composer.clear()
+  assert.equal(draft.body.value, "")
   assert.deepEqual(composer.mentions.value, [])
   assert.deepEqual(composer.people.value, [])
   assert.deepEqual(composer.images.files.value, [])
   await assert.rejects(fetch(preview))
-  await assert.rejects(fetch(secondPreview))
-
-  // Editing back to the submitted text still constitutes a newer draft.
-  composer.body.value = "Original"
-  const edited = composer.beginSend()
-  composer.body.value = "Edited"
-  composer.body.value = "Original"
-  assert.equal(edited(true), false)
-  assert.equal(composer.body.value, "Original")
+  draft.body.value = "Ada's own draft"
   app.unmount()
+
+  const reload = renderer.createApp({
+    setup() {
+      draft = provideReviewDraft(() => "shared-drop")
+      return () => h("div")
+    },
+  })
+  reload.mount(node())
+  assert.equal(draft.body.value, "Ada's own draft")
+  author.value = null
+  assert.equal(draft.body.value, "")
+  draft.body.value = "Guest draft"
+  author.value = { id: "bea" }
+  assert.equal(draft.body.value, "")
+  draft.body.value = "Bea's own draft"
+  author.value = { id: "ada" }
+  assert.equal(draft.body.value, "Ada's own draft")
+  reload.unmount()
 })

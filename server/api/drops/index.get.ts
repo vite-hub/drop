@@ -1,11 +1,19 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { DropsQuerySchema } from "#shared/schemas"
-import { findDropByRef, listDrops, listFolder, listFolders, listSharedWithMe, permissions } from "../../utils/drops"
+import {
+  findDropByRef,
+  listDrops,
+  listFolder,
+  listFolders,
+  listPinned,
+  listSharedWithMe,
+  permissions,
+} from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 import { searchKinds } from "../../utils/search"
 
 /**
- * Your drops at the top; with `?trash` the ones in your Trash; with `?shared` what others share with you (on a team Drop
+ * Your drops at the top; with `?trash` the ones in your Trash; with `?pinned` the drops you pinned, yours and others'; with `?shared` what others share with you (on a team Drop
  * the team's folders first); with `?folders` every folder your drops may go in, yours and the team's. `?q=` searches your drops at any depth, by name and by a doc's text, and with
  * `?folder=<id or link>` the folder's drops (`&limit=` the newest few), or with `q` everything below it. `?kind=image,file` keeps those kinds, at
  * any depth, with or without `q`.
@@ -25,6 +33,7 @@ export default defineValidatedHandler({
       return listFolder(folder, event, { query: words, kinds, who, limit })
     }
     if (query.has("folders")) return listFolders(who, event)
+    if (query.has("pinned")) return listPinned(who, event)
     return query.has("shared")
       ? listSharedWithMe(who, event)
       : listDrops(who, event, query.has("trash") ? { trash: true } : { query: words, kinds })

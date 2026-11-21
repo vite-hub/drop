@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Your drops, newest first as cards that preview what's inside (DropCard), or as a list (DropLine). No top bar: the
 // sidebar says where you are, makes new drops (its +) and searches (⌘K, whose first row brings every match here as
-// `?q=`). One row leads the page: Recent or Folders, which the reader keeps (a cookie), the Trash beside them, a
-// search's words while it's on, and grid or list.
+// `?q=`). One row leads the page: Pinned, Recent or Folders, which the reader keeps (a cookie), the Trash beside them, a
+// search's words while it's on, and grid or list. Pinned is where it opens until the reader picks another: the drops
+// they pinned from a drop's + or ⌘K, theirs and other people's, most recently pinned first.
 //
 // Clicks follow Finder and the folder page (ViewerFolder): on wide screens one click previews the drop in a pane that
 // pushes the page left (ViewerFolderPreview, its width dragged from its edge), a double-click, Enter or Open opens it;
@@ -19,6 +20,7 @@ import type { DropSummary } from "#shared/types"
 definePageMeta({
   middleware: () => {
     void useDrops()
+    usePinned()
     useTrash()
     useUsage()
   },
@@ -31,6 +33,7 @@ const folderDialog = useFolderDialog()
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 const { data: trash } = useTrash()
+const { data: pinned, status: pinnedStatus, error: pinnedError, refresh: refreshPinned } = usePinned()
 const { data: shared } = useSharedWithMe()
 // A personal Drop's teams list their folders under Teams, not here.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
@@ -39,9 +42,11 @@ const getStartedHidden = useGetStartedHidden()
 const route = useRoute("drops")
 const view = useDropsView()
 const layout = useDropsLayout()
-// What the page shows: the Trash and Shared with me are places in the URL, Recent and Folders the reader's own view.
+// What the page shows: the Trash and Shared with me are places in the URL, Pinned, Recent and Folders the reader's own
+// view.
 const place = computed(() => (route.query.tab === "trash" ? "trash" : route.query.tab === "with-me" ? "with-me" : null))
 const VIEWS = [
+  { value: "pinned", label: "Pinned", icon: "i-mingcute-pin-line" },
   { value: "recent", label: "Recent", icon: "i-mingcute-time-line" },
   { value: "folders", label: "Folders", icon: "i-mingcute-folder-line" },
   { value: "trash", label: "Trash", icon: "i-mingcute-delete-2-line" },
@@ -58,6 +63,7 @@ const searchQuery = computed(() => v.parse(SearchQuery, route.query))
 const query = computed(() => searchQuery.value.q.trim())
 const kind = computed(() => searchQuery.value.kind)
 const searching = computed(() => Boolean(query.value || kind.value) && !place.value)
+const showingPinned = computed(() => current.value === "pinned" && !searching.value)
 const {
   data: found,
   status: searchStatus,
@@ -79,6 +85,7 @@ const visible = computed(() => {
   if (place.value === "trash") return trash.value
   if (place.value === "with-me") return withMe.value
   if (searching.value) return found.value
+  if (view.value === "pinned") return pinned.value
   if (view.value === "recent") return drops.value
   return [
     ...drops.value.filter((drop) => drop.kind === "folder"),
@@ -105,6 +112,8 @@ const now = useRelativeNow()
 const mounted = useMounted()
 const groups = computed(() => {
   const list = visible.value.slice(0, shown.value)
+  // Pinned keeps the order you pinned in, in one group the row above already names.
+  if (current.value === "pinned" && !searching.value) return list.length ? [{ label: "", drops: list }] : []
   if (current.value === "folders" && !searching.value) {
     const folders = list.filter((drop) => drop.kind === "folder")
     const rest = list.filter((drop) => drop.kind !== "folder")
@@ -290,7 +299,12 @@ async function newTeamFolder() {
 
             <!-- The cards' own boxes, so the drops land without moving anything. -->
             <ul
-              v-if="status === 'pending' && !drops.length && !place"
+              v-if="
+                !place &&
+                (showingPinned
+                  ? (pinnedStatus === 'idle' || pinnedStatus === 'pending') && !pinned.length
+                  : status === 'pending' && !drops.length)
+              "
               aria-hidden="true"
               class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-6"
             >
@@ -302,14 +316,22 @@ async function newTeamFolder() {
             </ul>
 
             <div
-              v-else-if="error"
+              v-else-if="showingPinned ? pinnedError : error"
               class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
               role="alert"
             >
               <UIcon name="i-mingcute-warning-line" class="size-6 text-error" />
-              <p class="mt-3 font-medium text-highlighted">Couldn't load your drops</p>
+              <p class="mt-3 font-medium text-highlighted">
+                {{ showingPinned ? "Couldn't load your pins" : "Couldn't load your drops" }}
+              </p>
               <p class="mt-1 text-sm text-muted">Try again in a moment.</p>
-              <UButton class="mt-5" color="neutral" label="Try again" variant="outline" @click="refresh()" />
+              <UButton
+                class="mt-5"
+                color="neutral"
+                label="Try again"
+                variant="outline"
+                @click="showingPinned ? refreshPinned() : refresh()"
+              />
             </div>
 
             <div
@@ -344,14 +366,14 @@ async function newTeamFolder() {
 
             <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
             <GetStarted
-              v-else-if="!place && !searching && !drops.length && !getStartedHidden && !uploading"
+              v-else-if="!place && !searching && !showingPinned && !drops.length && !getStartedHidden && !uploading"
               :drops="drops"
               @site="newSite()"
               @upload="openPicker()"
             />
 
             <div
-              v-else-if="!place && !searching && !drops.length && !uploading"
+              v-else-if="!place && !searching && !showingPinned && !drops.length && !uploading"
               class="rounded-lg border border-dashed border-default px-6 py-16 text-center"
             >
               <UIcon name="i-mingcute-layers-line" class="size-6 text-dimmed" />
@@ -369,6 +391,25 @@ async function newTeamFolder() {
                   @click="openPicker()"
                 />
               </div>
+            </div>
+
+            <div
+              v-else-if="showingPinned && pinnedStatus === 'success' && !pinned.length && !showsUploads"
+              class="mb-8 rounded-lg border border-dashed border-default px-6 py-16 text-center"
+            >
+              <UIcon name="i-mingcute-pin-line" class="size-6 text-dimmed" />
+              <p class="mt-3 font-medium text-highlighted">Nothing pinned yet</p>
+              <p class="mx-auto mt-1 max-w-sm text-sm text-pretty text-muted">
+                Pin the drops you keep coming back to, yours or a teammate's, and they wait here. Pin one from the + on
+                its page, from ⌘K, or from a card's menu.
+              </p>
+              <UButton
+                class="mt-5"
+                color="neutral"
+                label="See recent drops"
+                variant="outline"
+                @click="show('recent')"
+              />
             </div>
 
             <p v-else-if="!visible.length && !showsUploads" class="py-16 text-center text-sm text-muted">
@@ -400,7 +441,7 @@ async function newTeamFolder() {
 
             <div v-if="visible.length" ref="list" @keydown="walk">
               <section v-for="group in groups" :key="group.label" class="mb-8">
-                <h2 class="label-mono mb-3">{{ group.label }}</h2>
+                <h2 v-if="group.label" class="label-mono mb-3">{{ group.label }}</h2>
                 <!-- The Trash keeps its rows: Restore and Delete for good are what it's for. -->
                 <ul
                   v-if="place === 'trash'"

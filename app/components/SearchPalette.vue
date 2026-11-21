@@ -1,8 +1,12 @@
 <script setup lang="ts">
 // The ⌘K palette on every dashboard page: drops you can open (yours at any depth, then teammates'), matched by name or
 // by a doc's words on the server, and, matched here, what you can do with the drop open, new drops to make, the app's
-// pages, the theme, and signing out. The sidebar's search button opens it too, and a folder's search box opens it with
-// `in:<folder>` typed in. `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
+// pages, the theme, and signing out. The sidebar's search button opens it too, a folder's search box opens it with
+// `in:<folder>` typed in, and a drop's frame passes ⌘K on while the page in it has the focus (useViewerFrame,
+// ViewerSiteFrame). `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
+// With nothing typed it leads with the drops you pinned, then your newest.
+// The drop open offers everything its review pill does (DropViewer's usePaletteOffer), each with the pill's key, and a
+// mode or a view that's on, or the choice made, as `active`, as the Theme group marks the theme.
 import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
 import { DROP_KINDS, type DropSummary } from "#shared/types"
 
@@ -17,7 +21,11 @@ const context = injectPaletteContext()
 const current = computed(() => context?.drop.value ?? null)
 const folder = computed(() => context?.folder.value ?? null)
 const scope = computed(() => context?.scope.value ?? null)
-const { drops: recent } = useSidebarDrops()
+const { drops: newest } = useSidebarDrops()
+const { data: pinned } = usePinned()
+const pinnedIds = computed(() => new Set(pinned.value.map((drop) => drop.id)))
+const recent = computed(() => newest.value.filter((drop) => !pinnedIds.value.has(drop.id)))
+const dropsView = useDropsView()
 const term = usePaletteTerm()
 // Opened with a term (a folder's search), the caret goes after it: the field selects it all, and the first key typed
 // would replace the folder's `in:`.
@@ -102,6 +110,14 @@ const toItem = (drop: DropSummary): CommandPaletteItem => ({
 const pages = computed<CommandPaletteItem[]>(() =>
   [
     { label: me.value?.mode === "team" ? "My drops" : "Drops", icon: "i-mingcute-layers-line", to: "/drops" },
+    {
+      label: "Pinned",
+      icon: "i-mingcute-pin-line",
+      onSelect: () => {
+        dropsView.value = "pinned"
+        void navigateTo("/drops")
+      },
+    },
     me.value?.mode === "team"
       ? { label: "Team", icon: "i-mingcute-group-2-line", to: "/drops?tab=with-me" }
       : { label: "Shared with me", icon: "i-mingcute-inbox-line", to: "/drops?tab=with-me" },
@@ -269,9 +285,11 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
         },
       ]
     : []),
-  ...(current.value?.items.length && !filtered.value
-    ? [{ id: "drop", label: current.value.title, items: current.value.items }]
-    : []),
+  ...(filtered.value
+    ? []
+    : (current.value?.groups ?? [])
+        .filter((group) => group.items.length)
+        .map((group) => ({ id: `drop-${group.id}`, label: group.label, items: group.items }))),
   ...(filtered.value
     ? []
     : term.value.trim()
@@ -289,6 +307,9 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
           },
         ]
       : [
+          ...(pinned.value.length
+            ? [{ id: "pinned", label: "Pinned", ignoreFilter: true, items: pinned.value.slice(0, 8).map(toItem) }]
+            : []),
           { id: "recent", label: "Recent", ignoreFilter: true, items: recent.value.slice(0, 5).map(toItem) },
           { id: "create", label: "Create", items: create.value },
           { id: "pages", label: "Go to", items: pages.value },

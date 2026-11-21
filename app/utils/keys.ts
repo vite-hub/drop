@@ -9,6 +9,8 @@ export const keys = {
   /** The sidebar's drops (useDropTree). */
   tree: "tree",
   sharedWithMe: "shared-with-me",
+  /** The drops you pinned (usePinned). */
+  pinned: "pinned",
   trash: "trash",
   usage: "usage",
   /** Every folder you may move a drop into (MoveModal). */

@@ -217,10 +217,11 @@ export function event(path, method = "GET") {
 }
 export function reset() {
   sql.exec(
-    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comment_messages; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_counters; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
+    "DELETE FROM quota_reservations; DELETE FROM abuse_reports; DELETE FROM drop_files; DELETE FROM vitehub_comment_messages; DELETE FROM vitehub_comment_threads; DELETE FROM vitehub_comment_counters; DELETE FROM drop_pins; DELETE FROM drops; DELETE FROM drop_views; DELETE FROM drop_viewers; DELETE FROM blob_cleanup; DELETE FROM comment_cleanup; DELETE FROM code_images; DELETE FROM member; DELETE FROM invitation; DELETE FROM subscription; DELETE FROM organization; DELETE FROM user",
   )
   state.bursts.length = 0
   state.failBurst = false
+  delete state.burstRetryAfter
   state.ogRenders.length = 0
   state.refreshedLinks.length = 0
   state.ogBrowser = true

@@ -10,15 +10,25 @@ const year = 60 * 60 * 24 * 365
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
-/** How the Drops page lists your drops: newest first (Recent) or folders first (Folders). */
+/** How the Drops page opens: the drops you pinned (Pinned), yours newest first (Recent), or folders first (Folders). */
 export const useDropsView = () =>
-  useCookie<"recent" | "folders">("drop-drops-view", { default: () => "recent", maxAge: year, sameSite: "lax" })
+  useCookie<"pinned" | "recent" | "folders">("drop-drops-view", {
+    default: () => "pinned",
+    maxAge: year,
+    sameSite: "lax",
+  })
 /** Whether the Drops page shows cards with previews or a list. */
 export const useDropsLayout = () =>
   useCookie<"grid" | "list">("drop-drops-layout", { default: () => "grid", maxAge: year, sameSite: "lax" })
 /** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
+
+/**
+ * Zen mode, from the review pill's + or Z, for every drop: a Markdown doc reads without its outline, and the pill folds
+ * to a small handle while nothing needs it (DropViewer).
+ */
+export const useZen = () => useCookie<boolean>("drop-zen", { default: () => false, maxAge: year, sameSite: "lax" })
 
 /**
  * How comments on a Markdown doc's text show: "card", the cards in the margin and the composer floating over its place

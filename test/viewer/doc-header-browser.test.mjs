@@ -192,6 +192,17 @@ test(
       // Copy asks for the Markdown when the pointer reaches it, and writes it in the click. The button stays the
       // same element through another header, so the press can't be lost and focus stays.
       const copy = frame.getByRole("button", { name: "Copy as Markdown" })
+      const waitForIcon = (shown) =>
+        frame.waitForFunction((visibleIcon) => {
+          const icons = document.querySelectorAll('[data-slot="copy-button-icon"] > [data-icon]')
+          return (
+            icons.length === 2 &&
+            [...icons].every(
+              (icon) => getComputedStyle(icon).opacity === (icon.dataset.icon === visibleIcon ? "1" : "0"),
+            )
+          )
+        }, shown)
+      await waitForIcon("copy")
       await copy.evaluate((el) => (el.dataset.same = "1"))
       await page.evaluate((header) => window.tell(header), HEADER)
       assert.equal(await copy.getAttribute("data-same"), "1")
@@ -209,7 +220,9 @@ test(
       assert.equal(await copy.getAttribute("data-copied"), "")
       assert.equal(await copy.innerText(), "Copy", "the label stays")
       assert.equal(await frame.locator(".drop-note").textContent(), "Markdown copied")
+      await waitForIcon("check")
       await copy.locator(":scope:not([data-copied])").waitFor({ timeout: 3000 })
+      await waitForIcon("copy")
 
       // The arrow's menu is a popover; Escape closes it without reaching Drop.
       const arrow = frame.getByRole("button", { name: "More ways to save this doc" })

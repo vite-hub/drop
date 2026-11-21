@@ -1,0 +1,32 @@
+[data-slot="copy-button-icon"]:has(> [data-icon="copy"]):has(> [data-icon="check"]) {
+  display: grid;
+  place-items: center;
+
+  > :is([data-icon="copy"], [data-icon="check"]) {
+    display: flex;
+    grid-area: 1 / 1;
+    scale: none;
+    transition: none;
+  }
+
+  > [data-icon="check"],
+  [data-copied] & > [data-icon="copy"] {
+    opacity: 0;
+    filter: var(--drop-copy-icon-blur, none);
+  }
+
+  [data-copied] & > [data-icon="check"] {
+    opacity: 1;
+    filter: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    --drop-copy-icon-blur: blur(3px);
+
+    > :is([data-icon="copy"], [data-icon="check"]) {
+      transition:
+        opacity 150ms ease-out,
+        filter 150ms ease-out;
+    }
+  }
+}

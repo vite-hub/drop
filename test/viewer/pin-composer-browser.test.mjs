@@ -128,7 +128,7 @@ const pastePicture = (page, name) =>
   }, name)
 
 test(
-  "compact drafts stay unchanged while waiting for a screenshot or sending, then become editable again",
+  "compact drafts stay unchanged while waiting for a screenshot, then become editable again",
   { timeout: 60_000 },
   async () => {
     const browser = await chromium.launch()
@@ -149,36 +149,30 @@ test(
         { body: "Keep this feedback", files: ["original.png"] },
       ])
 
-      for (const phase of ["waiting", "sending"]) {
-        if (phase === "sending")
-          await page.evaluate(() => {
-            // A frame screenshot must still join the draft while user mutation is locked.
-            draft.images.add([new File(["shot"], "shot.png", { type: "image/png" })])
-            draft.sending.value = true
-            draft.waiting.value = false
-          })
-        await field.focus()
-        await field.press("End")
-        await field.pressSequentially(" edits during " + phase)
-        await page
-          .getByRole("button", { name: /^Remove / })
-          .first()
-          .click({ force: true })
-        await pastePicture(page, "replacement.png")
-        await field.press("Escape")
-        assert.equal(await page.evaluate(() => cancellations), 0, phase)
-        assert.equal(await page.evaluate(() => unhandledEscapes), 0, phase)
-        assert.equal(await field.inputValue(), "Keep this feedback", phase)
-        assert.deepEqual(
-          await page.evaluate(() => draft.images.files.value.map((file) => file.name)),
-          phase === "waiting" ? ["original.png"] : ["original.png", "shot.png"],
-          phase,
-        )
-      }
-
-      // A failed send releases the controls without losing the original draft or its screenshot.
+      // The frame's screenshot still joins the draft while the reader's edits are locked.
       await page.evaluate(() => {
-        draft.sending.value = false
+        draft.images.add([new File(["shot"], "shot.png", { type: "image/png" })])
+      })
+      await field.focus()
+      await field.press("End")
+      await field.pressSequentially(" edits during waiting")
+      await page
+        .getByRole("button", { name: /^Remove / })
+        .first()
+        .click({ force: true })
+      await pastePicture(page, "replacement.png")
+      await field.press("Escape")
+      assert.equal(await page.evaluate(() => cancellations), 0)
+      assert.equal(await page.evaluate(() => unhandledEscapes), 0)
+      assert.equal(await field.inputValue(), "Keep this feedback")
+      assert.deepEqual(await page.evaluate(() => draft.images.files.value.map((file) => file.name)), [
+        "original.png",
+        "shot.png",
+      ])
+
+      // Once the wait is over, the controls work again, with the draft and its screenshot.
+      await page.evaluate(() => {
+        draft.waiting.value = false
       })
       await field.press("End")
       await field.pressSequentially(" retry")
@@ -212,7 +206,7 @@ test(
 )
 
 test(
-  "mention choices remain visible, survive replacement, and cannot mutate an in-flight draft",
+  "mention choices remain visible, survive replacement, and cannot mutate a draft waiting for its screenshot",
   { timeout: 60_000 },
   async () => {
     const browser = await chromium.launch()
@@ -242,42 +236,32 @@ test(
 
       await page.evaluate(() => {
         draft.waiting.value = false
-        window.finish = draft.beginSend()
+        draft.clear()
       })
-      assert.equal(await page.evaluate(() => finish(true)), true)
       assert.equal(await field.inputValue(), "")
       assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
 
       await page.evaluate(() => replaceComposer(false))
 
       // Each attempt starts with a lookup opened before the real Send-button interaction.
-      for (const phase of ["waiting", "sending"]) {
-        for (const selection of ["keyboard", "pointer"]) {
-          await field.fill("@An")
-          await option.waitFor()
-          await page.getByRole("button", { name: "Comment", exact: true }).click()
-          if (phase === "sending")
-            await page.evaluate(() => {
-              window.finish = draft.beginSend()
-              draft.waiting.value = false
-            })
-          if (selection === "keyboard") {
-            await field.focus()
-            await field.press("Enter")
-          } else {
-            await option.click({ force: true })
-          }
-          assert.equal(await field.inputValue(), "@An", phase + " " + selection)
-          assert.deepEqual(await page.evaluate(() => draft.mentions.value), [], phase + " " + selection)
-          if (phase === "waiting")
-            await page.evaluate(() => {
-              window.finish = draft.beginSend()
-              draft.waiting.value = false
-            })
-          assert.equal(await page.evaluate(() => finish(true)), true)
-          assert.equal(await field.inputValue(), "")
-          assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
+      for (const selection of ["keyboard", "pointer"]) {
+        await field.fill("@An")
+        await option.waitFor()
+        await page.getByRole("button", { name: "Comment", exact: true }).click()
+        if (selection === "keyboard") {
+          await field.focus()
+          await field.press("Enter")
+        } else {
+          await option.click({ force: true })
         }
+        assert.equal(await field.inputValue(), "@An", selection)
+        assert.deepEqual(await page.evaluate(() => draft.mentions.value), [], selection)
+        await page.evaluate(() => {
+          draft.waiting.value = false
+          draft.clear()
+        })
+        assert.equal(await field.inputValue(), "")
+        assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
       }
     } finally {
       await browser.close()

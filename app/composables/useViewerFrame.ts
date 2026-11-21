@@ -51,6 +51,8 @@ export function useViewerFrame(options: {
   bottom: Ref<number>
   /** How wide a Markdown doc's text runs. */
   width: Ref<DocWidth>
+  /** The reader's zen mode (useZen), in which a Markdown doc hides its outline. */
+  zen?: Ref<boolean>
   annotations: ReturnType<typeof useViewerAnnotations>
   /**
    * How comments on a Markdown doc's text show (useCommentStyle), who's reading, for the Pin style's draft pin, and the
@@ -63,6 +65,7 @@ export function useViewerFrame(options: {
   threadOverCard?: Ref<boolean>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
+  variants?: Ref<ViewerVariants | null>
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
   arrow?: (key: "ArrowLeft" | "ArrowRight") => void
   /** Who else has the drop open (usePresence): the reader's pointer goes up to them, and their cursors come down. */
@@ -76,6 +79,15 @@ export function useViewerFrame(options: {
   /** The header's own Copy, as it went. */
   docCopied?: (ok: boolean, error?: string) => void
   openDrop?: (id: string) => void
+  /** ⌘K pressed in the page: the palette's own shortcut never reaches this window while the frame has the focus. */
+  palette?: () => void
+  /** Z pressed in the page, the pill's key for zen mode. */
+  toggleZen?: () => void
+  /**
+   * Escape pressed in the page, asked first: whether the viewer used it, for the last step of its own Escape (leaving
+   * zen), which only comes once nothing else is open. When it didn't, the annotations take it as before.
+   */
+  escape?: () => boolean
 }) {
   const {
     drop,
@@ -108,6 +120,13 @@ export function useViewerFrame(options: {
   watch(options.inset, (value) => (startInset = value), { immediate: true, flush: "sync" })
   let startWidth: DocWidth = "readable"
   watch(options.width, (value) => (startWidth = value), { immediate: true, flush: "sync" })
+  // Zen too, so a doc opened in zen never shows its outline first; the "zen" message turns it on and off after that.
+  let startZen = false
+  watch(
+    () => options.zen?.value ?? false,
+    (value) => (startZen = value),
+    { immediate: true, flush: "sync" },
+  )
   // Only the viewer's direct document uses its bar; nested app frames keep their own picker controls.
   const variantBar = (html: string) => (options.variantBar && html ? withVariantBar(html) : html)
   /**
@@ -148,6 +167,7 @@ export function useViewerFrame(options: {
         attached.defer(drop.value.html ?? ""),
         startInset,
         startWidth,
+        startZen,
       )
     if (!attached.ready.value) return ""
     return planDocument(
@@ -157,6 +177,7 @@ export function useViewerFrame(options: {
       attached.inline(drop.value.html ?? ""),
       startInset,
       startWidth,
+      startZen,
     )
   }
 
@@ -200,7 +221,7 @@ export function useViewerFrame(options: {
     location.value = at
   }
 
-  const variants = shallowRef<ViewerVariants | null>(null)
+  const variants = options.variants ?? shallowRef<ViewerVariants | null>(null)
   const picker = (command: PickerCommand, index?: number) => send({ type: "picker", do: command, index })
 
   /**
@@ -397,6 +418,11 @@ export function useViewerFrame(options: {
         if (options.variantBar) variants.value = { ...message }
         return
       case "key":
+        if (message.key === "meta_k") return options.palette?.()
+        // Like the tool keys, an app keeps Z for itself under Browse (useViewerAnnotations).
+        if (message.key === "z")
+          return isApp.value && (message.tool ?? "browse") === "browse" ? undefined : options.toggleZen?.()
+        if (message.key === "Escape" && options.escape?.()) return
         if (message.key === "ArrowLeft" || message.key === "ArrowRight") return options.arrow?.(message.key)
         return annotations.receive(message, box)
       case "selection":
@@ -431,7 +457,8 @@ export function useViewerFrame(options: {
       send({
         type: "markers",
         // `suggestion`: the doc strikes the quote and shows the new words after it. `body` and `replies`: a text
-        // comment's card in the doc's margin shows its words and how many replies it has.
+        // comment's card in the doc's margin shows its words and how many replies it has. `waiting`: "pending" or
+        // "failed" while the comment is in the outbox.
         markers: options.pinned.value.map(
           ({
             id,
@@ -452,6 +479,7 @@ export function useViewerFrame(options: {
             authorImage,
             body,
             replies,
+            delivery,
           }) => ({
             id,
             n,
@@ -471,6 +499,8 @@ export function useViewerFrame(options: {
             image: authorImage,
             body,
             replies: replies.length,
+            // Not on the server yet (the outbox's): the pin shows a clock where a count goes.
+            ...(delivery ? { waiting: delivery.status } : {}),
           }),
         ),
       })
@@ -528,6 +558,10 @@ export function useViewerFrame(options: {
     () => ready.value && send({ type: "inset", right: options.inset.value, bottom: options.bottom.value }),
   )
   watch([ready, options.width], () => ready.value && send({ type: "width", column: DOC_WIDTHS[options.width.value] }))
+  watch(
+    [ready, () => options.zen?.value ?? false],
+    ([loaded, zen]) => loaded && drop.value.kind === "markdown" && send({ type: "zen", on: zen }),
+  )
   // A scroll key Drop's window has no use for scrolls the page in the frame (frameScrollKey).
   useEventListener("keydown", (event: KeyboardEvent) => {
     const scroll = ready.value && frameScrollKey(event)

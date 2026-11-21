@@ -101,6 +101,31 @@ export async function readCommentBody<T extends v.GenericSchema>(
   return { input: parsed.output, images: form ? await imagesOf(form) : [] }
 }
 
+/**
+ * A comment or reply from the viewer's outbox says whom it was written as (`as`, their user id; none for a guest). When
+ * the session isn't them, because they signed out or someone else signed in, it answers 401 and stores nothing: the
+ * outbox holds it until they sign in again, rather than send it as someone else.
+ */
+export function requireSender(who: Identity | null, as: string | undefined) {
+  if (as !== undefined && as !== who?.userId)
+    throw new HTTPError({ status: 401, statusText: "Sign in again to send this comment." })
+}
+
+/**
+ * Refuses a comment or reply before its body is read: with `refusal`, unless the body was written as someone the
+ * session isn't (requireSender). So a person signed out of a drop only members see gets the 401 that holds their
+ * outbox, not the 404 that drops what they wrote. An unreadable body gets `refusal`.
+ */
+export async function refuseSend(event: H3Event, who: Identity | null, refusal: HTTPError): Promise<never> {
+  const multipart = event.req.headers.get("content-type")?.startsWith("multipart/form-data")
+  const data: unknown = await (
+    multipart ? readForm(event).then((form) => JSON.parse(textValue(form.get("data")) ?? "")) : event.req.json()
+  ).catch(() => null)
+  const as = v.safeParse(v.object({ as: v.string() }), data)
+  requireSender(who, as.success ? as.output.as : undefined)
+  throw refusal
+}
+
 /** An image of `parent`'s, stored as `key`: private, since it follows its parent's sharing. */
 export function imageDrop(
   parent: Pick<DropRow, "id" | "ownerId" | "teamId">,
@@ -132,6 +157,7 @@ export function imageDrop(
     actorKind: "browser",
     actorName,
     agent: null,
+    sessionPublisherId: null,
     createdAt: now,
     updatedAt: now,
     lastAccessedAt: now,
@@ -229,15 +255,17 @@ export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType
 
 /**
  * Stores the images, then runs `write` (which adds a comment or a reply that lists them in `attachments`), then links
- * them to it. If `write` fails, the images go, so a retry doesn't leave them behind.
+ * them to it. If `write` fails, the images go, so a retry doesn't leave them behind. `owner` says which comment or reply
+ * they're in, or null when `write` returned one that an earlier request with the same retry key added, which lists
+ * that request's images: then these go too, and `attachments` is null.
  */
 export async function withImages<T extends { id: string }>(
   parent: DropRow | null,
   images: CommentImage[],
   actorName: string,
   write: (attachments: string[]) => Promise<T>,
-  owner: (row: T) => { commentId: string; replyId: string | null },
-): Promise<{ row: T; attachments: CommentAttachment[] }> {
+  owner: (row: T, attachments: string[]) => { commentId: string; replyId: string | null } | null,
+): Promise<{ row: T; attachments: CommentAttachment[] | null }> {
   const stored = parent ? await storeImages(parent, images, actorName) : []
   const ids = stored.map((row) => row.id)
   let row: T
@@ -247,8 +275,28 @@ export async function withImages<T extends { id: string }>(
     await deleteImages(ids)
     throw error
   }
-  await linkImages(ids, owner(row))
+  const link = owner(row, ids)
+  if (!link) {
+    await deleteImages(ids)
+    return { row, attachments: null }
+  }
+  await linkImages(ids, link)
   return { row, attachments: stored.map(toAttachment) }
+}
+
+/** Whether a message lists all of `ids`: the images this request stored, rather than an earlier request's. */
+export const lists = (message: { attachments: readonly string[] } | undefined, ids: string[]) =>
+  ids.every((id) => message?.attachments.includes(id))
+
+/** The comment images `ids` names, as Drop's API answers them, for a comment or reply an earlier request stored. */
+export async function attachmentsById(ids: readonly string[]): Promise<Map<string, CommentAttachment>> {
+  if (!ids.length) return new Map()
+  const rows = await db
+    .select({ id: drops.id, filename: drops.filename, contentType: drops.contentType, size: drops.size })
+    .from(commentAttachments)
+    .innerJoin(drops, eq(drops.id, commentAttachments.dropId))
+    .where(inArray(drops.id, [...ids]))
+  return new Map(rows.map((row) => [row.id, toAttachment(row)]))
 }
 
 /**

@@ -12,6 +12,8 @@ const on = defineModel<boolean>("on", { required: true })
 const style = defineModel<CommentStyle>("style")
 defineProps<{
   count: number
+  /** The drop's comments and replies still on their way (waitingCount), shown only when there are some. */
+  waiting?: number
   listOpen: boolean
   canComment: boolean
   canUseMode: boolean
@@ -53,12 +55,24 @@ const item =
         @click="emit('toggle')"
       >
         <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
-        {{ on ? "Click anywhere" : "Comments" }}
-        <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
-          count
-        }}</span>
+        <span data-review-label>{{ on ? "Click anywhere" : "Comments" }}</span>
+        <span
+          v-if="count && !on"
+          data-review-label
+          class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums"
+          >{{ count }}</span
+        >
       </button>
     </UTooltip>
+    <!-- One count for what hasn't gone out; each comment says why under its words. -->
+    <span
+      v-if="waiting"
+      class="inline-flex h-7 shrink-0 items-center gap-1 px-1.5 text-xs text-toned tabular-nums"
+      data-waiting
+      role="status"
+    >
+      <UIcon name="i-mingcute-time-line" class="size-3.5" />{{ waiting }} waiting
+    </span>
     <!-- Pressed means hidden: pressed is the state that changes the page. -->
     <UTooltip v-if="pins" text="Hide comments" :content="{ side: 'top', sideOffset: 8 }">
       <button

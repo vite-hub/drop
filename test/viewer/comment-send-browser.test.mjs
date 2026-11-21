@@ -9,8 +9,8 @@ import { build } from "vite-plus"
 import { test } from "vite-plus/test"
 import { compileScript, compileStyle, parse } from "vue/compiler-sfc"
 
-// The real dock, comment segment and ViteHub's CommentSend in the dark pill, driven through the Send stub
-// (app/utils/comment-send.ts) from Send 3 through every state. DROP_SEND_SHOTS=<dir> saves a screenshot of each.
+// The real dock, comment segment and ViteHub's CommentSend in the dark pill, driven through a Send stub
+// (./stub-send.ts) that plays the server and the agent, from Send 3 through every state. DROP_SEND_SHOTS=<dir> saves a screenshot of each.
 const require = createRequire(import.meta.url)
 const root = fileURLToPath(new URL("../../", import.meta.url))
 const shots = process.env.DROP_SEND_SHOTS
@@ -80,10 +80,9 @@ const entry = `
   import Dock from "ViewerReviewDock"
   import Comments from "ViewerCommentsSegment"
   import Send from "ViewerCommentSend"
-  import { createStubSend } from "${root}app/utils/comment-send.ts"
+  import { createStubSend } from "${root}test/viewer/stub-send.ts"
   Object.assign(window, Vue, VueUse)
   window.useHead = () => {}
-  const send = createStubSend()
   const icons = ${JSON.stringify(icons)}
   let at = 10
   const comment = (n, authorId, fields = {}) => ({
@@ -98,6 +97,7 @@ const entry = `
     comment(3, "ada"),
     comment(4, "bob", { replies: [{ id: "r1", body: "Done", authorId: "ada", agent: { name: "Claude", image: null }, createdAt: at++, mine: true, attachments: [] }] }),
   ])
+  const send = createStubSend({ me: "ada", comments: () => comments.value })
   window.drop = {
     send: send.controls,
     comment: (authorId) => (comments.value = [...comments.value, comment(comments.value.length + 1, authorId)]),
@@ -108,7 +108,7 @@ const entry = `
       toolbar: () => [
         button("Drop"),
         Vue.h(Comments, { on: false, count: 5, listOpen: false, canComment: true, canUseMode: true, pins: true, pinsShown: true }, {
-          tools: () => Vue.h(Send, { drop: "abc", me: "ada", comments: comments.value, send }),
+          tools: () => Vue.h(Send, { drop: "abc", comments: comments.value, send }),
         }),
         button("Share"),
         button("+", { "aria-label": "More" }),
@@ -226,7 +226,6 @@ test("Send walks every In place state in the pill, one row each, through the stu
     await step("sent", "sent")
 
     // The agent starts and links its thread; it finishes, and the button pops out.
-    await tab.waitForSelector('[data-slot="comment-send"][data-state="working"]', { timeout: 4000 })
     await control("work", "https://app.example.com/threads/42")
     const open = segment.getByRole("link", { name: "Open the T3 Code thread" })
     await open.waitFor()
@@ -243,7 +242,6 @@ test("Send walks every In place state in the pill, one row each, through the stu
     await step("failed", "failed")
     await segment.getByRole("button", { name: "Retry: send 1 comment again" }).click()
     await step("sent-again", "sent")
-    await tab.waitForSelector('[data-slot="comment-send"][data-state="working"]', { timeout: 4000 })
     await control("work", "https://app.example.com/threads/42")
 
     // A comment while the agent works brings Send 1 back beside Working, and the 31st send an hour is refused.

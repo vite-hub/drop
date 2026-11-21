@@ -181,7 +181,7 @@ const markers = computed(() => {
     at,
     comments,
     left: `${Math.min(100, (at / duration.value) * 100)}%`,
-    label: `${clock(at)}: ${comments.map((comment) => `#${comment.n} ${comment.body || "image"}`).join(", ")}`,
+    label: `${clock(at)}: ${comments.map((comment) => `${comment.delivery ? waitingLabel(comment.delivery) : `#${comment.n}`} ${comment.body || "image"}`).join(", ")}`,
   }))
 })
 
@@ -296,7 +296,15 @@ const variables = {
               :aria-label="`Comment ${marker.label}`"
               @click="emit('open', marker.comments[0]!)"
             >
-              {{ marker.comments.length > 1 ? marker.comments.length : marker.comments[0]!.n }}
+              <!-- A comment still in the outbox has no number yet: a clock takes its place. -->
+              <UIcon
+                v-if="marker.comments.length === 1 && marker.comments[0]!.delivery"
+                name="i-mingcute-time-line"
+                class="size-3 align-[-2px]"
+              />
+              <template v-else>{{
+                marker.comments.length > 1 ? marker.comments.length : marker.comments[0]!.n
+              }}</template>
             </button>
           </UTooltip>
         </div>

@@ -26,11 +26,19 @@ const key = key => key.replace(/^\\/cache:/, "").replaceAll("/", ":")
 const storage = () => ({ get: k => globalThis.dropTest.storage.getItem(key(k)), set: (k, value, options) => globalThis.dropTest.storage.setItem(key(k), value, options?.ttl ? { ttl: options.ttl } : undefined) })
 export const defineCachedFunction = (fn, options) => define(fn, { storage, group: "nitro/functions", ...options })`,
   "nitro/storage": "export const useStorage = () => globalThis.dropTest.storage",
-  "vite-hub/rate-limit": `export const checkRateLimit = async (_event, bucket, options) => {
+  // Like ViteHub's: a 429 says Retry-After only when the limiter knows it. `burstRetryAfter: undefined` is
+  // Cloudflare's binding, which doesn't.
+  "vite-hub/rate-limit": `import { HTTPError } from "h3"
+export const checkRateLimit = async (_event, bucket, options) => {
   globalThis.dropTest.bursts.push({ bucket, ...options })
-  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter: 42, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
+  const retryAfter = "burstRetryAfter" in globalThis.dropTest ? globalThis.dropTest.burstRetryAfter : 42
+  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
 }
-export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(...args))[1].allowed) throw Object.assign(new Error("burst limit"), { name: "HTTPError", status: 429 }) }`,
+export const requireRateLimit = async (...args) => {
+  const [, decision] = await checkRateLimit(...args)
+  if (decision.allowed) return
+  throw new HTTPError({ status: 429, message: "burst limit", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
+}`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":
@@ -76,10 +84,11 @@ const baseline = new Set([
   "server/utils/code-image-store.ts",
 ])
 const PREFIX = "\0drop-stub:"
-// By stub name, which has no `?raw` for Vite to see: the import, and the file under node_modules.
+// By stub name, which has no `?raw` for Vite to see: the import, and the file relative to the workspace root.
 const rawCss: Record<string, [string, string]> = {
-  "comments-css": ["comark-comments/style.css?raw", "comark-comments/dist/style.css"],
-  "comment-marks-css": ["@vite-hub/ui/comment-marks.css?raw", "@vite-hub/ui/dist/comment-marks.css"],
+  "comments-css": ["comark-comments/style.css?raw", "node_modules/comark-comments/dist/style.css"],
+  "comment-marks-css": ["@vite-hub/ui/comment-marks.css?raw", "node_modules/@vite-hub/ui/dist/comment-marks.css"],
+  "copy-icon-css": ["./copy-icon.css?raw", "shared/copy-icon.css"],
 }
 
 /** Swaps the runtime modules server code imports for test doubles. Tests import the real packages directly. */
@@ -91,8 +100,7 @@ export function dropTestStubs(): Plugin {
     apply: () => Boolean(process.env.VITEST),
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
-      // Vitest empties CSS `?raw` imports; the frame's comment layer needs the real stylesheets of comark-comments and
-      // ViteHub's comment marks.
+      // Vitest empties CSS `?raw` imports; the frame's browser tests need the real stylesheets.
       const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
       if (css) return PREFIX + css[0]
       if (id in stubs && importer !== `${root}nuxt.config.ts`) return PREFIX + id
@@ -106,7 +114,7 @@ export function dropTestStubs(): Plugin {
       if (id.startsWith(PREFIX)) {
         const name = id.slice(PREFIX.length)
         const css = rawCss[name]
-        if (css) return `export default ${JSON.stringify(readFileSync(`${root}node_modules/${css[1]}`, "utf8"))}`
+        if (css) return `export default ${JSON.stringify(readFileSync(`${root}${css[1]}`, "utf8"))}`
         return modules[name] ?? stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE

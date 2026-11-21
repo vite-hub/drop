@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { createCommentSend } from "vite-hub/comments/client"
 import { test } from "vite-plus/test"
-import { createStubSend } from "../../app/utils/comment-send.ts"
+import { createStubSend } from "./stub-send.ts"
 
 let at = 1
 const thread = (n, authorId, fields = {}) => ({
@@ -18,7 +18,6 @@ const thread = (n, authorId, fields = {}) => ({
 const reply = (authorId, fields = {}) => ({ authorId, agent: null, createdAt: at++, ...fields })
 
 test("Send N counts every open thread that waits for an answer, others' too, until a send carries it", async () => {
-  const send = createStubSend()
   let comments = [
     thread(1, "ada"),
     thread(2, "bob"),
@@ -26,9 +25,11 @@ test("Send N counts every open thread that waits for an answer, others' too, unt
     thread(4, "bob", { replies: [reply("ada", { agent: { name: "Claude", image: null } })] }),
     thread(5, "bob", { resolved: true }),
   ]
-  const transport = send.transport({ drop: "abc", me: "ada", comments: () => comments })
+  const send = createStubSend({ me: "ada", comments: () => comments })
+  const transport = send.transport("abc")
   assert.equal((await transport.status()).count, 3)
-  assert.equal((await send.transport({ drop: "abc", me: "bob", comments: () => comments }).status()).count, 3)
+  const bob = createStubSend({ me: "bob", comments: () => comments })
+  assert.equal((await bob.transport("abc").status()).count, 3)
 
   const { code } = await transport.startPairing()
   send.controls.pair({ name: "T3 Code", logo: "t3", host: "relay.t3.codes" })
@@ -44,9 +45,10 @@ test("Send N counts every open thread that waits for an answer, others' too, unt
 })
 
 test("pairing confirms the current count and carries only that batch even if delivery takes time", async () => {
-  const send = createStubSend()
   const comments = [thread(1, "ada"), thread(2, "bob"), thread(3, "ada")]
-  const transport = send.transport({ drop: "abc", me: "ada", comments: () => comments })
+  let visible = comments
+  const send = createStubSend({ me: "ada", comments: () => visible })
+  const transport = send.transport("abc")
   const client = createCommentSend(transport, { pairingInterval: 1 })
   const stop = client.start()
   try {
@@ -77,10 +79,8 @@ test("pairing confirms the current count and carries only that batch even if del
     await delivery
     assert.equal(client.state.status, "sent")
     assert.equal((await transport.status()).count, 2)
-    assert.equal(
-      (await send.transport({ drop: "abc", me: "ada", comments: () => comments.slice(1, 5) }).status()).count,
-      0,
-    )
+    visible = comments.slice(1, 5)
+    assert.equal((await transport.status()).count, 0)
   } finally {
     stop()
   }

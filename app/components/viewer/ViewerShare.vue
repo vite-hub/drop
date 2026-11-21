@@ -66,6 +66,7 @@ function focusPanel(event: Event) {
       :icon="SHARE_ICONS[drop.share]"
       label="Share"
       size="xs"
+      :ui="{ label: 'review-share-label' }"
       variant="ghost"
     />
     <template #content>
