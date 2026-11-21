@@ -688,3 +688,52 @@ test("a control with data-go draws a labelled arrow to its screen, routed by whe
     await browser.close()
   }
 })
+
+test("a wheel gesture stays with what it started on: a list stops at its end, and a pan keeps panning over a list", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const list = `<div id="v-list-box" style="height:300px;overflow:auto"><div style="height:900px">long</div></div>`
+    const html = injectRuntime(
+      `<!doctype html><html><body><section id="v-list" data-variant="List" data-width="400" data-height="400">${list}</section><section id="v-two" data-variant="Two" data-width="400">two</section></body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/latch", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/latch")
+    await tab.waitForFunction(() => document.documentElement.dataset.prototypeLayout === "canvas")
+    await tab.keyboard.press("0")
+    await tab.waitForTimeout(100)
+    const camera = () => tab.evaluate(() => document.getElementById("v-list").style.transform)
+    const top = () => tab.evaluate(() => document.getElementById("v-list-box").scrollTop)
+    const box = await tab.locator("#v-list-box").boundingBox()
+    const still = await camera()
+    // Scrolling the list past its end in one gesture leaves the camera where it was.
+    await tab.mouse.move(box.x + 100, box.y + 100)
+    for (let n = 0; n < 12; n++) await tab.mouse.wheel(0, 200)
+    await tab.waitForTimeout(50)
+    assert.equal(await top(), 600)
+    assert.equal(await camera(), still)
+    // After a pause, a new wheel over the finished list pans the plane.
+    await tab.waitForTimeout(400)
+    await tab.mouse.wheel(0, 200)
+    await tab.waitForTimeout(50)
+    assert.notEqual(await camera(), still)
+    // A pan started over empty space keeps panning when the list slides under the pointer.
+    await tab.evaluate(() => {
+      document.getElementById("v-list-box").scrollTop = 0
+    })
+    await tab.waitForTimeout(400)
+    const panned = await camera()
+    await tab.mouse.move(box.x + 100, box.y - 60)
+    await tab.mouse.wheel(0, -100)
+    await tab.mouse.move(box.x + 100, box.y + 100)
+    for (let n = 0; n < 3; n++) await tab.mouse.wheel(0, 100)
+    await tab.waitForTimeout(50)
+    assert.equal(await top(), 0)
+    assert.notEqual(await camera(), panned)
+  } finally {
+    await browser.close()
+  }
+})

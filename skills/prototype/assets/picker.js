@@ -617,22 +617,34 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden) drop(); });
 
   // A nested scroller that can still scroll in the wheel's direction keeps the wheel; otherwise the plane pans.
-  function scrolls(t, dx, dy) {
-    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) {
-      const s = getComputedStyle(el);
-      if (dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
-      if (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)) return true;
-    }
-    return false;
+  function room(el, dx, dy) {
+    const s = getComputedStyle(el);
+    return Boolean((dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0))
+      || (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)));
   }
+  function scrolls(t, dx, dy) {
+    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) if (room(el, dx, dy)) return el;
+    return null;
+  }
+  // One wheel gesture stays with what it started on, as a browser latches scrolling: a scroll inside an item stops at
+  // the end of its list instead of carrying on into the plane, and a pan keeps panning when an item slides under the
+  // pointer. A pause of LATCH ms starts a new gesture.
+  const LATCH = 250;
+  let latched = null, latchedAt = -Infinity;
   window.addEventListener("wheel", (e) => {
     if (mode !== "canvas" || e.composedPath().includes(bar)) return;
     if (e.composedPath().includes(map)) { e.preventDefault(); return; }
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
     let dx = e.deltaX * unit, dy = e.deltaY * unit;
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); latched = null; zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
-    if (scrolls(e.target, dx, dy)) return;
+    if (e.timeStamp - latchedAt > LATCH || !latched) latched = scrolls(e.target, dx, dy) || "plane";
+    latchedAt = e.timeStamp;
+    if (latched !== "plane") {
+      // At the end of its list the wheel does nothing, as it does at the end of a page.
+      if (!latched.isConnected || !room(latched, dx, dy)) e.preventDefault();
+      return;
+    }
     e.preventDefault();
     pan(-dx, -dy); settle();
   }, { passive: false, capture: true });
