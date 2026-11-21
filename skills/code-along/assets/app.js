@@ -213,6 +213,9 @@ async function previewDocument(files, run) {
   const entries = [];
   const importMaps = [...doc.querySelectorAll('script[type="importmap" i]')];
   if (modules.length) {
+    if (modules.some((tag) => tag.hasAttribute("src") && tag.hasAttribute("integrity"))) {
+      throw new Error("The preview cannot preserve integrity on module scripts with a src attribute.");
+    }
     const localEntries = modules.some((tag) => !tag.hasAttribute("src") || resolvePath("index.html", tag.getAttribute("src")));
     let parse;
     if (localEntries) {

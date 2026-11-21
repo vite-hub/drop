@@ -59,7 +59,7 @@ console.log("hi")
 - **Links** to a path open that file; add `#L3` or `#L3-L5` to select lines. A link whose text is a file name shows as a file chip. Every link must point to a file of its step, or the build stops.
 - **The step opens** on the file its text links to first, else the first file it writes.
 - **The preview** shows `index.html` in a sandboxed frame. It runs native `<script type="module">` with literal imports between lesson JavaScript files, `fetch("./file.ext")` of any lesson file, and bare imports such as `import confetti from "canvas-confetti"` from esm.sh (unless the preview supplies its own import map). Use string literals with `import()` in lesson modules. Virtual modules have `data:` URLs, not HTTP paths: use relative string `fetch` for lesson assets instead of resolving them against `import.meta.url`. Local module previews require the CDN module lexer. There is no server, so a lesson about a server shows its code without a preview.
-- **The console** tab shows the preview's `console` calls and errors.
+- **The console** tab shows the preview's `console` calls and errors. The preview rejects module script tags that specify both `src` and `integrity` because it cannot preserve that integrity check when rewriting the entry.
 - **Callouts** are `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` and `[!CAUTION]`. Tables and `<details>` work as in GitHub.
 - **Frontmatter:** `title`, and `guide: right` to put the guide on the right, as for a prototype the person tries first.
 

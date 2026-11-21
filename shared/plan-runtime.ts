@@ -2100,7 +2100,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // A root class hides the outline in Zen and tells comark-outline to recalculate its placement.
     if (m.type === "zen") { document.documentElement.classList.toggle("drop-zen", m.on === true); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
+    if (m.type === "active") {
+      opened = typeof m.id === "string" ? m.id : null;
+      if (pendingFocus && pendingFocus.id !== opened) pendingFocus = null;
+      covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft();
+    }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
     // The drop's own link: each heading's # points at it with the section's #id (see the click handler).
     if (m.type === "page-link" && typeof m.href === "string" && /^https?:\/\//.test(m.href)) {

@@ -13,7 +13,7 @@ import { htmlLanding, HTML_CONTENT_SECURITY_POLICY } from "../../shared/html-lan
 
 const skill = fileURLToPath(new URL("../../skills/code-along/", import.meta.url))
 const require = createRequire(import.meta.url)
-const lexer = readFileSync(createRequire(require.resolve("vite-plus")).resolve("es-module-lexer/js"), "utf8")
+const lexer = readFileSync(require.resolve("es-module-lexer/js"), "utf8")
 
 function build(source) {
   const dir = mkdtempSync(join(tmpdir(), "code-along-browser-"))
@@ -37,9 +37,9 @@ const lesson = [
   "## 次の手順\n\n[b.js](b.js) is the default.\n\n| File |\n| --- |\n| [a.js](a.js#L1) |\n\nThis comment belongs to the second step.",
 ].join("\n\n")
 
-async function open(browser, html, layout = "standalone") {
+async function open(browser, html, layout = "standalone", markedGate) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
-  await page.route("**/*", (route) => {
+  await page.route("**/*", async (route) => {
     const url = new URL(route.request().url())
     if (url.pathname.endsWith("/lexer.asm.js"))
       return route.fulfill({
@@ -48,6 +48,7 @@ async function open(browser, html, layout = "standalone") {
         body: lexer,
       })
     if (url.pathname.endsWith("/marked.esm.js")) {
+      await markedGate
       const parse = `export const marked = { parse: (source) => source.split("\\n\\n").map((block) => {
         const html = block.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2">$1</a>');
         return html.startsWith('|') ? '<table><tr><td>' + html.split("\\n").at(-1).split('|')[1] + '</td></tr></table>' : '<p>' + html + '</p>';
@@ -58,26 +59,32 @@ async function open(browser, html, layout = "standalone") {
         body: parse,
       })
     }
+    if (url.href === "https://drop.test/external.js")
+      return route.fulfill({
+        contentType: "text/javascript",
+        headers: { "access-control-allow-origin": "*" },
+        body: 'document.body.textContent = "External module ran";',
+      })
     if (url.hostname !== "drop.test") return route.abort()
     if (layout === "landing")
       return route.fulfill({
-        contentType: "text/html",
+        contentType: "text/html; charset=utf-8",
         headers: { "content-security-policy": HTML_CONTENT_SECURITY_POLICY },
         body: htmlLanding(html, url.pathname),
       })
     if (layout === "viewer") {
       const source = planDocument("html", html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
       return route.fulfill({
-        contentType: "text/html",
+        contentType: "text/html; charset=utf-8",
         body: `<iframe style="width:100%;height:760px" sandbox="${PREVIEW_SANDBOX}" srcdoc="${source}"></iframe>
         <script>window.posts = []; addEventListener("message", event => {
           if (event.data?.__drop) window.posts.push(event.data);
         });</script>`,
       })
     }
-    return route.fulfill({ contentType: "text/html", body: html })
+    return route.fulfill({ contentType: "text/html; charset=utf-8", body: html })
   })
-  await page.goto("https://drop.test/")
+  await page.goto("https://drop.test/", { waitUntil: markedGate ? "domcontentloaded" : "load" })
   return { page, frame: layout === "standalone" ? page : page.frames()[1] }
 }
 
@@ -87,13 +94,13 @@ test("built and manual lessons preserve source; Unicode and table links restore 
     const html = build(lesson)
     const { page } = await open(browser, html)
     const editor = page.locator(".ca-textarea")
-    assert.equal(await editor.inputValue(), original)
+    assert.equal(await editor.inputValue(), `${original}\n`)
     await page.getByRole("button", { name: "Next" }).click()
-    assert.equal(await editor.inputValue(), "const b = 1")
+    assert.equal(await editor.inputValue(), "const b = 1\n")
     await page.reload()
-    assert.equal(await editor.inputValue(), "const b = 1")
+    assert.equal(await editor.inputValue(), "const b = 1\n")
     await page.locator(".ca-table a").click()
-    assert.equal(await editor.inputValue(), original)
+    assert.equal(await editor.inputValue(), `${original}\n`)
     await editor.fill("const saved = true")
     await page.evaluate(() => {
       location.hash = "#first"
@@ -117,45 +124,58 @@ test("built and manual lessons preserve source; Unicode and table links restore 
       .replace('id="ca-lesson" type="application/json">', (slot) => slot + encode(asset("lesson.js")))
       .replace('id="ca-app" type="application/json">', (slot) => slot + encode(asset("app.js")))
     const { frame } = await open(browser, manual, "landing")
-    assert.equal(await frame.locator(".ca-textarea").inputValue(), original)
+    assert.equal(await frame.locator(".ca-textarea").inputValue(), `${original}\n`)
     await frame.getByText("Temporary edits: reloading may lose your changes.").waitFor()
   } finally {
     await browser.close()
   }
 }, 30000)
 
-test("Drop viewer comment focus reveals its step before and after lesson mount", async () => {
-  const browser = await chromium.launch()
-  try {
-    const { page, frame } = await open(browser, build(lesson), "viewer")
-    await page.waitForFunction(() => window.posts.some((message) => message.type === "ready"))
-    await page.evaluate(() => {
-      const send = (message) => frames[0].postMessage({ __drop: true, ...message }, "*")
-      send({ type: "focus", id: "c1" })
-      send({
-        type: "markers",
-        markers: [
-          {
-            id: "c1",
-            n: 1,
-            kind: "text",
-            selector: '[data-step="次の手順"] p:last-child',
-            quote: "This comment belongs to the second step.",
-            author: "Reader",
-            body: "Comment",
-            replies: 0,
-          },
-        ],
-      })
-    })
-    await frame.getByText("This comment belongs to the second step.").waitFor()
-    await frame.getByRole("button", { name: "Back" }).click()
-    await page.evaluate(() => frames[0].postMessage({ __drop: true, type: "focus", id: "c1" }, "*"))
-    await frame.getByText("This comment belongs to the second step.").waitFor()
-  } finally {
-    await browser.close()
-  }
-}, 30000)
+test.each([false, true])(
+  "Drop viewer defers comment focus until lesson mount (dismissed: %s)",
+  async (dismissed) => {
+    const browser = await chromium.launch()
+    const marked = Promise.withResolvers()
+    try {
+      const { page, frame } = await open(browser, build(lesson), "viewer", marked.promise)
+      await page.waitForFunction(() => window.posts.some((message) => message.type === "ready"))
+      await frame.locator(".ca-loading").waitFor()
+      await page.evaluate((dismissed) => {
+        const send = (message) => frames[0].postMessage({ __drop: true, ...message }, "*")
+        send({ type: "focus", id: "c1" })
+        send({
+          type: "markers",
+          markers: [
+            {
+              id: "c1",
+              n: 1,
+              kind: "text",
+              selector: '[data-step="次の手順"] p:last-child',
+              quote: "This comment belongs to the second step.",
+              author: "Reader",
+              body: "Comment",
+              replies: 0,
+            },
+          ],
+        })
+        if (dismissed) send({ type: "active", id: null })
+        send({ type: "tool", tool: "browse" })
+      }, dismissed)
+      await page.waitForFunction(() =>
+        window.posts.some((message) => message.type === "tool" && message.tool === "browse"),
+      )
+      marked.resolve()
+      await frame.locator(dismissed ? "#first:visible" : "#次の手順:visible").waitFor()
+      if (!dismissed) await frame.getByRole("button", { name: "Back" }).click()
+      await page.evaluate(() => frames[0].postMessage({ __drop: true, type: "focus", id: "c1" }, "*"))
+      await frame.getByText("This comment belongs to the second step.").waitFor()
+    } finally {
+      marked.resolve()
+      await browser.close()
+    }
+  },
+  30000,
+)
 
 test("the Drop landing preview evaluates real modules, waits for TLA and serves virtual HTML", async () => {
   const browser = await chromium.launch()
@@ -185,7 +205,7 @@ test("the Drop landing preview evaluates real modules, waits for TLA and serves 
     const shell = frame.locator('.ca-shell[data-preview="ready"]')
     await shell.waitFor()
     const preview = frame.childFrames()[0]
-    assert.equal(await preview.locator("output").textContent(), '1 <b>Partial</b> import "./not-a-module.js"')
+    assert.equal(await preview.locator("output").textContent(), '1 <b>Partial</b>\n import "./not-a-module.js"')
     assert.equal(await preview.locator("body").getAttribute("data-dom-ready"), "true")
     await frame.getByRole("button", { name: "Next" }).click()
     await frame.locator('.ca-shell[data-preview="running"]').waitFor()
@@ -194,6 +214,32 @@ test("the Drop landing preview evaluates real modules, waits for TLA and serves 
       .locator(".ca-log.is-error")
       .filter({ hasText: "late module failure" })
       .first()
+      .waitFor({ state: "attached" })
+  } finally {
+    await browser.close()
+  }
+}, 30000)
+
+test("the preview rejects module scripts whose integrity check it cannot preserve", async () => {
+  const browser = await chromium.launch()
+  try {
+    const source = [
+      "## External module",
+      fenced("index.html", '<script type="module" src="https://drop.test/external.js"></script>'),
+      "## Integrity required",
+      fenced(
+        "index.html",
+        '<script type="module" src="https://drop.test/external.js" integrity="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="></script>',
+      ),
+    ].join("\n\n")
+    const { frame } = await open(browser, build(source), "landing")
+    await frame.locator('.ca-shell[data-preview="ready"]').waitFor()
+    await frame.childFrames()[0].getByText("External module ran").waitFor()
+    await frame.getByRole("button", { name: "Next" }).click()
+    await frame.locator('.ca-shell[data-preview="failed"]').waitFor()
+    await frame
+      .locator(".ca-log.is-error")
+      .filter({ hasText: "cannot preserve integrity" })
       .waitFor({ state: "attached" })
   } finally {
     await browser.close()
