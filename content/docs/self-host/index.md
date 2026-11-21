@@ -148,14 +148,13 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 
 | Host | Applies migrations with |
 | --- | --- |
-| Cloudflare | `pnpm run deploy`, which the button runs. Workers Builds that run `npx wrangler deploy` need `pnpm db:migrate:remote` after schema changes. |
-| Vercel, Netlify | `pnpm db:migrate` (ViteHub's `vitehub database migrate`) after the build, before publishing. |
-| Deno Deploy | `pnpm db:migrate:d1` as a pre-deploy command. |
-| Docker | Drop itself before it listens, after copying the SQLite file to `backups/`; an image built for D1 runs `pnpm db:migrate:d1` before Drop starts. |
+| Cloudflare | `pnpm run deploy`, which the button runs: Wrangler applies them, then deploys the Worker. Workers Builds that run `npx wrangler deploy` need [`DROP_PRODUCTION_BRANCH`](/docs/self-host/cloudflare#workers-builds). |
+| Vercel, Netlify, Deno Deploy | `pnpm db:migrate` (ViteHub's `vitehub database migrate`) after the build, before publishing. |
+| Docker | Drop itself before it listens, after copying the SQLite file to `backups/`; an image built for D1 runs Drop's D1 script before Drop starts. |
 
-Both commands need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. They record migrations in `d1_migrations`, as Wrangler does, and skip those already applied.
+`pnpm db:migrate` and the D1 script need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. Every path records migrations in `d1_migrations`, as Wrangler does, and skips those already applied.
 
-`pnpm db:migrate` on Vercel and Netlify and Drop's own migration on Docker refuse a migration that would delete existing data. The D1 script that Deno and D1 Docker builds use has no such check, so read new migrations before you deploy there.
+`pnpm db:migrate` and Drop's own migration on Docker refuse a migration that would delete existing data. Wrangler on Cloudflare and the D1 script of D1 Docker images have no such check, so read new migrations before you deploy there.
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 

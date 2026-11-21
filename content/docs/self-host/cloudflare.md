@@ -42,16 +42,16 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    pnpm exec wrangler r2 bucket create vitehub-drop
    ```
 
-   The KV namespace for Drop's render cache has no id to fill in. Wrangler creates it on the first deploy.
+   The KV namespace for Drop's render cache has no id to fill in. The first deploy creates it.
 3. Fill `.env` with the settings below. Uncomment the D1 database id and name:
 
    ```sh
    cp .env.example .env
    ```
-4. Deploy. It builds, applies the D1 migrations, and publishes the Worker with `.env` as its secrets:
+4. Deploy. With a `.env`, `pnpm run deploy` runs ViteHub's `vitehub deploy`: it builds, applies the D1 migrations, and publishes the Worker with the settings Drop declares as its secrets. Other names in `.env`, such as `CLOUDFLARE_API_TOKEN`, stay on your machine. It lists any resource it has to create and asks first:
 
    ```sh
-   pnpm build && pnpm run deploy
+   pnpm run deploy
    ```
 5. Add your domain to the Worker (Workers and Pages, your Worker, Settings, Domains and Routes), and make sure the GitHub app's callback uses it.
 6. Run the smoke test:
@@ -87,7 +87,7 @@ To [give apps their own domain](/docs/self-host#content-origin), add a proxied w
 
 ## Database {#database}
 
-D1. `pnpm run deploy` applies new migrations before it publishes; `pnpm db:migrate:remote` applies them on their own.
+D1. `pnpm run deploy` applies new migrations before it publishes. Without a local `.env`, as in Workers Builds, it runs the deploy command of the last `pnpm build` and keeps the Worker's secrets as they are.
 
 After deploying a database change, confirm the new migration appears in the remote `d1_migrations` ledger, then exercise a lookup that uses the changed schema on the deployed Worker. The pull request migration check cannot verify either step.
 

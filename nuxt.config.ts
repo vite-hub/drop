@@ -86,6 +86,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       // Reads go to the D1 replica nearest the Worker once replication is on for the database (Cloudflare API,
       // read_replication.mode "auto"); a request that writes sets a bookmark cookie, so its reader sees the write next.
       readReplication: true,
+      // The deploy command in .output/nitro.json applies pending D1 migrations before `wrangler deploy`
+      // (scripts/deploy-cloudflare.mjs runs it).
+      migrateOnDeploy: true,
     },
     kv: true,
     // Cached functions and handlers share the Worker's KV, under the nitro-cache: prefix.
