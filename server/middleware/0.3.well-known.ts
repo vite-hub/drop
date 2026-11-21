@@ -5,14 +5,14 @@ export default defineHandler(async (event) => {
   if (pathname.startsWith("/d/") && pathname.includes("/.well-known/"))
     return (await import("../utils/hub-skills")).serveHubSkills(event)
   if (!pathname.startsWith("/.well-known/")) return
-  const [{ serveSkills }, { enabledSkills }, { serveMcpOAuthDiscovery }, { MCP_SERVER_INFO }] = await Promise.all([
+  const [{ serveSkills }, { default: settings }, { serveMcpOAuthDiscovery }, { MCP_SERVER_INFO }] = await Promise.all([
     import("vite-hub/skills"),
-    import("../utils/skills"),
+    import("../skills"),
     import("vite-hub/auth/mcp"),
     import("#shared/mcp"),
   ])
   return (
-    (await serveSkills(event.req, enabledSkills)) ??
+    (await serveSkills(event.req, settings.enabled)) ??
     serveMcpOAuthDiscovery(event.req, {
       resourceName: MCP_SERVER_INFO.title,
       resourceDocumentation: `${event.url.origin}/docs/agents`,
