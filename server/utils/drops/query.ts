@@ -526,7 +526,7 @@ export function liveEditable(row: DropRow, who: Identity | null) {
 }
 
 /** A drop's versions, newest first: the latest, then the ones `drop_versions` keeps, at most 100 in all. */
-export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
+export async function versionsOf(row: DropRow, who: Identity | null = null): Promise<DropVersion[]> {
   const head = row.head ?? row.raw ?? row
   const older = await db
     .select()
@@ -540,9 +540,15 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
     createdAt: item.createdAt,
     note: item.note,
     actorName: item.actorName,
-    agent: item.agent,
+    agent: versionAgent(item.agent, who?.userId === row.ownerId),
     current: item.version === row.version,
   }))
+}
+
+function versionAgent(agent: DropVersion["agent"], isOwner: boolean): DropVersion["agent"] {
+  if (isOwner || !agent?.session) return agent
+  const { session: _session, ...attribution } = agent
+  return attribution
 }
 
 /**
@@ -571,7 +577,7 @@ export async function dropDetail(
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
   const [versions, body, attachments, views, quiz, gallery, owner] = await Promise.all([
-    versionsOf(row),
+    versionsOf(row, who),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
@@ -687,7 +693,7 @@ async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachme
   const rows = await db
     .select()
     .from(drops)
-    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), notCommentImage))
+    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), eq(drops.draftImage, false), notCommentImage))
     .limit(100)
   return rows.map((item) => ({
     id: item.id,

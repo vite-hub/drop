@@ -15,7 +15,7 @@ export function useLatestVersion(
   const config = useRuntimeConfig()
   const enabled = () => config.public.realtime && toValue(options.enabled)
   // The room loads once the page shows and following is on (~/composables/latest-room), in a scope of this component's.
-  const room = shallowRef<ComputedRef<number>>()
+  const room = shallowRef<Readonly<Ref<number>>>()
   let scope: EffectScope | undefined
   let generation = 0
   const mounted = useMounted()

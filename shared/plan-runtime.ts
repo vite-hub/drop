@@ -879,6 +879,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (zoomMarks) zoomMarks.innerHTML = "";
     if (asideMarks) asideMarks.innerHTML = "";
     const unplaced = [], railed = [], standing = new Map();
+    const pinOnStand = (marker, stand) => {
+      resized.observe(stand);
+      const rect = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
+      standing.set(stand, before + 1);
+      placePin(marker, rect.right + scrollX + before * (PIN + 4), rect.top + scrollY, marks, true);
+    };
     clearBubbles();
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
@@ -910,12 +916,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!shows(el)) {
           const stand = !zoom && standIn(el);
           if (!stand) continue;
-          resized.observe(stand);
-          const s = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
           // Side by side when several wait on the same element, so each can be clicked.
-          standing.set(stand, before + 1);
-          x = s.right + scrollX + before * (PIN + 4); y = s.top + scrollY;
-          placePin(m, x, y, into, true);
+          pinOnStand(m, stand);
           continue;
         }
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
@@ -936,6 +938,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const railedHere = bubbles.has(m.id);
         textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
+        if (article) {
+          const end = range.endContainer;
+          const element = end.nodeType === 1 ? end : end.parentElement;
+          const folded = element?.closest(".drop-head a.cp.drop-folded");
+          const toggle = folded && folded.parentElement.querySelector(':scope > .drop-links-toggle[aria-expanded="false"]');
+          if (toggle) { pinOnStand(m, toggle); continue; }
+        }
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
         // Outlined like an area, one box per line: a highlight alone can't draw a border, and its tint barely shows on
@@ -2169,6 +2178,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The page and every anchor: an area must follow its element even when the page keeps its size.
   const resized = new ResizeObserver(render);
   resized.observe(document.documentElement);
+  if (article) article.addEventListener("drop-links-layout", () => { if (markers.length) render(); });
   // An element that shows or hides without changing size, such as a tooltip that fades, changes a class, a style, or
   // its hidden or open attribute, or ends a transition: pins on elements are placed again then. Drop's own changes
   // (the root's custom properties, its hosts in the page) don't count.

@@ -1,5 +1,5 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
-import { createEditorCodec } from "comark-ui/editor"
+import { createEditorCodec, uploadKey } from "comark-ui/editor"
 import { Editor } from "@tiptap/vue-3"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { LIVE_EDITOR_KIT } from "#shared/live-editor"
@@ -30,6 +30,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewe
     },
   })
   const editor = shallowRef<Editor>()
+  const uploading = ref(false)
   // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
   // in as y-sync transactions and don't count.
   const edited = ref(false)
@@ -43,6 +44,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewe
   watch([realtime.document, realtime.provider], () => {
     editor.value?.destroy()
     editor.value = undefined
+    uploading.value = false
     const extensions = realtime.extensions.value
     if (!extensions.length || !realtime.provider.value) return
     editor.value = new Editor({
@@ -52,6 +54,9 @@ export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewe
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
       ],
       autofocus: "end",
+      onTransaction({ editor: current }) {
+        uploading.value = Boolean(uploadKey.getState(current.state)?.find().length)
+      },
     })
     editor.value.on("update", ({ transaction }) => {
       if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return
@@ -60,7 +65,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewe
     })
   })
 
-  return { realtime, editor, edited, unsaved }
+  return { realtime, editor, edited, unsaved, uploading }
 }
 
 export type LiveRoom = ReturnType<typeof useLiveRoom>
