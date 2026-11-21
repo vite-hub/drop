@@ -83,7 +83,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     host: "netlify",
     blob: files,
     database: d1("vitehub-drop-netlify"),
-    schedule: { providerOutput: "standalone" },
+    schedule: true,
     realtime: false,
   },
   deno: {
