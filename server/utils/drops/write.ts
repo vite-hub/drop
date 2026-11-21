@@ -3,7 +3,7 @@ import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-or
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob, detectContentType } from "vite-hub/blob"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import { blobCleanup, dropFiles, drops, dropVersions, suggestionAcceptances } from "../../databases/default/index"
 import { newLink, slugify } from "#shared/links"
 import { BOARD_CONTENT_TYPE, BOARD_EXTENSION, emptyBoard, parseBoard, serializeBoard } from "#shared/board"
@@ -28,7 +28,6 @@ import { editorImageExtension } from "#shared/editor-images"
 import { MAX_APP_BYTES, MAX_APP_FILES, MIB } from "#shared/quotas"
 import { permissions } from "./access"
 import { findDrop, findDropByBlob, storageFailure } from "./query"
-import { d1Chunks } from "../d1"
 
 const Unavailable = v.object({ status: v.literal(503) })
 
@@ -56,7 +55,7 @@ async function referencedFileKeys(html: string, origin: string) {
 
 async function adoptAttachments(doc: DropRow, source: string) {
   const keys = [...new Set([...source.matchAll(FILE_LINK)].map((match) => match[1]!))]
-  for (const chunk of d1Chunks(keys))
+  for (const chunk of chunkParameters(keys, { reserved: 10 }))
     await db
       .update(drops)
       .set({ parentId: doc.id })
@@ -97,7 +96,7 @@ async function queueBlobCleanup(keys: string[]) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
   try {
-    for (const chunk of d1Chunks(unique, { perItem: 3, others: 0 }))
+    for (const chunk of chunkParameters(unique, { per: 3 }))
       await db
         .insert(blobCleanup)
         .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })))
@@ -129,7 +128,8 @@ export async function deleteBlobKeys(keys: string[]) {
     await queueBlobCleanup(unique)
     return
   }
-  for (const chunk of d1Chunks(unique)) await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, chunk))
+  for (const chunk of chunkParameters(unique, { reserved: 10 }))
+    await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, chunk))
 }
 
 export function requireBase(latest: Pick<DropRow, "id" | "version">, base: number | undefined) {
@@ -346,7 +346,7 @@ export async function createDocDrop(
         await quota.commit(
           [
             ...write,
-            ...d1Chunks(draftKeys).map((chunk) =>
+            ...chunkParameters(draftKeys, { reserved: 10 }).map((chunk) =>
               db
                 .update(drops)
                 .set({ draftImage: false })

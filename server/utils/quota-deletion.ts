@@ -1,7 +1,6 @@
 import { eq, like, sql } from "drizzle-orm"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../databases/default/index"
-import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 
 export async function deleteRetainedDrop(
@@ -38,5 +37,5 @@ export async function deleteRetainedDrop(
     .from(blobCleanup)
     .where(like(blobCleanup.id, `${token}:%`))
   const [, , , rows] = await db.batch([queue, queueComments, remove, pending])
-  for (const chunk of d1Chunks(rows, { perItem: 3, others: 0 })) await deleteKeys(chunk.map((item) => item.key))
+  for (const chunk of chunkParameters(rows, { per: 3 })) await deleteKeys(chunk.map((item) => item.key))
 }

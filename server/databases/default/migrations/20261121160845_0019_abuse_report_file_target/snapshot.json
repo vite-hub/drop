@@ -2,7 +2,7 @@
   "dialect": "sqlite",
   "id": "b50487af-3b34-42ae-9a59-14e923f85511",
   "prevIds": [
-    "1dc3716d-6d56-49c0-b48c-65d37078263c"
+    "3e2162ab-fcef-43e5-ab16-24ec6f3a8ae1"
   ],
   "version": "7",
   "ddl": [
@@ -5873,6 +5873,74 @@
       "name": "vitehub_webhook_endpoints_pk",
       "columns": [
         "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "name": "drop_runtime_errors",
+      "entityType": "tables"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "drop_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "errors",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "fk_drop_runtime_errors_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "drop_runtime_errors_pk",
+      "columns": [
+        "drop_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"

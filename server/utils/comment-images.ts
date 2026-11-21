@@ -10,8 +10,10 @@ import { commentAttachmentUrl } from "vite-hub/comments/client"
 import type { CommentAttachment } from "#shared/types"
 import { textValue } from "#shared/utils/text"
 import { commentAttachments, drops } from "../databases/default/index"
+import { readFormWithin } from "./params"
 import { type DropRow, deleteDrop, findDrop, permissions, storageFailure } from "./drops"
 import type { Identity } from "./identity"
+import { background } from "./logs"
 import { withDropQuota } from "./quotas"
 
 type ImageType = (typeof COMMENT_IMAGE_TYPES)[number]
@@ -42,11 +44,11 @@ function imageName(name: string, contentType: ImageType) {
 const MAX_COMMENT_FORM_BYTES = (MAX_COMMENT_IMAGES + 1) * MAX_FILE_BYTES + 64 * 1024
 
 export async function readForm(event: H3Event) {
-  if (Number(event.req.headers.get("content-length") ?? 0) > MAX_COMMENT_FORM_BYTES)
-    throw new HTTPError({ status: 413, statusText: `Send at most ${MAX_COMMENT_IMAGES} images of 4 MiB each.` })
   try {
-    return await event.req.formData()
-  } catch {
+    return await readFormWithin(event, MAX_COMMENT_FORM_BYTES)
+  } catch (error) {
+    if (HTTPError.isError(error) && error.status === 413)
+      throw new HTTPError({ status: 413, statusText: `Send at most ${MAX_COMMENT_IMAGES} images of 4 MiB each.` })
     throw new HTTPError({ status: 400, statusText: "Send the comment as multipart form data." })
   }
 }
@@ -193,7 +195,11 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
           .values(rows.map((row, index) => ({ dropId: row.id, commentId: "", replyId: null, createdAt: now + index }))),
       ])
     } catch (error) {
-      if (stored.length) await blob.delete(stored)
+      if (stored.length) {
+        const [cleanupError] = await blob.delete(stored)
+        if (cleanupError)
+          background.error({ action: "comment-image-cleanup", error: cleanupError.message, keys: stored.length })
+      }
       throw error
     }
     return rows

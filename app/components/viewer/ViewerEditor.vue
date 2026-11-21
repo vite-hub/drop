@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { EditorEmojiMenuItem } from "@nuxt/ui"
 import type { Editor } from "@tiptap/vue-3"
-import { MarkdownEditor } from "@vite-hub/ui/markdown-editor"
+import { MarkdownEditor } from "vite-hub/ui/markdown-editor"
 import { chooseFiles, uploadKey, uploadPlugin, type UploadOptions } from "comark-ui/editor"
 import * as v from "valibot"
 import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
