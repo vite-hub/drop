@@ -101,6 +101,8 @@ When Drop refuses one, its words stay, and the line under them says why:
 | **This drop no longer takes comments** | **Copy** the words, or **Discard** them. |
 | Why, such as an image that's too large | **Edit** it, and it goes out again, or **Discard** it. |
 
+Open **Unsent comments** to recover a comment or reply even if its drop no longer opens. If your session ends, the queue hides your text and images until you sign back in with the same account. You can still discard the browser's copy without signing in.
+
 Comments stay anchored to what they point at, per page for apps. Click a pin to open the thread; anyone who can comment can reply, and **Copy link** links straight to it. The author, the drop's owner, or an admin resolves a comment, which closes its thread. A guest's comments show as theirs in the browser they wrote them in, but resolving or deleting one needs someone signed in.
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const { entries } = useCommentsOutbox()
+const { entries, heldIds, discard } = useCommentsOutbox()
+const route = useRoute()
+const count = computed(() => entries.value.length + heldIds.value.length)
 const open = ref(false)
 const urls = fileUrls()
 watch(entries, (saved) => urls.keep(fileKeys(saved)))
@@ -29,23 +31,33 @@ const items = computed(() =>
 
 <template>
   <UModal
-    v-if="entries.length || open"
+    v-if="count || open"
     v-model:open="open"
     title="Unsent comments"
     description="Recover comments and replies even when the original page is unavailable. Discard only removes this browser’s copy."
   >
     <UButton
-      v-if="entries.length"
+      v-if="count"
       class="fixed bottom-3 left-3 z-40 shadow-sm"
       color="neutral"
       icon="i-mingcute-time-line"
-      :label="`Unsent comments (${entries.length})`"
+      :label="`Unsent comments (${count})`"
       size="sm"
       variant="outline"
     />
     <template #body>
-      <p v-if="!items.length" class="text-muted">No unsent comments.</p>
+      <p v-if="!count" class="text-muted">No unsent comments.</p>
       <ul v-else class="divide-y divide-default">
+        <li v-for="id in heldIds" :key="id" class="flex items-center gap-2 py-3 first:pt-0 last:pb-0">
+          <UButton
+            :to="{ path: '/signin', query: { redirect: route.path } }"
+            color="neutral"
+            label="Sign in to send"
+            size="sm"
+            variant="link"
+          />
+          <UButton color="neutral" label="Discard" size="sm" variant="link" @click="discard(id)" />
+        </li>
         <li v-for="item in items" :key="item.message.id" class="space-y-2 py-3 first:pt-0 last:pb-0">
           <p class="text-xs text-muted">
             {{ item.reply ? "Reply" : "Comment" }}<template v-if="item.drop"> · Drop {{ item.drop }}</template>

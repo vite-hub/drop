@@ -12,6 +12,7 @@ export function useSignOut() {
   const outbox = useCommentsOutbox()
   const confirm = useConfirm()
   return async () => {
+    const account = outbox.account.value
     const count = outbox.entries.value.length
     if (count) {
       const discard = await confirm({
@@ -20,9 +21,8 @@ export function useSignOut() {
         destructive: true,
       })
       if (!discard) return
+      await outbox.clear(account)
     }
-    // Also forgets whose comments they were, so the next person in this browser doesn't see them held.
-    await outbox.clear()
     await Promise.resolve(signOut())
     returning.value = null
     // Leave first: cleared data would flash the dashboard's empty defaults for a frame. /home, not /: / sends whoever

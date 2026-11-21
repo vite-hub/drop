@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { computed, effectScope, onScopeDispose, readonly, ref, shallowRef, toValue, watch } from "vue"
 import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/client"
-import { createEventHook, createInjectionState, useEventListener } from "@vueuse/core"
+import { createEventHook, createInjectionState, useEventListener, useTimeoutFn } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
 import { RETURNING_COOKIE } from "../../shared/sign-in.ts"
@@ -17,6 +17,8 @@ const saved = new Map()
 let answer
 const ada = { id: "ada", name: "Ada", image: null }
 const me = ref(ada)
+const identityStatus = ref("success")
+const resolveIdentity = vi.fn()
 const returning = ref("1")
 let app
 const confirm = vi.fn()
@@ -33,6 +35,7 @@ for (const [name, value] of Object.entries({
   createEventHook,
   createInjectionState,
   useEventListener,
+  useTimeoutFn,
   keys,
   toThread,
   useApi: (_url, options) => ({
@@ -45,7 +48,7 @@ for (const [name, value] of Object.entries({
     setItem: (key, value) => void saved.set(key, String(value)),
     removeItem: (key) => void saved.delete(key),
   },
-  useMe: () => ({ data: me, status: ref("success") }),
+  useMe: () => ({ data: me, status: identityStatus }),
   useNotify: () => ({ problem: () => "problem", alert() {}, fail() {} }),
   useCommentsOutbox: () => app,
   useNuxtApp: () => ({ $auth: {} }),
@@ -57,7 +60,10 @@ for (const [name, value] of Object.entries({
   useConfirm: () => confirm,
   navigateTo: async () => {},
   clearNuxtData: () => {},
-  refreshNuxtData: async (key) => void refreshed.push(key),
+  refreshNuxtData: async (key) => {
+    refreshed.push(key)
+    if (key === "me") await resolveIdentity()
+  },
   quotaFailureOf: () => undefined,
   errorText: (_error, fallback) => fallback,
   $fetch: async (url, options) => {
@@ -88,6 +94,7 @@ const scoped = (run) => {
 const durableStore = () => ({ ...createMemoryOutboxStore(), persisted: true })
 beforeEach(async () => {
   me.value = ada
+  identityStatus.value = "success"
   returning.value = "1"
   app = scoped(() => createCommentsOutbox({ store: durableStore() })).value
   await vi.waitFor(() => app.writable())
@@ -100,6 +107,7 @@ afterEach(() => {
   saved.clear()
   confirm.mockReset()
   signOut.mockClear()
+  resolveIdentity.mockReset()
 })
 function open(id = "doc") {
   const { scope, value: state } = scoped(() => provideDrop(id))
@@ -387,15 +395,13 @@ test(
     assert.equal(fetches[0].body.as, "ada", "it says who wrote it")
     assert.ok(refreshed.includes("me"), "a 401 asks who's signed in now")
 
-    // /api/me says nobody: Ada's comment stays in view as hers, held, says to sign in, and nothing goes out.
+    // /api/me says nobody: only a redacted recovery entry remains.
     me.value = null
     const sends = fetches.length
-    await vi.waitFor(() => assert.equal(app.entries.value[0]?.account, "ada"))
+    await vi.waitFor(() => assert.equal(app.heldIds.value.length, 1))
     assert.equal(app.account.value, "guest")
-    assert.deepEqual(
-      state.list.value.map((item) => [item.authorName, item.delivery?.status, item.delivery?.error?.status]),
-      [["Ada", "pending", 401]],
-    )
+    assert.deepEqual(app.entries.value, [])
+    assert.deepEqual(state.list.value, [])
     assert.equal(fetches.length, sends, "nothing goes out while she's signed out")
     const unload = new Event("beforeunload", { cancelable: true })
     window.dispatchEvent(unload)
@@ -430,9 +436,8 @@ test(
     assert.equal(app.entries.value[0].uncertain, true)
     me.value = null
     await vi.waitFor(() => app.writable())
-    await vi.waitFor(() => assert.equal(app.entries.value[0]?.account, "ada"))
-    const held = app.entries.value[0].id
-    assert.equal(app.author("ada")?.name, "Ada")
+    await vi.waitFor(() => assert.equal(app.heldIds.value.length, 1))
+    const [held] = app.heldIds.value
     await state.addComment(place, "From the guest composer")
     await vi.waitFor(() => assert.ok(state.findComment("guest-comment")))
     assert.equal(fetches.at(-1).body.as, undefined)
@@ -450,6 +455,53 @@ test("signing out forgets whose the held comments were", async () => {
   confirm.mockResolvedValueOnce(true)
   await useSignOut()()
   assert.equal(saved.size, 0)
+})
+
+test("sign-out confirmation discards the original account's queue after session expiry", async () => {
+  answer = offline
+  const { state } = open()
+  await state.addComment(place, "From Ada")
+  await vi.waitFor(() => assert.ok(saved.size))
+  confirm.mockImplementationOnce(async () => {
+    me.value = null
+    await vi.waitFor(() => assert.equal(app.heldIds.value.length, 1))
+    await state.addComment(place, "From the guest")
+    return true
+  })
+  await useSignOut()()
+  assert.deepEqual(app.heldIds.value, [])
+  assert.deepEqual(
+    app.entries.value.map((entry) => entry.input.body),
+    ["From the guest"],
+  )
+})
+
+test("a startup identity failure retries on reconnect before replaying a saved comment", async () => {
+  const store = durableStore()
+  answer = offline
+  const first = scoped(() => createCommentsOutbox({ store }))
+  app = first.value
+  const { state, close } = open()
+  await vi.waitFor(() => app.writable())
+  await state.addComment(place, "Saved before reload")
+  await vi.waitFor(() => assert.equal(fetches.length, 1))
+  close()
+  first.scope.stop()
+
+  identityStatus.value = "error"
+  me.value = null
+  app = scoped(() => createCommentsOutbox({ store })).value
+  assert.deepEqual(app.entries.value, [])
+  await assert.rejects(app.writable())
+  resolveIdentity.mockImplementationOnce(() => {
+    me.value = ada
+    identityStatus.value = "success"
+  })
+  answer = (_url, body) => comment("c1", body.body, body.requestId)
+  window.dispatchEvent(new Event("online"))
+  await vi.waitFor(() => assert.equal(fetches.length, 2), { timeout: 5000 })
+  assert.equal(fetches[1].body.as, "ada")
+  assert.equal(fetches[1].body.requestId, fetches[0].body.requestId)
 })
 
 test("a guest's waiting comment goes out as the person who signs in, without asking", { timeout: 10_000 }, async () => {

@@ -9,7 +9,7 @@ import {
   type CommentUser,
 } from "vite-hub/comments/client"
 import type { CommentReply, DropComment } from "#shared/types"
-import * as v from "valibot"
+import { readOutboxAuthor, writeOutboxAuthor } from "../lib/comment-outbox-storage.client"
 
 /** A drop page that shows its comments as they land. A drop without one only loads its list again. */
 interface OutboxPage {
@@ -27,8 +27,9 @@ export interface AppCommentsOutbox {
   /** Whose new writes the active queue accepts. */
   account: Readonly<Ref<string>>
   author: (account: string) => CommentUser | undefined
-  /** Saved entries of the active queue and any held queue visible while signed out. */
+  /** Saved entries readable by the current author. */
   entries: Readonly<Ref<readonly CommentsOutboxEntry[]>>
+  heldIds: Readonly<Ref<readonly string[]>>
   /** The comments and replies the server took in this tab, by `requestId`, with the thread each is in. */
   accepted: ReadonlyMap<string, string>
   /** The client that saves new comments and replies, once the browser started it. */
@@ -40,8 +41,8 @@ export interface AppCommentsOutbox {
   edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
   /** Shows the page's drop's comments as they land, until the page's scope ends. */
   attach: (page: OutboxPage) => void
-  /** Discards every entry of the account and forgets whose they were, as at sign-out. */
-  clear: () => Promise<void>
+  /** Discards the specified account's queue, even if it is no longer active. */
+  clear: (account: string) => Promise<void>
 }
 
 /** Whose entries this browser's outbox holds, and whether they go out (`held`: not while that person is signed out). */
@@ -49,38 +50,6 @@ interface Holder {
   account: string
   user?: CommentUser
   held: boolean
-}
-
-/**
- * Who wrote the waiting comments while signed in, kept so they still show as that person's after a sign-out or an
- * expired session, until they go out or are discarded. Each read and write may throw where storage is blocked.
- */
-const AUTHOR_KEY = "drop-comments-author"
-const AuthorSchema = v.object({ id: v.string(), name: v.string(), image: v.optional(v.string()) })
-function readAuthor() {
-  try {
-    const parsed = v.safeParse(AuthorSchema, JSON.parse(localStorage.getItem(AUTHOR_KEY) ?? "null"))
-    return parsed.success ? parsed.output : undefined
-  } catch {
-    return undefined
-  }
-}
-function writeAuthor(user: CommentUser) {
-  try {
-    localStorage.setItem(
-      AUTHOR_KEY,
-      JSON.stringify({ id: user.id, name: user.name ?? "", ...(user.image ? { image: user.image } : {}) }),
-    )
-  } catch {
-    // Blocked storage: the comments still go out, they just show as a guest's after a sign-out.
-  }
-}
-function forgetAuthor() {
-  try {
-    localStorage.removeItem(AUTHOR_KEY)
-  } catch {
-    // Blocked storage held nothing.
-  }
 }
 
 /** Moves what a guest wrote in this browser to the person who signed in here, so it goes out as them. */
@@ -99,7 +68,7 @@ async function adoptGuests(store: CommentsOutboxStore, account: string) {
  * The app's one comments outbox: what the reader wrote keeps going out after they leave the drop page, every page can
  * count what still waits, and the tab-close guard and sign-out read it. It sends the signed-in person's entries, or the
  * guests' ones (GUEST_ACCOUNT). What a guest wrote goes out as whoever signs in next in this browser. Signed out, the
- * last person's entries stay in view, held ("Sign in to send"), until they sign in again or discard them.
+ * last person's entries stay held, with only their count and discard controls visible until they sign in again.
  */
 export function createCommentsOutbox(
   options: { store?: CommentsOutboxStore; environment?: CommentsOutboxEnvironment } = {},
@@ -110,17 +79,16 @@ export function createCommentsOutbox(
   const heldHolder = shallowRef<Holder>()
   const activeEntries = shallowRef<readonly CommentsOutboxEntry[]>([])
   const heldEntries = shallowRef<readonly CommentsOutboxEntry[]>([])
-  const entries = computed(() => [...activeEntries.value, ...heldEntries.value])
-  const queueFor = (id: string) =>
-    activeEntries.value.some((entry) => entry.id === id) ? active.value?.outbox : held.value?.outbox
+  const heldIds = computed(() => heldEntries.value.map((entry) => entry.id))
   const pages = new Set<OutboxPage>()
   const accepted = new Map<string, string>()
   // What this tab sent, including site reviews.
   const sentHere = new Set<string>()
   const outbox: AppCommentsOutbox = {
     account: computed(() => holder.value?.account ?? GUEST_ACCOUNT),
-    author: (account) => [holder.value, heldHolder.value].find((who) => who?.account === account)?.user,
-    entries,
+    author: (account) => (holder.value?.account === account ? holder.value.user : undefined),
+    entries: computed(() => activeEntries.value),
+    heldIds,
     accepted,
     writable: async () => {
       throw new Error("Comments can't be written before the page has loaded.")
@@ -158,18 +126,21 @@ export function createCommentsOutbox(
     }
     throw new Error("Comments aren't ready yet. Try again in a moment.")
   }
-  outbox.clear = async () => {
-    const account = holder.value?.account
-    await active.value?.outbox.clear()
-    if (readAuthor()?.id === account) forgetAuthor()
+  outbox.clear = async (account) => {
+    const client =
+      holder.value?.account === account ? active.value : heldHolder.value?.account === account ? held.value : undefined
+    if (client) await client.outbox.clear()
+    else await store.update(account, (drafts) => drafts.clear())
+    if (readOutboxAuthor() === account) writeOutboxAuthor()
   }
 
   // ViteHub won't change uncertain entries. Local recovery can remove them without deleting a server copy, or edit
   // a refused entry without changing its retry key. Check in the transaction that no tab is currently sending it.
   const revise = async (id: string, change?: (entry: CommentsOutboxEntry) => CommentsOutboxEntry) => {
-    const saved = entries.value.find((entry) => entry.id === id)
-    const lib = queueFor(id)
-    if (!saved || !lib || (change && saved.account === heldHolder.value?.account)) return false
+    const isActive = activeEntries.value.some((entry) => entry.id === id)
+    const saved = (isActive ? activeEntries.value : heldEntries.value).find((entry) => entry.id === id)
+    const lib = (isActive ? active.value : held.value)?.outbox
+    if (!saved || !lib || (change && !isActive)) return false
     if (!change && (await lib.dismiss(id))) return true
     const changed = await store.update(saved.account, (drafts) => {
       const entry = drafts.get(id)
@@ -198,19 +169,24 @@ export function createCommentsOutbox(
     })
 
   // Who's signed in is known once /api/me first answers; until then nothing goes out as a guest by mistake.
-  const known = ref(false)
+  const retryIdentity = () => {
+    if (status.value === "error") void refreshNuxtData(keys.me)
+  }
+  const retryTimer = useTimeoutFn(retryIdentity, 5000, { immediate: false })
+  useEventListener(window, "online", retryIdentity)
   watch(
     status,
     (value) => {
-      if (value === "success") known.value = true
+      if (value === "error") retryTimer.start()
+      else retryTimer.stop()
     },
     { immediate: true },
   )
   let resolving = 0
   watch(
-    [() => me.value?.id, known],
-    async ([id, ready]) => {
-      if (!ready) return
+    [() => me.value?.id, status],
+    async ([id, state]) => {
+      if (state !== "success" || holder.value?.account === (id ?? GUEST_ACCOUNT)) return
       const turn = ++resolving
       const person = me.value
       heldHolder.value = undefined
@@ -224,9 +200,9 @@ export function createCommentsOutbox(
           held: false,
         }
       } else {
-        const last = readAuthor()
+        const last = readOutboxAuthor()
         holder.value = { account: GUEST_ACCOUNT, held: false }
-        if (last) heldHolder.value = { account: last.id, user: last, held: true }
+        if (last) heldHolder.value = { account: last, held: true }
       }
     },
     { immediate: true, flush: "sync" },
@@ -277,14 +253,7 @@ export function createCommentsOutbox(
         let before = next.outbox.entries
         const stopChange = next.onChange(() => {
           const now = next.outbox.entries
-          visible.value = who.held
-            ? now.map((entry) => ({
-                ...entry,
-                status: "pending",
-                held: true,
-                error: { status: 401, why: "Sign in to send" },
-              }))
-            : now
+          visible.value = now
           // One that left without this tab sending it went out from another tab: the drop's list loads it.
           const left = before.filter(
             (entry) => !sentHere.has(entry.requestId) && !now.some((item) => item.id === entry.id),
@@ -297,8 +266,8 @@ export function createCommentsOutbox(
             void (page ? page.refresh() : refreshNuxtData(keys.comments(drop)))
           }
           // Whose they are outlives a sign-out while any wait, and goes with the last of them.
-          if (now.length && who.user && !who.held) writeAuthor(who.user)
-          else if (emptied && readAuthor()?.id === who.account) forgetAuthor()
+          if (now.length && who.user) writeOutboxAuthor(who.account)
+          else if (emptied && readOutboxAuthor() === who.account) writeOutboxAuthor()
         })
         const stop = next.start()
         // What a 401 held for this person goes out now that they're signed in again. Signed out, it stays held, unless
@@ -319,7 +288,7 @@ export function createCommentsOutbox(
 
   // Closing the tab asks first while anything waits or was refused, on any page of the app.
   const guard = (event: Event) => {
-    if (entries.value.length) event.preventDefault()
+    if (activeEntries.value.length || heldIds.value.length) event.preventDefault()
   }
   useEventListener(window, "beforeunload", guard)
 
