@@ -73,6 +73,36 @@ test("each viewer counts once a day, across every version; the owner's own visit
   assert.deepEqual(await viewsOf("doc"), { person: 2, anonymous: 3, agent: 2 }, "the next day counts again")
 })
 
+test("on a VPS, forged X-Forwarded-For or cf-connecting-ip values don't add views", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  insertDrop("doc", { visibility: "shared" })
+  // nginx with $proxy_add_x_forwarded_for appends the address it sees to what the client sent.
+  await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "203.0.113.1, 198.51.100.7" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "203.0.113.2, 203.0.113.3,198.51.100.7" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "198.51.100.7", "cf-connecting-ip": "203.0.113.4" })
+  assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 1, agent: 0 })
+})
+
+test("without a client IP header, views count by the runtime address, whatever headers the caller sends", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  insertDrop("doc", { visibility: "shared" })
+  state.clientIpHeader = ""
+  const visitFrom = (ip, headers) => {
+    state.who = null
+    const event = request("/api/drops/doc/visit", { method: "POST", id: "doc", headers: { ...beacon, ...headers } })
+    // Nitro's Cloudflare entry sets `ip` from cf-connecting-ip, and srvx from the socket elsewhere.
+    Object.defineProperty(event.req, "ip", { value: ip })
+    return visitHandler(event)
+  }
+  await visitFrom("198.51.100.7", {})
+  await visitFrom("198.51.100.7", { "x-forwarded-for": "203.0.113.1" })
+  await visitFrom("198.51.100.7", { "cf-connecting-ip": "203.0.113.2" })
+  assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 1, agent: 0 })
+  await visitFrom("192.0.2.8", {})
+  assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 2, agent: 0 })
+})
+
 test("anonymous visitors' ids last the day; the counts stay until the doc is deleted", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
   insertDrop("doc", { visibility: "shared" })

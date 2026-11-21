@@ -1,9 +1,8 @@
-import { getIP } from "better-auth/api"
 import { defineHandler, redirect } from "h3"
-import { useRuntimeConfig } from "nitro/runtime-config"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { nextPath } from "#shared/sign-in"
+import { clientAddress } from "../../utils/client-address"
 import { authFor, identify } from "../../utils/identity"
 import { logError } from "../../utils/logs"
 import { authProxy } from "../../utils/proxy-auth"
@@ -15,11 +14,7 @@ export default defineHandler(async (event) => {
   const page = `/signin?redirect=${encodeURIComponent(next)}`
   if (await identify(event)) return redirect(next, 302)
   if (authProxy().enabled) return redirect(page, 302)
-  const { clientIpHeader } = useRuntimeConfig()
-  const visitor = clientIpHeader
-    ? getIP(event.req.headers, { advanced: { ipAddress: { ipAddressHeaders: [clientIpHeader] } } })
-    : null
-  await requireRateLimit(event, "sign-in-start", { key: visitor || undefined, limit: 10, window: "1m" })
+  await requireRateLimit(event, "sign-in-start", { key: clientAddress(event), limit: 10, window: "1m" })
   const choose = event.url.searchParams.has("choose")
   const response = await authFor(event)
     .api.signInSocial({
