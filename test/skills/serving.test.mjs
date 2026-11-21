@@ -123,13 +123,13 @@ test("pr-evidence serves bundled comark-ui references through discovery and MCP"
 })
 
 test("pr-evidence's Git plugin references work even when the served skill is disabled", async () => {
-  const { setSkillEnabled } = await import("../../server/utils/skills.ts")
+  const { default: settings } = await import("../../server/skills.ts")
   const skillRoot = new URL("pr-evidence/", root)
   const skill = await readFile(new URL("SKILL.md", skillRoot), "utf8")
   const links = [...skill.matchAll(/\]\((references\/[^)#]+)(?:#([^)]+))?\)/g)]
   assert.equal(links.length, 3)
   try {
-    await setSkillEnabled("pr-evidence", false, "admin")
+    await settings.set("pr-evidence", false)
     const index = await (await get("/.well-known/skills/index.json")).json()
     assert.ok(!index.skills.some((item) => item.name === "pr-evidence"))
     assert.equal((await mcp("skills/get", { uri: "skill://pr-evidence/SKILL.md" })).error.code, -32602)
@@ -139,7 +139,7 @@ test("pr-evidence's Git plugin references work even when the served skill is dis
       assert.ok(reference.split("\n").some((line) => line.toLowerCase() === `## ${section}`))
     }
   } finally {
-    await setSkillEnabled("pr-evidence", true, "admin")
+    await settings.set("pr-evidence", true)
   }
   for (const path of new Set(links.map((link) => link[1]))) {
     const reference = await readFile(new URL(path, skillRoot), "utf8")
@@ -183,7 +183,7 @@ test("bundled Comark UI skills serve every file and archive through discovery an
 })
 
 test("admins can toggle bundled skills while their source links point upstream", async () => {
-  const { setSkillEnabled } = await import("../../server/utils/skills.ts")
+  const { default: settings } = await import("../../server/skills.ts")
   const { default: catalog } = await import("../../server/api/skills/index.get.ts")
   const who = globalThis.dropTest.who
   globalThis.dropTest.who = { role: "admin" }
@@ -192,14 +192,14 @@ test("admins can toggle bundled skills while their source links point upstream",
     for (const skill of bundledComarkSkills) {
       const entry = (await catalog(event())).find((item) => item.name === skill.name)
       assert.equal(entry.source, `https://comark-ui.onmax.me/.well-known/skills/${skill.name}/SKILL.md`)
-      await setSkillEnabled(skill.name, false, "admin")
+      await settings.set(skill.name, false)
       assert.ok(
         !(await (await get("/.well-known/skills/index.json")).json()).skills.some((item) => item.name === skill.name),
       )
       assert.equal((await mcp("skills/get", { uri: `skill://${skill.name}/SKILL.md` })).error.code, -32602)
       assert.equal((await get(`/.well-known/skills/${skill.name}/SKILL.md`)).status, 404)
       assert.equal((await catalog(event())).find((item) => item.name === skill.name).enabled, false)
-      await setSkillEnabled(skill.name, true, "admin")
+      await settings.set(skill.name, true)
     }
   } finally {
     globalThis.dropTest.who = who

@@ -89,7 +89,8 @@ export function useViewerFrame(options: {
     (value) => (startZen = value),
     { immediate: true, flush: "sync" },
   )
-  const variantBar = (html: string) => (options.variantBar && html ? withVariantBar(html) : html)
+  const variantBar = (html: string) =>
+    options.variantBar && html ? withVariantBar(html, `${drop.value.id}@${drop.value.version}`) : html
   const readPages = shallowRef(new Map<string, string | null>())
   watch([() => drop.value.id, () => drop.value.version], () => {
     readPages.value = new Map()

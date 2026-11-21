@@ -242,6 +242,42 @@ test("a prototype opens on the canvas; an item opens in focus and comes back as 
   }
 })
 
+test("the canvas keeps its camera for the version it was moved on, and a new version opens fitted", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("").replaceAll("<section ", '<section data-width="800" data-height="500" '),
+      false,
+      0,
+      true,
+    )
+    let version = "d1@1"
+    await tab.route("https://picker.test/versions", (route) =>
+      route.fulfill({ contentType: "text/html", body: withVariantBar(html, version) }),
+    )
+    const scale = () =>
+      tab.evaluate(() => document.getElementById("v-one").style.transform.match(/scale\(([\d.]+)\)/)?.[1])
+    const open = async () => {
+      await tab.goto("https://picker.test/versions")
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+      await tab.waitForTimeout(300)
+    }
+    await open()
+    assert.notEqual(await scale(), "1", "the first visit fits all three items")
+    await tab.keyboard.press("0")
+    await tab.waitForFunction(() => document.getElementById("v-one").style.transform.endsWith("scale(1)"))
+    await tab.waitForTimeout(300)
+    await open()
+    assert.equal(await scale(), "1", "the same version comes back where it was left")
+    version = "d1@2"
+    await open()
+    assert.notEqual(await scale(), "1", "a new version opens fitted")
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the canvas camera stops before the last item leaves the screen, and the minimap moves it", async () => {
   const browser = await chromium.launch()
   try {
@@ -550,6 +586,153 @@ test("inside Drop's viewer the page reports to Drop's bar and takes its commands
     assert.equal((await last()).tool, "move", "Space doesn't change the tool")
     await hosted.evaluate(() => send({ type: "picker", do: "release" }))
     await frame.waitForFunction(() => !("prototypeHand" in document.documentElement.dataset))
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a control with data-go draws a labelled arrow to its screen, routed by where that screen lies", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1200, height: 800 } })
+    const screen = (id, go = "") =>
+      `<div data-screen id="${id}" style="width:200px;height:300px;background:#fff">${go}</div>`
+    const flows = `<section id="v-flows" data-variant="Flows" data-width="900" style="padding:60px">
+      <div style="display:grid;grid-template-columns:200px 200px;gap:120px 200px">
+        ${screen("v-flows-a", '<button id="v-flows-pay" data-go="v-flows-b" data-label="Pay" style="margin:100px 20px">Pay</button><button id="v-flows-help" data-go="v-flows-c" data-label="Help">Help</button>')}
+        ${screen("v-flows-b", '<button id="v-flows-back" data-go="v-flows-a" data-label="Back">Back</button>')}
+        ${screen("v-flows-c")}
+      </div></section><section id="v-other" data-variant="Other">other</section>`
+    await tab.route("https://picker.test/flows", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: injectRuntime(`<!doctype html><html><body style="margin:0">${flows}</body></html>`, false, 0, true),
+      }),
+    )
+    await tab.goto("https://picker.test/flows")
+    // Arrows are measured in the item's own pixels, so the canvas zoom doesn't move them.
+    const arrows = () =>
+      tab.evaluate(() => {
+        const el = document.getElementById("v-flows"),
+          k = el.getBoundingClientRect().width / el.offsetWidth
+        const box = (id) => {
+          const s = el.getBoundingClientRect(),
+            r = document.getElementById(id).getBoundingClientRect()
+          return { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k }
+        }
+        const layer = el.querySelector("[data-drop-flow]")
+        return {
+          paths: [...layer.querySelectorAll("g path")].map((p) => {
+            const t = p.getTotalLength()
+            return [p.getPointAtLength(0), p.getPointAtLength(t)].map(({ x, y }) => [Math.round(x), Math.round(y)])
+          }),
+          labels: [...layer.querySelectorAll("span")].map((s) => s.textContent),
+          a: box("v-flows-a"),
+          b: box("v-flows-b"),
+          c: box("v-flows-c"),
+          pay: box("v-flows-pay"),
+        }
+      })
+    await tab.waitForFunction(() => document.querySelectorAll("#v-flows [data-drop-flow] g path").length === 3)
+    for (const read of [
+      await arrows(),
+      await (async () => {
+        await tab.keyboard.press("1")
+        await tab.waitForTimeout(100)
+        return arrows()
+      })(),
+    ]) {
+      const {
+        paths: [pay, help, back],
+        labels,
+        a,
+        b,
+        c,
+        pay: button,
+      } = read
+      assert.deepEqual(labels, ["Pay", "Help", "Back"])
+      // Pay leaves its button's right edge and ends at B's left edge.
+      assert.ok(
+        Math.abs(pay[0][0] - (button.x + button.w + 6)) <= 1 && Math.abs(pay[0][1] - (button.y + button.h / 2)) <= 1,
+        JSON.stringify(pay),
+      )
+      assert.ok(Math.abs(pay[1][0] - (b.x - 8)) <= 1 && pay[1][1] > b.y && pay[1][1] < b.y + b.h, JSON.stringify(pay))
+      // Help goes down to C, below A, entering from the top.
+      assert.ok(
+        Math.abs(help[1][0] - (c.x + c.w / 2)) <= 1 && Math.abs(help[1][1] - (c.y - 8)) <= 1,
+        JSON.stringify(help),
+      )
+      // Back runs over the top and comes down into A.
+      assert.ok(
+        back[1][0] > a.x && back[1][0] < a.x + a.w && Math.abs(back[1][1] - (a.y - 8)) <= 1,
+        JSON.stringify(back),
+      )
+    }
+    // Hovering a control lights its arrow and dims the others.
+    await tab.hover("#v-flows-pay")
+    assert.deepEqual(
+      await tab.evaluate(() =>
+        [...document.querySelectorAll("#v-flows [data-drop-flow] g")].map((g) => g.getAttribute("class") || ""),
+      ),
+      ["on", "off", "off"],
+    )
+    assert.equal(await tab.getAttribute("#v-flows-pay", "data-go-on"), "")
+    // A control added later gets its arrow.
+    await tab.evaluate(() =>
+      document
+        .getElementById("v-flows-c")
+        .insertAdjacentHTML("beforeend", '<button data-go="v-flows-b" data-label="Retry">Retry</button>'),
+    )
+    await tab.waitForFunction(() => document.querySelectorAll("#v-flows [data-drop-flow] g path").length === 4)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("a wheel gesture stays with what it started on: a list stops at its end, and a pan keeps panning over a list", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const list = `<div id="v-list-box" style="height:300px;overflow:auto"><div style="height:900px">long</div></div>`
+    const html = injectRuntime(
+      `<!doctype html><html><body><section id="v-list" data-variant="List" data-width="400" data-height="400">${list}</section><section id="v-two" data-variant="Two" data-width="400">two</section></body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/latch", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/latch")
+    await tab.waitForFunction(() => document.documentElement.dataset.prototypeLayout === "canvas")
+    await tab.keyboard.press("0")
+    await tab.waitForTimeout(100)
+    const camera = () => tab.evaluate(() => document.getElementById("v-list").style.transform)
+    const top = () => tab.evaluate(() => document.getElementById("v-list-box").scrollTop)
+    const box = await tab.locator("#v-list-box").boundingBox()
+    const still = await camera()
+    // Scrolling the list past its end in one gesture leaves the camera where it was.
+    await tab.mouse.move(box.x + 100, box.y + 100)
+    for (let n = 0; n < 12; n++) await tab.mouse.wheel(0, 200)
+    await tab.waitForTimeout(50)
+    assert.equal(await top(), 600)
+    assert.equal(await camera(), still)
+    // After a pause, a new wheel over the finished list pans the plane.
+    await tab.waitForTimeout(400)
+    await tab.mouse.wheel(0, 200)
+    await tab.waitForTimeout(50)
+    assert.notEqual(await camera(), still)
+    // A pan started over empty space keeps panning when the list slides under the pointer.
+    await tab.evaluate(() => {
+      document.getElementById("v-list-box").scrollTop = 0
+    })
+    await tab.waitForTimeout(400)
+    const panned = await camera()
+    await tab.mouse.move(box.x + 100, box.y - 60)
+    await tab.mouse.wheel(0, -100)
+    await tab.mouse.move(box.x + 100, box.y + 100)
+    for (let n = 0; n < 3; n++) await tab.mouse.wheel(0, 100)
+    await tab.waitForTimeout(50)
+    assert.equal(await top(), 0)
+    assert.notEqual(await camera(), panned)
   } finally {
     await browser.close()
   }

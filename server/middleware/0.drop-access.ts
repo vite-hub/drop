@@ -16,9 +16,6 @@ export default defineHandler(async (event) => {
     const key = decoded(event.url.pathname.slice(3))
     if (event.url.searchParams.has("raw") || /\.(html?|shtml|xht(?:ml)?|svgz?)$/i.test(key))
       event.res.headers.set("Content-Security-Policy", "sandbox")
-    const { requireBlobAccess } = await import("../utils/content-access")
-    await requireBlobAccess(event, key)
-    event.context.dropAccessChecked = true
     return
   }
   const markdown = /^\/d\/[^/]+(?:\/[^/]+)?\.md$/.test(event.url.pathname)

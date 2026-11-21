@@ -2312,8 +2312,11 @@ function withPicker(html: string): string {
     : marked + picker
 }
 
-export const withVariantBar = (document: string) =>
-  prependToHead(document, "<script>self.__dropVariantBar = true;</script>")
+export const withVariantBar = (document: string, version?: string) =>
+  prependToHead(
+    document,
+    `<script>self.__dropVariantBar = true;${version ? `self.__dropVersion = ${JSON.stringify(version)};` : ""}</script>`,
+  )
 
 export function embedDocument(html: string, dark: boolean): string {
   const theme = usesDropTheme(html) ? `<style data-drop-theme>${THEME_CSS}</style>` : ""

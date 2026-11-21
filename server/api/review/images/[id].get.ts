@@ -1,5 +1,6 @@
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
+import { storageFailure } from "../../../utils/drops"
 import { routeId } from "../../../utils/params"
 import { reviewApi, reviewImage, reviewSession } from "../../../utils/review"
 
@@ -7,16 +8,18 @@ export default reviewApi(async (event) => {
   const { site } = await reviewSession(event)
   const image = await reviewImage(site, await routeId(event))
   if (!image) throw new HTTPError({ status: 404, statusText: "No image with that id." })
-  const [error, file] = await blob.get(image.blobKey!)
-  if (error || !file) throw new HTTPError({ status: 404, statusText: "The image is missing." })
-  const headers = new Headers({
-    "Content-Type": image.contentType ?? "application/octet-stream",
-    "Cache-Control": "private, no-store",
-    "X-Content-Type-Options": "nosniff",
-  })
+  const headers: Record<string, string> = {}
   for (const name of ["access-control-allow-origin", "vary"]) {
     const value = event.res.headers.get(name)
-    if (value) headers.set(name, value)
+    if (value) headers[name] = value
   }
-  return new Response(file.stream(), { headers })
+  event.res.headers.delete("Cache-Control")
+  let response: Response
+  try {
+    response = await blob.serve(event.req, image.blobKey!, { cacheControl: "private, no-cache", headers })
+  } catch (error) {
+    throw storageFailure(error)
+  }
+  if (response.status === 404) throw new HTTPError({ status: 404, statusText: "The image is missing." })
+  return response
 })

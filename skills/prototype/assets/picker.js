@@ -11,7 +11,9 @@
 // - Focus: one item fills the page, the same element as on the canvas, so what you typed stays. ← and → step, 1–9
 //   jump, Esc or C go back to the canvas, centred on that item.
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
+// In an item, a control with `data-go="<screen id>"` and `data-label` gets an arrow from it to that `[data-screen]`.
 // The page remembers the canvas camera and item positions (never content); the URL hash (#v-…) names the item in focus.
+// Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
 // on document each frame the camera or an item moves.
@@ -139,11 +141,13 @@
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
+  // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
+  const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
   const saved = { camera: null, positions: {} };
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
-      const c = doc.camera;
+      const c = (doc.version ?? null) === version ? doc.camera : null;
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
       for (const [id, p] of Object.entries(doc.positions || {})) if (ids.has(id) && Array.isArray(p) && finite(p[0]) && finite(p[1])) saved.positions[id] = [p[0], p[1]];
@@ -353,7 +357,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, version };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
@@ -613,22 +617,34 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden) drop(); });
 
   // A nested scroller that can still scroll in the wheel's direction keeps the wheel; otherwise the plane pans.
-  function scrolls(t, dx, dy) {
-    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) {
-      const s = getComputedStyle(el);
-      if (dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
-      if (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)) return true;
-    }
-    return false;
+  function room(el, dx, dy) {
+    const s = getComputedStyle(el);
+    return Boolean((dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0))
+      || (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)));
   }
+  function scrolls(t, dx, dy) {
+    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) if (room(el, dx, dy)) return el;
+    return null;
+  }
+  // One wheel gesture stays with what it started on, as a browser latches scrolling: a scroll inside an item stops at
+  // the end of its list instead of carrying on into the plane, and a pan keeps panning when an item slides under the
+  // pointer. A pause of LATCH ms starts a new gesture.
+  const LATCH = 250;
+  let latched = null, latchedAt = -Infinity;
   window.addEventListener("wheel", (e) => {
     if (mode !== "canvas" || e.composedPath().includes(bar)) return;
     if (e.composedPath().includes(map)) { e.preventDefault(); return; }
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
     let dx = e.deltaX * unit, dy = e.deltaY * unit;
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); latched = null; zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
-    if (scrolls(e.target, dx, dy)) return;
+    if (e.timeStamp - latchedAt > LATCH || !latched) latched = scrolls(e.target, dx, dy) || "plane";
+    latchedAt = e.timeStamp;
+    if (latched !== "plane") {
+      // At the end of its list the wheel does nothing, as it does at the end of a page.
+      if (!latched.isConnected || !room(latched, dx, dy)) e.preventDefault();
+      return;
+    }
     e.preventDefault();
     pan(-dx, -dy); settle();
   }, { passive: false, capture: true });
@@ -659,6 +675,103 @@
   });
   window.addEventListener("resize", () => { if (mode === "canvas") bound(); schedule(); });
   window.addEventListener("pagehide", () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; save(); } });
+
+  // Arrows between screens. In an item, a control with data-go="<id>" draws an arrow from its right edge to the element
+  // with that id in the same item, with its data-label beside it. The arrow leaves the [data-screen] that holds the
+  // control and takes the way the target lies: a curve to a screen on the right, down the gap to one in a lower row,
+  // over the top back to one on the left. Hovering a screen or a control lights its arrows and dims the rest.
+  const flowCss = document.createElement("style");
+  flowCss.textContent = `body > [data-variant]:has([data-go]) { position: relative; }
+    [data-drop-flow] { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; }
+    [data-drop-flow] svg { position: absolute; left: 0; top: 0; overflow: visible; }
+    [data-drop-flow] g path, [data-drop-flow] g circle { fill: none; stroke: #a1a1aa; stroke-width: 1.75; transition: stroke .15s, opacity .15s; }
+    [data-drop-flow] g circle { fill: #fff; }
+    [data-drop-flow] g.on path, [data-drop-flow] g.on circle { stroke: #2563eb; }
+    [data-drop-flow] .off { opacity: .12; }
+    [data-drop-flow] span { position: absolute; transform: translate(-50%, -50%); padding: 4px 10px; border: 1px solid #e4e4e7; border-radius: 99px; background: #fff;
+      color: #52525b; font: 600 13px/1.2 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; transition: opacity .15s, color .15s, border-color .15s; }
+    [data-drop-flow] span.on { color: #2563eb; border-color: #93b4f5; }
+    [data-go] { outline: 5px solid rgb(37 99 235 / .4); outline-offset: 3px; }
+    [data-go][data-go-on] { outline-color: #2563eb; }
+    @media (prefers-reduced-motion: reduce) { [data-drop-flow] * { transition: none !important; } }`;
+  document.head.append(flowCss);
+  const layers = new Map();
+  const curveAt = (p0, p1, p2, p3, t) => [0, 1].map((n) => (1 - t) ** 3 * p0[n] + 3 * (1 - t) ** 2 * t * p1[n] + 3 * (1 - t) * t * t * p2[n] + t ** 3 * p3[n]);
+  function route(f, fs, t) {
+    const x1 = Math.min(Math.max(f.x + f.w + 6, fs.x + 16), fs.x + fs.w + 6), y1 = f.y + f.h / 2;
+    if (t.y >= fs.y + fs.h) {
+      const xg = fs.x + fs.w + 26, yg = t.y - 34, x2 = t.x + t.w / 2, r = 14, d = x2 < xg ? 1 : -1;
+      return { d: `M${x1} ${y1}L${xg - r} ${y1}Q${xg} ${y1} ${xg} ${y1 + r}L${xg} ${yg - r}Q${xg} ${yg} ${xg - d * r} ${yg}L${x2 + d * r} ${yg}Q${x2} ${yg} ${x2} ${yg + r}L${x2} ${t.y - 8}`, l: [xg, (y1 + yg) / 2] };
+    }
+    if (t.x >= fs.x + fs.w) {
+      const x2 = t.x - 8, y2 = clamp(y1, t.y + 30, Math.max(t.y + 30, t.y + t.h - 30)), dx = Math.max(40, (x2 - x1) * 0.45);
+      const c1 = [x1 + dx, y1], c2 = [x2 - dx, y2], mid = curveAt([x1, y1], c1, c2, [x2, y2], 0.5);
+      return { d: `M${x1} ${y1}C${c1} ${c2} ${x2} ${y2}`, l: [Math.max(mid[0], fs.x + fs.w + 72), mid[1]] };
+    }
+    const xs = fs.x + fs.w + 10, top = Math.min(fs.y, t.y) - 30, x2 = t.x + t.w * 0.72, r = 12;
+    return { d: `M${x1} ${y1}C${xs + 50} ${y1} ${xs + 50} ${top} ${xs} ${top}L${x2 + r} ${top}Q${x2} ${top} ${x2} ${top + r}L${x2} ${t.y - 8}`, l: [(xs + x2) / 2, top] };
+  }
+  function drawFlow(el) {
+    let layer = layers.get(el);
+    const controls = [...el.querySelectorAll("[data-go]")];
+    if (!controls.length && !layer) return;
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.setAttribute("data-drop-flow", "");
+      layer.setAttribute("aria-hidden", "true");
+      layers.set(el, layer);
+    }
+    if (layer.parentNode !== el) el.append(layer);
+    layer.links = [];
+    if (!el.offsetWidth) return;
+    const s = el.getBoundingClientRect(), k = s.width / el.offsetWidth || 1;
+    const at = (n) => { const r = n.getBoundingClientRect(); return { x: (r.left - s.left) / k - el.clientLeft + el.scrollLeft, y: (r.top - s.top) / k - el.clientTop + el.scrollTop, w: r.width / k, h: r.height / k }; };
+    const head = "drop-flow-head-" + variants.indexOf(el);
+    let paths = "", labels = "";
+    for (const a of controls) {
+      const to = document.getElementById(a.dataset.go), from = a.closest("[data-screen]") || a;
+      if (!to || !el.contains(to) || !a.getClientRects().length || !to.getClientRects().length) continue;
+      const f = at(a), fs = at(from), rt = route(f, fs, at(to)), n = layer.links.length;
+      layer.links.push({ a, from, to });
+      paths += `<g data-n="${n}"><path d="${rt.d}" marker-end="url(#${head})"/><circle cx="${Math.min(Math.max(f.x + f.w + 2, fs.x + 12), fs.x + fs.w + 2)}" cy="${f.y + f.h / 2}" r="4"/></g>`;
+      if (a.dataset.label) labels += `<span data-n="${n}" style="left:${rt.l[0]}px;top:${rt.l[1]}px"></span>`;
+    }
+    layer.innerHTML = `<svg width="${el.scrollWidth}" height="${el.scrollHeight}"><defs><marker id="${head}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" style="fill:none;stroke:context-stroke;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"/></marker></defs>${paths}</svg>${labels}`;
+    for (const span of layer.querySelectorAll("span")) span.textContent = layer.links[span.dataset.n].a.dataset.label;
+  }
+  function lightFlow(el, target) {
+    const layer = layers.get(el);
+    if (!layer || !layer.links) return;
+    const control = target && target.closest && target.closest("[data-go]"), screen = target && target.closest && target.closest("[data-screen]");
+    const lit = layer.links.map((l) => (control ? l.a === control : screen ? l.from === screen || l.to === screen : false));
+    const any = lit.some(Boolean);
+    for (const node of layer.querySelectorAll("[data-n]")) { const on = lit[node.dataset.n]; node.classList.toggle("on", on); node.classList.toggle("off", any && !on); }
+    layer.links.forEach((l, n) => l.a.toggleAttribute("data-go-on", lit[n]));
+  }
+  const dirty = new Set();
+  let flowFrame = 0;
+  const redrawFlow = (el) => {
+    if (!el) return;
+    dirty.add(el);
+    flowFrame ||= requestAnimationFrame(() => { flowFrame = 0; for (const d of dirty) drawFlow(d); dirty.clear(); });
+  };
+  const itemOf = (n) => variants.find((el) => el.contains(n));
+  const flowSizes = new ResizeObserver((entries) => { for (const e of entries) redrawFlow(itemOf(e.target)); });
+  const flowChanges = new MutationObserver((records) => {
+    for (const r of records) {
+      const el = itemOf(r.target);
+      if (el && !(layers.get(el) && layers.get(el).contains(r.target))) redrawFlow(el);
+    }
+  });
+  for (const el of variants) {
+    if (el.dataset.src) continue;
+    flowSizes.observe(el);
+    flowChanges.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-go", "data-label", "data-screen", "hidden"] });
+    el.addEventListener("pointerover", (e) => lightFlow(el, e.target));
+    el.addEventListener("pointerleave", () => lightFlow(el, null));
+    redrawFlow(el);
+  }
+  if (document.fonts) document.fonts.ready.then(() => variants.forEach(redrawFlow));
 
   if (hosted || !several) bar.remove();
   document.body.append(host);
