@@ -197,7 +197,9 @@ test(
           const icons = document.querySelectorAll('[data-slot="copy-button-icon"] > [data-icon]')
           return (
             icons.length === 2 &&
-            [...icons].every((icon) => getComputedStyle(icon).opacity === (icon.dataset.icon === visibleIcon ? "1" : "0"))
+            [...icons].every(
+              (icon) => getComputedStyle(icon).opacity === (icon.dataset.icon === visibleIcon ? "1" : "0"),
+            )
           )
         }, shown)
       await waitForIcon("copy")

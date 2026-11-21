@@ -24,7 +24,9 @@
     --drop-copy-icon-blur: blur(3px);
 
     > :is([data-icon="copy"], [data-icon="check"]) {
-      transition: opacity 150ms ease-out, filter 150ms ease-out;
+      transition:
+        opacity 150ms ease-out,
+        filter 150ms ease-out;
     }
   }
 }
