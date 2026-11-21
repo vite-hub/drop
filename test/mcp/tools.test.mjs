@@ -95,6 +95,33 @@ async function call(tool, input, protocolVersion = "2025-06-18") {
   return result.isError ? { isError: true, message: result.content.map((block) => block.text).join(" ") } : result
 }
 
+test("an upload streamed with no length is cut off at the limit, not read whole", async () => {
+  state.who = who
+  const boundary = "drop-test"
+  let chunks = 0
+  const head = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\nContent-Type: text/plain\r\n\r\n`
+  const endless = new ReadableStream({
+    pull: (stream) =>
+      chunks++ === 0
+        ? stream.enqueue(new TextEncoder().encode(head))
+        : chunks < 64
+          ? stream.enqueue(new Uint8Array(1024 * 1024).fill(120))
+          : stream.close(),
+  })
+  const event = new H3Event(
+    new Request("https://drop.example/api/files", {
+      method: "POST",
+      body: endless,
+      duplex: "half",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}` },
+    }),
+  )
+  event.context.log = { set() {}, error() {}, warn() {} }
+  await assert.rejects(uploadFile(event), { status: 413, statusText: "The file exceeds the 4 MiB limit." })
+  assert.ok(chunks < 10, `read ${chunks} chunks`)
+  assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM drops").get().n, 0)
+})
+
 test("read_drop delivers a person's private upload as image bytes to their agent", async () => {
   const png = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
