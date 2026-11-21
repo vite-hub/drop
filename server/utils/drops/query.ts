@@ -99,7 +99,13 @@ async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
 async function summarize(
   rows: DropRow[],
   days: number,
-  options: { ownerId?: string; path?: boolean; below?: string; snippets?: Map<string, string | undefined> } = {},
+  options: {
+    ownerId?: string
+    path?: boolean
+    below?: string
+    snippets?: Map<string, string | undefined>
+    folderIds?: SQL
+  } = {},
 ) {
   // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
   // round trip to D1.
@@ -111,7 +117,11 @@ async function summarize(
           .innerJoin(drops, eq(drops.id, dropFiles.dropId))
           .where(eq(drops.ownerId, options.ownerId))
       : [],
-    itemCounts(rows.flatMap((row) => (row.kind === "folder" ? [row.id] : []))),
+    itemCounts(
+      rows.some((row) => row.kind === "folder") && options.folderIds
+        ? options.folderIds
+        : rows.flatMap((row) => (row.kind === "folder" ? [row.id] : [])),
+    ),
   ])
   const pathsOf = (id: string) =>
     files
@@ -401,6 +411,7 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
  * whose they are, and every drop in a folder says where it sits.
  */
 export async function listPinned(who: Identity, event?: H3Event): Promise<DropSummary[]> {
+  const pinnedIds = sql`SELECT ${dropPins.dropId} FROM ${dropPins} WHERE ${dropPins.userId} = ${who.userId}`
   const rows = await db
     .select({ drop: drops, owner: user })
     .from(dropPins)
@@ -410,10 +421,15 @@ export async function listPinned(who: Identity, event?: H3Event): Promise<DropSu
     .orderBy(desc(dropPins.at), desc(dropPins.dropId))
   const { days } = expiryPolicy(event)
   const owners = new Map(rows.map(({ drop, owner }) => [drop.id, owner]))
-  const resolved = await resolveRows(
-    rows.map(({ drop }) => drop),
-    days,
-  )
+  const dropsToResolve = rows.map(({ drop }) => drop)
+  const ancestorRows = dropsToResolve.some((drop) => drop.parentId)
+    ? await db
+        .select()
+        .from(drops)
+        .where(inArray(drops.id, withAncestors(pinnedIds)))
+    : []
+  const ancestors = walkUp(dropsToResolve, new Map(ancestorRows.map((drop) => [drop.id, drop])))
+  const resolved = dropsToResolve.map((drop) => resolveNode(drop, ancestors.get(drop.id) ?? [], days))
   const nodes = (
     await Promise.all(
       resolved.map((node) => {
@@ -423,7 +439,7 @@ export async function listPinned(who: Identity, event?: H3Event): Promise<DropSu
     )
   ).filter((node) => canPinDrop(node, who))
   const byId = new Map(nodes.map((node) => [node.id, node]))
-  return (await summarize(nodes, days, { ownerId: who.userId })).map((summary) => {
+  return (await summarize(nodes, days, { ownerId: who.userId, folderIds: sql`(${pinnedIds})` })).map((summary) => {
     const node = byId.get(summary.id)!
     const path = openableAncestors(node, who, days)
     return {

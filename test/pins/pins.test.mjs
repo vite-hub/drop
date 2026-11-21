@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
-import { sql, state, event, migrate, reset, insertDrop, who } from "../cost/harness.mjs"
+import { sql, state, event, migrate, reset, insertDrop, who, queries } from "../cost/harness.mjs"
 
 const { listPinned, setPinned, dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 
@@ -11,6 +11,26 @@ beforeEach(() => {
   sql.prepare("INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')").run()
 })
 const titles = async (person) => (await listPinned(person)).map((drop) => drop.title)
+
+test("many pinned folders under distinct parents fit in a fixed D1 query budget", async () => {
+  const pin = sql.prepare("INSERT INTO drop_pins (user_id, drop_id, at) VALUES (?, ?, ?)")
+  for (let index = 0; index < 2250; index++) {
+    const parent = `parent-${index}`
+    const folder = `folder-${index}`
+    insertDrop(parent, { kind: "folder" })
+    insertDrop(folder, { kind: "folder", parent_id: parent })
+    pin.run(who.userId, folder, index)
+  }
+  insertDrop("child", { parent_id: "folder-0" })
+  queries.length = 0
+  const pinned = await listPinned(who)
+  assert.ok(queries.length <= 3, `Pinned used ${queries.length} queries`)
+  assert.equal(pinned.length, 2250)
+  assert.equal(pinned[0].id, "folder-2249")
+  assert.equal(pinned.at(-1).id, "folder-0")
+  assert.equal(pinned.at(-1).path[0].id, "parent-0")
+  assert.equal(pinned.at(-1).items, 1)
+})
 
 test("pins list newest pin first, yours and others' you can open, and say whose they are", async () => {
   insertDrop("mine")

@@ -1,17 +1,25 @@
 import assert from "node:assert/strict"
 import { afterEach, test, vi } from "vite-plus/test"
-import { effectScope, ref, toRef } from "vue"
+import { computed, effectScope, ref, toRef } from "vue"
 import { keys } from "../../app/utils/keys"
-import { useDropActions } from "../../app/composables/useDrops"
+
+vi.stubGlobal("keys", keys)
+const { useDropActions, useDropPin, usePinned } = await import("../../app/composables/useDrops")
+vi.unstubAllGlobals()
 
 afterEach(() => vi.unstubAllGlobals())
 
 function setup(data, fetch) {
-  const pending = ref([])
+  const state = new Map()
   const refresh = vi.fn()
   vi.stubGlobal("useNuxtApp", () => ({ payload: { data } }))
   vi.stubGlobal("useNuxtData", (key) => ({ data: toRef(data, key) }))
-  vi.stubGlobal("useState", () => pending)
+  vi.stubGlobal("useState", (key, init) => {
+    if (!state.has(key)) state.set(key, ref(init()))
+    return state.get(key)
+  })
+  vi.stubGlobal("keys", keys)
+  vi.stubGlobal("computed", computed)
   vi.stubGlobal("useNotify", () => ({ say: vi.fn(), fail: vi.fn() }))
   vi.stubGlobal("useConfirm", () => undefined)
   vi.stubGlobal("useSiteDialog", () => undefined)
@@ -20,6 +28,35 @@ function setup(data, fetch) {
   vi.stubGlobal("$fetch", fetch)
   return refresh
 }
+
+test("card actions reflect confirmed writes through failed or stale list refreshes", async () => {
+  const doc = { id: "doc" }
+  const other = { id: "other", pinned: true }
+  const data = { [keys.pinned]: [other] }
+  const refresh = setup(data, vi.fn())
+  vi.stubGlobal("useApi", (_, options) => options)
+  const { transform } = usePinned()
+  const pin = useDropPin(() => doc)
+  const otherPin = useDropPin(() => ({ id: "other" }))
+  const { setPinned } = useDropActions()
+  refresh.mockImplementation(() => Promise.resolve())
+
+  assert.equal(pin.value, false)
+  await setPinned(doc, true)
+  assert.equal(pin.value, true)
+  assert.deepEqual(data[keys.pinned], [other])
+  assert.equal(otherPin.value, true)
+  const pinned = { ...doc, pinned: true }
+  data[keys.pinned] = transform([pinned, other])
+  const pinnedCard = useDropPin(() => pinned)
+  await setPinned(doc, false)
+  data[keys.pinned] = transform([pinned, other])
+  assert.equal(pin.value, false)
+  assert.equal(pinnedCard.value, false)
+  data[keys.pinned] = transform([other])
+  assert.equal(otherPin.value, true)
+  assert.equal(pin.value, false)
+})
 
 test("confirmed pin and unpin update the current and archived viewers", async () => {
   const data = {

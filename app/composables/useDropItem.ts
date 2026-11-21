@@ -11,9 +11,7 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
   const now = useRelativeNow()
   const { copy } = useCopy()
   const { setShare, setPinned } = useDropActions()
-  // The Drops page loads your pins (usePinned) alongside your drops, so the menu knows which ones are pinned.
-  const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
-  const pinned = computed(() => drop().pinned || Boolean(pins.value?.some((item) => item.id === drop().id)))
+  const pinned = useDropPin(drop)
   const moveTo = useMoveDialog()
   const { data: me } = useMe()
   const shared = computed(() => drop().share !== "private")

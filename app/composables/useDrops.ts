@@ -4,7 +4,6 @@ import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
 import type { DropDetail, DropSummary, DropTree, Viewer } from "#shared/types"
-import { keys } from "../utils/keys"
 
 /**
  * Your drops, every one: the Drops page's list, and the sidebar's once it's loaded. The actions (useDropActions) patch it
@@ -51,8 +50,37 @@ const LISTS = [keys.drops, keys.tree]
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
+const usePinConfirmations = () => useState<Record<string, boolean>>("pin-confirmations", () => ({}))
+
 /** The drops you pinned, yours and others', most recently pinned first (listPinned). */
-export const usePinned = () => useApi("/api/drops", { key: keys.pinned, query: { pinned: "1" }, default: () => [] })
+export function usePinned() {
+  const confirmed = usePinConfirmations()
+  return useApi("/api/drops", {
+    key: keys.pinned,
+    query: { pinned: "1" },
+    default: () => [],
+    transform: (list) => {
+      const ids = new Set(list.map((item) => item.id))
+      for (const [id, pinned] of Object.entries(confirmed.value)) {
+        if (ids.has(id) === pinned) delete confirmed.value[id]
+      }
+      return list
+    },
+  })
+}
+
+/** Card actions honor confirmed writes while the list is stale or unavailable. */
+export function useDropPin(drop: () => DropSummary) {
+  const confirmed = usePinConfirmations()
+  const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
+  return computed(() => {
+    const { id, pinned } = drop()
+    const confirmedPin = confirmed.value[id]
+    return typeof confirmedPin === "boolean"
+      ? confirmedPin
+      : (pinned ?? Boolean(pins.value?.some((item) => item.id === id)))
+  })
+}
 
 /** Your Trash, top-most nodes only (listDrops). */
 export const useTrash = () => useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
@@ -98,6 +126,7 @@ export function useDropActions() {
   const { data: tree } = useNuxtData<DropTree>(keys.tree)
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
   const pinWrites = useState<string[]>("pin-writes", () => [])
+  const confirmedPins = usePinConfirmations()
   /** Changes both lists (LISTS) the same way. */
   const edit = (change: (list: DropSummary[]) => DropSummary[]) => {
     if (cached.value) cached.value = change(cached.value)
@@ -232,6 +261,7 @@ export function useDropActions() {
     } finally {
       pinWrites.value = pinWrites.value.filter((id) => id !== drop.id)
     }
+    confirmedPins.value[drop.id] = pinned
     const currentKey = keys.drop(drop.id)
     for (const key of Object.keys(nuxtApp.payload.data)) {
       if (key === currentKey || key.startsWith(`${currentKey}@`)) editDetail(key, (detail) => ({ ...detail, pinned }))
