@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
 import { H3Event } from "h3"
+import { isSkillSettings } from "vite-hub/skills"
 import { afterEach, test, vi } from "vite-plus/test"
 import { migrations } from "../../scripts/migrations.mjs"
-import { sql, state } from "../cost/harness.mjs"
+import { queries, roundTrips, sql, state } from "../cost/harness.mjs"
 
 const all = migrations()
 const latest = all.findIndex((migration) => migration.name === "0019_skill_settings_updated_by.sql")
@@ -130,6 +131,7 @@ test("the admin route turns a skill off and answers 404 for an unknown skill", a
 })
 
 test("another instance's change shows within a minute, and a failed read is not kept", async () => {
+  assert.deepEqual(await offNames(), [])
   sql.exec("UPDATE skill_settings SET enabled = 0 WHERE name = 'slidev'")
   assert.deepEqual(await offNames(), [])
   later()
@@ -147,4 +149,33 @@ test("another instance's change shows within a minute, and a failed read is not 
   assert.deepEqual(await offNames(), ["slidev"])
   await settings.set("slidev", true)
   assert.deepEqual(await offNames(), [])
+})
+
+test("concurrent toggles from separate served settings instances preserve both switches", async () => {
+  vi.resetModules()
+  const { default: other } = await import("../../server/skills.ts")
+  assert.notEqual(settings, other)
+  assert.ok(isSkillSettings(other))
+  const start = queries.length
+  try {
+    await roundTrips(async () => {
+      const results = await Promise.all([settings.set("prototype", false), other.set("slidev", false)])
+      for (const [error, result] of results) {
+        assert.equal(error, undefined)
+        assert.equal(result.enabled, false)
+      }
+    })
+    const firstStatements = queries.slice(start, start + 2).map(({ query }) => query.split(" ", 1)[0])
+    assert.deepEqual(firstStatements, ["select", "select"], "both reads must finish before either write")
+    assert.deepEqual(
+      rows()
+        .filter(({ enabled }) => !enabled)
+        .map(({ name }) => name),
+      ["prototype", "slidev"],
+    )
+    assert.deepEqual(await offNames(), ["prototype", "slidev"])
+  } finally {
+    await settings.set("prototype", true)
+    await other.set("slidev", true)
+  }
 })
