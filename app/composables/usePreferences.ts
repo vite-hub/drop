@@ -92,7 +92,8 @@ const tick = createSharedComposable(() => {
 
 /**
  * "Now" for relative times ("3m ago"). Taken once on the server and reused on hydration, so server and
- * client print the same text; then it ticks every 30 seconds in the browser.
+ * client print the same text; then it ticks every 30 seconds in the browser. app.vue gives it to vite-hub/ui's
+ * RelativeTime (provideRelativeNow), so the words and Drop's own countdowns move together.
  */
 export function useRelativeNow() {
   const now = useState("now", () => Date.now())
@@ -100,6 +101,9 @@ export function useRelativeNow() {
   if (import.meta.client) onMounted(tick)
   return now
 }
+
+/** How long a copy button shows its check, in ms. */
+export const COPY_MS = 1400
 
 /**
  * Copy without a toast: the button that copied shows a check while `copied(key)` holds, for a moment. A copy whose
@@ -110,7 +114,7 @@ export function useCopy() {
   const notify = useNotify()
   const { copy: write } = useClipboard({ legacy: true })
   const last = ref<string>()
-  const { start } = useTimeoutFn(() => (last.value = undefined), 1400, { immediate: false })
+  const { start } = useTimeoutFn(() => (last.value = undefined), COPY_MS, { immediate: false })
   type Options = { key?: string; announce?: string }
   function done({ key = "", announce }: Options) {
     last.value = key

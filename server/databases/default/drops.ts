@@ -60,6 +60,7 @@ export const drops = sqliteTable(
     trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
     /** The doc an image belongs to. Attachments share the doc's sharing, lifetime, and Trash, and don't count as drops. */
     parentId: text("parent_id"),
+    draftImage: integer("draft_image", { mode: "boolean" }).notNull().default(false),
     /**
      * Sites: the origin of the website under review, or a `*.` pattern of them; the only ones its review script may post
      * from. Links: the page the link opens, like a pull request (../utils/link-items.ts).

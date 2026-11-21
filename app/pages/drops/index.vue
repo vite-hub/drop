@@ -122,15 +122,7 @@ const groups = computed(() => {
     ]
   }
   const timeZone = mounted.value ? undefined : "UTC"
-  const start = new Date(now.value)
-  if (timeZone) start.setUTCHours(0, 0, 0, 0)
-  else start.setHours(0, 0, 0, 0)
-  const label = (at: number) => {
-    if (at >= start.getTime()) return "Today"
-    if (at >= start.getTime() - 86_400_000) return "Yesterday"
-    if (at >= start.getTime() - 6 * 86_400_000) return "This week"
-    return new Date(at).toLocaleDateString("en", { timeZone, month: "long", year: "numeric" })
-  }
+  const label = (at: number) => dayGroup(at, now.value, timeZone)
   const out: Array<{ label: string; drops: DropSummary[] }> = []
   for (const drop of list) {
     // The Trash groups by when things went there, which is also what sets when they're deleted.

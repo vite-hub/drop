@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { RelativeTime } from "vite-hub/ui"
 import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
+import type { SendEndpoint, SendTestResult } from "~/utils/comment-send"
 
 // Started before the layout renders, which waits for your drops first, so the agents load alongside them.
 definePageMeta({ middleware: () => void useAgentList() })
@@ -22,7 +24,36 @@ const tabsUi = {
 
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
-const { copy, copied } = useCopy()
+
+// Send: the agent that a Send button in the review pill hands comments to. A member pairs one from any Send button;
+// this row shows it, tests it, and removes it.
+const sendOn = useRuntimeConfig().public.send
+const endpoint = ref<SendEndpoint | null>(null)
+const tested = ref<SendTestResult | null>(null)
+const testing = ref(false)
+const loadEndpoint = async () => {
+  endpoint.value = await dropSend.endpoint()
+}
+const pairable = ["T3 Code", "Claude Code", "Codex"]
+async function sendTest() {
+  testing.value = true
+  try {
+    tested.value = await dropSend.test()
+  } finally {
+    testing.value = false
+  }
+}
+async function removeEndpoint() {
+  await dropSend.remove()
+  tested.value = null
+}
+let unwatchEndpoint: (() => void) | undefined
+onMounted(() => {
+  if (!sendOn) return
+  void loadEndpoint()
+  unwatchEndpoint = dropSend.onChange(() => void loadEndpoint())
+})
+onBeforeUnmount(() => unwatchEndpoint?.())
 </script>
 
 <template>
@@ -37,15 +68,7 @@ const { copy, copied } = useCopy()
         <div class="flex items-center gap-2 rounded-md border border-default bg-muted py-1 pr-1 pl-3">
           <span class="label-mono">Server</span>
           <span class="min-w-0 flex-1 truncate font-mono text-xs text-highlighted">{{ server }}</span>
-          <UButton
-            aria-label="Copy server URL"
-            color="neutral"
-            :icon="copied('server') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-            :ui="{ leadingIcon: copied('server') ? 'animate-icon-in' : undefined }"
-            size="xs"
-            variant="ghost"
-            @click="copy(server, { key: 'server' })"
-          />
+          <DropCopyButton aria-label="Copy server URL" size="xs" :value="server" />
         </div>
         <div class="-mx-1 overflow-x-auto px-1">
           <UTabs
@@ -67,21 +90,62 @@ const { copy, copied } = useCopy()
         >
         <!-- A bare "Template" said nothing about what it copies. -->
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
-          <UButton
-            color="neutral"
-            :icon="copied('template') ? 'i-mingcute-check-line' : 'i-mingcute-copy-2-line'"
-            :ui="{ leadingIcon: copied('template') ? 'animate-icon-in' : undefined }"
-            :label="copied('template') ? 'Copied' : 'Copy plan template'"
-            size="sm"
-            variant="ghost"
-            @click="copy(PLAN_TEMPLATE, { key: 'template' })"
-          />
+          <DropCopyButton label="Copy plan template" size="sm" :value="PLAN_TEMPLATE" />
         </UTooltip>
       </div>
       <p class="mt-3 border-t border-default pt-3 text-sm text-muted">
         Once it's connected, ask it for something to review, like “Write a one-page plan for what we're building next
         and drop it for review.” It answers with the link.
       </p>
+    </UCard>
+
+    <UCard v-if="sendOn" class="mt-4" :ui="{ body: 'p-5 sm:p-5' }">
+      <h2 class="font-medium text-highlighted">Send comments to</h2>
+      <div
+        v-if="!endpoint"
+        class="mt-4 flex items-center gap-3 rounded-lg border border-dashed border-default px-4 py-3"
+      >
+        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated ring-1 ring-default ring-inset">
+          <UIcon name="i-mingcute-send-plane-line" class="size-4 text-muted" />
+        </span>
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-highlighted">Connect from any Send button.</p>
+          <p class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span v-for="name in pairable" :key="name" class="inline-flex items-center gap-1">
+              <AgentIcon :name="name" kind="agent" class="size-3.5" />{{ name }}
+            </span>
+          </p>
+        </div>
+      </div>
+      <div v-else class="mt-4 flex items-center gap-3 rounded-lg border border-default px-4 py-3">
+        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated ring-1 ring-default ring-inset">
+          <AgentIcon :name="endpoint.agent.name" kind="agent" class="size-5" />
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-medium text-highlighted">{{ endpoint.agent.name }}</p>
+          <p v-if="tested?.status === 'delivered'" class="flex items-center gap-1 truncate text-xs text-success">
+            <UIcon name="i-mingcute-check-circle-line" class="size-3.5 shrink-0" />Delivered · {{ tested.code }} in
+            {{ tested.ms }} ms
+          </p>
+          <p v-else-if="tested" class="flex items-center gap-1 truncate text-xs text-error">
+            <UIcon name="i-mingcute-alert-octagon-line" class="size-3.5 shrink-0" />Not delivered · {{ tested.reason }}
+          </p>
+          <p v-else class="truncate text-xs text-muted">
+            {{ endpoint.agent.host ?? "Inbox" }}
+            <template v-if="endpoint.lastSentAt"> · last sent <RelativeTime :at="endpoint.lastSentAt" /> </template>
+          </p>
+        </div>
+        <UButton
+          color="neutral"
+          icon="i-mingcute-send-plane-line"
+          label="Send test"
+          :loading="testing"
+          size="sm"
+          variant="ghost"
+          @click="sendTest"
+        />
+        <UButton color="neutral" label="Remove" size="sm" variant="ghost" @click="removeEndpoint" />
+      </div>
     </UCard>
 
     <section class="mt-8">
@@ -100,7 +164,7 @@ const { copy, copied } = useCopy()
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-highlighted">{{ agent.name }}</p>
             <p v-if="agent.connectedAt" class="truncate text-xs text-muted">
-              Connected <TimeAgo :at="agent.connectedAt" />
+              Connected <RelativeTime :at="agent.connectedAt" />
             </p>
           </div>
           <UButton color="neutral" label="Disconnect" size="sm" variant="ghost" @click="disconnect(agent)" />

@@ -25,7 +25,7 @@ More in [Comments](/docs/review#comments).
 
 A drop starts with the Drop's default: Only me on a personal Drop, the Team on a team Drop. One dialog changes it: the team can open it or edit it, or a public link lets anyone open it, and comment if you allow it.
 
-::docs-figure{src="/docs/features/share.webp" alt="The Share dialog with five options: Only me, Team, Team can edit, Public link, and Public, anyone comments" :width="512" :height="600" .mx-auto .max-w-sm}
+::docs-figure{src="/docs/features/share.webp" alt="The Share drop popover with five choices: Only me, Team, Team can edit (picked), Public link, and Public, anyone comments; the drop's link and a copy button below them" :width="736" :height="720" .mx-auto .max-w-sm}
 ::
 
 More in [Sharing](/docs/review#sharing).
@@ -93,7 +93,7 @@ The search box on the Drops page (<kbd>/</kbd> puts the cursor in it) looks insi
 
 Press :kbd[?] on any page of Drop to see them all. **Keyboard shortcuts** in the account menu and in :kbd[⌘K] opens the same list.
 
-::docs-figure{src="/docs/features/shortcuts.webp" alt="The keyboard shortcuts dialog, grouped into General, In a drop, and Editing" :width="449" :height="608" .mx-auto .max-w-xs}
+::docs-figure{src="/docs/features/shortcuts.webp" alt="The keyboard shortcuts sheet, grouped into General, In a drop, In a folder, and Editing" :width="896" :height="1980" .mx-auto .max-w-xs}
 ::
 
 ::shortcut-table

@@ -70,6 +70,8 @@ const AGENTS: readonly KnownAgent[] = [
     logo: "/agents/github-actions.svg",
     names: ["github actions"],
   },
+  // T3 Code's mark from t3.codes, white on its black tile; Simple Icons has none. Send delivers to it (app/utils/comment-send.ts).
+  { key: "t3", label: "T3 Code", logo: "/agents/t3.svg", names: ["t3 code"] },
   // Executor's own mark (MIT, github.com/UsefulSoftwareCo/executor); Simple Icons has none.
   { key: "executor", label: "Executor", logo: "/agents/executor.png", names: ["executor", "executor cli"] },
 ]

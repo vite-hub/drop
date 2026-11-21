@@ -12,7 +12,10 @@ watch(
   async (id) => {
     related.value = []
     if (!id) return
-    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch(() => [])
+    const found = await $fetch<RelatedDrop[]>(`/api/drops/${id}/related`).catch((error: unknown) => {
+      reportClientError("related", error, { drop: id })
+      return []
+    })
     if (props.relatedTo === id) related.value = found
   },
   { immediate: true },

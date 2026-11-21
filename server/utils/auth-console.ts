@@ -14,20 +14,9 @@ export async function countDropsByUser(userIds: readonly string[]): Promise<Reco
   return Object.fromEntries(counts.map((row) => [row.id, row.drops]))
 }
 
-/** Display the same switches that configure sign-in; never disclose the email allowlist. */
-export function authAccessLines(config: {
-  members: boolean
-  organization: string
-  proxied: boolean
-  password: boolean
-}) {
+/** Display the switches that configure sign-in. ViteHub Auth adds its own line for `VITEHUB_MEMBERS`. */
+export function authAccessLines(config: { proxied: boolean; password: boolean }) {
   return [
-    config.members
-      ? "DROP_MEMBERS is on: only listed verified emails and DROP_ADMINS can sign in."
-      : "DROP_MEMBERS is off: there is no email allowlist.",
-    config.organization
-      ? `Active membership of the GitHub organization ${config.organization} is required on every request.`
-      : "No GitHub organization membership is required.",
     config.proxied ? "Sign-in uses the deployment's GitHub oauth2-proxy." : "Sign-in uses GitHub.",
     ...(config.password ? ["Email and password sign-in is enabled for local development or runtime tests."] : []),
   ]

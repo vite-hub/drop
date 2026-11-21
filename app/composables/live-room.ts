@@ -1,17 +1,24 @@
 import { Placeholder } from "@tiptap/extension-placeholder"
-import { createEditorCodec } from "comark-ui/editor"
+import { createEditorCodec, uploadKey } from "comark-ui/editor"
 import { Editor } from "@tiptap/vue-3"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { LIVE_EDITOR_KIT } from "#shared/live-editor"
+import type { Viewer } from "#shared/types"
 
 /**
  * The live editor's room and its Tiptap editor: Yjs, ProseMirror, and the code highlighter. useLiveEditor imports this
  * only when someone opens the editor, so readers never download it. Run inside an effect scope: leaving the scope
  * leaves the room.
  */
-export function useLiveRoom(documentId: Ref<string | undefined>) {
+export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewer | null | undefined) {
   const realtime = useRealtimeTiptap("drafts", documentId, {
     enabled: () => Boolean(documentId.value),
+    // Drop's own viewer from /api/me. Realtime's default reads the Better Auth session, which Drop never loads outside
+    // sign-in, so this person's own face said "Anonymous" (the server names them to everyone else).
+    identity: () => {
+      const viewer = me()
+      return viewer && { id: viewer.id, name: viewer.name, email: viewer.email, image: viewer.image ?? undefined }
+    },
     // The room's schema (server/utils/live-editor.ts).
     editor: createEditorCodec({ kit: LIVE_EDITOR_KIT }),
     // A lighter selection tint than the default.
@@ -23,6 +30,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
     },
   })
   const editor = shallowRef<Editor>()
+  const uploading = ref(false)
   // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
   // in as y-sync transactions and don't count.
   const edited = ref(false)
@@ -36,6 +44,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
   watch([realtime.document, realtime.provider], () => {
     editor.value?.destroy()
     editor.value = undefined
+    uploading.value = false
     const extensions = realtime.extensions.value
     if (!extensions.length || !realtime.provider.value) return
     editor.value = new Editor({
@@ -45,6 +54,9 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
         Placeholder.configure({ placeholder: "Write, or type / for blocks, : for emoji, @ for people" }),
       ],
       autofocus: "end",
+      onTransaction({ editor: current }) {
+        uploading.value = Boolean(uploadKey.getState(current.state)?.find().length)
+      },
     })
     editor.value.on("update", ({ transaction }) => {
       if (transaction.getMeta(ySyncPluginKey)?.isChangeOrigin) return
@@ -53,7 +65,7 @@ export function useLiveRoom(documentId: Ref<string | undefined>) {
     })
   })
 
-  return { realtime, editor, edited, unsaved }
+  return { realtime, editor, edited, unsaved, uploading }
 }
 
 export type LiveRoom = ReturnType<typeof useLiveRoom>

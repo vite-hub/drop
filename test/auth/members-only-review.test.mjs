@@ -13,10 +13,10 @@ const request = (path, method = "GET") =>
 migrate()
 beforeEach(() => {
   reset()
-  state.githubOrg = "acme"
+  state.members = "github-org:acme"
 })
 afterEach(() => {
-  state.githubOrg = ""
+  state.members = ""
 })
 
 // review.js on a site sends no Drop session, only its review token, which each route checks (server/utils/review.ts).
@@ -61,4 +61,29 @@ test("a members-only Drop lets a folder's skill discovery through, and nothing e
     assert.equal((await request(path)).status, 200, path)
   for (const path of ["/d/abc/skill-hub/.well-known/other/index.json", "/d/abc/skill-hub/deeper/page"])
     assert.equal((await request(path)).status, 401, path)
+})
+
+// ViteHub serves Comments, Realtime, browser errors and the Console's reads under /_vitehub, outside /api.
+test("a members-only Drop gates ViteHub's data routes, and leaves its signed and static ones open", async () => {
+  for (const path of [
+    "/_vitehub/comments/threads",
+    "/_vitehub/comments/auth/github",
+    "/_vitehub/realtime/drafts/abc",
+    "/_vitehub/browser-errors",
+    "/_vitehub/console/status",
+    "/api/_vitehub/comments/threads",
+    "/api/_vitehub/realtime/drafts/abc",
+  ])
+    assert.equal((await request(path)).status, 401, path)
+  for (const path of [
+    "/_vitehub/comments/attachments/abc",
+    "/api/_vitehub/comments/attachments/abc",
+    "/_vitehub/realtime/latest/abc",
+    "/_vitehub/realtime/presence/abc",
+    "/api/_vitehub/realtime/presence/abc",
+    "/_vitehub/rpc",
+    "/_vitehub/comments/assets/overlay.js",
+    "/_vitehub/console/assets/page-tool.js",
+  ])
+    assert.equal((await request(path)).status, 200, path)
 })

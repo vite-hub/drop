@@ -37,7 +37,8 @@ jobs:
       - run: pnpm typecheck
       # `run`: pnpm 11's own `pnpm doctor` checks the pnpm install, not the project.
       - run: pnpm run doctor
-      - run: pnpm exec playwright install --with-deps chromium
+      # Firefox too: the doc header's copy and the zoom's comment layer have Firefox tests (Drop comment #12).
+      - run: pnpm exec playwright install --with-deps chromium firefox
       - run: pnpm test
       - run: pnpm --filter @vite-hub/drop test
       - run: pnpm build

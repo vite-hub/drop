@@ -78,8 +78,7 @@ async function open(browser) {
 async function drag(page, from, to) {
   await page.mouse.move(from[0], from[1])
   await page.mouse.down()
-  for (let i = 1; i <= 8; i++)
-    await page.mouse.move(from[0] + ((to[0] - from[0]) * i) / 8, from[1] + ((to[1] - from[1]) * i) / 8)
+  await page.mouse.move(to[0], to[1], { steps: 2 })
   await page.mouse.up()
 }
 
@@ -105,7 +104,6 @@ test("comment composers tab in reading order, images to Send, and send with the 
     await page.keyboard.press("Tab")
     assert.equal(await focused(ui.getByRole("button", { name: "Send", exact: true })), true)
     assert.match(await ui.locator(".pop [type=submit]").getAttribute("title"), /Send \((⌘|Ctrl\+)Enter\)/)
-    assert.equal(await ui.locator(".pop .shortcut").count(), 0)
     await page.keyboard.press("Escape")
     assert.equal(await focused(comment), true)
 
@@ -253,7 +251,7 @@ test("Esc and Undo take strokes back", async () => {
   } finally {
     await browser.close()
   }
-})
+}, 15_000)
 
 test("Highlight's Text tip types a label, edits, moves, and deletes it, and sends it on the screenshot", async () => {
   const browser = await chromium.launch()

@@ -8,11 +8,7 @@ migrate()
 const mate = { ...who, userId: "mate", name: "Mate", email: "mate@example.com", actorName: "Mate" }
 beforeEach(() => {
   reset()
-  sql
-    .prepare(
-      "INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')",
-    )
-    .run()
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('mate', 'Mate', 'mate@example.com')").run()
 })
 const titles = async (person) => (await listPinned(person)).map((drop) => drop.title)
 
@@ -67,12 +63,14 @@ test("a drop in a folder lists with the folders it sits in", async () => {
 
 test("a drop's detail says whether you pinned it", async () => {
   state.who = who
-  insertDrop("doc")
+  insertDrop("doc", { visibility: "public" })
   const before = await dropDetail(await findDrop("doc"), who, "https://drop.example")
   assert.equal(before.pinned, undefined)
   await setPinned("doc", who, true)
   const after = await dropDetail(await findDrop("doc"), who, "https://drop.example")
   assert.equal(after.pinned, true)
-  const theirs = await dropDetail(await findDrop("doc"), null, "https://drop.example").catch(() => null)
-  assert.equal(theirs?.pinned, undefined)
+  assert.equal(after.owner.name, "Owner")
+  const anonymous = await dropDetail(await findDrop("doc"), null, "https://drop.example")
+  assert.equal(anonymous.pinned, undefined)
+  assert.equal(anonymous.owner, undefined)
 })

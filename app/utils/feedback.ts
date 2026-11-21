@@ -1,7 +1,3 @@
-import type { DropComment } from "#shared/types"
-import { suggestionLine } from "#shared/suggestion"
-import { writtenBy } from "#shared/agents"
-
 /** The sandbox drops render in by default: scripts run, but with an opaque origin, so they can't reach Drop's session. */
 export const PREVIEW_SANDBOX = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
 
@@ -33,33 +29,3 @@ export const frameAllow = (kind: string) =>
  * Mirror, a screen that stays on). The browser announces fullscreen and asks before anyone's screen is captured.
  */
 const PRESENT_ALLOW = "fullscreen; display-capture; screen-wake-lock"
-
-const pct = (n: number) => `${(n / 10).toFixed(0)}%`
-
-/** What a comment points at: its quote, the page, or an element and where on it. */
-function target(comment: DropComment) {
-  if (comment.quote) return `> ${comment.quote}`
-  if (comment.kind === "page") return "The whole page"
-  const what = `${comment.kind === "image" ? "Image" : "Element"} \`${comment.selector}\``
-  return comment.ow || comment.oh
-    ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
-    : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
-}
-
-/** Attachments use absolute addresses so pasted feedback can be read outside Drop. */
-const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
-  item.attachments.length
-    ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
-    : ""
-
-/** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
-export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
-  const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
-  const lines = open.map((comment) =>
-    `${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`.replace(
-      /^/,
-      `${comment.n}. `,
-    ),
-  )
-  return `## Feedback on "${title}"\n\n${url}\n\n${lines.join("\n") || "No open comments."}\n\nDrop a new version that addresses these.`
-}

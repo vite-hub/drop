@@ -16,13 +16,29 @@ const settings = {
   CLOUDFLARE_D1_DATABASE_ID: "test-database",
 }
 
-test("migrations create Drop's schema once and share Wrangler's ledger", async () => {
+test.each(["fresh database", "existing Wrangler ledger"])("D1 migrations on a %s run only once", async (scenario) => {
   const previousFetch = globalThis.fetch
   const previousEnv = { ...process.env }
   const database = new DatabaseSync(":memory:")
-  const expectedMigrations = dropMigrations().length
-  let migrations = 0
+  const entries = dropMigrations()
+  const pinsMigration = "0016_drop_pins.sql"
+  const applied = scenario === "fresh database" ? [] : entries.filter(({ name }) => name !== pinsMigration)
+  const expected = entries.filter((entry) => !applied.includes(entry))
+  const migrations = []
   try {
+    if (applied.length) {
+      database.exec("CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)")
+      for (const { name, sql } of applied) {
+        database.exec(sql)
+        database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(name)
+      }
+      database.exec(`
+        INSERT INTO user (id, name, email) VALUES ('owner', 'Owner', 'owner@example.com');
+        INSERT INTO drops (id, owner_id, kind, title, filename, actor_kind, actor_name, created_at, updated_at)
+        VALUES ('doc', 'owner', 'markdown', 'Existing doc', 'doc.md', 'browser', 'Owner', 1, 1);
+      `)
+      assert.throws(() => database.prepare("SELECT at FROM drop_pins"), /no such table/)
+    }
     Object.assign(process.env, settings)
     globalThis.fetch = async (url, options) => {
       assert.equal(url, "https://api.cloudflare.com/client/v4/accounts/test-account/d1/database/test-database/query")
@@ -30,23 +46,34 @@ test("migrations create Drop's schema once and share Wrangler's ledger", async (
       const { sql } = JSON.parse(options.body)
       if (sql.startsWith("SELECT"))
         return Response.json({ success: true, result: [{ success: true, results: database.prepare(sql).all() }] })
-      if (sql.includes("INSERT INTO d1_migrations")) migrations++
+      const entry = /INSERT INTO d1_migrations \(name\) VALUES \('([^']+)'\)/.exec(sql)
+      if (entry) migrations.push(entry[1])
       database.exec(`BEGIN; ${sql}; COMMIT;`)
       return Response.json({ success: true, result: [{ success: true, results: [] }] })
     }
     await migrateD1()
-    assert.equal(migrations, expectedMigrations)
-    assert.equal(database.prepare("SELECT count(*) AS count FROM d1_migrations").get().count, expectedMigrations)
+    assert.deepEqual(
+      migrations,
+      expected.map(({ name }) => name),
+    )
     assert.deepEqual(
       database
         .prepare("SELECT name FROM d1_migrations ORDER BY id")
         .all()
         .map((row) => row.name),
-      dropMigrations().map((migration) => migration.name),
+      entries.map((migration) => migration.name),
     )
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
+    if (applied.length) {
+      database.exec("INSERT INTO drop_pins (user_id, drop_id, at) VALUES ('owner', 'doc', 42)")
+      const lookup = database.prepare(`
+        SELECT drops.title, drops.draft_image, drop_pins.at
+        FROM drop_pins JOIN drops ON drops.id = drop_pins.drop_id WHERE drop_pins.user_id = ?
+      `)
+      assert.deepEqual({ ...lookup.get("owner") }, { title: "Existing doc", draft_image: 0, at: 42 })
+    }
     await migrateD1()
-    assert.equal(migrations, expectedMigrations)
+    assert.equal(migrations.length, expected.length)
   } finally {
     globalThis.fetch = previousFetch
     process.env = previousEnv
@@ -61,21 +88,25 @@ test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and r
   const folders = dropMigrations().sort((a, b) => (a.tag < b.tag ? -1 : 1))
   const hash = (sql) => createHash("sha256").update(sql).digest("hex")
   const journal = JSON.parse(readFileSync(new URL("./fixtures/legacy-journal.json", import.meta.url), "utf8")).entries
-  for (let applied = 0; applied <= folders.length; applied++) {
+  const legacy = folders.flatMap((migration) => {
+    const entry = journal.find((item) => migration.tag.endsWith(`_${item.tag}`))
+    return entry ? [{ ...migration, when: entry.when }] : []
+  })
+  for (let applied = 0; applied <= legacy.length; applied++) {
     const database = new DatabaseSync(":memory:")
     try {
       database.exec("PRAGMA foreign_keys = ON")
       database.exec(
         "CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at NUMERIC)",
       )
-      folders.slice(0, applied).forEach((migration) => {
+      legacy.slice(0, applied).forEach((migration) => {
         database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
         database
           .prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)")
-          .run(hash(migration.sql), journal.find((entry) => migration.tag.endsWith(`_${entry.tag}`)).when)
+          .run(hash(migration.sql), migration.when)
       })
       // This shipped variant survives timestamp-based upgrades even though its SQL was later replaced with SELECT 1.
-      if (applied === folders.length) {
+      if (applied === legacy.length) {
         const historical = readFileSync(new URL("./fixtures/0004_comment_suggestions.sql", import.meta.url), "utf8")
         assert.equal(hash(historical), "3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083")
         database
@@ -106,7 +137,7 @@ test("a database Drizzle Kit 0.x migrated to any point upgrades its ledger and r
       )
       assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_comment_threads'").get())
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
-      assert.deepEqual(database.prepare("SELECT id FROM drops LIMIT 1").all(), [])
+      assert.deepEqual(database.prepare("SELECT id, draft_image FROM drops LIMIT 1").all(), [])
     } finally {
       database.close()
     }

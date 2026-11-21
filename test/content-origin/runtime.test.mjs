@@ -101,6 +101,12 @@ test("a wildcard can sit inside the first label, one level under the zone, and m
   }
 })
 
+test("the content origin blocks ViteHub routes including the legacy aliases", async () => {
+  for (const prefix of ["/_vitehub", "/api/_vitehub"])
+    for (const path of ["/comments/attachments/abc", "/realtime/presence/abc"])
+      assert.equal((await contentMiddleware(request(`https://drop-usercontent.example${prefix}${path}`)))?.status, 404)
+})
+
 test("the content origin serves only the frame host, at any path, and nothing of Drop", async () => {
   for (const path of ["/", "/product/", "/api/me", "/d/abc", "/f/key.html"]) {
     const response = await contentMiddleware(
@@ -108,7 +114,6 @@ test("the content origin serves only the frame host, at any path, and nothing of
     )
     assert.equal(response.status, 200, path)
     const html = await response.text()
-    assert.match(html, /document\.write\(message\.html\.slice\(0, at\) \+ hold/)
     assert.match(html, /event\.source !== parent/)
     assert.doesNotMatch(html, /__NUXT__|_nuxt/)
     assert.equal(response.headers.get("x-robots-tag"), "noindex, nofollow")
@@ -214,7 +219,14 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     detailEvent.context.params = { id: "app" }
     const detail = await detailHandler(detailEvent)
     assert.match(detail.contentOrigin, /^https:\/\/[a-z2-7]{26}-drop\.example$/)
-    assert.deepEqual(Object.keys(detail.files).sort(), ["docs/index.html", "index.html"], "only its pages")
+    assert.equal(detail.files, undefined, "no file's text, its pages' included: the frame reads them on the origin")
+    assert.deepEqual(detail.paths, [
+      "_nuxt/B0nDsZtt.js",
+      "_nuxt/entry.js",
+      "_nuxt/inter.woff2",
+      "docs/index.html",
+      "index.html",
+    ])
     assert.equal(detail.sizes["_nuxt/inter.woff2"], font.byteLength)
     assert.match(detail.contentGrant, /^[\w-]+$/)
 
@@ -223,7 +235,7 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
       contentMiddleware(
         request(`${origin}${path}`, {
           headers: {
-            "sec-fetch-dest": dest,
+            ...(dest ? { "sec-fetch-dest": dest } : {}),
             ...(grant ? { cookie: `theme=dark; drop_grant=${grant}` } : {}),
             ...headers,
           },
@@ -242,6 +254,14 @@ test("an app's own origin serves its files to a frame holding its grant, and to 
     )
     const etag = script.headers.get("etag")
     assert.equal((await load("/_nuxt/entry.js", { headers: { "if-none-match": etag } })).status, 304)
+    // What the frame host reads for the viewer, as a fetch: the page itself, for the grant only.
+    const home = await load("/index.html", { dest: "empty" })
+    const unmarked = await load("/index.html", { dest: null, headers: { "x-drop-read": "page" } })
+    assert.equal(await unmarked.text(), '<script type="module" src="/_nuxt/entry.js"></script>', "no Sec-Fetch-Dest")
+    assert.equal(home.status, 200)
+    assert.equal(await home.text(), '<script type="module" src="/_nuxt/entry.js"></script>')
+    assert.equal(await (await load("/docs/index.html", { dest: "empty" })).text(), "<p>Docs</p>")
+    assert.equal((await load("/index.html", { dest: "empty", grant: null })).status, 404, "no grant, no page")
     const chunk = await load("/_nuxt/B0nDsZtt.js")
     assert.equal(chunk.headers.get("cache-control"), "private, max-age=31536000, immutable", "a hashed name")
 
@@ -776,6 +796,52 @@ test("the frame host keeps the viewer's grant as a cookie before it writes the p
   assert.deepEqual(run(undefined).cookies, [])
 })
 
+test("the frame host reads a page on its own origin for the viewer, with the grant set first", async () => {
+  const script = FRAME_HOST_HTML.match(/<script\b[^>]*>([\s\S]*)<\/script>/)[1]
+  const cookies = []
+  const fetched = []
+  const posted = []
+  let onMessage
+  const parent = { postMessage: (message) => posted.push({ ...message }) }
+  runInNewContext(script, {
+    parent,
+    window: {},
+    isSecureContext: true,
+    location: { pathname: "/" },
+    addEventListener: (_type, handler) => (onMessage = handler),
+    fetch: async (url, init) => {
+      assert.equal(init.headers["x-drop-read"], "page", "a page read, whatever Sec-Fetch-Dest says")
+      assert.equal(init.cache, "no-store", "never reuse the cached navigation host at the page URL")
+      fetched.push({ url, cookies: cookies.length })
+      return url === "/docs/getting%20started.html"
+        ? { ok: true, text: async () => "<p>Start</p>" }
+        : { ok: false, text: async () => "Not found" }
+    },
+    document: {
+      body: {},
+      set cookie(value) {
+        cookies.push(value)
+      },
+    },
+  })
+  posted.length = 0
+  onMessage({ source: parent, data: { __drop: true, type: "read", page: "docs/getting started.html", grant: "0a:1b" } })
+  onMessage({ source: parent, data: { __drop: true, type: "read", page: "missing.html" } })
+  onMessage({ source: {}, data: { __drop: true, type: "read", page: "index.html" } })
+  for (let i = 0; i < 10; i++) await Promise.resolve()
+  assert.deepEqual(fetched, [
+    { url: "/docs/getting%20started.html", cookies: 1 },
+    { url: "/missing.html", cookies: 1 },
+  ])
+  assert.deepEqual(
+    posted.sort((a, b) => a.page.localeCompare(b.page)),
+    [
+      { __drop: true, type: "page", page: "docs/getting started.html", html: "<p>Start</p>" },
+      { __drop: true, type: "page", page: "missing.html", html: undefined },
+    ],
+  )
+})
+
 test("the frame host asks for its page on load, and again when the viewer says hello after missing that", () => {
   const script = FRAME_HOST_HTML.match(/<script\b[^>]*>([\s\S]*)<\/script>/)[1]
   const asked = []
@@ -996,10 +1062,9 @@ test("Drop's scripts go first in the head without dropping the page out of stand
     false,
   )
   assert.ok(app.startsWith("<!doctype html>"))
-  assert.ok(
-    app.indexOf('if (self.origin !== "null") return;') < app.indexOf("const pageAt"),
-    "the opaque shim runs before the app runtime",
-  )
+  const shim = app.indexOf(OPAQUE_ORIGIN_SHIM)
+  assert.notEqual(shim, -1, "the page carries the opaque shim")
+  assert.ok(shim < app.indexOf("const pageAt"), "the opaque shim runs before the app runtime")
 })
 
 /** Runs the shim in a window whose storage, cookies, and URL changes throw, like an opaque-origin sandbox. */
@@ -1079,9 +1144,6 @@ test("every script the runtime injects parses, tools included", () => {
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1])
   assert.ok(scripts.length >= 3)
   for (const source of scripts) assert.doesNotThrow(() => new Script(source))
-  // The toolbar's messages reach the comment layer.
-  assert.match(html, /m\.type === "tool"/)
-  assert.match(html, /m\.type === "view"/)
 })
 
 test("a comment may point at a spot on an element, but an area needs both sides", async () => {

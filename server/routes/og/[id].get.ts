@@ -36,7 +36,13 @@ export default defineHandler(async (event) => {
   }
   const key = await ogCardKey(drop.id, card)
   const storage = useStorage("cache")
-  const cached = await storage.getItemRaw<Uint8Array<ArrayBuffer>>(key).catch(() => null)
+  // A cache that can't be read renders the card again.
+  const cached = await storage.getItemRaw<Uint8Array<ArrayBuffer>>(key).catch((error: unknown) => {
+    useLogger(event).warn("OG card cache read failed", {
+      ogImage: { cache: "read", failure: error instanceof Error ? error.message : String(error) },
+    })
+    return null
+  })
   if (cached) return png(event, cached)
 
   if (!(await rendersAllowed(event))) return generic()
@@ -60,7 +66,13 @@ async function rendersAllowed(event: H3Event) {
   try {
     await requireRateLimit(event, "og-image", { limit: 20, window: "1m" })
     return true
-  } catch {
+  } catch (error) {
+    // Over the limit, or a limiter that can't answer: both get the generic card, and only the second is a failure.
+    if (!(error instanceof Error && "status" in error && error.status === 429))
+      useLogger(event).warn("OG card rate limit unavailable", {
+        ogImage: { rateLimit: error instanceof Error ? error.message : String(error) },
+      })
+    else useLogger(event).set({ ogImage: { rateLimited: true } })
     return false
   }
 }

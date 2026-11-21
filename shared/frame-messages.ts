@@ -1,5 +1,6 @@
 import * as v from "valibot"
 import { MAX_QUIZ_BLOCKS, QuizAnswerInput, QuizId } from "./quiz"
+import { InkSchema } from "./schemas"
 
 // What a drop's frame posts up to the viewer: the comment layer (shared/plan-runtime.ts), an app's page runtime
 // (shared/project-bundle.ts), and the content origin's frame host (server/utils/content-origin.ts). Frames run the
@@ -19,12 +20,20 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("host"), ...path }),
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
+  // An app page's HTML, read on the app's own origin for a viewer that came without it; none when it didn't load.
+  v.object({ type: v.literal("page"), page: v.string(), html: v.optional(v.string()) }),
   v.object({ type: v.literal("copy"), text: v.string() }),
   // A Markdown doc's section the reader went to, or (`copy`) whose link they copied: Drop's address keeps it as #id.
   v.object({ type: v.literal("heading"), id: v.pipe(v.string(), v.maxLength(300)), copy: v.optional(v.boolean()) }),
   // A Markdown doc's header (DOC_HEADER_SCRIPT in ./doc-header): one of its buttons, or a related drop to open.
   v.object({ type: v.literal("doc-action"), action: v.picklist(["markdown", "download", "pdf"]) }),
   v.object({ type: v.literal("doc-open"), id: v.pipe(v.string(), v.regex(/^[\w-]{1,64}$/)) }),
+  // The pointer or focus reached Copy: the viewer loads the Markdown and sends it down ("doc-markdown").
+  v.object({ type: v.literal("doc-intent") }),
+  // The header's Copy wrote the clipboard, or the browser refused it, with the error's name and message.
+  v.object({ type: v.literal("doc-copied"), ok: v.boolean(), error: v.optional(v.pipe(v.string(), v.maxLength(300))) }),
+  // The pointer or focus reached the folder: the viewer sends its drops down ("doc-folder-items").
+  v.object({ type: v.literal("doc-folder") }),
   // Input inside the frame keeps the reader active, even when no cursor is being shared.
   v.object({ type: v.literal("activity") }),
   // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):
@@ -92,6 +101,8 @@ export const FrameMessage = v.variant("type", [
     shot: v.optional(v.number()),
     // From the Marker: the words under its strokes.
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
+    // From the Marker: its strokes, in pixels of the area. Strokes past the limits leave the comment with its box only.
+    ink: v.optional(v.fallback(v.nullable(InkSchema), null)),
   }),
   // null: the picture couldn't be taken.
   v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),

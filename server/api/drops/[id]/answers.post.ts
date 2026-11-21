@@ -5,6 +5,7 @@ import type { QuizSaved } from "#shared/types"
 import { answerable, quizBlocks, quizResults, recordAnswer } from "../../../utils/answers"
 import { expiredLink, findDropAt, permissions, readText, waitingForReview } from "../../../utils/drops"
 import { requireIdentity } from "../../../utils/identity"
+import { logDrop } from "../../../utils/logs"
 import { renderMarkdownCached } from "../../../utils/markdown-document"
 import { routeId } from "../../../utils/params"
 
@@ -46,6 +47,7 @@ export default defineValidatedHandler({
     const kept = await recordAnswer(link, who.userId, answer)
     if (!kept)
       throw new HTTPError({ status: 409, statusText: `A doc keeps answers to ${MAX_QUIZ_BLOCKS} blocks at most.` })
+    logDrop(event, drop, { change: "answer" })
     if (answer.kind === "recall") return { answer: kept }
     const { counts, total } = (await quizResults(link, { question: answer.id })).get(answer.id) ?? {
       counts: {},

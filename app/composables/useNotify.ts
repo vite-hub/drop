@@ -17,8 +17,12 @@ export function useNotify() {
   const toast = useToast()
   const note = useStatusNote()
   const quotaNotice = useQuotaNotice()
-  /** The sentence to show beside the control that failed, or nothing when the plan-limit dialog says it instead. */
-  function problem(error: unknown) {
+  /**
+   * The sentence to show beside the control that failed, or nothing when the plan-limit dialog says it instead. A
+   * failure the server didn't log itself (a network error, a bug here) goes to the server's logs, under `title`.
+   */
+  function problem(error: unknown, title?: string) {
+    reportClientError("notify", error, title ? { title } : {})
     const body = quotaFailureOf(error)
     if (!body) return errorText(error)
     quotaNotice.value = body
@@ -33,7 +37,7 @@ export function useNotify() {
     done: (title: string) => say(title),
     alert,
     fail: (title: string, error: unknown) => {
-      const description = problem(error)
+      const description = problem(error, title)
       if (description) alert(title, description)
     },
     problem,

@@ -263,6 +263,154 @@ for (const [name, layer, datasets, expected] of [
     60_000,
   )
 
+test("named Vega sources preserve parsing, shared references and independent sources under filters", async () => {
+  const rows = [
+    { day: "31/01/2026", label: "January", team: "Alpha" },
+    { day: "28/02/2026", label: "February", team: "Beta" },
+  ]
+  const names = ["observations", "root", "data_0"]
+  const encoding = { x: { field: "day", type: "temporal" } }
+  const input = {
+    ...report,
+    filters: [{ field: "team", type: "list", count: "observations" }],
+    data: Object.fromEntries(names.map((name) => [name, rows])),
+    views: [
+      {
+        id: "overview",
+        label: "Overview",
+        blocks: [
+          ...names.map((name) => ({
+            type: "vega",
+            title: name,
+            spec: {
+              data: { name, format: { parse: { day: "date:'%d/%m/%Y'" } } },
+              layer: [
+                { mark: "point", encoding },
+                { data: { name }, mark: "text", encoding: { ...encoding, text: { field: "label" } } },
+              ],
+            },
+          })),
+          {
+            type: "vega",
+            title: "Local dataset",
+            spec: {
+              data: { name: "observations" },
+              datasets: { observations: [{ team: "Beta", note: "Local" }] },
+              layer: [
+                { mark: "text", encoding: { text: { field: "label" } } },
+                { data: { name: "observations" }, mark: "text", encoding: { text: { field: "note" } } },
+                {
+                  transform: [
+                    {
+                      lookup: "team",
+                      from: { data: { name: "observations" }, key: "team", fields: ["note"] },
+                      as: ["match"],
+                    },
+                    { calculate: "'Lookup: ' + datum.match", as: "result" },
+                  ],
+                  mark: "text",
+                  encoding: { text: { field: "result" } },
+                },
+              ],
+            },
+          },
+          {
+            type: "vega",
+            title: "Generated dataset",
+            spec: {
+              data: { name: "observations" },
+              layer: [
+                { mark: "text", encoding: { text: { field: "label" } } },
+                {
+                  data: { name: "observations", sequence: { start: 1, stop: 3 } },
+                  mark: "text",
+                  encoding: { text: { field: "data", type: "nominal" } },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  }
+  writeFileSync(join(dir, "named.json"), JSON.stringify(input))
+  execFileSync("node", [join(skill, "scripts/build.mjs"), "named.json", "named.html"], { cwd: dir, stdio: "pipe" })
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    page.setDefaultTimeout(5000)
+    await page.route("https://cdn.jsdelivr.net/npm/**", (route) => {
+      const key = Object.keys(vega).find((key) => route.request().url().includes(`/npm/${key}/`))
+      return key ? route.fulfill({ contentType: "text/javascript", body: readFileSync(vega[key]) }) : route.abort()
+    })
+    await page.route("https://fonts.googleapis.com/**", (route) => route.abort())
+    await page.goto(`file://${join(dir, "named.html")}#overview?team=Beta`)
+    for (const name of names) {
+      const svg = page.locator(`.rp-chart[aria-label="${name}"][data-state="ok"] svg`)
+      await svg.waitFor()
+      assert.equal(await svg.locator(".mark-symbol.role-mark path").count(), 1, name)
+      assert.deepEqual(await svg.locator(".mark-text.role-mark text").allTextContents(), ["February"], name)
+    }
+    for (const [title, labels] of [
+      ["Local dataset", ["February", "Local", "Lookup: Local"]],
+      ["Generated dataset", ["February", "1", "2"]],
+    ]) {
+      const svg = page.locator(`.rp-chart[aria-label="${title}"][data-state="ok"] svg`)
+      await svg.waitFor()
+      assert.deepEqual(await svg.locator(".mark-text.role-mark text").allTextContents(), labels, title)
+    }
+  } finally {
+    await browser.close()
+  }
+}, 60_000)
+
+test("bare Vega references and lookups bind to report rows regardless of inline layer order", async () => {
+  const { compile } = await import(from.resolve("vega-lite"))
+  const { View, parse } = await import(from.resolve("vega"))
+  const app = readFileSync(join(skill, "assets/app.js"), "utf8")
+  const start = app.indexOf("function isolateVegaSource")
+  const isolate = runInNewContext(`${app.slice(start, app.indexOf("const tooltip", start))}
+    isolateVegaSource`)
+  const reportKey = "observations"
+  const encoding = { text: { field: "label" } }
+  const reportLayer = { data: { name: reportKey }, mark: "text", encoding }
+  const inlineLayer = { data: { name: reportKey, values: [{ label: "Inline" }] }, mark: "text", encoding }
+  const lookupLayer = {
+    data: { values: [{ team: "Beta" }] },
+    transform: [{ lookup: "team", from: { data: { name: reportKey }, key: "team", fields: ["label"] } }],
+    mark: "text",
+    encoding,
+  }
+  for (const [layers, expected] of [
+    [
+      [reportLayer, inlineLayer],
+      ["February", "February", "Inline", "February"],
+    ],
+    [
+      [inlineLayer, reportLayer],
+      ["February", "Inline", "February", "February"],
+    ],
+  ]) {
+    const spec = structuredClone({
+      data: { name: reportKey },
+      layer: [{ mark: "text", encoding }, ...layers, lookupLayer],
+    })
+    const alias = isolate(spec, reportKey)
+    const compiled = compile(spec).spec
+    compiled.data.find((dataset) => dataset.name === alias).values = [{ team: "Beta", label: "February" }]
+    const view = new View(parse(compiled), { renderer: "none" })
+    try {
+      const svg = await view.toSVG()
+      assert.deepEqual(
+        Array.from(svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g), (match) => match[1]),
+        expected,
+      )
+    } finally {
+      view.finalize()
+    }
+  }
+})
+
 test("paint preprocessing preserves nested records and explicit scale choices", () => {
   const app = readFileSync(join(skill, "assets/app.js"), "utf8")
   const paint = runInNewContext(`${app.slice(app.indexOf("const PALETTE"), app.indexOf("const report"))}

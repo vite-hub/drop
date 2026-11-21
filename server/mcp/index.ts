@@ -1,5 +1,6 @@
 import { createMcpHandler, createMcpOAuth, type McpHandler, type McpOAuth } from "nitro-mcp-toolkit"
 import { useLogger } from "evlog/nitro/v3"
+import * as v from "valibot"
 import { MCP_INSTRUCTIONS, MCP_SERVER_INFO } from "#shared/mcp"
 import { identify } from "../utils/identity"
 import { mcpSkills, skillResources } from "../utils/mcp-skills"
@@ -27,6 +28,9 @@ import { siteCommentTools } from "./site-comments"
  * The resource identifier is the request's origin plus `/mcp`, so the handler is built once per origin.
  */
 const servers = new Map<string, { mcp: McpHandler; oauth: McpOAuth }>()
+
+/** A tool result that names a drop: publish, update_drop, create_folder, edit_board, accept_suggestion. */
+const NamesDrop = v.object({ id: v.string() })
 
 export function mcpFor(origin: string) {
   let server = servers.get(origin)
@@ -73,20 +77,23 @@ export function mcpFor(origin: string) {
       ],
       prompts: [addressFeedback],
       resources: skillResources,
-      // Every tool call lands on the request's wide event.
+      // Every tool call lands on the request's wide event, in `mcp.calls`: a batch makes several in one request.
       onToolCall: ({ name, result, durationMs, event }) => {
         const log = useLogger(event)
         const failed = "isError" in result && Boolean(result.isError)
-        log.set({ mcp: { tool: name, durationMs: Math.round(durationMs), isError: failed } })
-        if (failed)
-          log.warn(`MCP tool ${name} failed`, {
-            mcp: {
-              error: result.content
-                ?.map((block) => ("text" in block ? block.text : ""))
-                .join(" ")
-                .slice(0, 500),
-            },
-          })
+        const error = failed
+          ? result.content
+              ?.map((block) => ("text" in block ? block.text : ""))
+              .join(" ")
+              .slice(0, 500)
+          : undefined
+        // The drop it returned, or else the first one it read.
+        const named = v.safeParse(NamesDrop, "structuredContent" in result ? result.structuredContent : undefined)
+        const drop = named.success ? named.output.id : event.context.loggedDrop
+        event.context.loggedDrop = undefined
+        const call = { tool: name, durationMs: Math.round(durationMs), isError: failed, drop, error }
+        log.set({ mcp: { method: "tools/call", tool: name, isError: failed, calls: [call] } })
+        if (failed) log.warn(`MCP tool ${name} failed`)
       },
     },
     { extensionPlugins: [mcpSkills()] },

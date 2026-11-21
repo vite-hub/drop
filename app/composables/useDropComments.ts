@@ -132,7 +132,11 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
   // The client and the parts keep their own copy of the threads. Whatever changes the viewer's list (a send, a new
   // version, the lightbox) has them read it again.
   const client = createCommentsClient({ transport, user: user.value, refreshOnFocus: false })
-  watch([options.source, subject], () => void client.refresh().catch(() => undefined), { flush: "post" })
+  watch(
+    [options.source, subject],
+    () => void client.refresh().catch((error: unknown) => reportClientError("comments-refresh", error)),
+    { flush: "post" },
+  )
   const comments = useComments({ client, subject, user, can, hotkey: false })
 
   const images = computed(() => attachmentsOf(options.source()))

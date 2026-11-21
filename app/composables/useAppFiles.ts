@@ -9,8 +9,9 @@ import type { DropDetail } from "#shared/types"
 export function useAppFiles(drop: Ref<DropDetail>) {
   const route = useRoute()
   const setQuery = useSetQuery()
+  // An app its origin serves comes without its files: its pages are in its paths, and the frame reads them there.
   const files = computed(() => drop.value.files ?? {})
-  const pages = computed(() => appPages(Object.keys(files.value)))
+  const pages = computed(() => appPages(drop.value.paths ?? Object.keys(files.value)))
   const location = ref("/")
   const page = computed({
     get: () => appPageFor(pages.value, location.value),

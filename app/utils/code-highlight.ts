@@ -21,7 +21,9 @@ async function prepare(lang: CodeLanguage) {
     highlighter = (await loadHighlighter(lang, [THEMES.light, THEMES.dark])).shiki
     loaded.add(lang)
     loading.delete(lang)
-  } catch {}
+  } catch (error) {
+    reportClientError("code-highlight", error)
+  }
 }
 
 function decorate(doc: ProseMirrorNode): DecorationSet {
