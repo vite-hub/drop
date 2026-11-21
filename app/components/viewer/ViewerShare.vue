@@ -16,7 +16,7 @@ const choices = computed(() => shareItems(me.value, props.drop))
 const now = useRelativeNow()
 
 const linkNote = computed(() => {
-  if (props.drop.isOwner && !shared.value) return "Pick who can open it to turn the link on."
+  if (props.drop.isOwner && !shared.value) return ""
   if (!isPublic(props.drop.share)) return "Teammates sign in to open it."
   if (!props.drop.publicUntil) return "It stays open until you change it."
   const left = daysUntil(props.drop.publicUntil, now.value)
@@ -35,6 +35,9 @@ async function pick(next: Share) {
   if (done && renew) notify.done("Public link renewed")
 }
 
+const trigger = useTemplateRef<{ $el: HTMLElement }>("trigger")
+const bar = computed(() => trigger.value?.$el?.closest<HTMLElement>('[aria-label="Document tools"]') ?? undefined)
+
 function focusPanel(event: Event) {
   event.preventDefault()
   if (event.target instanceof HTMLElement) event.target.focus({ preventScroll: true })
@@ -44,13 +47,15 @@ function focusPanel(event: Event) {
 <template>
   <UPopover
     v-model:open="open"
-    :content="{ align: 'end', side: 'top', onOpenAutoFocus: focusPanel }"
+    :content="{ align: 'center', side: 'top', sideOffset: 8, onOpenAutoFocus: focusPanel }"
+    :reference="bar"
     :ui="{
       content:
         'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px]',
     }"
   >
     <UButton
+      ref="trigger"
       aria-label="Share drop"
       class="shrink-0"
       color="neutral"
@@ -131,7 +136,7 @@ function focusPanel(event: Event) {
               :value="url"
             />
           </div>
-          <p aria-live="polite" class="mt-1.5 min-h-lh px-1 text-xs text-muted">
+          <p v-if="linkNote" aria-live="polite" class="mt-1.5 px-1 text-xs text-muted">
             {{ linkNote }}
           </p>
         </div>
