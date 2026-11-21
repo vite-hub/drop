@@ -203,7 +203,7 @@ export default defineNuxtConfig({
   },
 
   $development: {
-    vitehub: { blob: { driver: "fs", serve: { route: "/f", access: "public" } } },
+    vitehub: { blob: { driver: "fs" } },
   },
 
   css: [
