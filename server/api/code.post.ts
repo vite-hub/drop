@@ -3,7 +3,6 @@ import { CodeImageSchema } from "#shared/schemas"
 import { createCodeImage } from "../utils/code-image-store"
 import { requireIdentity } from "../utils/identity"
 
-/** Turns code into an image for the browser; agents use the `create_code_image` MCP tool. */
 export default defineValidatedHandler({
   validate: { body: CodeImageSchema },
   async handler(event) {

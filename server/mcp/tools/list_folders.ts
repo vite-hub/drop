@@ -6,7 +6,6 @@ import { requireIdentity } from "../../utils/identity"
 import { searchWords } from "../../utils/search"
 import { mcpDrop } from "../format"
 
-/** How much of each description a list without query shows: enough to pick a folder, then query it for the rest. */
 const SHORT = 160
 
 const cut = (text: string) => {

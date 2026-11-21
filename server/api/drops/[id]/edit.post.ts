@@ -6,7 +6,6 @@ import { logDrop } from "../../../utils/logs"
 import { ensureDraft } from "../../../utils/live-drafts"
 import { routeId } from "../../../utils/params"
 
-/** Opens the live draft of a Markdown drop's current version, starting it from the published text. People only. */
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)

@@ -6,7 +6,6 @@ import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 import { siteItems } from "../../../utils/review"
 
-/** A site's review list for its page in Drop: every comment sent from the site, newest first, with its screenshot. */
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)

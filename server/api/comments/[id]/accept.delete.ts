@@ -5,7 +5,6 @@ import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 import { undoSuggestion } from "../../../utils/suggestions"
 
-/** Takes an accepted suggestion back while its version is the latest (../../../utils/suggestions.ts). */
 export default defineHandler(async (event) => {
   const thread = await findThread(await routeId(event))
   const drop = thread ? await findDrop(thread.meta.dropId) : null

@@ -1,13 +1,4 @@
-/**
- * A site's letter tile, for a link whose site has no icon: the first letter of its name on a rounded square lit from
- * above (a soft gradient, a light top edge, a dark rim, a faint shadow under the letter), so it reads as a small icon
- * beside real logos rather than a placeholder. Its hue stays the same for that name, so two sites without icons still
- * look apart. The server serves it for a host no provider knows (server/utils/favicons.ts), and a doc's frame draws it
- * when an icon doesn't load (./doc-header.ts), which takes this function's source: it uses nothing from outside its
- * body. Chosen from flat, tinted and aurora on drop vb7hqztte1e2.
- */
 export function siteTile(name: string): string {
-  // Eight hues around the wheel, skipping the muddy olive and brown that oklch gives near 90–120 at this lightness.
   const hues = [25, 55, 150, 185, 230, 265, 300, 340]
   let hash = 0
   for (const char of name) hash = (Math.imul(hash, 31) + (char.codePointAt(0) ?? 0)) >>> 0

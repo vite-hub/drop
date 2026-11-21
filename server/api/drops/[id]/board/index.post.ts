@@ -7,10 +7,8 @@ import { identify } from "../../../../utils/identity"
 import { logDrop } from "../../../../utils/logs"
 import { routeId } from "../../../../utils/params"
 
-// Each element is checked in writeBoard (isBoardElement); here only that it's a list of objects.
 const BoardSave = v.object({ elements: v.pipe(v.array(v.record(v.string(), v.unknown())), v.maxLength(5000)) })
 
-/** Elements a person changed in Excalidraw since their last save. Anyone who may edit the drop may draw on its latest version. */
 export default defineValidatedHandler({
   validate: { body: BoardSave },
   async handler(event) {

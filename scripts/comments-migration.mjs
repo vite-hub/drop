@@ -1,9 +1,3 @@
-// Writes server/databases/default/migrations/20261103143224_0011_comments_one_model/migration.sql: ViteHub's move of
-// the live-site comment tables to its one comment model (`commentsMigrationSql({ from: "live" })`), then Drop's own
-// backfills. This migration has shipped: later ViteHub schema changes need a new migration from `pnpm db:generate`, not
-// a rewrite of 0011.
-//
-//   node scripts/comments-migration.mjs
 import { writeFileSync } from "node:fs"
 import { commentsMigrationSql } from "vite-hub/comments/database"
 
@@ -14,15 +8,10 @@ const first =
 const box = `${meta("ow")} > 0 AND ${meta("oh")} > 0`
 const selector = `coalesce(nullif(${meta("selector")}, ''), 'body')`
 
-/** Drop's threads kept their version, their anchor, and their empty notes in `metadata`; the one model has fields for them. */
 export const dropBackfills = [
-  // The version a comment was written on is the thread's `revision`, which `list({ revision: { lte } })` reads.
   `UPDATE \`vitehub_comment_threads\` SET \`revision\` = CAST(${meta("version")} AS integer) WHERE ${drop} AND \`revision\` IS NULL AND json_type(\`metadata\`, '$.version') IN ('integer', 'real')`,
-  // A suggestion or an image-only comment was saved with a stand-in note and `emptyBody`; the one model takes an empty note.
   `UPDATE \`vitehub_comment_messages\` SET \`body\` = '' WHERE \`id\` IN (SELECT ${first} FROM \`vitehub_comment_threads\` AS \`t\` WHERE \`t\`.${drop} AND json_extract(\`t\`.\`metadata\`, '$.emptyBody') = 1)`,
-  // Images sent with a comment or a reply: the message lists their image drops, oldest first.
   "UPDATE `vitehub_comment_messages` SET `attachments` = (SELECT json_group_array(`drop_id`) FROM (SELECT `a`.`drop_id` FROM `comment_attachments` AS `a` WHERE coalesce(`a`.`reply_id`, `a`.`comment_id`) = `vitehub_comment_messages`.`id` ORDER BY `a`.`created_at`)) WHERE `id` IN (SELECT coalesce(`reply_id`, `comment_id`) FROM `comment_attachments`)",
-  // The anchor that ViteHub's Console and MCP read, from the one Drop's viewers draw.
   [
     "UPDATE `vitehub_comment_threads` SET `anchor` = CASE",
     `WHEN ${meta("kind")} = 'page' THEN '{"kind":"page"}'`,
@@ -33,15 +22,11 @@ export const dropBackfills = [
     `ELSE json_object('kind', 'element', 'selector', ${selector}, 'x', ${meta("ox")}, 'y', ${meta("oy")})`,
     `END WHERE ${drop} AND json_type(\`metadata\`, '$.kind') = 'text'`,
   ].join(" "),
-  // `version` and `emptyBody` now live in the model.
   `UPDATE \`vitehub_comment_threads\` SET \`metadata\` = json_remove(\`metadata\`, '$.version', '$.emptyBody') WHERE ${drop} AND \`metadata\` IS NOT NULL`,
 ]
 
-// SQLite retargets foreign keys and triggers when the live threads table is renamed. Keep the retry receipts,
-// but bind them and their claim trigger to the replacement table so retries and deletes still work.
 const reviewSubmissions = [
   "CREATE TABLE `review_submissions_next` (`scope` text NOT NULL, `request_id` text NOT NULL, `thread_id` text NOT NULL, PRIMARY KEY (`scope`, `request_id`), FOREIGN KEY (`thread_id`) REFERENCES `vitehub_comment_threads` (`id`) ON UPDATE no action ON DELETE cascade)",
-  // Explicit destination columns let ViteHub verify that this rebuild preserves every receipt column.
   "INSERT INTO `review_submissions_next` (`scope`, `request_id`, `thread_id`) SELECT `scope`, `request_id`, `thread_id` FROM `review_submissions`",
   "DROP TABLE `review_submissions`",
   "ALTER TABLE `review_submissions_next` RENAME TO `review_submissions`",

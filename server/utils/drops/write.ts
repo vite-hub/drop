@@ -30,14 +30,11 @@ import { permissions } from "./access"
 import { findDrop, findDropByBlob, storageFailure } from "./query"
 import { d1Chunks } from "../d1"
 
-// Storage that was down (503), not a row someone else published first.
 const Unavailable = v.object({ status: v.literal(503) })
 
 const TEXT_KINDS = new Set(["markdown", "html"])
-/** `/f/<key>` links in a doc's source, absolute or relative, with or without `?raw`. */
 const FILE_LINK = /\/f\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,16})/gi
 
-/** Draft images follow rendered file URLs that target this Drop independently of the reader's page path. */
 async function referencedFileKeys(html: string, origin: string) {
   const keys = new Set<string>()
   const { htmlToMarkdown } = await import("mdream")
@@ -57,11 +54,6 @@ async function referencedFileKeys(html: string, origin: string) {
   return [...keys]
 }
 
-/**
- * Makes the files a doc embeds its attachments, so they share its sharing, lifetime, and Trash. Only the doc owner's
- * own files that aren't docs themselves: embedding never exposes someone else's file. A file already attached to
- * another doc, or in a folder, stays where it is.
- */
 async function adoptAttachments(doc: DropRow, source: string) {
   const keys = [...new Set([...source.matchAll(FILE_LINK)].map((match) => match[1]!))]
   for (const chunk of d1Chunks(keys))
@@ -79,11 +71,6 @@ async function adoptAttachments(doc: DropRow, source: string) {
       )
 }
 
-/** What the publisher says about a drop's life. Later versions inherit it unless they say otherwise. */
-/**
- * Agents may keep a drop when they say why; people just choose. On a Drop that turned keeping off, only admins keep.
- * Returns the columns to store.
- */
 export function lifetimeFields(
   who: Identity,
   input: LifetimeInput,
@@ -120,17 +107,12 @@ async function queueBlobCleanup(keys: string[]) {
   }
 }
 
-/** Retries cleanup left by an earlier metadata operation, in one batch. */
 export async function drainBlobCleanup() {
   await deleteBlobKeys(
     (await db.select({ key: blobCleanup.blobKey }).from(blobCleanup).limit(20)).map((item) => item.key),
   )
 }
 
-/**
- * Deletes blobs whose metadata is already gone. A failure doesn't fail the request (the publish or delete already
- * happened): the keys stay queued and the next drop operation retries them.
- */
 export async function deleteBlobKeys(keys: string[]) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
@@ -150,10 +132,6 @@ export async function deleteBlobKeys(keys: string[]) {
   for (const chunk of d1Chunks(unique)) await db.delete(blobCleanup).where(inArray(blobCleanup.blobKey, chunk))
 }
 
-/**
- * Refuses a version on top of one the agent didn't read: `base` is the version it read, and the drop has moved on
- * since. Without `base`, the next version goes on top of the latest, as before.
- */
 export function requireBase(latest: Pick<DropRow, "id" | "version">, base: number | undefined) {
   if (base !== undefined && base !== latest.version)
     throw new HTTPError({
@@ -162,18 +140,10 @@ export function requireBase(latest: Pick<DropRow, "id" | "version">, base: numbe
     })
 }
 
-/**
- * Stores one file as a private doc drop, or as the next version of the drop `supersedes` names. Markdown and HTML must
- * be UTF-8. `slug` names the link (the previous version's, or the title's, otherwise); with `nameFromSlug` the file is
- * called after it too, keeping the extension.
- * `folder` (checked by `requireFolder`) places a new drop in it. A drop in a folder lives as long as the folder, so it
- * takes no lifetime of its own, and its slug gets a number when another drop in the folder has it.
- */
 export async function createDocDrop(
   who: Identity,
   input: LifetimeInput & {
     agent?: AgentMetadata
-    /** The version the agent read, refused unless it's still the latest (`requireBase`). */
     base?: number
     filename: string
     bytes: Uint8Array
@@ -181,9 +151,7 @@ export async function createDocDrop(
     slug?: string
     nameFromSlug?: boolean
     supersedes?: string
-    /** Internal acceptance receipt, committed atomically with the new version. */
     acceptedSuggestionId?: string
-    /** Internal undo receipt, committed atomically with the reversal. */
     undoneSuggestionId?: string
     share?: Share
     folder?: DropRow
@@ -218,8 +186,6 @@ export async function createDocDrop(
     contentType = kind === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8"
   }
   if (extension === BOARD_EXTENSION) {
-    // An empty .excalidraw starts an empty board (the New menu's Board). Any other is stored without what a board
-    // doesn't take (images, embeds) or the uploader's own view.
     try {
       const board = input.bytes.byteLength
         ? parseBoard(new TextDecoder("utf-8", { fatal: true }).decode(input.bytes))
@@ -233,14 +199,12 @@ export async function createDocDrop(
     contentType = BOARD_CONTENT_TYPE
   }
   if (kind === "file" && contentType.startsWith("image/")) kind = "image"
-  // The bytes only tell images and PDFs apart; files are served with nosniff, so a video needs its type to play.
   if (kind === "file" && contentType === "application/octet-stream") contentType = videoType(filename) ?? contentType
 
   let previous: DropRow | null = null
   if (input.supersedes) {
     const found = (await findDrop(input.supersedes)) ?? (await findDropByBlob(input.supersedes))
     const can = found && permissions(found, who)
-    // An expired drop is read-only even for its owner, so check the Trash before the edit right.
     if (found?.expired && can && can.manage)
       throw new HTTPError({
         status: 409,
@@ -256,24 +220,19 @@ export async function createDocDrop(
         })
       if (!can.manage && kind !== found.kind)
         throw new HTTPError({ status: 403, statusText: "Only the drop's owner can change what kind of file it is." })
-      // A file of an earlier version names the drop too; the next version goes on top of the latest.
       previous = found.head ? await findDrop(found.id) : found
-      // Checked again on the row the write guards, so a version published since the caller's check is refused too.
       if (previous) requireBase(previous, input.base)
     }
   }
-  // What the drop stores itself, before its folders widen its share or lend it their lifetime.
   const own = previous?.raw ?? previous
   const folder = previous ? null : (input.folder ?? null)
   const parentId = attachment?.id ?? previous?.parentId ?? folder?.id ?? null
-  // A drop in someone's folder is theirs (admins add to anyone's); in a team folder it stays its publisher's.
   const ownerId =
     attachment?.ownerId ?? previous?.ownerId ?? (folder && !folder.teamFolder ? folder.ownerId : who.userId)
   const life = parentId
     ? lifetimeFields(who, {}, attachment ?? own ?? folder, event)
     : lifetimeFields(who, input, own, event)
   await requireKeepSlot(ownerId, life, own?.lifetime === "keep", !parentId)
-  // In a team's folders a drop shares like one on a team Drop (../share.ts modeFor).
   const mode = modeFor(previous ?? folder, event)
   const share = attachment
     ? { share: "private" as const, publicUntil: null }
@@ -283,7 +242,6 @@ export async function createDocDrop(
         ? { share: own.share, publicUntil: own.publicUntil }
         : { share: defaultShare(mode), publicUntil: null }
 
-  // Before anything is stored, so a doc Comark can't render right leaves no file and no version behind.
   const warnings =
     kind === "markdown" && text !== undefined
       ? await (await import("../markdown-document")).requirePublishableMarkdown(text, event)
@@ -300,7 +258,6 @@ export async function createDocDrop(
         throw storageFailure(storageError)
       }
 
-      // Renders once at upload: the title comes from Comark, and the first view hits a warm cache.
       let parsedTitle: string | undefined
       let draftKeys: string[] = []
       try {
@@ -316,7 +273,6 @@ export async function createDocDrop(
       }
       const markdownTitle = parsedTitle === "Untitled document" ? undefined : parsedTitle
       const now = Date.now()
-      // A version that doesn't name itself keeps its drop's title: a board or a file has only its filename to offer.
       const title = (
         input.title?.trim() ||
         markdownTitle ||
@@ -351,7 +307,6 @@ export async function createDocDrop(
         trashReason: null,
         parentId,
         draftImage: Boolean(attachment),
-        // A public link waits for an admin's review again with each version: what it shows changed.
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: own?.quarantinedAt ?? null,
         publishToken: null,
@@ -360,8 +315,6 @@ export async function createDocDrop(
         resources: own?.resources ?? null,
       }
       try {
-        // The latest version moves to drop_versions and the new one takes its place, only if no one else's did first:
-        // the guard sees this publish's file on the drop, or rolls the whole batch back.
         const write = own
           ? [
               db.insert(dropVersions).select((qb) =>
@@ -403,7 +356,6 @@ export async function createDocDrop(
             ...(folder ? [touchFolder(folder.id, now)] : []),
             ...(input.acceptedSuggestionId
               ? [
-                  // An undone suggestion can be accepted again; an active receipt still rejects duplicate accepts.
                   db
                     .delete(suggestionAcceptances)
                     .where(
@@ -480,20 +432,13 @@ export async function createDocDrop(
         throw error
       }
       if (text && TEXT_KINDS.has(kind)) await adoptAttachments(row, text)
-      // People reading the doc's link follow it to this version.
       if (previous) await refreshLatest(row.id)
-      // TODO(repo-mirror): also commit this version to a repo the owner picks, one commit per version with the note
-      // as its message. Drop stays the source of truth: versions keep living in Blob and the database on every host.
-      // Waits on a public app-facing API in @vite-hub/forge (`commitFiles()` through the `forges` library), which is
-      // internal-only on vite-hub/vitehub's feat/forge-primitive branch today, and on a token that may write to the
-      // owner's repo (a GitHub App install, or a wider scope on GitHub sign-in).
       logDrop(event, row, { change: "publish" })
       return Object.assign(row, { warnings })
     },
   )
 }
 
-/** The files whose references `appLinkIssues` checks, as text. Fonts, images and the like reference nothing. */
 function linkedText(files: (readonly [string, Uint8Array])[]) {
   const decoder = new TextDecoder()
   return Object.fromEntries(
@@ -513,11 +458,6 @@ function cleanPath(path: string) {
   return clean
 }
 
-/**
- * Whether a blob key part climbs out of its folder once decoded. ViteHub's blob store percent-decodes every key before
- * its driver sees it, so `%2e%2e/` is `../`, which the fs driver resolves; a URL-based driver (S3) may decode again.
- * Either way an app's file could land on another drop's blob.
- */
 export function escapesFolder(path: string) {
   let decoded = path
   for (let round = 0; round < 3; round++) {
@@ -535,26 +475,14 @@ export function escapesFolder(path: string) {
     .some((part) => part === "." || part === "..")
 }
 
-/**
- * TODO(app-history): an app's next version replaces its files in place (same row, old blobs deleted), so apps have
- * no History tab, nothing to compare, and their comments never go outdated. Keeping each version (a row per version
- * like docs, or ViteHub Workspace history) would give them all three.
- *
- * Creates an app drop, or publishes the next version of one you may edit. A next version starts from the previous
- * one's files: `files` adds or replaces paths, and a path leaves the app only when `removes` names it, so an agent
- * that sends just the files it changed can't delete the rest by accident. With `replace` (a built app's archive),
- * `files` is the whole next version instead. `folder` places a new app in it, as in `createDocDrop`.
- */
 export async function publishApp(
   who: Identity,
   input: LifetimeInput & {
     agent?: AgentMetadata
-    /** The version the agent read, refused unless it's still the latest (`requireBase`). */
     base?: number
     id?: string
     name?: string
     slug?: string
-    /** Text, or bytes for a binary file from an archive. */
     files: Record<string, string | Uint8Array>
     removes?: string[]
     replace?: boolean
@@ -577,7 +505,6 @@ export async function publishApp(
     throw new HTTPError({ status: 400, statusText: "An archive replaces the whole app, so it takes no removes." })
   const encoder = new TextEncoder()
   const encoded = entries.map(
-    // doctor-disable-next-line typescript/strict/no-runtime-typeof -- the parsed domain: an app file is text or bytes
     ([path, content]) => [path, typeof content === "string" ? encoder.encode(content) : content] as const,
   )
   if (entries.length > MAX_APP_FILES)
@@ -591,7 +518,6 @@ export async function publishApp(
   const now = Date.now()
   let row: DropRow | null = input.id ? await findDrop(input.id) : null
   if (input.id && (!row || row.kind !== "app")) throw new HTTPError({ status: 404, statusText: "No app with that id." })
-  // An expired app is read-only even for its owner, so check the Trash before the edit right. Apps keep no older versions.
   if (row?.expired && permissions(row, who).manage)
     throw new HTTPError({
       status: 409,
@@ -599,7 +525,6 @@ export async function publishApp(
     })
   if (row && !permissions(row, who).edit) throw new HTTPError({ status: 403, statusText: "You can't edit this app." })
   if (row) requireBase(row, input.base)
-  // The app's own share, not the one a folder gives it: this writes the row.
   const own = row?.raw ?? row
   const folder = row ? null : (input.folder ?? null)
   const parentId = row?.parentId ?? folder?.id ?? null
@@ -635,7 +560,6 @@ export async function publishApp(
       status: 400,
       message: `removes names ${stale.join(", ")}, which ${stale.length === 1 ? "isn't" : "aren't"} in ${row ? `v${row.version}` : "a new app"}. Nothing was published.`,
     })
-  // Files the agent neither sent nor removed carry over, blob and all: no new write, no new bytes. An archive keeps none.
   const sent = new Set(entries.map(([path]) => path))
   const kept = input.replace ? [] : old.filter((file) => !removes.includes(file.path) && !sent.has(file.path))
   const paths = [...kept.map((file) => file.path), ...entries.map(([path]) => path)]
@@ -666,8 +590,6 @@ export async function publishApp(
       const stagedKeys: string[] = []
       let committedPublish = false
       try {
-        // A few at a time: a built app has hundreds of files, and a Worker keeps only six connections open. After a
-        // failure the others stop taking files, and all of them finish before the cleanup below deletes what they wrote.
         const queue = [...encoded]
         let failed = false
         const put = async () => {
@@ -761,8 +683,6 @@ export async function publishApp(
               shareReview,
             })
             .where(and(eq(drops.id, id), eq(drops.version, row.version)))
-          // The file set changes only if the update above won: both statements check for this publish's token.
-          // (Builders, not raw `db.run(sql)`: D1's batch can't bind raw statements.)
           const won = and(eq(drops.id, id), eq(drops.publishToken, token))
           const replace = db
             .delete(dropFiles)

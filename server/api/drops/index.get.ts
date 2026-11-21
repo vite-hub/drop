@@ -12,12 +12,6 @@ import {
 import { requireIdentity } from "../../utils/identity"
 import { searchKinds } from "../../utils/search"
 
-/**
- * Your drops at the top; with `?trash` the ones in your Trash; with `?pinned` the drops you pinned, yours and others'; with `?shared` what others share with you (on a team Drop
- * the team's folders first); with `?folders` every folder your drops may go in, yours and the team's. `?q=` searches your drops at any depth, by name and by a doc's text, and with
- * `?folder=<id or link>` the folder's drops (`&limit=` the newest few), or with `q` everything below it. `?kind=image,file` keeps those kinds, at
- * any depth, with or without `q`.
- */
 export default defineValidatedHandler({
   validate: { query: DropsQuerySchema },
   async handler(event) {

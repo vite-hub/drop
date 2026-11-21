@@ -2,29 +2,23 @@ import * as v from "valibot"
 
 export const PLANS = ["free", "pro", "unlimited"] as const
 export type Plan = (typeof PLANS)[number]
-/** What an admin picks per user in the Auth Console. `unlimited` stays an operator's DROP_DEFAULT_PLAN. */
 export const TIERS = ["free", "pro"] as const
 export const MIB = 1024 * 1024
 export const MAX_APP_FILES = 1000
 export const MAX_APP_BYTES = 25 * MIB
-/** Pro keeps any number of drops unless an operator caps them (`DROP_PRO_DROPS`); storage and writes stay capped. */
 export const DEFAULT_PRO_LIMITS = { drops: null, bytes: 1024 * MIB, writes: 10_000 } as const
-/** Drops a Free plan keeps forever at once (`DROP_FREE_KEPT`). Team folders and drops inside folders don't count. */
 export const DEFAULT_FREE_KEPT = 10
-/** Members a team has before it needs a subscription (`DROP_FREE_TEAM_MEMBERS`). */
 export const DEFAULT_FREE_TEAM_MEMBERS = 2
 
 interface PlanLimits {
   drops: number | null
   bytes: number | null
   writes: number | null
-  /** Drops kept forever at once. */
   kept: number | null
   appFiles: number
   appBytes: number
 }
 
-/** Global app safety limits also apply when owner quotas are disabled. */
 export function planLimits(
   plan: Plan,
   pro: { drops?: number; bytes?: number; writes?: number } = {},
@@ -53,7 +47,6 @@ export interface Usage {
   writes: { used: number; limit: number | null }
   kept: { used: number; limit: number | null }
   app: { files: number; bytes: number }
-  /** A team subscription gives this plan (server/utils/teams.ts), not an admin or DROP_DEFAULT_PLAN. */
   paid: boolean
   selfHostUrl: string
 }
@@ -63,17 +56,13 @@ type QuotaUnit = (typeof QUOTA_UNITS)[number]
 export interface QuotaFailure {
   code: "DROP_LIMIT_REACHED"
   quota: { unit: QuotaUnit; used: number; limit: number }
-  /** Only the per-minute publish limit clears by waiting; every other limit needs the user. */
   retryable: boolean
-  /** Seconds until a retryable limit clears. */
   retryAfterSeconds?: number
-  /** When the counter resets: the next minute for publishes, the next month (UTC) for file writes. Absent for limits that never reset on their own. */
   resetAt?: string
   selfHostUrl: string
   message: string
 }
 
-/** A refused write's body, as the app reads it back from an API error. */
 export const QuotaFailureSchema = v.object({
   code: v.literal("DROP_LIMIT_REACHED"),
   quota: v.object({ unit: v.picklist(QUOTA_UNITS), used: v.number(), limit: v.number() }),
@@ -84,7 +73,6 @@ export const QuotaFailureSchema = v.object({
   message: v.string(),
 }) satisfies v.GenericSchema<QuotaFailure>
 
-/** The first instant of next month, UTC, when monthly file writes start over. */
 function nextMonthStart(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
 }

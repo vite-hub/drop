@@ -1,6 +1,3 @@
-// A link item: a drop that opens a page outside Drop, such as the pull request a folder's reports go with. It has no
-// file and no versions: a title, the address (in `site_url`), and a note. In a folder it lists, shares, lives, and moves
-// with the folder's other drops.
 import type { AgentMetadata } from "#shared/agent"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
@@ -17,7 +14,6 @@ import { requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
 import { shareReviewFor } from "./trust"
 
-/** The address a link item may open, checked and normalized like a resource's. */
 export function linkAddress(url: string) {
   const href = url.length <= MAX_RESOURCE_URL ? resourceUrl(url) : null
   if (!href) throw new HTTPError({ status: 400, message: `${url} isn't a link: use https, or http on localhost.` })
@@ -26,10 +22,6 @@ export function linkAddress(url: string) {
 
 const PullRequest = v.object({ title: v.string() })
 
-/**
- * A public pull request's title, from GitHub's API without a token: one request when the link is made, never again.
- * Null for a private repository, a rate limit, or a slow answer; the link then goes by its repository and number.
- */
 async function pullRequestTitle(href: string): Promise<string | null> {
   const pull = pullRequestOf(href)
   if (!pull) return null
@@ -45,11 +37,9 @@ async function pullRequestTitle(href: string): Promise<string | null> {
   }
 }
 
-/** Its title: the one given, a pull request's own, or what the address says (`quiverdk/website#33`). */
 const linkTitle = async (href: string, title?: string) =>
   (title?.trim() || (await pullRequestTitle(href)) || linkSource(href)).slice(0, 160)
 
-/** Creates a link item at the top, or in `folder`, where it lives as long as the folder. It counts as a drop. */
 export async function createLinkDrop(
   who: Identity,
   input: LifetimeInput & {

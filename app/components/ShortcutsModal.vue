@@ -1,13 +1,9 @@
 <script setup lang="ts">
-// Linear's ? sheet: every shortcut, grouped by where it works. ? opens it from any page that mounts this, outside text
-// fields; the account menu and the ⌘K palette open it too. It sits in the bottom right without covering the page, so
-// the reader can try a shortcut while it's open; Escape or ? closes it.
 const open = useShortcutsOpen()
 defineShortcuts({ "?": () => (open.value = !open.value) })
 onKeyStroke("Escape", () => (open.value = false))
 
 const panel = useTemplateRef<HTMLElement>("panel")
-// Focus goes to the sheet so a screen reader reads it, and back to where it was when it closes.
 let returnFocus: HTMLElement | null = null
 watch(open, async (now) => {
   if (now) {
@@ -20,7 +16,6 @@ watch(open, async (now) => {
 
 <template>
   <Teleport to="body">
-    <!-- Rises out of the corner it sits in; the exit retraces it, faster. Reduced motion keeps only the fade. -->
     <Transition
       enter-active-class="transition-[opacity,translate,scale] duration-200 ease-(--ease-out)"
       enter-from-class="opacity-0 translate-y-2 scale-97 motion-reduce:translate-y-0 motion-reduce:scale-100"

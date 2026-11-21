@@ -14,12 +14,6 @@ import { modeFor, shareFields, sharePolicy } from "./share"
 import { shareReviewFor } from "./trust"
 import { runsTeam, teamOf, teamsEnabled } from "./teams"
 
-/**
- * The folder `ref` names (its id, its link's key, or its share link) when the caller may put something in it: their own
- * folders, or any as an admin. Everyone on the team adds drops to a team folder, people and agents alike; folders go in
- * one only when they're team folders an admin makes in the browser. `moving` is a drop already somewhere that would go
- * in, subtree and all; `adding` says a new folder would.
- */
 export async function requireFolder(
   ref: string,
   who: Identity,
@@ -56,22 +50,11 @@ export async function requireFolder(
   return folder
 }
 
-/** Who makes a team's folders, in the browser: on a team Drop its admins; on a personal one the team's owner and admins. */
 const keepsTeamFolders = (who: Identity, team: string | null) =>
   who.actorKind === "browser" && (team ? runsTeam(team, who) || who.role === "admin" : who.role === "admin")
 
-/** The longest a folder's description may be: a few paragraphs on what goes in it and how. */
 export const MAX_FOLDER_DESCRIPTION = 2000
 
-/**
- * Creates a folder, at the top or inside `folder`. A folder has no file: a title, a link, a description of what goes in
- * it (`note`), and the drops in it, which share and live with it. One inside another folder takes that folder's lifetime.
- * It isn't a drop for the plan's count.
- *
- * A team folder (`team`, or any folder made inside one) is the team's: on a team Drop, admins make it in the browser, it
- * reaches the whole team, and it never expires. On a personal Drop with teams, `teamId` names the team: its owner and
- * admins make its folders, which reach its members only.
- */
 export async function createFolder(
   who: Identity,
   input: LifetimeInput & {
@@ -163,11 +146,6 @@ export async function createFolder(
   })
 }
 
-/**
- * Moves a drop into a folder, or to the top with null. From then on it shares and lives with
- * its new ancestors, and its slug gets a number if the folder has one like it. A drop leaving the folders keeps the
- * lifetime it lived by, from now, so it doesn't expire on the spot.
- */
 export async function moveNode(drop: DropRow, ref: string | null, who: Identity, event?: H3Event) {
   const target = ref ? await requireFolder(ref, who, event, drop) : null
   if ((target?.id ?? null) === drop.parentId) return

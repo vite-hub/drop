@@ -1,22 +1,9 @@
 <script setup lang="ts">
-// Your drops, newest first as cards that preview what's inside (DropCard), or as a list (DropLine). No top bar: the
-// sidebar says where you are, makes new drops (its +) and searches (⌘K, whose first row brings every match here as
-// `?q=`). One row leads the page: Pinned, Recent or Folders, which the reader keeps (a cookie), the Trash beside them, a
-// search's words while it's on, and grid or list. Pinned is where it opens until the reader picks another: the drops
-// they pinned from a drop's + or ⌘K, theirs and other people's, most recently pinned first.
-//
-// Clicks follow Finder and the folder page (ViewerFolder): on wide screens one click previews the drop in a pane that
-// pushes the page left (ViewerFolderPreview, its width dragged from its edge), a double-click, Enter or Open opens it;
-// the arrow keys walk the drops with the preview following, Escape closes it. Files dropped on the page upload.
-//
-// The sidebar's Shared with me (Team, on a team Drop) is `?tab=with-me`: the same cards, for what others share.
 import { breakpointsTailwind } from "@vueuse/core"
 import * as v from "valibot"
 import { TRASH_DAYS } from "#shared/expiry"
 import type { DropSummary } from "#shared/types"
 
-// The layout waits for your drops before this page's setup runs, which put the Trash and usage a round trip later.
-// Started here, before either renders, they load alongside the sidebar's (started by the auth middleware).
 definePageMeta({
   middleware: () => {
     void useDrops()
@@ -35,15 +22,12 @@ const team = computed(() => me.value?.mode === "team")
 const { data: trash } = useTrash()
 const { data: pinned, status: pinnedStatus, error: pinnedError, refresh: refreshPinned } = usePinned()
 const { data: shared } = useSharedWithMe()
-// A personal Drop's teams list their folders under Teams, not here.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
 const getStartedHidden = useGetStartedHidden()
 
 const route = useRoute("drops")
 const view = useDropsView()
 const layout = useDropsLayout()
-// What the page shows: the Trash and Shared with me are places in the URL, Pinned, Recent and Folders the reader's own
-// view.
 const place = computed(() => (route.query.tab === "trash" ? "trash" : route.query.tab === "with-me" ? "with-me" : null))
 const VIEWS = [
   { value: "pinned", label: "Pinned", icon: "i-mingcute-pin-line" },
@@ -57,7 +41,6 @@ function show(value: (typeof VIEWS)[number]["value"]) {
   void navigateTo({ query: { tab: value === "trash" ? "trash" : undefined } }, { replace: true })
 }
 
-// A search from ⌘K's "Show every drop matching": your drops at any depth, by name and by a doc's words.
 const SearchQuery = v.object({ q: v.fallback(v.string(), ""), kind: v.fallback(v.string(), "") })
 const searchQuery = computed(() => v.parse(SearchQuery, route.query))
 const query = computed(() => searchQuery.value.q.trim())
@@ -93,8 +76,6 @@ const visible = computed(() => {
   ]
 })
 
-// Each card costs the server render a little, so the page starts with the newest ROWS, about two screens of cards, and
-// shows more as you reach its end. The search and Recent still cover every drop.
 const ROWS = 24
 const shown = ref(ROWS)
 watch([current, query, kind], () => (shown.value = ROWS))
@@ -103,16 +84,10 @@ useIntersectionObserver(more, ([entry]) => {
   if (entry?.isIntersecting) shown.value += ROWS
 })
 
-/**
- * Recent groups by day: Today, Yesterday, This week, then month names. Folders puts the folders before the rest. The
- * Worker renders in UTC, so the server render and hydration group in UTC and the browser regroups in the reader's own
- * timezone once mounted.
- */
 const now = useRelativeNow()
 const mounted = useMounted()
 const groups = computed(() => {
   const list = visible.value.slice(0, shown.value)
-  // Pinned keeps the order you pinned in, in one group the row above already names.
   if (current.value === "pinned" && !searching.value) return list.length ? [{ label: "", drops: list }] : []
   if (current.value === "folders" && !searching.value) {
     const folders = list.filter((drop) => drop.kind === "folder")
@@ -126,7 +101,6 @@ const groups = computed(() => {
   const label = (at: number) => dayGroup(at, now.value, timeZone)
   const out: Array<{ label: string; drops: DropSummary[] }> = []
   for (const drop of list) {
-    // The Trash groups by when things went there, which is also what sets when they're deleted.
     const name = label(place.value === "trash" ? (drop.trashedAt ?? drop.updatedAt) : drop.updatedAt)
     const last = out.at(-1)
     if (last?.label === name) last.drops.push(drop)
@@ -136,8 +110,6 @@ const groups = computed(() => {
 })
 const order = computed(() => groups.value.flatMap((group) => group.drops))
 
-// One click picks, a double-click opens. Below `lg` there's no room for the preview, so a click opens at once, and so
-// do clicks with a modifier (a new tab) everywhere, and Enter (a click with no `detail`).
 const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")
 const selected = ref<string | null>(null)
 const picked = computed(() => (wide.value ? order.value.find((drop) => drop.id === selected.value) : undefined))
@@ -149,7 +121,6 @@ function pick(event: MouseEvent, drop: DropSummary) {
   selected.value = drop.id
 }
 const list = useTemplateRef("list")
-// Arrows walk the drops with the preview following; Escape closes it. In the grid, up and down move a row of cards.
 function walk(event: KeyboardEvent) {
   if (event.key === "Escape" && selected.value) return void (selected.value = null)
   const across = layout.value === "grid" ? columns() : 1
@@ -161,7 +132,6 @@ function walk(event: KeyboardEvent) {
   if (wide.value) selected.value = next.id
   list.value?.querySelector<HTMLElement>(`[data-id="${next.id}"] a`)?.focus()
 }
-// How many cards sit in a row: the cards of the first group that share the first one's top.
 function columns() {
   const cards = [...(list.value?.querySelectorAll<HTMLElement>("ul[data-grid] > li") ?? [])]
   const top = cards[0]?.offsetTop
@@ -171,16 +141,12 @@ async function trashOne(drop: DropSummary) {
   if ((await remove(drop)) && selected.value === drop.id) selected.value = null
 }
 
-// The preview's width, dragged from its left edge, shared with the folder page's.
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
 
-// Files dropped anywhere on the page upload to the top; one opens once it's in.
-// Each file shows at the top of Recent or Folders from the moment it's added, with how much has gone.
 const { pending, uploading, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), { wide, selected })
 const showsUploads = computed(() => uploading.value > 0 && !place.value && !searching.value)
 const dropping = computed(() => isOverDropZone.value && place.value !== "trash" && place.value !== "with-me")
 
-// Admins on a team Drop make the team's folders; on the Team page that's what a new folder is by default.
 async function newTeamFolder() {
   const input = await folderDialog({ offerTeam: true, team: true })
   if (input) await createFolder(input.title, undefined, { description: input.description, team: input.team })
@@ -199,7 +165,6 @@ async function newTeamFolder() {
                 {{ team ? "Team" : "Shared with me" }}
                 <span class="ml-1 font-mono text-xs font-normal text-muted tabular-nums">{{ withMe.length }}</span>
               </h1>
-              <!-- Recent and Folders are the reader's view; the Trash sits beside them, with how much it holds. -->
               <div v-else class="flex gap-0.5 rounded-lg bg-elevated p-0.5" role="radiogroup" aria-label="View">
                 <button
                   v-for="item in VIEWS"
@@ -297,7 +262,6 @@ async function newTeamFolder() {
               Deleted and expired drops. Restore one within {{ TRASH_DAYS }} days, or it's gone for good.
             </p>
 
-            <!-- The cards' own boxes, so the drops land without moving anything. -->
             <ul
               v-if="
                 !place &&
@@ -364,7 +328,6 @@ async function newTeamFolder() {
               </p>
             </div>
 
-            <!-- A first run gets the checklist instead; once it's dismissed, the empty page still says what goes here. -->
             <GetStarted
               v-else-if="!place && !searching && !showingPinned && !drops.length && !getStartedHidden && !uploading"
               :drops="drops"
@@ -442,7 +405,6 @@ async function newTeamFolder() {
             <div v-if="visible.length" ref="list" @keydown="walk">
               <section v-for="group in groups" :key="group.label" class="mb-8">
                 <h2 v-if="group.label" class="label-mono mb-3">{{ group.label }}</h2>
-                <!-- The Trash keeps its rows: Restore and Delete for good are what it's for. -->
                 <ul
                   v-if="place === 'trash'"
                   class="divide-y divide-default overflow-hidden rounded-lg border border-default"
@@ -496,7 +458,6 @@ async function newTeamFolder() {
         </div>
 
         <template v-if="picked">
-          <!-- The pane's left border is its handle: drag it, double-click it to reset, or focus it and use the arrows. -->
           <div
             aria-label="Resize the preview"
             aria-orientation="vertical"
@@ -509,7 +470,6 @@ async function newTeamFolder() {
             v-bind="preview.handle"
           />
           <aside aria-label="Preview" class="shrink-0" :style="{ width: `${preview.width.value}rem` }">
-            <!-- Lazy: the preview frames docs with Drop's document runtime, which the list doesn't need until a click. -->
             <LazyViewerFolderPreview
               :key="picked.id"
               :child="picked"
@@ -520,7 +480,6 @@ async function newTeamFolder() {
           </aside>
         </template>
 
-        <!-- Files dragged over the page: one target for all of it. -->
         <div
           v-if="dropping"
           class="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-lg border-2 border-dashed border-inverted bg-default/85"

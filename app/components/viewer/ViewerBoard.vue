@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// A board drop: Excalidraw, mounted as a React root inside this Vue component and loaded only on boards. People draw;
-// each changed element goes to the server a moment later, and every few seconds the board pulls what others and agents
-// changed and merges it the way Excalidraw's own collaboration does (higher version wins, reconcileElements). After a
-// save, the browser renders the whole board and each frame as PNG for agents (view_board), since Excalidraw only
-// renders in a browser. The server records who added each element, which read_drop's outline shows.
 import type { Board, BoardElement } from "#shared/board"
 import type { DropDetail } from "#shared/types"
 
@@ -12,7 +7,6 @@ const host = useTemplateRef<HTMLElement>("host")
 const colorMode = useColorMode()
 const state = ref<"loading" | "ready" | "failed">("loading")
 const saving = ref(false)
-// Why the last save failed, shown until one goes through.
 const unsaved = ref<string>()
 const readOnly = ref(true)
 
@@ -32,7 +26,6 @@ onMounted(async () => {
       $fetch<{ snapshot: Board; canEdit: boolean }>(`/api/drops/${id}/board`, { query: { v: props.drop.version } }),
       import("@excalidraw/excalidraw/index.css"),
     ])
-    // The reader left while Excalidraw loaded: there's no host to mount in any more.
     if (left) return
     readOnly.value = !data.canEdit
     const elements = data.snapshot.elements
@@ -52,9 +45,6 @@ onMounted(async () => {
             theme: colorMode.value === "dark" ? "dark" : "light",
             viewModeEnabled: !data.canEdit,
             name: props.drop.title,
-            // Drop's header already names the board, holds its menu and shares it, and the board saves on its own:
-            // Excalidraw's open, save, reset and background controls would repeat it or fight the sync. Images need
-            // files Drop doesn't keep.
             UIOptions: {
               canvasActions: {
                 loadScene: false,
@@ -67,7 +57,6 @@ onMounted(async () => {
               tools: { image: false },
             },
             excalidrawAPI: (ready: Api) => {
-              // In dev, the editor on window lets a browser session inspect and drive the board.
               if (import.meta.dev) Object.assign(window, { boardApi: ready })
               ;({ stop, onChange } = sync(ex, ready, data.snapshot.elements, data.canEdit))
               state.value = "ready"
@@ -75,12 +64,10 @@ onMounted(async () => {
             // SAFETY: Excalidraw's elements are plain objects with the fields BoardElement names.
             onChange: (changed: readonly unknown[]) => onChange?.(changed as readonly BoardElement[]),
           },
-          // An empty main menu: its button is hidden (below), and Help stays in the footer.
           createElement(ex.MainMenu),
         ),
       )
     render()
-    // Excalidraw follows Drop's theme; re-rendering only passes the new prop, the scene stays.
     watch(() => colorMode.value, render)
   } catch (error) {
     reportClientError("board-load", error, { drop: id })
@@ -93,7 +80,6 @@ onBeforeUnmount(() => {
   root?.unmount()
 })
 
-// Excalidraw's label layout (its BOUND_TEXT_PADDING, getBoundTextMaxWidth and getFontString), for agents' words.
 const PADDING = 5
 type Shape = { type: string; width: number; fontSize?: number }
 function labelWidth(container: Shape) {
@@ -112,8 +98,6 @@ const FAMILIES = new Map([
 const fontOf = (text: { fontSize: number; fontFamily: number }) =>
   `${text.fontSize}px ${FAMILIES.get(text.fontFamily) ?? "Helvetica"}, Segoe UI Emoji`
 
-// Excalidraw centers bound text at the middle vertex of odd-point polylines, or
-// the midpoint of the middle segment for even-point polylines.
 function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>): [number, number] {
   if (!points.length) return [0, 0]
   const middle = Math.floor(points.length / 2)
@@ -130,7 +114,6 @@ function arrowMidpoint(points: ReadonlyArray<ReadonlyArray<number>>): [number, n
 }
 
 let measuring: CanvasRenderingContext2D | null = null
-/** Words wrapped to `max` px wide the way Excalidraw wraps them: at spaces, and inside words longer than a line. */
 function wrap(text: string, font: string, max: number) {
   measuring ??= document.createElement("canvas").getContext("2d")!
   measuring.font = font
@@ -162,27 +145,27 @@ function wrap(text: string, font: string, max: number) {
 
 function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolean) {
   const id = props.drop.id
-  // The version of each element the server has, and the elements changed here that it doesn't have yet.
   const known = new Map(initial.map((element) => [element.id, element.version]))
   const pending = new Map<string, BoardElement>()
-  // The version each pending element had when it was queued: Excalidraw changes elements in place, so the queued
-  // element's own version can't say whether a change is new.
   const queued = new Map<string, number>()
 
-  let saveTimer: ReturnType<typeof setTimeout> | undefined
-  let imageTimer: ReturnType<typeof setTimeout> | undefined
   let busy: Promise<unknown> = Promise.resolve()
-  // Failed saves in a row, for the wait before the next (saveRetryDelay). After stop(), nothing is scheduled again.
   let failures = 0
   let stopped = false
+  const saveDelay = ref(700)
+  const saveTimer = useTimeoutFn(() => (busy = busy.then(save)), saveDelay, { immediate: false })
+  const imageDelay = ref(4000)
+  const imageTimer = useTimeoutFn(() => void images(), imageDelay, { immediate: false })
+  const imagesSoon = () => {
+    imageTimer.stop()
+    imageDelay.value = 4000
+    if (!stopped) imageTimer.start()
+  }
   const schedule = (delay = 700) => {
     if (stopped) return
-    clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => (busy = busy.then(save)), delay)
+    saveDelay.value = delay
+    saveTimer.start()
   }
-  // Excalidraw calls this on every change, the pointer's and the selection's too: only elements with a version the
-  // server hasn't seen go out.
-  // Excalidraw loads its initial scene after it hands over its API: the first change with elements is the board.
   let loaded = false
   const onChange = (elements: readonly BoardElement[]) => {
     if (!loaded && elements.length) {
@@ -190,8 +173,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       measure()
     }
     if (!canEdit) return
-    // Only a version newer than the one already queued counts: pointer and selection changes don't restart a save
-    // that's waiting after a failure.
     let any = false
     for (const element of elements)
       if (element.version > (queued.get(element.id) ?? known.get(element.id) ?? 0)) {
@@ -207,7 +188,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
 
   async function save() {
     if (!pending.size) return
-    // Excalidraw changes elements in place, so the copy is what gets sent, and its versions are what the server has.
     const elements = structuredClone([...pending.values()])
     pending.clear()
     saving.value = true
@@ -220,14 +200,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       }
       failures = 0
       unsaved.value = undefined
-      clearTimeout(imageTimer)
-      if (!stopped) imageTimer = setTimeout(() => void images(), 4000)
+      imagesSoon()
     } catch (error) {
-      // Kept for the next save, unless something newer replaced them meanwhile.
       for (const element of elements) if (!pending.has(element.id)) pending.set(element.id, element)
       reportClientError("board-save", error, { drop: id })
-      // A permanent refusal (no longer allowed to draw, too big) waits for the next change; rate limits try
-      // again, less often each time, down to once a minute.
       const status = httpStatus(error)
       if (status !== undefined && status >= 400 && status < 500 && status !== 429)
         unsaved.value = `Not saved: ${errorText(error)}`
@@ -240,7 +216,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     }
   }
 
-  // Others' and agents' changes: elements whose version is newer than this browser's, merged as Excalidraw merges.
   async function pull() {
     if (document.hidden) return
     await busy
@@ -266,14 +241,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     )
     api.updateScene({ elements, captureUpdate: ex.CaptureUpdateAction.NEVER })
     measure()
-    // An agent's edit shows in its next view_board too.
-    clearTimeout(imageTimer)
-    if (!stopped) imageTimer = setTimeout(() => void images(), 4000)
+    imagesSoon()
   }
-  // doctor-disable-next-line vue/lifecycle/require-cleanup -- the returned stop() clears it, from onBeforeUnmount
-  const poll = setInterval(() => void pull(), 3000)
+  const poll = useIntervalFn(() => void pull(), 3000)
 
-  // A new version for people who can draw, so it saves; a reader's copy stays at the server's version.
   type Element = ReturnType<Api["getSceneElementsIncludingDeleted"]>[number]
   const next = <T extends Element>(element: T, fields: Partial<T>) =>
     // SAFETY: spreading an Element and Partial<T> preserves the concrete element shape for this generic helper.
@@ -283,9 +254,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       ...(canEdit && { version: element.version + 1, versionNonce: Math.floor(Math.random() * 2 ** 31) }),
     }) as T
 
-  // Words an agent wrote reach the board unmeasured (`fit`, shared/board.ts): they're wrapped to their shape here, the
-  // shape grows to hold them, and someone who can draw saves the result, so the next reader and view_board get it as
-  // it is. Only those: people's own text is Excalidraw's, measured when they typed it.
   function measure() {
     const scene = api.getSceneElementsIncludingDeleted()
     const byId = new Map(scene.map((element) => [element.id, element]))
@@ -302,7 +270,6 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
         changed.set(element.id, next(element, { ...fields, width: element.width }))
         continue
       }
-      // A shape grows down to hold its label; an arrow's label sits on its middle.
       let box = container
       if (container.type !== "arrow" && height + PADDING * 2 > container.height) {
         box = next(container, { height: height + PADDING * 4 })
@@ -320,16 +287,15 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     })
   }
 
-  // Open on the whole board, never zoomed past 100%: wide frames otherwise start off screen.
-  requestAnimationFrame(() =>
-    api.scrollToContent(api.getSceneElements(), { fitToViewport: true, viewportZoomFactor: 0.95, maxZoom: 1 }),
+  useRafFn(
+    () => api.scrollToContent(api.getSceneElements(), { fitToViewport: true, viewportZoomFactor: 0.95, maxZoom: 1 }),
+    { once: true },
   )
 
   async function images() {
     if (!canEdit) return
     const elements = api.getSceneElements()
     if (!elements.length) return
-    // At most 1600 px on the long side: readable for a model, small enough to send.
     const render = async (frame: (typeof elements)[number] | null) => {
       const blob = await ex.exportToBlob({
         elements,
@@ -356,8 +322,10 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
       reportClientError("board-images", error, { drop: id })
     }
   }
-  // The first person to open a board an agent made gives agents its first images.
-  if (canEdit) imageTimer = setTimeout(() => void images(), 1500)
+  if (canEdit) {
+    imageDelay.value = 1500
+    imageTimer.start()
+  }
 
   const flush = () => void save()
   // doctor-disable-next-line vue/lifecycle/require-cleanup -- the returned stop() removes it, from onBeforeUnmount
@@ -367,9 +335,9 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     stop: () => {
       stopped = true
       window.removeEventListener("pagehide", flush)
-      clearInterval(poll)
-      clearTimeout(imageTimer)
-      clearTimeout(saveTimer)
+      poll.pause()
+      imageTimer.stop()
+      saveTimer.stop()
       if (pending.size) void save()
     },
   }

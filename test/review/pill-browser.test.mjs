@@ -14,7 +14,7 @@ const source = readFileSync(new URL("../../app/pages/review/open.vue", import.me
 const { descriptor } = parse(source)
 const copyPage = transpileModule(compileScript(descriptor, { id: "review-open", inlineTemplate: true }).content, {
   compilerOptions: { module: ModuleKind.ESNext },
-}).outputText
+}).outputText.replaceAll("import.meta.client", "true")
 
 const SITE = "https://site.test"
 const DROP = "https://drop.test"
@@ -178,6 +178,7 @@ async function serveOpenPage(context) {
           window.useMounted = () => { const ready = Vue.ref(false); Vue.onMounted(() => ready.value = true); return ready }
           window.openReview = body => fetch("/api/review/open", { method: "POST", body: JSON.stringify(body) }).then(r => r.json())
           window.navigateTo = to => location.replace(to)
+          window.useTimeoutFn = (cb, ms) => { let id; return { start: () => { clearTimeout(id); id = setTimeout(cb, ms) }, stop: () => clearTimeout(id) } }
           window.errorText = error => error.message
           const app = Vue.createApp({ render: () => Vue.h(Vue.Suspense, null, { default: () => Vue.h(CopyPage) }) })
           app.component("UButton", {

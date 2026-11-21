@@ -20,17 +20,8 @@ import updateDrop from "./tools/update_drop"
 import viewBoard from "./tools/view_board"
 import { siteCommentTools } from "./site-comments"
 
-/**
- * Drop's MCP server (nitro-mcp-toolkit on h3-mcp): the 2026-07-28 revision plus the 2025 ones, one file per
- * tool and prompt, and the Skills extension. It's an OAuth 2.1 protected resource: a `401` points at
- * `/.well-known/oauth-protected-resource/mcp`, which names Drop's Better Auth as the authorization server, and
- * every bearer token must be a JWT Drop issued for this `/mcp` (checked in `identify`).
- *
- * The resource identifier is the request's origin plus `/mcp`, so the handler is built once per origin.
- */
 const servers = new Map<string, { mcp: McpHandler; oauth: McpOAuth }>()
 
-/** A tool result that names a drop: publish, update_drop, create_folder, edit_board, accept_suggestion. */
 const NamesDrop = v.object({ id: v.string() })
 
 export function mcpFor(origin: string) {
@@ -41,7 +32,6 @@ export function mcpFor(origin: string) {
     authorizationServers: [`${origin}/api/auth`],
     scopesSupported: ["openid", "profile", "email", "offline_access"],
     verify: async (_token, event) => {
-      // Modern clients name the JSON-RPC method in a header; it makes /mcp requests tell apart in the logs.
       const method = event.req.headers.get("mcp-method")
       if (method) useLogger(event).set({ mcp: { method, name: event.req.headers.get("mcp-name") ?? undefined } })
       return Boolean(await identify(event))
@@ -58,7 +48,6 @@ export function mcpFor(origin: string) {
         { src: `${origin}/icon.png`, mimeType: "image/png", sizes: ["512x512"] },
       ],
       instructions: MCP_INSTRUCTIONS,
-      // MCP clients send no Origin; the access token, not the origin, is the boundary.
       origin: false,
       auth: oauth.auth,
       tools: [
@@ -79,7 +68,6 @@ export function mcpFor(origin: string) {
       ],
       prompts: [addressFeedback],
       resources: skillResources,
-      // Every tool call lands on the request's wide event, in `mcp.calls`: a batch makes several in one request.
       onToolCall: ({ name, result, durationMs, event }) => {
         const log = useLogger(event)
         const failed = "isError" in result && Boolean(result.isError)
@@ -89,7 +77,6 @@ export function mcpFor(origin: string) {
               .join(" ")
               .slice(0, 500)
           : undefined
-        // The drop it returned, or else the first one it read.
         const named = v.safeParse(NamesDrop, "structuredContent" in result ? result.structuredContent : undefined)
         const drop = named.success ? named.output.id : event.context.loggedDrop
         event.context.loggedDrop = undefined
@@ -101,7 +88,6 @@ export function mcpFor(origin: string) {
     { extensionPlugins: [mcpSkills()] },
   )
   server = { mcp, oauth }
-  // The origin comes from the request's Host, which a Node host passes through as sent: keep only the latest few.
   if (servers.size >= 8) servers.delete(servers.keys().next().value!)
   servers.set(origin, server)
   return server

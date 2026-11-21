@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The loop on the landing page: Claude Code drops a launch plan linked to its pull request, you comment on one line,
-// Claude Code reads the comment and publishes v2, and the line and the comment show what changed.
 import type { Beat } from "~/composables/useStoryboard"
 
 const BEATS = [
@@ -35,7 +33,6 @@ const composing = computed(() => beat.value === "b.comment")
 const posted = computed(() => at("b.posted"))
 const v2 = computed(() => at("b.v2"))
 
-// Your pointer, and the beats that end in a click where it rests: the next beat shows what the click did.
 const TARGETS: Partial<Record<Name, string>> = {
   "b.open": "line",
   "b.select": "line",
@@ -109,7 +106,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
             url
           >
             <div class="flex h-full flex-col">
-              <!-- The viewer's header: where it lives, who can open it, the pull request it belongs to. -->
               <div class="flex h-11 shrink-0 items-center gap-2 border-b border-default px-4 text-sm">
                 <DropMark class="h-3.5 shrink-0" />
                 <span class="text-muted">Plans</span><span class="text-dimmed">/</span>
@@ -179,7 +175,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                   <h4 class="mt-5 text-sm font-semibold text-highlighted">Risks</h4>
                   <p class="mt-1">Invoices may double-send during the switch.</p>
 
-                  <!-- The comment box that opens on a selection. -->
                   <div
                     v-if="composing"
                     class="absolute top-[14.75rem] left-14 w-64 rounded-lg border border-default bg-default p-2.5 shadow-xl [animation:pop-in_300ms_var(--ease-out)]"
@@ -203,7 +198,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                   </p>
                 </article>
 
-                <!-- The docked comments panel. -->
                 <aside class="flex min-w-0 flex-col border-l border-default bg-muted/50">
                   <div class="flex h-10 shrink-0 items-center gap-2 border-b border-default px-3 text-xs">
                     <span class="font-medium text-highlighted">Comments</span>

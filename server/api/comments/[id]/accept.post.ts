@@ -5,7 +5,6 @@ import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 import { acceptSuggestion } from "../../../utils/suggestions"
 
-/** Accepts a suggestion on a Markdown doc as its next version (../../../utils/suggestions.ts). */
 export default defineHandler(async (event) => {
   const thread = await findThread(await routeId(event))
   const drop = thread ? await findDrop(thread.meta.dropId) : null

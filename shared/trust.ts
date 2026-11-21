@@ -7,7 +7,6 @@ export function needsShareReview(
 }
 
 export function reportTarget(value: string) {
-  // A share link's slug only reads well; the drop is the key before it.
   value = value.replace(/^(\/d\/[^/?#]+)\/[^/?#]*$/, "$1")
   if (!/^\/(?:d\/[^/?#]+|f\/[^?#]+)$/.test(value) || value.length > 600) return null
   try {

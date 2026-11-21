@@ -5,20 +5,15 @@ import { DatabaseSync } from "node:sqlite"
 import { adoptSqliteLedger } from "./adopt-sqlite-ledger.mjs"
 import { migrations } from "./migrations.mjs"
 
-// The container's entry: backs up the SQLite database when this image brings migrations, then starts Drop, which
-// applies them before it listens. D1 builds migrate over Cloudflare's API instead.
-
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const KEEP_BACKUPS = 3
 
-/** Path of a libSQL `file:` URL, percent-decoded and relative to the working directory, as libSQL opens it. */
 export function databasePath(url = "file:.data/database/drop.db") {
   if (!url.startsWith("file:")) throw new Error("DROP_DATABASE_URL must be a local file: URL.")
   if (url.startsWith("file://")) return fileURLToPath(url)
   return resolve(decodeURIComponent(url.slice("file:".length).split("?")[0]))
 }
 
-/** Use folder names for Drizzle 1.0 ledgers, retaining the timestamp fallback for legacy ledgers. */
 function pendingMigrations(database, entries, columns) {
   if (!columns.length) return entries
   if (columns.some(({ name }) => name === "name")) {
@@ -34,10 +29,6 @@ function pendingMigrations(database, entries, columns) {
   return last === null ? entries : entries.filter((entry) => entry.when > Number(last))
 }
 
-/**
- * Copies the database into a `backups` folder beside it before migrations change it, and keeps the newest three
- * copies. A new database has nothing to keep.
- */
 export function backupBeforeMigrate({ file, entries, backups, now = new Date(), log = console.log }) {
   if (!existsSync(file)) return
   const database = new DatabaseSync(file)

@@ -1,8 +1,3 @@
-/**
- * The heading a drop list files a time under: Today, Yesterday, This week (the six days before today), or its month.
- * Days are calendar days in `timeZone`, the reader's own when it's undefined and UTC before hydration, so a day that
- * gains or loses an hour for daylight saving still starts at midnight.
- */
 export function dayGroup(at: number, now: number, timeZone?: "UTC") {
   const utc = timeZone === "UTC"
   const daysAgo = (days: number) => {

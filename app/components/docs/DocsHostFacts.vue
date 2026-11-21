@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { HostId } from "../../../scripts/deployment"
 
-// What a host gives Drop, in one table.
 const props = defineProps<{ host: HostId }>()
 const info = computed(() => hostById(props.host))
 const rows = computed(() => [

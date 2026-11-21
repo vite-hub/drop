@@ -5,7 +5,6 @@ import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 import { createSiteDrop } from "../utils/review"
 
-/** New site review from the app, at the top or inside `folder`: the same rules as an agent's `publish({ site })`. */
 export default defineValidatedHandler({
   validate: { body: SiteSchema },
   async handler(event) {

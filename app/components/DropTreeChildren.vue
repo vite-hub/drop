@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The drops in an open folder of the sidebar tree, fetched when it opens.
 const props = defineProps<{ id: string }>()
 const emit = defineEmits<{ navigate: [] }>()
 const { data: drops, status } = useFolder(() => props.id)

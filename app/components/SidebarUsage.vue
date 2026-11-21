@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// How much of the plan the drops use, at the foot of the sidebar: storage, drops, and file writes. Shown only
-// where a plan sets limits. Near or at a limit the bar darkens to a warning and offers your own Drop, which has none.
 import { MIB, usageNearLimit } from "#shared/quotas"
 
 const { data: usage } = useUsage()

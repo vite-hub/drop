@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Someone's pointer on a stage: glides to (x, y) slowly enough to follow, with a name tag.
-// `click` (ms into the current beat) plays a press and a ripple there; `beat` restarts it each beat.
 defineProps<{ x: number; y: number; shown: boolean; label?: string; click?: number | null; beat?: string }>()
 </script>
 

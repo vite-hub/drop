@@ -8,7 +8,6 @@ import { drops } from "../databases/default/index"
 import type { DropRow } from "./drops/types"
 import { teamOf, teamsEnabled } from "./teams"
 
-/** How this Drop shares (`DROP_MODE`, `DROP_PUBLIC_LINK_DAYS`): its mode, and days a public link stays open. */
 export function sharePolicy(event?: H3Event): { mode: DropMode; publicLinkDays: number | null } {
   const { mode, publicLinkDays } = useServerEnv(event).drop
   const days = publicLinkDays.trim()
@@ -20,10 +19,6 @@ export function sharePolicy(event?: H3Event): { mode: DropMode; publicLinkDays: 
   return { mode: resolvedMode, publicLinkDays: value }
 }
 
-/**
- * The mode a drop shares under: this Drop's, except that inside a team's folders a personal Drop shares like a team one,
- * with that team (./teams.ts).
- */
 export function modeFor(
   node: Pick<DropRow, "teamFolder" | "teamId" | "ancestors"> | null | undefined,
   event?: H3Event,
@@ -32,17 +27,12 @@ export function modeFor(
   return mode === "team" || (node && teamOf(node)) ? ("team" as const) : ("personal" as const)
 }
 
-/** A row's share in force now, under this Drop's mode or the one its place gives it (`modeFor`). */
 export const shareNow = (
   row: { share: Share; publicUntil: number | null },
   now = Date.now(),
   mode: DropMode = sharePolicy().mode,
 ) => liveShare(row.share, row.publicUntil, mode, now)
 
-/**
- * The columns a share change writes, after checking this Drop offers it for the drop. Making a link public starts its
- * window now; any other share clears it. `team` says the drop is in a team's folders on a personal Drop.
- */
 export function shareFields(
   share: Share,
   drop: { kind: DropKind; teamFolder?: boolean; team?: boolean },
@@ -57,19 +47,13 @@ export function shareFields(
   return { share, publicUntil: isPublic(share) ? publicUntilFrom(publicLinkDays, now) : null }
 }
 
-// What an agent refused a team share can pick instead, after the reason the dialog shows people.
 function nextStep(share: Share, mode: DropMode) {
   if (share === "team_edit" && mode === "team") return " Share it with the team instead."
   return share === "team" || share === "team_edit" ? " Keep it private, or share it with a public link." : ""
 }
 
-/**
- * Writes down the public links that closed: each becomes the share it fell back to. Reads already treat them as closed
- * (`shareNow`); this keeps the stored state honest for queries and exports. Runs with the hourly cleanup.
- */
 export async function closePublicLinks(at: Date) {
   const { mode } = sharePolicy()
-  // A team folder is never private: on a personal Drop too, it goes back to its team.
   const closed = await db
     .update(drops)
     .set({

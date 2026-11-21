@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A drop's name, edited where it shows (a folder's list, its preview). It opens with the name picked, a file's
-// extension left out as Finder does; Enter or leaving the field saves, Escape keeps the old name.
 const props = defineProps<{ title: string; label: string }>()
 const emit = defineEmits<{ done: [title: string | null] }>()
 const value = ref(props.title)
@@ -24,7 +22,6 @@ function finish(save: boolean) {
 </script>
 
 <template>
-  <!-- Its keys stay here: Escape would close the preview and the arrows walk the list otherwise. -->
   <input
     ref="input"
     v-model="value"

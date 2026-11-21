@@ -1,4 +1,3 @@
-// Drop's MCP server identity, shared by the endpoint (server/mcp) and the docs.
 export const MCP_LATEST = "2026-07-28"
 export const MCP_LEGACY = ["2025-11-25", "2025-06-18", "2025-03-26"]
 export const MCP_SERVER_INFO = { name: "drop", title: "Drop", version: "0.1.0" }

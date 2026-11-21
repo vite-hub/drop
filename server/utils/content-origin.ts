@@ -3,19 +3,6 @@ import { deriveSecret, useServerEnv } from "vite-hub/env"
 import { siteMatches } from "#shared/review"
 import { escapeRegExp } from "#shared/utils/text"
 
-/**
- * Apps and HTML docs run real code, and real apps need a real origin: storage, cookies, and history.pushState all
- * throw in an opaque-origin sandbox. `DROP_CONTENT_ORIGIN` names hostnames served by this same deployment, which the
- * viewer frames, so drops never run on Drop's origin: they can't read Drop's session or call its API (auth cookies
- * are `__Host-`, and cookie-carrying API writes must come from Drop's origin).
- *
- * With a wildcard every drop gets an origin of its own, like an app on its own subdomain, so one drop can't read
- * another's localStorage, IndexedDB, or caches. The `*` stands for part of the first label: `https://*.usercontent.example`
- * gives `<label>.usercontent.example`, and `https://*-drop.example.com` gives `<label>-drop.example.com`, one level under
- * the zone, where a free certificate still reaches. The label is a keyed hash of the doc's link key, the same on every
- * version, not the key itself, because hostnames travel in clear text (DNS, TLS SNI) and the key opens a shared drop. A plain hostname puts
- * every drop on that one origin, sharing storage. Without either, drops keep the opaque sandbox.
- */
 interface ContentConfig {
   protocol: string
   port: string
@@ -37,7 +24,6 @@ function configured(event: H3Event): ContentConfig | null {
       return null
     }
   }
-  // One `*`, inside the first label, with a domain after it.
   const at = name.indexOf("*")
   const firstDot = name.indexOf(".")
   if (name.includes("*", at + 1) || firstDot === -1 || at > firstDot) return null
@@ -54,10 +40,6 @@ function configured(event: H3Event): ContentConfig | null {
 
 const LABEL = "[a-z2-7]{26}"
 
-/**
- * A DNS label for `dropId`: 26 base32 characters of an HMAC under ViteHub's `deriveSecret("drop:content-origin")`, from
- * VITEHUB_SECRET. Stable, and says nothing about the id.
- */
 async function contentLabel(event: H3Event, dropId: string): Promise<string> {
   const secret = await deriveSecret("drop:content-origin", { event })
   const key = await crypto.subtle.importKey(
@@ -82,10 +64,8 @@ async function contentLabel(event: H3Event, dropId: string): Promise<string> {
   return label
 }
 
-/** Whether every drop gets an origin of its own: only then can its origin serve the app's files (server/utils/app-files.ts). */
 export const perDropOrigins = (event: H3Event) => !!configured(event)?.perDrop
 
-/** Where the viewer frames the drop `dropId` names (an app or HTML doc, by its link key), or null for the opaque sandbox. Never Drop's own origin. */
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null
@@ -100,17 +80,11 @@ async function hostFor(event: H3Event, config: ContentConfig, dropId: string) {
   return `${name}${config.port ? `:${config.port}` : ""}`
 }
 
-/** Whether this request came in on the origin of the drop `dropId` names, its own one. Needs per-drop origins. */
 export async function onOwnOrigin(event: H3Event, dropId: string): Promise<boolean> {
   const config = configured(event)
   return !!config?.perDrop && (await hostFor(event, config, dropId)) === event.url.host
 }
 
-/**
- * How this request's host relates to the content origin: `content` for a drop's own host, `stray` for a host that has
- * the wildcard's shape but no valid label (evil-drop.example.com), which a `*-drop.example.com/*` route also sends
- * here and which must not serve a copy of Drop, and `false` for anything else, such as Drop itself.
- */
 export function contentHost(event: H3Event): "content" | "stray" | false {
   const config = configured(event)
   if (!config) return false
@@ -119,7 +93,6 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   if (!config.perDrop) return hostname === config.host && "content"
   const { prefix, suffix } = config.perDrop
   if (new RegExp(`^${escapeRegExp(prefix)}${LABEL}${escapeRegExp(suffix)}$`).test(hostname)) return "content"
-  // Only when the `*` shares its label with fixed text (`*-drop`): a whole level (`*.example.com`) may also hold Drop.
   if (!prefix && suffix.startsWith(".")) return false
   return (
     hostname.length > prefix.length + suffix.length &&
@@ -130,19 +103,6 @@ export function contentHost(event: H3Event): "content" | "stray" | false {
   )
 }
 
-/**
- * The only page the content origin serves, at every path so an app sees the URL it was built for. The viewer sends
- * the document over postMessage, so docs and unpublished edits never pass through this origin's server. An app's files
- * do, with per-drop origins: the viewer sends a grant along, kept here as a cookie, which opens that app's files on
- * this origin and nothing else (server/utils/app-files.ts). Its pages too: the viewer asks for one (`read`), the host
- * reads it here and posts its HTML back (`page`), and the document the viewer builds from it comes down as above.
- * Opened outside a frame it shows nothing: there is no parent to take a document from. The viewer's page renders the frame on the server, so this page can load before the
- * viewer's script listens: it says hello once it does, and the host asks again.
- *
- * The `data-vitehub-page-tools` mark keeps ViteHub from adding its page tools loader to this page. That loader is a
- * module script, and once a module has run, Firefox ignores the import map of the page written here, so a Nuxt app
- * can't resolve `#entry`. The tools can't load on this origin anyway: `/_vitehub` is a 404 here.
- */
 export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Drop</title></head><body><script data-vitehub-page-tools>(() => {
   if (parent === window) { document.body.textContent = "This domain shows previews inside Drop."; return; }
   const ask = () => parent.postMessage({ __drop: true, type: "host", path: location.pathname + location.search + location.hash }, "*");
@@ -188,10 +148,6 @@ export const FRAME_HOST_HTML = `<!doctype html><html lang="en"><head><meta chars
   ask();
 })();</script></body></html>`
 
-/**
- * Whether a site review's address reaches Drop itself or its content origin. Reviewing either inside Drop would frame
- * Drop's own pages, or other people's drops, in Drop's page, so neither can be a site to review.
- */
 export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
   if (siteMatches(siteUrl, event.url.origin)) return true
   const config = configured(event)
@@ -205,7 +161,6 @@ export function siteCoversDrop(event: H3Event, siteUrl: string): boolean {
         )
       : hostname === config.host
   }
-  // A pattern covers the content origin when it covers any one drop's host on it.
   const sample = config.perDrop ? `${config.perDrop.prefix}${"a".repeat(26)}${config.perDrop.suffix}` : config.host
   return siteMatches(siteUrl, `${config.protocol}//${sample}${config.port ? `:${config.port}` : ""}`)
 }

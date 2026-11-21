@@ -1,12 +1,5 @@
 <script setup lang="ts">
-// The list, thread, and composer rise above the pill. Only the pill is dark, like the HTML prototype picker; the panel
-// is a floating surface in the page's own theme, as every popover from the pill is.
 defineOptions({ inheritAttrs: false })
-// settle: what to wait for before the composer takes focus, which the drop's frame would otherwise hear it lose.
-// heading: how the panel's top row is drawn, so it never stacks a second row over one its content already has. "row" is
-// the dock's own row with the title; "none" leaves the row to the content (a list or thread with its own actions).
-// folded: zen mode with nothing that needs the pill, which then folds to a small handle (#handle, labeled handleLabel). A
-// press on the handle shows the pill again for a while, a peek, without leaving zen.
 const props = defineProps<{
   open: boolean
   heading: "row" | "none"
@@ -22,7 +15,6 @@ useHead({ htmlAttrs: { "data-vitehub-pill": "mark" } })
 const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
 const toolbar = useTemplateRef<HTMLElement>("toolbar")
-// Its top follows wrapped touch controls and the dock's safe-area offset, without counting an open comments panel.
 const { top, update } = useElementBounding(toolbar)
 onMounted(() => {
   const html = document.documentElement
@@ -50,27 +42,21 @@ defineExpose({ focusTrigger, top })
 
 const handle = useTemplateRef<HTMLElement>("handle")
 const collapsed = computed(() => Boolean(props.folded) && !peek.value)
-// Whatever unfolded the pill (a mode, a popover, zen turned off) ends the peek with it: once it's done, the pill folds.
 watch(
   () => props.folded,
   (folded) => !folded && (peek.value = false),
 )
-// The pill folds into the handle's box, so it closes on the handle rather than fading where it was.
 const { width: handleWidth, height: handleHeight } = useElementSize(handle, undefined, { box: "border-box" })
 const foldTo = computed(() => ({
   "--handle-width": `${handleWidth.value || 40}px`,
   "--handle-height": `${handleHeight.value || 28}px`,
 }))
-// A press of the handle with a key (no pointer, so no click count) takes the focus into the pill, where the handle was.
 async function showPill(event: MouseEvent) {
   peek.value = true
   if (event.detail !== 0) return
   await nextTick()
   toolbar.value?.querySelector<HTMLElement>("button:not(:disabled), a[href]")?.focus({ preventScroll: true })
 }
-// A peek ends as the mouse leaves the pill, unless a menu it opened is showing over the page; as the focus leaves it,
-// but not for that menu; and on a press outside it, which is how a touch screen, with no pointer to leave, ends it.
-// The frame takes presses without Drop's window hearing them, so a press there counts once the frame takes the focus.
 const POPPER = "[data-reka-popper-content-wrapper]"
 function pointerLeft(event: PointerEvent) {
   if (!peek.value || event.pointerType === "touch") return
@@ -83,8 +69,6 @@ function focusLeft(event: FocusEvent) {
   peek.value = false
 }
 onClickOutside(toolbar, () => (peek.value = false), { ignore: [handle, POPPER], detectIframe: true })
-// A press on the bar leaves focus in the drop's frame. The page there would hear it go and close what it has open, such
-// as the tooltip someone is about to comment on. Keys and the composer still move focus.
 function keepFrameFocus(event: MouseEvent) {
   if (
     document.activeElement instanceof HTMLIFrameElement &&
@@ -114,7 +98,6 @@ watch(
       class="review-dock @container/review-dock pointer-events-none inset-x-2 bottom-[max(1rem,env(safe-area-inset-bottom))] flex max-h-[calc(100%-2rem)] flex-col items-center gap-2 sm:inset-x-4"
       :class="overlay ? 'fixed z-[60]' : 'absolute z-30'"
     >
-      <!-- Rises out of the bar it opens from; closing is quicker and quieter, since the reader has moved on. -->
       <Transition
         enter-active-class="motion-safe:transition-[opacity,translate,scale] motion-safe:duration-200 motion-safe:ease-(--ease-out)"
         enter-from-class="translate-y-2 scale-[0.98] opacity-0"
@@ -147,7 +130,6 @@ watch(
           <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"><slot name="panel" /></div>
         </section>
       </Transition>
-      <!-- The pill and, under zen, its handle share one place at the bottom: the pill folds into the handle there. -->
       <div class="grid max-w-full shrink-0 justify-items-center" :style="foldTo">
         <div
           ref="toolbar"

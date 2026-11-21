@@ -1,38 +1,5 @@
-// A screenshot of what someone sees in a page, taken inside it: the site review script's (./review-script) for each
-// comment, and the comment layer's (./plan-runtime) for each comment on a doc or an app, cut to its box.
-
-/** Pinned, and loaded only when someone presses Comment. A page whose CSP blocks it sends comments without a screenshot. */
 const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
 
-/**
- * The screenshot: `captureViewport(skip)` draws the viewport as the reviewer sees it, without `skip` (the toolbar),
- * with modern-screenshot from a CDN the first time.
- *
- * modern-screenshot draws a clone of the page that isn't scrolled, and shifts its content up by the scroll offset
- * instead, so a sticky header would sit where the page starts and a fixed button would move with the content: both
- * leave the viewport once the page is scrolled. `pinsNow` records where each visible one is on screen, and its `apply`
- * (modern-screenshot's onCloneEachNode) puts the clone there:
- *
- * - a fixed element becomes absolute, at its rect relative to what contains it in the clone, at its current size;
- * - a sticky element becomes relative, offset from where it would be unstuck, so it keeps its space in the flow and
- *   the content below it doesn't move up.
- *
- * Clones only reach the hook without their original, so originals carry a data attribute for the length of a capture.
- * `describe` names the element under a box, and says when it's on a sticky or fixed one, which doesn't scroll, with the
- * CSS that pins it. Needs ELEMENT_NAMING's labelOf and pinnedOf.
- *
- * What kept a comment's box from showing for seconds, measured in Firefox on a dashboard (2026-10-29):
- *
- * - Cloning the page reads and copies every computed style of every element: about a second on a dashboard, four on a
- *   long page. It ran before the browser painted the box, and froze the page while it ran. The capture now waits for
- *   the next frame, and the clone hands the main thread back every SLICE_MS, so the box takes typing meanwhile. The
- *   clone walks the page by next siblings, so a page that removes the element just cloned, or one it's inside, in one
- *   of those pauses cuts it short, and that capture is taken again in one go.
- * - modern-screenshot first waits for every image on the page, and lazy images below the fold never load, so it sat
- *   out its whole timeout. The clone embeds each image from its URL anyway, so this wait gets LOAD_WAIT_MS.
- * - In Firefox and Safari it draws the result once more per image and CSS image on the page, 100 ms apart and one
- *   after another (its fixSvgXmlDecode), which an icon-heavy page pays in seconds. MAX_REDRAWS caps it.
- */
 export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_MS = 300, MAX_REDRAWS = 2, SLICE_MS = 30;
   let screenshotModule = null;
   // Loaded when someone presses Comment, so the box's screenshot can start the moment it's drawn.

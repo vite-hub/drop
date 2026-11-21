@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// `nuxt dev` has no GitHub app, so server/auth.ts turns on email and password there. This form is the only way in
-// locally: sign in, or create the first account (and a teammate's) without reaching for the API.
 const { next, signIn } = useGitHubSignIn()
 const { $auth } = useNuxtApp()
 const creating = ref(false)

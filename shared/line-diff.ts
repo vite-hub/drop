@@ -1,12 +1,6 @@
 export type DiffLine = { type: "same" | "add" | "remove"; text: string }
-/** A run of unchanged lines folded away between hunks. */
 type DiffGap = { type: "gap"; lines: number }
 
-/**
- * Lines removed and added between two texts. The common start and end are trimmed first, so an edit in a long doc
- * only compares the part around it; when even that is too big to compare (`limit` line pairs), the middle shows as
- * removed then added.
- */
 export function diffLines(before: string, after: string, limit = 1_000_000): DiffLine[] {
   const a = before.split("\n"),
     b = after.split("\n")
@@ -27,7 +21,6 @@ export function diffLines(before: string, after: string, limit = 1_000_000): Dif
   ]
 }
 
-/** The longest common subsequence of lines, walked into removed, added, and unchanged lines. */
 function common(x: string[], y: string[]): DiffLine[] {
   const width = y.length + 1
   const lengths = new Uint32Array((x.length + 1) * width)
@@ -55,7 +48,6 @@ function common(x: string[], y: string[]): DiffLine[] {
   return lines
 }
 
-/** The changed lines with `context` unchanged lines around each change; longer unchanged runs fold into a gap. */
 export function diffHunks(lines: DiffLine[], context = 3): (DiffLine | DiffGap)[] {
   const near = new Uint8Array(lines.length)
   lines.forEach((line, index) => {

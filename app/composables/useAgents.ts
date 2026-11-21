@@ -1,9 +1,7 @@
 import type { ConnectedAgent } from "#shared/types"
 
-/** The agents this person approved over MCP. */
 export const useAgentList = () => useApi("/api/agents", { key: keys.agents, default: () => [] })
 
-/** The agents this person approved over MCP, and disconnecting one. */
 export function useAgents() {
   const { data: agents, status, refresh } = useAgentList()
   const notify = useNotify()

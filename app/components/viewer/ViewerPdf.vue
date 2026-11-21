@@ -1,14 +1,9 @@
 <script setup lang="ts">
-// A PDF file, drawn by pdf.js in Drop's own page. The browser's PDF viewer can't do it here: `/f/` files refuse every
-// frame (X-Frame-Options, frame-ancestors), Chromium won't load a PDF in a sandboxed frame, and a native viewer can't
-// say where on a page someone clicked. pdf.js keeps each page's text selectable and its links working, and draws only
-// the pages near the view, so a long paper opens as fast as a short one.
 import "pdfjs-dist/web/pdf_viewer.css"
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist"
 import type { EventBus, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs"
 import type { DropComment } from "#shared/types"
 
-/** A page as a still: the page as a data URL and a PNG file, its number, and its box on the screen. */
 export type PdfPage = {
   src: string
   file: File
@@ -19,14 +14,11 @@ export type PdfPage = {
 const props = defineProps<{
   src: string
   title: string
-  /** The comments on its pages, pinned where they point. */
   comments?: DropComment[]
   canComment?: boolean
 }>()
 const emit = defineEmits<{
-  /** Comment on the page in view. */
   page: [page: PdfPage]
-  /** A comment's pin was clicked. */
   open: [comment: DropComment]
 }>()
 
@@ -44,20 +36,16 @@ const failed = ref(false)
 const pages = ref(0)
 const current = ref(1)
 const scale = ref(1)
-/** Bumped when pages move (zoom, resize, load), so the pins follow them. */
 const layout = ref(0)
 
 onMounted(async () => {
   try {
-    // pdf.js reads browser globals when it loads, so it loads here, in the browser. pdf_viewer.mjs reads
-    // globalThis.pdfjsLib, which pdf.mjs sets.
     const [lib, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")])
     lib.GlobalWorkerOptions.workerSrc = worker.default
     const { EventBus, PDFLinkService, PDFViewer, LinkTarget } = await import("pdfjs-dist/web/pdf_viewer.mjs")
     if (lifecycle.signal.aborted || !container.value || !viewerElement.value) return
     bus = new EventBus()
     const links = new PDFLinkService({ eventBus: bus, externalLinkTarget: LinkTarget.BLANK })
-    // pdf.js 6.5 supports abortSignal at runtime but omits it from PDFViewerOptions.
     const options = {
       container: container.value,
       viewer: viewerElement.value,
@@ -68,7 +56,6 @@ onMounted(async () => {
     viewer = new PDFViewer(options)
     links.setViewer(viewer)
     bus.on("pagesinit", () => {
-      // Fits the page's width up to a comfortable reading size, then leaves zoom to the reader.
       viewer!.currentScaleValue = "auto"
       loaded.value = true
       layout.value++
@@ -78,8 +65,6 @@ onMounted(async () => {
       scale.value = next
       void nextTick(() => layout.value++)
     })
-    // The file comes from Drop's own origin with the reader's cookie, in ranges once the server says it can.
-    // Compressed page images need pdf.js's binary decoders, including in comment snapshots.
     task = lib.getDocument({ url: props.src, wasmUrl: "/vendor/pdfjs/wasm/" })
     pdf = await task.promise
     if (lifecycle.signal.aborted) return
@@ -93,7 +78,6 @@ onMounted(async () => {
   }
 })
 onBeforeUnmount(() => {
-  // The lifecycle signal owns scroll/resize handlers; clearing the document releases copy listeners and canvases.
   lifecycle.abort()
   viewer?.setDocument(null)
   viewer = null
@@ -102,7 +86,6 @@ onBeforeUnmount(() => {
 })
 useResizeObserver(container, () => {
   if (!viewer || !loaded.value) return
-  // "auto" and "page-width" fit again when the pane changes size; a number the reader zoomed to stays.
   const fitted = viewer.currentScaleValue
   if (Number.isNaN(Number(fitted))) viewer.currentScaleValue = fitted
   layout.value++
@@ -124,7 +107,6 @@ function submitPage() {
   pageInput.value = String(current.value)
 }
 
-/** The page's box on the screen, past its border. */
 function pageBox(page: number) {
   const div = viewer?.getPageView(page - 1)?.div
   if (!div) return null
@@ -134,16 +116,13 @@ function pageBox(page: number) {
   return { div, x, y, width: div.clientWidth, height: div.clientHeight }
 }
 
-/** Page `page` drawn on its own, near 2000px on its long side, as a PNG: what a comment on it carries. */
 async function pageAt(page = current.value): Promise<PdfPage | null> {
-  // A comment's link can ask for its page before the pages are laid out.
   await until(() => loaded.value || failed.value).toBe(true, { timeout: 15000 })
   if (!pdf || !viewer || failed.value || lifecycle.signal.aborted) return null
   go(page)
   await nextTick()
   const proxy = await pdf.getPage(page)
   const base = proxy.getViewport({ scale: 1 })
-  // Keeps the picture near 2000px on its long side, the size of a comment's other images.
   const viewport = proxy.getViewport({ scale: Math.min(4, 2000 / Math.max(base.width, base.height)) })
   const canvas = document.createElement("canvas")
   canvas.width = Math.round(viewport.width)
@@ -179,7 +158,6 @@ async function commentOnPage() {
   }
 }
 
-// Each comment's pin on its page, and the box of an area, in the scrolling pane's coordinates, so they move with it.
 const pins = computed(() => {
   void layout.value
   if (!loaded.value) return []
@@ -216,12 +194,10 @@ defineExpose({ pageAt })
 
 <template>
   <div class="relative flex min-h-0 flex-1 flex-col bg-elevated">
-    <!-- pdf.js wants its pane absolutely placed, and scrolls it itself. -->
     <div ref="container" class="pdf-pane absolute inset-0 overflow-auto" :aria-label="title" role="document">
       <div ref="viewerElement" class="pdfViewer" />
       <template v-for="{ comment, pin, area } in pins" :key="comment.id">
         <div v-if="area" class="pdf-area" :class="{ done: comment.resolved }" :style="area" />
-        <!-- A comment still in the outbox has no number yet: a clock takes its place. -->
         <UTooltip :text="`${numberOf(comment)} ${comment.body || 'image'}`">
           <button
             type="button"
@@ -248,7 +224,6 @@ defineExpose({ pageAt })
     <div v-else-if="!loaded" class="absolute inset-0 grid place-items-center text-sm text-muted">
       <UIcon name="i-mingcute-loading-line" class="size-5 animate-spin" />
     </div>
-    <!-- Page and zoom, over the top of the pane, out of the review dock's way at the bottom. -->
     <div
       v-if="loaded"
       class="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-lg border border-default bg-default/90 p-1 shadow-sm backdrop-blur"

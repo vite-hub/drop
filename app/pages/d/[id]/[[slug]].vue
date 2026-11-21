@@ -1,15 +1,10 @@
 <script setup lang="ts">
-// What someone with the link sees: the doc's latest version, or the one `?v=` pins, full screen, no sidebar. Private
-// drops 404. Signed-in people read it inside the app instead, so the link never strands them; opened straight away, it
-// keeps the sidebar out of the way until they ask for it (useOpenedOnLink).
-// The address settles on the doc's link (`/d/<link>/<slug>`): an outdated slug moves there.
 import { type DropLink, dropPath } from "#shared/links"
 import { isPublic } from "#shared/share"
 
 definePageMeta({
   middleware: async (to) => {
     const { data: me } = await useMe()
-    // `?present` shows the drop alone, for another window (ViewerPresent), signed in or not.
     if (me.value && to.query.present === undefined) setPageLayout("dashboard")
   },
 })
@@ -34,7 +29,6 @@ async function settle() {
 await settle()
 watch(() => target.data.value, settle)
 
-// Until the link resolves (or when it can't), the drop API answers for the key itself and says why it can't open.
 const { drop, comments } = provideDrop(
   () => target.data.value?.id ?? route.params.id,
   () =>
@@ -42,8 +36,6 @@ const { drop, comments } = provideDrop(
 )
 await Promise.all([drop, comments])
 useSeoMeta({ title: () => drop.data.value?.title ?? "Drop", robots: "noindex, nofollow" })
-// A pasted link's preview names the drop. Unfurlers aren't signed in, so only public drops reach them; the rest keep
-// app.vue's Drop card. The card image is the drop's own (server/routes/og/[id].get.ts).
 const origin = useRequestURL().origin
 const shown = computed(() => (drop.data.value && isPublic(drop.data.value.share) ? drop.data.value : null))
 useSeoMeta({
@@ -54,7 +46,6 @@ useSeoMeta({
   ogImageAlt: () => shown.value?.title,
   ogType: () => shown.value && "article",
 })
-// The doc renders in a frame once the page's script runs; agents reading the HTML find its text here instead.
 useHeadSafe({
   link: () =>
     ["markdown", "html"].includes(drop.data.value?.kind ?? "")
@@ -67,7 +58,6 @@ useHeadSafe({
         ]
       : [],
 })
-// A visit beacon: unfurlers and crawlers never run this, so only people reading the link keep the drop alive.
 onMounted(() => {
   const id = drop.data.value?.id
   if (id)
@@ -81,12 +71,10 @@ const here = useHerePath()
 
 <template>
   <ViewerPresent v-if="presenting && drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" />
-  <!-- The dashboard layout brings its own UDashboardGroup; a visitor's page needs one for the viewer's panels. -->
   <template v-else-if="me">
     <DropViewer v-if="drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" public-view />
     <UDashboardPanel v-else id="drop-missing">
       <template #header>
-        <!-- The viewer's bar while it loads or can't open, so the page keeps its line and doesn't jump. -->
         <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-2 sm:px-3' }">
           <template #left>
             <SidebarExpand />

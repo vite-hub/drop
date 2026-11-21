@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// The drop picked in a folder's list, previewed beside it (Dropbox's and Supabase Storage's pane): images and videos as
-// themselves, Markdown, HTML and spreadsheets in a frame with no scripts, the rest by kind. Its name sits on top with
-// what it is under it, and double-clicking the name renames it (`renames`); who added it, and when, sits by Open.
 import { RelativeTime } from "vite-hub/ui"
 import { planDocument } from "#shared/documents"
 import { videoType } from "#shared/plans"
@@ -15,7 +12,6 @@ function renamed(title: string | null) {
   renaming.value = false
   emit("rename", title)
 }
-// The viewer's own cache key, so the page opens at once after its preview.
 const { data: detail } = useApi<DropDetail>(() => `/api/drops/${props.child.id}`, {
   key: () => keys.drop(props.child.id),
   server: false,
@@ -25,9 +21,6 @@ const colorMode = useColorMode()
 const dark = computed(() => colorMode.value === "dark")
 const url = computed(() => detail.value?.url)
 const video = computed(() => (props.child.kind === "file" ? videoType(props.child.filename) : undefined))
-// `sandbox` with nothing allowed: the doc's own scripts and the viewer's runtime stay off, so it can't reach the app.
-// Images a doc embeds load through that runtime, so they wait for the page. A Markdown doc reads smaller here, edge to
-// edge of the pane: its page keeps the reading size.
 const COMPACT_CSS =
   "<style>main{width:auto;padding:1rem 1.25rem 2rem}.typeset{font-size:.875rem;--typeset-leading:1.6}</style>"
 const srcdoc = computed(() => {
@@ -42,7 +35,6 @@ const srcdoc = computed(() => {
   if (drop.kind === "file" && drop.html) return planDocument("file", "", dark.value, drop.html)
   return ""
 })
-// What it is, in one line under its name: "Image · 1.13 MB", a folder's count, whose it is when it isn't yours.
 const about = computed(() =>
   [
     KIND_LABELS[props.child.kind],

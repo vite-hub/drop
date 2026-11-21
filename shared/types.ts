@@ -1,4 +1,3 @@
-// The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
 import type { CommentDelivery } from "vite-hub/comments/client"
 import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
@@ -10,25 +9,19 @@ export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder",
 export type DropKind = (typeof DROP_KINDS)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]
-/** Who viewed a drop, for its Details: a signed-in person, an anonymous visitor, or an agent. */
 export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const
 export type ViewerKind = (typeof VIEWER_KINDS)[number]
 
-/** How many of your newest drops the sidebar lists before its "more" (`/api/drops?tree`). */
 export const TREE_ROWS = 30
 
-/** The sidebar's drops: your newest TREE_ROWS at the top, and the open one wherever it sits, of `total`. */
 export interface DropTree {
   drops: DropSummary[]
   total: number
 }
 
 export interface DropSummary {
-  /** This version. */
   id: string
-  /** The doc's share link key, the same on every version (`/d/<link>/<slug>`, see #shared/links). */
   link: string
-  /** The readable part of the link. */
   slug: string
   kind: DropKind
   title: string
@@ -37,56 +30,33 @@ export interface DropSummary {
   version: number
   shareReview: "pending" | "rejected" | null
   quarantinedAt: number | null
-  /** Who can open it now (see #shared/share): the widest share on its path, with a closed public link resolved. */
   share: Share
-  /** When its own public link closes. Null while it isn't public, or when public links stay open. */
   publicUntil: number | null
   actorKind: ActorKind
   actorName: string
   createdAt: number
   updatedAt: number
-  /** Apps only. */
   paths?: string[]
-  /** When the drop stops being served unless someone visits it. Null when it never expires. */
   expiresAt: number | null
   lifetime: Lifetime
-  /** Why an agent kept this drop. Null when a person chose to keep it. */
   keepReason: string | null
-  /** What changed in this version. A folder's is its description: what goes in it, which agents read to pick it. */
   note: string | null
-  /** When it went to the Trash (or expired into it). Null while it's live. */
   trashedAt: number | null
   trashReason: "deleted" | "expired" | null
-  /**
-   * The node this drop sits in: a folder, or the doc an embedded file belongs to. A drop takes the widest share on its
-   * path, and the lifetime and Trash of the top-most node (see server/utils/nodes.ts).
-   */
   parentId: string | null
-  /** The node above whose share reaches wider than this drop's own. `share` then says the widest. */
   sharedFrom?: { id: string; title: string }
-  /** This drop's own share, when a node above shares it wider. The share controls change this one. */
   ownShare?: Share
-  /** Folders the team keeps: everyone adds to them; admins name, describe, and share them. */
   teamFolder?: boolean
-  /** On a personal Drop with teams: the team whose folders hold it, which its team shares reach. */
   team?: string
-  /** Folders: how many drops are directly inside. */
   items?: number
-  /** Links: the page outside Drop it opens, like a pull request. */
   href?: string
-  /** Images in a folder or a search: where the file is served, for a thumbnail. */
   thumbnail?: string
-  /** Search results: the folders it sits in, top-most first. */
   path?: DropCrumb[]
-  /** Search results: words around the match in a doc's text, when its name doesn't have them all. */
   snippet?: string
-  /** "Shared with me" and search: whose drop it is, when it isn't yours. */
   owner?: { name: string; image: string | null }
-  /** You pinned it: the Drops page's Pinned view and ⌘K list it. Set on a drop's detail and the Pinned list. */
   pinned?: boolean
 }
 
-/** What a card on the Drops page shows of a drop: an image's file, a doc's or board's first words, a folder's newest drops. */
 export interface DropPeek {
   id: string
   kind: DropKind
@@ -96,13 +66,10 @@ export interface DropPeek {
   inside?: DropPeek[]
 }
 
-/** `GET /api/drops/peeks`: a peek for each of the ids asked for that the caller owns. */
 export type DropPeeks = Record<string, DropPeek>
 
-/** An image beside the open one in its folder, for moving to it. */
 export type DropGalleryItem = DropCrumb & { thumbnail: string }
 
-/** A node on the way to a drop, for breadcrumbs. */
 export interface DropCrumb {
   id: string
   kind: DropKind
@@ -121,14 +88,11 @@ export interface DropVersion {
   current?: boolean
 }
 
-/** A link a drop points to, like its pull request. Every version of the drop shows the same ones (#shared/resources). */
 export interface DropResource {
   url: string
-  /** What it is, like "PR #123". Without one, the page shows the link's host. */
   title?: string
 }
 
-/** A drop related to another through the pages they link to (server/utils/related.ts), with its links not listed yet. */
 export interface RelatedDrop {
   id: string
   title: string
@@ -136,7 +100,6 @@ export interface RelatedDrop {
   links: DropResource[]
 }
 
-/** A file a doc embeds from this Drop (an image, usually). It belongs to the doc. */
 export interface DropAttachment {
   id: string
   kind: DropKind
@@ -148,80 +111,44 @@ export interface DropAttachment {
 
 export interface DropDetail extends DropSummary {
   siteScreenshot?: boolean
-  /** The effective root is a team folder, whose lifetime cannot change. */
   lifetimeFixed?: boolean
-  /** Change its share, name, lifetime, or folder: its owner and admins; a team folder's admins only. */
   isOwner: boolean
-  /** Move it to the Trash: who may change it, and anyone on the team for a drop in a team folder. */
   canTrash: boolean
   canComment: boolean
-  /** Live editing: a Markdown drop's current version, for people who may edit it, on a host with Realtime. */
   canEdit: boolean
-  /** Why someone who may edit can't open this doc in the live editor. */
   editNote?: string
-  /** Text source for Markdown and HTML docs. */
   content?: string
-  /** A line of what it says, for link previews: a doc's first words, a folder's description, a site's address. */
   excerpt?: string
-  /** Markdown docs, rendered by the server's Comark renderer: the viewer shows exactly what /f/ shows. */
   html?: string
-  /** Where the raw file is served, for images and other files. */
   url?: string
-  /** An app's text files keyed by path, unless its origin serves them all (contentGrant): the frame reads pages there. */
   files?: Record<string, string>
-  /** Apps: each file's size in bytes, keyed by path. */
   sizes?: Record<string, number>
-  /** Apps and HTML docs: the separate origin the viewer frames them on. Absent means an opaque-origin sandbox. */
   contentOrigin?: string
-  /** Apps on a per-drop origin: what the viewer hands the frame so that origin serves the app's files to it. */
   contentGrant?: string
   versions: DropVersion[]
-  /** Docs: the files they embed from this Drop. */
   attachments?: DropAttachment[]
-  /** The nodes above this one that the reader may open, top-most first. */
   ancestors: DropCrumb[]
-  /** Folders: the drops directly inside, newest first. */
   children?: DropSummary[]
-  /** Images in a folder the reader may open: the folder's images, in its order, this one among them. Two or more. */
   gallery?: DropGalleryItem[]
-  /** Sites: the origin of the website under review. */
   siteUrl?: string
-  /** Its owner and admins: views of every version, each viewer counted once a day. Their own visits don't count. */
   views?: Record<ViewerKind, number>
-  /** Links it points to, like its pull request and that PR's preview, in the order they were added. */
   resources?: DropResource[]
-  /**
-   * Markdown docs, when the reader's answers count (a person signed in, and the doc out of the Trash): what they answered
-   * to its questions, polls, and recall cards, and how everyone answered the questions and polls they did.
-   */
   quiz?: DropQuiz
-  /** A folder a stranger opens that is a skill hub, or one of a hub's skills: what `npx skills add` installs from it. */
   install?: SkillInstall
 }
 
-/**
- * Where `npx skills add` installs a public folder's skills from (server/utils/hub-skills.ts): the hub's link and slug,
- * and on a skill's own folder, the skill's name.
- */
 export interface SkillInstall {
   link: string
   slug: string
-  /** A hub's page: how many skills it serves. */
   skills?: number
-  /** A skill's folder in a hub: the skill, for `--skill`. */
   skill?: string
 }
 
-/** A reader's latest answer to a block of a Markdown doc (#shared/quiz): the option keys they picked. */
 export interface QuizAnswer {
   choice: string[]
   correct: boolean | null
 }
 
-/**
- * How everyone signed in answered a question or a poll: people per option key, by their first try at a question and
- * their current vote in a poll. `total` counts people, so where people pick several options the counts add up to more.
- */
 export interface QuizResult {
   counts: Record<string, number>
   total: number
@@ -229,11 +156,9 @@ export interface QuizResult {
 
 export interface DropQuiz {
   answers: Record<string, QuizAnswer>
-  /** Never a block the reader hasn't answered: results show once they have. */
   results: Record<string, QuizResult>
 }
 
-/** What saving an answer returns: the answer as kept, and the block's results unless it's a recall card. */
 export interface QuizSaved {
   answer: QuizAnswer
   results?: QuizResult
@@ -241,62 +166,40 @@ export interface QuizSaved {
 
 export interface DropComment {
   id: string
-  /** The id of its first message, which a reply or an edit names. */
   messageId: string
   n: number
-  /** `text` quotes a selection, `image` marks a spot or area of an image, `area` a rectangle of a page, `page` the whole page. */
   kind: "text" | "image" | "area" | "page"
   selector: string
-  /** Position and size in thousandths of the anchor's box. A point has `ow` = `oh` = 0. */
   ox: number
   oy: number
   ow: number
   oh: number
   quote: string | null
-  /** A suggested edit: the words that replace the quote, empty to delete it. Null on a plain comment. */
   suggestion: string | null
-  /** On a video's frame: the second it's at. `ox`/`oy`/`ow`/`oh` are then thousandths of the frame. */
   at: number | null
-  /** On a PDF's page: its number, from 1. `ox`/`oy`/`ow`/`oh` are then thousandths of the page. */
   pdfPage: number | null
-  /** From the Marker: its strokes, which the page draws over the area. */
   ink: Ink | null
   label: string | null
   page: string | null
   body: string
-  /** `guest:<uuid>` for someone on a "Can comment" link. */
   authorId: string
   authorName: string
-  /** The author's picture, when they have one; pins and threads fall back to initials. */
   authorImage: string | null
-  /** The agent that wrote it for the author, through an MCP client. Threads show it: "Claude (Maxi)". */
   agent: CommentAgent | null
-  /** The ids of the people its `@`s name. */
   mentions: string[]
   resolved: boolean
-  /** When it was last resolved. A reply after it brings the comment back to Open, still resolved. */
   resolvedAt: number | null
   createdAt: number
   editedAt: number | null
-  /** The version it was written on. Open comments carry over to later versions until someone resolves them. */
   version: number
   mine: boolean
-  /** The thread under it, oldest first. */
   replies: CommentReply[]
-  /** Images sent with it. */
   attachments: CommentAttachment[]
-  /** The people its and its replies' `@`s name, so their names show to readers who can't list people. */
   people: { id: string; name: string; image: string | null }[]
-  /** The retry key the viewer sent it with, so its waiting copy and the server's show once. */
   requestId?: string
-  /**
-   * Only in the viewer: it waits in the outbox (useDrop) and isn't on the server yet. Its `id` is local, `n` is 0, and
-   * its images are `delivery.files`.
-   */
   delivery?: CommentDelivery
 }
 
-/** A reply in a comment's thread: words and images; the comment keeps the anchor and the resolved state. */
 export interface CommentReply {
   id: string
   body: string
@@ -309,45 +212,29 @@ export interface CommentReply {
   editedAt: number | null
   mine: boolean
   attachments: CommentAttachment[]
-  /** As on a comment: the retry key it was sent with. */
   requestId?: string
-  /** As on a comment: it waits in the outbox, with a local `id`. */
   delivery?: CommentDelivery
 }
 
-/** An agent that wrote a comment or a reply for its author. `image` is its logo, when Drop knows the agent. */
 export interface CommentAgent {
   name: string
   image: string | null
 }
 
-/** An image someone sent with a comment or a reply. It's a drop of its own under the commented drop. */
 export interface CommentAttachment {
   id: string
   filename: string
   contentType: string
   size: number
-  /** Where ViteHub Comments serves it (`/_vitehub/comments/attachments/<id>`), to whoever may read its thread. */
   url: string
 }
 
-/**
- * A comment someone sent from a site under review, with the screenshot it came with. Its box is in thousandths of
- * the screenshot (the viewport they saw); `page` is the address they were on.
- */
 export interface SiteReviewItem extends DropComment {
-  /** Identifies the submission when its POST response is lost. Absent on older comments. */
   requestId?: string
-  /** The screenshot's own drop, which shows the box and takes replies. Null when the page couldn't take one. */
   screenshot: { id: string; link: string; slug: string; url: string } | null
-  /** Where the pin sits on the element `label` names, in thousandths of its box. Null without an element. */
   spot: { x: number; y: number } | null
 }
 
-/**
- * A thread as the review script shows it on the site's page: what Drop's own lists show, minus anything that would
- * open the review in Drop (ids, links). Images come from /api/review/images/<id> with the review token.
- */
 export interface ReviewThread {
   n: number
   requestId?: string
@@ -356,13 +243,10 @@ export interface ReviewThread {
   createdAt: number
   resolved: boolean
   mine: boolean
-  /** Its author and the site's managers may resolve it, as in Drop. */
   canResolve: boolean
   page: string | null
-  /** The element under the box: its CSS path and its name, as the page sent them. */
   element: { selector: string; label: string | null } | null
   spot: { x: number; y: number } | null
-  /** The box, in thousandths of the viewport it was drawn in. */
   box: { ox: number; oy: number; ow: number; oh: number }
   screenshot: string | null
   images: { id: string; filename: string }[]
@@ -374,13 +258,10 @@ export interface ReviewThread {
   }[]
 }
 
-/** An MCP client someone approved on /oauth: it acts as them until disconnected. */
-/** A built-in Agent Skill as the catalog shows it. Members only see enabled ones; admins see all. */
 export interface SkillSummary {
   name: string
   description: string
   enabled: boolean
-  /** The full skill on GitHub. */
   source: string
 }
 
@@ -396,19 +277,12 @@ export interface Viewer {
   email: string
   image: string | null
   role: Role
-  /** This Drop's expiry rules: days a drop lives after its last visit (0 is off), and whether owners may opt out. */
   expiry: { days: number; custom: boolean }
-  /** `DROP_MODE`: a personal Drop shares by public link; on a team Drop drops start shared with the team. */
   mode: DropMode
-  /** Days a public link stays open before it closes (null: until changed, 0: public links are off). */
   publicLinkDays: number | null
-  /** How many skills are on: agents get them over MCP, and members see Skills only while one is. */
   skills: number
-  /** On a personal Drop with `DROP_TEAMS`: the teams they're on. Absent when teams are off. */
   teams?: ViewerTeam[]
-  /** Teams pay through Stripe here (`STRIPE_*`): past `freeMembers`, a team needs a subscription. */
   billing?: { freeMembers: number; annual: boolean }
-  /** They're on a team that pays: the Pro plan. */
   paid?: boolean
 }
 
@@ -418,6 +292,5 @@ interface ViewerTeam {
   slug: string
   role: "owner" | "admin" | "member"
   paid: boolean
-  /** Stripe couldn't charge the team's card (`past_due` or `unpaid`): Free until payment succeeds. */
   pastDue: boolean
 }

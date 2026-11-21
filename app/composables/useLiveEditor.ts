@@ -4,29 +4,19 @@ import { draftOf } from "#shared/draft-paths"
 import type { DropDetail, DropSummary, Viewer } from "#shared/types"
 import type { LiveRoom } from "~/composables/live-room"
 
-// What a publishing client leaves on its awareness state. Other clients set it, so it's parsed, not trusted.
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
 type Published = v.InferOutput<typeof PublishedSchema>
 const LintFailureSchema = v.object({
   problems: v.array(v.object({ severity: v.string(), line: v.number(), message: v.string() })),
 })
-// A drop this person can no longer open answers 404.
 const GoneSchema = v.object({ statusCode: v.literal(404) })
 
-/**
- * Live editing of a Markdown drop. Everyone who opens it joins one Realtime room on the drop's draft, sees the others,
- * and types into the same text. The room saves the draft on its own; publish saves it once more and makes it the next
- * version, and the others follow. Closing keeps the draft, so the next person who opens it continues where the room left off.
- * Since closing loses nothing, Close says so instead of asking; it asks only when edits may not have reached the room.
- */
 export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: boolean }) {
   const notify = useNotify()
   const confirm = useConfirm()
   const documentId = ref<string>()
   const opening = ref(false)
   const publishing = ref(false)
-  // The room and its editor load the first time someone opens the editor (~/composables/live-room), so readers never
-  // download Yjs or Tiptap. They run in a scope of this component's: leaving the page leaves the room.
   const scope = effectScope()
   const room = shallowRef<LiveRoom>()
   const realtime = computed(() => room.value?.realtime)
@@ -36,43 +26,36 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
   const people = computed(() => realtime.value?.people.value ?? [])
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
 
-  // The room admits only people who may edit, and only on the latest version's draft (server/realtime/drafts.ts). A
-  // version published from elsewhere (an agent, Accept on a suggestion) leaves this editor on an older draft, and once
-  // its socket drops, y-websocket knocks on the refused room every couple of seconds for as long as the tab stays open:
-  // browsers never say why a WebSocket failed. So when the room stays out of reach, ask the server whether this draft
-  // still qualifies, and if it doesn't, stop knocking. `refused` holds the newer version, or 0 when editing is over.
   const refused = ref<number>()
-  // Connecting and disconnected take turns while it knocks, so this stays true until the room answers or gives up.
   const outOfReach = computed(
     () => editing.value && refused.value === undefined && realtime.value?.status.value !== "connected",
   )
-  // A first look 5 s after the room goes out of reach, then one every 30 s while it stays there.
-  watch(outOfReach, (away, _, onCleanup) => {
-    if (!away) return
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let stopped = false
-    const look = (delay: number) => {
-      timer = setTimeout(() => void checkDraft().then(() => !stopped && look(30_000)), delay)
-    }
-    look(5_000)
-    onCleanup(() => {
-      stopped = true
-      clearTimeout(timer)
-    })
+  const lookDelay = ref(5_000)
+  const look = useTimeoutFn(
+    async () => {
+      await checkDraft()
+      if (!outOfReach.value) return
+      lookDelay.value = 30_000
+      look.start()
+    },
+    lookDelay,
+    { immediate: false },
+  )
+  watch(outOfReach, (away) => {
+    look.stop()
+    lookDelay.value = 5_000
+    if (away) look.start()
   })
   async function checkDraft() {
     const id = documentId.value
     const draft = id ? draftOf(id) : null
     if (!draft) return
-    // `undefined` when there's no answer, so the connection itself is down, and `null` when the drop is gone.
     const head = await $fetch<DropDetail>(`/api/drops/${draft.id}`).catch((error: unknown) =>
       v.is(GoneSchema, error) ? null : undefined,
     )
     if (documentId.value !== id || !outOfReach.value) return
     if (head === undefined || (head && head.version === draft.version && head.canEdit)) return
     realtime.value?.provider.value?.disconnect()
-    // The text stays on screen, read-only, so whatever didn't reach the room can still be copied. No update event: it
-    // would count as typing.
     editor.value?.setEditable(false, false)
     if (head && head.version > draft.version) {
       refused.value = head.version
@@ -86,21 +69,17 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     }
   }
 
-  // The room opens read-only a draft the editor can't save without changing it. The edit button checks that first, so
-  // it's rare: a draft someone else's edit left that way.
   watch([() => realtime.value?.readOnlyReason.value, editor], ([reason, current], [before]) => {
     if (reason !== "document") return
     current?.setEditable(false, false)
     if (reason !== before) notify.say("This doc can't be edited in Drop", { icon: "i-mingcute-lock-line" })
   })
 
-  // A new version keeps the drop's id, so the page reloads the drop's data rather than finding a new address.
   async function openLatest(id: string, edit = false) {
     await refreshNuxtData([keys.drop(id), keys.comments(id)])
     await navigateTo({ path: `${options.publicView ? "/d" : "/drops"}/${id}`, query: edit ? { edit: "1" } : {} })
   }
 
-  // A teammate published: their client leaves `published` on its awareness state before it goes.
   let announced = ""
   watch(
     () => realtime.value?.provider.value,
@@ -154,8 +133,6 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     documentId.value = undefined
   }
 
-  // Typing while disconnected stays in this tab until the room is back (`unsaved` until then). A refused draft never
-  // gets back, and it isn't kept for later either: the editor opens on the latest version next time.
   async function mayClose() {
     if (!room.value?.unsaved.value) return true
     return await confirm({
@@ -180,7 +157,6 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
       })
   }
 
-  /** Leaves a refused draft for the drop's latest version. */
   async function openRefused() {
     if (!(await mayClose())) return
     close()
@@ -211,14 +187,11 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         name: me.value?.name ?? "Someone",
       } satisfies Published)
       notify.done(`Published v${next.version}`)
-      // A new version adds bytes and a write, so the plan usage moves too.
       await refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage])
-      // Let the announcement reach the room before this client leaves it.
       await promiseTimeout(300)
       close()
       await openLatest(next.id)
     } catch (error) {
-      // The Markdown has Comark errors (requirePublishableMarkdown): the first few, by line, rather than the whole list.
       const errors = errorData(error, LintFailureSchema)?.problems.filter((problem) => problem.severity === "error")
       if (errors?.length) {
         notify.alert(
@@ -242,7 +215,6 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         confirmLabel: "Publish anyway",
         destructive: true,
       })
-      // Awaited, or this call's `finally` would release the lock while the forced publish still runs.
       if (replace) return await publish(true)
       notify.say(`v${head.version} is the latest version. Your draft stays here`, {
         icon: "i-mingcute-history-line",

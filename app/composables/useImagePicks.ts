@@ -1,15 +1,9 @@
 import { COMMENT_IMAGE_TYPES, MAX_COMMENT_IMAGES, MAX_FILE_BYTES } from "#shared/schemas"
 
-/** One image picked for a comment, with the object URL its preview shows. */
 export type ImagePick = { file: File; url: string }
 
 const isImage = (file: File) => COMMENT_IMAGE_TYPES.some((type) => type === file.type)
 
-/**
- * The images a comment or reply box will send: from its image button, a paste, or a drop on the box. At most
- * MAX_COMMENT_IMAGES of 4 MiB each, as the server takes them; `problem` says why one wasn't added. Previews are object
- * URLs, revoked when the image is removed, the box is cleared, or the box goes away.
- */
 export function useImagePicks() {
   const picks = shallowRef<ImagePick[]>([])
   const problem = ref<string>()
@@ -40,7 +34,6 @@ export function useImagePicks() {
   const dialog = useFileDialog({ accept: COMMENT_IMAGE_TYPES.join(","), multiple: true, reset: true })
   dialog.onChange((files) => files && add(files))
 
-  /** A paste with images adds them; text pastes as usual. */
   function paste(event: ClipboardEvent) {
     const files = [...(event.clipboardData?.files ?? [])].filter((file) => file.type.startsWith("image/"))
     if (!files.length) return
@@ -60,7 +53,6 @@ export function useImagePicks() {
   return {
     picks,
     problem,
-    /** The picked files. Setting it removes the picks that are gone and adds the new files, as a composer's `v-model:files`. */
     files: computed({
       get: () => picks.value.map((pick) => pick.file),
       set: (next: File[]) => {

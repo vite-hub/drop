@@ -2,7 +2,6 @@ import { HTTPError } from "h3"
 import { checkGitHubOrgMember } from "vite-hub/auth"
 import { useServerEnv } from "vite-hub/env"
 
-/** The GitHub organization that oauth2-proxy signs people in for: the first `github-org:` entry of `VITEHUB_MEMBERS`. */
 const proxyOrganization = () =>
   useServerEnv()
     .drop.members.unseal()
@@ -11,7 +10,6 @@ const proxyOrganization = () =>
     .find((entry) => entry.startsWith("github-org:"))
     ?.slice("github-org:".length) || null
 
-/** Whether sign-in is delegated to oauth2-proxy, and the cookie it sets. */
 export function readAuthProxyConfig() {
   const { authProxy: enabled, authProxyCookie } = useServerEnv().drop
   const cookie = authProxyCookie.trim() || null
@@ -21,10 +19,6 @@ export function readAuthProxyConfig() {
   return { enabled, cookie }
 }
 
-/**
- * Whether oauth2-proxy's GitHub token belongs to an active member of the proxy's organization. A confirmed membership
- * holds for five minutes. A token GitHub rejects answers 401, missing organization access 403, and an outage 503.
- */
 export async function isProxyMember(token: string): Promise<boolean> {
   const organization = proxyOrganization()
   if (!organization) return false

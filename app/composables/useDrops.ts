@@ -5,17 +5,8 @@ import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
 import type { DropDetail, DropSummary, DropTree, Viewer } from "#shared/types"
 
-/**
- * Your drops, every one: the Drops page's list, and the sidebar's once it's loaded. The actions (useDropActions) patch it
- * after the server agrees, or refresh it when the server computes fields.
- */
 export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: () => [] })
 
-/**
- * The sidebar's drops (listTree): your newest, and the one open on the page that loaded it, of how many in all. Every
- * dashboard page has the sidebar, and listing every drop on each of them cost every page's render and payload.
- */
-// A page's open drop is its route's single `id`; a route without one, or with a repeated one, has none.
 const OpenDrop = v.fallback(v.object({ id: v.optional(v.string()) }), {})
 
 export function useDropTree({ params }: Pick<RouteLocationNormalizedLoaded, "params"> = useRoute()) {
@@ -27,33 +18,25 @@ export function useDropTree({ params }: Pick<RouteLocationNormalizedLoaded, "par
   })
 }
 
-/**
- * The drops the sidebar shows, and how many you have: every one where the page loaded them all already (the Drops page),
- * else the sidebar's list (useDropTree).
- */
 export function useSidebarDrops() {
   const { data: tree, status } = useDropTree()
   const { data: all } = useNuxtData<DropSummary[]>(keys.drops)
   return {
     drops: computed(() => (all.value?.length ? all.value : tree.value.drops)),
     total: computed(() => all.value?.length || tree.value.total),
-    /** Whether every drop is in `drops`. */
     complete: computed(() => Boolean(all.value?.length)),
     status,
   }
 }
 
-/** Both lists of your drops: the whole one (useDrops) and the sidebar's (useDropTree). They refresh together. */
 const LISTS = [keys.drops, keys.tree]
 
-/** What others share with you: on a team Drop the team's folders and teammates' drops, on a personal one the public links you opened. */
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
 type PinConfirmations = Partial<Record<string, { pinned: boolean }>>
 const usePinConfirmations = () => useState<PinConfirmations>("pin-confirmations", () => ({}))
 
-/** The drops you pinned, yours and others', most recently pinned first (listPinned). */
 export function usePinned() {
   const confirmed = usePinConfirmations()
   const pending = new WeakMap<object, PinConfirmations>()
@@ -74,7 +57,6 @@ export function usePinned() {
   })
 }
 
-/** Card actions honor confirmed writes while the list is stale or unavailable. */
 export function useDropPin(drop: () => DropSummary) {
   const confirmed = usePinConfirmations()
   const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
@@ -84,13 +66,10 @@ export function useDropPin(drop: () => DropSummary) {
   })
 }
 
-/** Your Trash, top-most nodes only (listDrops). */
 export const useTrash = () => useApi("/api/drops", { key: keys.trash, query: { trash: "1" }, default: () => [] })
 
-/** Your plan's limits and how much of them you've used. */
 export const useUsage = () => useApi("/api/usage", { key: keys.usage })
 
-/** The drops directly in a folder, for an expanded row in the tree or the Drops page. Keyed `folder:<id>`. */
 export const useFolder = (id: MaybeRefOrGetter<string>) =>
   useApi("/api/drops", {
     key: () => keys.folder(toValue(id)),
@@ -98,10 +77,6 @@ export const useFolder = (id: MaybeRefOrGetter<string>) =>
     default: () => [],
   })
 
-/**
- * A doc's share link, absolute on the server too, so SSR and hydration print the same URL. It opens the latest version;
- * `version` pins one.
- */
 export function useShareUrl(
   drop: MaybeRefOrGetter<Pick<DropSummary, "link" | "slug">>,
   version?: MaybeRefOrGetter<number | undefined>,
@@ -110,16 +85,8 @@ export function useShareUrl(
   return computed(() => `${origin}${dropPath(toValue(drop), toValue(version))}`)
 }
 
-/**
- * What you can do to drops, for the page, rows, modals and the viewer: actions patch the shared "drops" cache
- * through useNuxtData instead of starting another fetch.
- */
 const refresh = () => refreshNuxtData([...LISTS, keys.usage])
 
-/**
- * The lists a new drop shows up in. Not awaited: the caller opens the new drop next, and its page loads by itself, so
- * waiting on the lists only held the page back by a round trip.
- */
 const refreshAfterCreate = (parent?: Pick<DropSummary, "id">) =>
   void refreshNuxtData([...LISTS, keys.usage, ...(parent ? [keys.folder(parent.id), keys.drop(parent.id)] : [])])
 
@@ -129,7 +96,6 @@ export function useDropActions() {
   const { data: me } = useNuxtData<Viewer | null>(keys.me)
   const pinWrites = useState<string[]>("pin-writes", () => [])
   const confirmedPins = usePinConfirmations()
-  /** Changes both lists (LISTS) the same way. */
   const edit = (change: (list: DropSummary[]) => DropSummary[]) => {
     if (cached.value) cached.value = change(cached.value)
     if (tree.value) tree.value = { ...tree.value, drops: change(tree.value.drops) }
@@ -137,13 +103,11 @@ export function useDropActions() {
   const notify = useNotify()
   const confirm = useConfirm()
   const siteDialog = useSiteDialog()
-  // Sharing, trashing or moving a folder changes what its open listings show, so they refetch too.
   const nuxtApp = useNuxtApp()
   const folders = () => Object.keys(nuxtApp.payload.data).filter((key) => key.startsWith(keys.folder("")))
 
   const patch = (id: string, change: Partial<DropSummary>) =>
     edit((list) => list.map((drop) => (drop.id === id ? { ...drop, ...change } : drop)))
-  /** Changes the drop's own page too (useDrop), when one has it loaded. */
   function editDetail(key: string, change: (detail: DropDetail) => DropDetail) {
     if (!(key in nuxtApp.payload.data)) return
     const scope = effectScope(true)
@@ -154,10 +118,6 @@ export function useDropActions() {
     return before
   }
 
-  /**
-   * Uploads one file as a drop with this Drop's default share, or into `folder`, where it shares and lives with the folder.
-   * `onProgress` hears how much of the file has gone, from 0 to 1. It resolves once the lists show the new drop.
-   */
   async function upload(
     file: File,
     folder?: Pick<DropSummary, "id" | "title">,
@@ -185,14 +145,9 @@ export function useDropActions() {
     }
   }
 
-  // Optimistic: sharing is one pick, so it changes at once, in the lists and on the drop's page, and rolls back if the
-  // server says no. The PATCH answers with everything the share decides (its review, a public link's window, the share
-  // a folder above leaves it), so the page takes that instead of loading the whole drop again; only the lists the drop
-  // may join or leave refetch, without holding the pick up.
   async function setShare(drop: Pick<DropSummary, "id">, share: Share) {
     const before = [...(cached.value ?? []), ...(tree.value?.drops ?? [])].find((item) => item.id === drop.id)?.share
     patch(drop.id, { share })
-    // In a folder that shares it wider, the pick is its own share; what it ends up with waits for the server.
     const shown = editDetail(keys.drop(drop.id), (detail) => ({
       ...detail,
       ...(detail.sharedFrom ? { ownShare: share } : { share }),
@@ -201,7 +156,6 @@ export function useDropActions() {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
       patch(drop.id, result)
       editDetail(keys.drop(drop.id), (detail) => ({ ...detail, sharedFrom: undefined, ownShare: undefined, ...result }))
-      // A folder's page lists its drops, whose shares follow it.
       void refreshNuxtData([
         keys.sharedWithMe,
         keys.pinned,
@@ -217,7 +171,6 @@ export function useDropActions() {
     }
   }
 
-  /** Change how long the drop lives, or renew its window. */
   async function setLifetime(drop: Pick<DropSummary, "id">, change: { lifetime?: Lifetime; renew?: true }) {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: change })
@@ -230,7 +183,6 @@ export function useDropActions() {
     }
   }
 
-  /** A new name for the drop. Its link keeps its slug. */
   async function rename(drop: Pick<DropSummary, "id" | "parentId">, title: string) {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { title } })
@@ -248,10 +200,6 @@ export function useDropActions() {
     }
   }
 
-  /**
-   * Pins the drop for every version. All controls share the same in-flight guard; only a confirmed write changes the
-   * cache. `quiet` skips the note for controls that show the new state themselves.
-   */
   async function setPinned(drop: DropSummary, pinned: boolean, { quiet = false } = {}) {
     if (pinWrites.value.includes(drop.id)) return false
     pinWrites.value = [...pinWrites.value, drop.id]
@@ -277,7 +225,6 @@ export function useDropActions() {
     return true
   }
 
-  /** Moves a drop to the Trash at once, with an undo: nothing is lost for 15 days. */
   async function remove(drop: Pick<DropSummary, "id" | "title">) {
     try {
       await $fetch(`/api/drops/${drop.id}`, { method: "DELETE" })
@@ -348,7 +295,6 @@ export function useDropActions() {
     }
   }
 
-  /** A new folder at the top, or inside `parent`, with what goes in it. `team` makes one of the team's (admins only). */
   async function createFolder(
     title: string,
     parent?: Pick<DropSummary, "id">,
@@ -370,10 +316,6 @@ export function useDropActions() {
     }
   }
 
-  /**
-   * Asks for a new site review's address and name, makes it inside `parent`, where it lives with the folder, and opens
-   * it. Without a parent the server puts it in Site reviews.
-   */
   async function newSite(parent?: Pick<DropSummary, "id">) {
     const input = await siteDialog()
     if (!input) return
@@ -389,7 +331,6 @@ export function useDropActions() {
     }
   }
 
-  /** A new empty Markdown doc, in `parent` when given. */
   async function createDoc(parent?: Pick<DropSummary, "id">) {
     try {
       const doc = await $fetch<DropSummary>("/api/drops", {
@@ -404,12 +345,10 @@ export function useDropActions() {
     }
   }
 
-  /** A new empty board, in `parent` when given. */
   async function createBoard(parent?: Pick<DropSummary, "id">) {
     try {
       const board = await $fetch<DropSummary>("/api/drops", {
         method: "POST",
-        // An empty .excalidraw becomes an empty board on the server.
         body: { filename: "board.excalidraw", title: "Untitled board", content: "" },
       })
       if (parent) await $fetch(`/api/drops/${board.id}`, { method: "PATCH", body: { folder: parent.id } })
@@ -420,7 +359,6 @@ export function useDropActions() {
     }
   }
 
-  /** A folder's description: what goes in it and how, which agents read to pick it. Saved, it shows in place of the editor. */
   async function describe(folder: Pick<DropSummary, "id">, description: string) {
     try {
       const result = await $fetch<DropSummary>(`/api/drops/${folder.id}`, { method: "PATCH", body: { description } })
@@ -433,7 +371,6 @@ export function useDropActions() {
     }
   }
 
-  /** Moves a drop into a folder, or to the top with null. It then shares and lives with the folder. */
   async function move(
     drop: Pick<DropSummary, "id" | "title" | "parentId">,
     folder: Pick<DropSummary, "id" | "title"> | null,

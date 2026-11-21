@@ -16,7 +16,5 @@ export function writeOutboxAuthor(id?: string) {
   try {
     if (id) localStorage.setItem(AUTHOR_KEY, JSON.stringify({ id }))
     else localStorage.removeItem(AUTHOR_KEY)
-  } catch {
-    // A storage failure doesn't change ownership of the saved entries.
-  }
+  } catch {}
 }

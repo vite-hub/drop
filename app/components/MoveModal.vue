@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Opened through useMoveDialog(): pick a folder to move a drop into, or the top. Resolves true once it moved.
-// A folder never goes inside itself, so it and everything below it stay out of the list.
 import type { DropSummary } from "#shared/types"
 
 const props = defineProps<{ drop: Pick<DropSummary, "id" | "title" | "kind" | "parentId"> }>()

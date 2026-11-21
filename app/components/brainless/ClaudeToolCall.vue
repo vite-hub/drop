@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Claude Code's collapsed tool line: ⏺ Tool(arg) and the ⎿ result under it.
-// Ported from Brainless (MIT, see LICENSE); static here, without the disclosure.
 const { status = "success" } = defineProps<{
   tool: string
   arg?: string

@@ -1,8 +1,4 @@
 <script setup lang="ts">
-// The lifetime as a chip in the review pill's + row, left of the version: "30 d", or ∞ "Forever". One click opens the
-// choices (useLifetime, which the ⌘K palette offers too). A drop in a folder lives as long as the folder at the top, so
-// there the choice changes that folder, and the menu says so. Opening a drop restarts its count, so the chip shows the
-// window, never a countdown. A trashed drop has the page's Restore banner instead.
 import { lifetimeLabel } from "#shared/expiry"
 import type { DropDetail } from "#shared/types"
 import type { DropdownMenuItem } from "@nuxt/ui"
@@ -15,7 +11,6 @@ const items = computed<DropdownMenuItem[][]>(() => [
   [
     {
       type: "label",
-      // Labels truncate by default; this one is a sentence, so it wraps.
       ui: { label: "font-normal text-muted", itemLabel: "whitespace-normal text-pretty" },
       label: folder.value ? `Set on its folder, ${folder.value.title}` : "Goes to the Trash when nobody opens it for",
     },
@@ -46,7 +41,6 @@ const chip =
 
 <template>
   <span v-if="fixed" :class="[chip, 'pointer-events-none']" aria-label="Lifetime: forever">
-    <!-- MingCute has no infinity sign; this one is drawn at its 1.75 stroke. -->
     <svg
       aria-hidden="true"
       class="size-3.5"

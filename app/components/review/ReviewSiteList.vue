@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The reviews that cover a page, in the connect popup when there are several: each with its owner, so people pick the
-// right one. `pending` is the choice being connected.
 defineProps<{
   sites: Array<{ choice: string; title: string; owner: string; address: string }>
   pending: string | null

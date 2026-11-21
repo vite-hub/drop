@@ -2,14 +2,9 @@ import * as v from "valibot"
 import { MAX_QUIZ_BLOCKS, QuizAnswerInput, QuizId } from "./quiz"
 import { InkSchema } from "./schemas"
 
-// What a drop's frame posts up to the viewer: the comment layer (shared/plan-runtime.ts), an app's page runtime
-// (shared/project-bundle.ts), and the content origin's frame host (server/utils/content-origin.ts). Frames run the
-// drop's own code, which can post anything, so the viewer parses each message here and drops what doesn't fit.
-
 const Rect = v.object({ left: v.number(), top: v.number(), right: v.number(), bottom: v.number() })
 const path = { path: v.string() }
 
-/** The most variants a prototype's message lists (the prototype skill asks for 3 to 6). */
 const MAX_VARIANTS = 100
 
 const RuntimeErrorKind = v.picklist(["error", "rejection", "console", "load"])
@@ -20,24 +15,15 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("host"), ...path }),
   v.object({ type: v.literal("location"), ...path }),
   v.object({ type: v.literal("frame-request"), id: v.string(), ...path }),
-  // An app page's HTML, read on the app's own origin for a viewer that came without it; none when it didn't load.
   v.object({ type: v.literal("page"), page: v.string(), html: v.optional(v.string()) }),
   v.object({ type: v.literal("copy"), text: v.string() }),
-  // A Markdown doc's section the reader went to, or (`copy`) whose link they copied: Drop's address keeps it as #id.
   v.object({ type: v.literal("heading"), id: v.pipe(v.string(), v.maxLength(300)), copy: v.optional(v.boolean()) }),
-  // A Markdown doc's header (DOC_HEADER_SCRIPT in ./doc-header): one of its buttons, or a related drop to open.
   v.object({ type: v.literal("doc-action"), action: v.picklist(["markdown", "download", "pdf"]) }),
   v.object({ type: v.literal("doc-open"), id: v.pipe(v.string(), v.regex(/^[\w-]{1,64}$/)) }),
-  // The pointer or focus reached Copy: the viewer loads the Markdown and sends it down ("doc-markdown").
   v.object({ type: v.literal("doc-intent") }),
-  // The header's Copy wrote the clipboard, or the browser refused it, with the error's name and message.
   v.object({ type: v.literal("doc-copied"), ok: v.boolean(), error: v.optional(v.pipe(v.string(), v.maxLength(300))) }),
-  // The pointer or focus reached the folder: the viewer sends its drops down ("doc-folder-items").
   v.object({ type: v.literal("doc-folder") }),
-  // Input inside the frame keeps the reader active, even when no cursor is being shared.
   v.object({ type: v.literal("activity") }),
-  // Where the reader's pointer is, for the people in the drop's presence room (PRESENCE_CURSORS in ./presence-cursors):
-  // the element under it and the spot inside it in thousandths. null once it leaves the page.
   v.object({
     type: v.literal("pointer"),
     at: v.nullable(
@@ -48,12 +34,8 @@ export const FrameMessage = v.variant("type", [
       }),
     ),
   }),
-  // The /f/ paths of a Markdown doc's images, videos, and audio that came near the screen (DEFERRED_FILES_SCRIPT in
-  // ./documents).
   v.object({ type: v.literal("files"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
-  // The links of a Markdown doc's `::drop` boxes that came near the screen (EMBEDS_SCRIPT in ./documents).
   v.object({ type: v.literal("embeds"), links: v.pipe(v.array(v.string()), v.maxLength(20)) }),
-  // A cleared selection carries nothing else.
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
     v.object({
@@ -65,10 +47,6 @@ export const FrameMessage = v.variant("type", [
       rect: Rect,
     }),
   ]),
-  // Where the composer for a held selection goes, in the frame's viewport: its card's place in the margin (`rail`), or
-  // the quote's box. In the Pin style (`pin`) it's the draft's pin. With `id`, it's where the thread Drop shows is
-  // written in: its card in the margin (`rail`), else its pin.
-  // A click on the page, away from the pins, with a thread open, or in the Pin style a composer beside a pin.
   v.object({ type: v.literal("page-click") }),
   v.object({
     type: v.literal("draft-place"),
@@ -87,7 +65,6 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({
     type: v.literal("area"),
-    // "image": drawn on a screenshot in Comark's zoom, which anchors to the image as Drop's lightbox does.
     kind: v.optional(v.picklist(["area", "image"])),
     selector: v.string(),
     label: v.string(),
@@ -96,21 +73,13 @@ export const FrameMessage = v.variant("type", [
     ow: v.number(),
     oh: v.number(),
     rect: Rect,
-    // On something that shows only for a while, or from the Marker: the number of the "area-shot" with its picture,
-    // which follows.
     shot: v.optional(v.number()),
-    // From the Marker: the words under its strokes.
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
-    // From the Marker: its strokes, in pixels of the area. Strokes past the limits leave the comment with its box only.
     ink: v.optional(v.fallback(v.nullable(InkSchema), null)),
   }),
-  // null: the picture couldn't be taken.
   v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),
-  // The tool the comment layer is under, once it has it: under any but browse, the page is held (EVENT_HOLD).
   v.object({ type: v.literal("tool"), tool: v.picklist(["browse", "comment", "measure", "mark"]) }),
-  // How many strokes the Marker's snapshot holds, after each one and each undo.
   v.object({ type: v.literal("marks"), count: v.pipe(v.number(), v.integer(), v.minValue(0)) }),
-  // A click on a pin, or (`focused`) the pin a "focus" with `open` scrolled to.
   v.object({
     type: v.literal("marker"),
     id: v.string(),
@@ -119,11 +88,6 @@ export const FrameMessage = v.variant("type", [
     focused: v.optional(v.boolean()),
   }),
   v.object({ type: v.literal("unplaced"), ids: v.array(v.string()) }),
-  // The toolbar's keys, pressed while the page had focus, with the tool it was under (apps keep their keys under Browse).
-  // B, P, and A pick the Marker's tips, [ and ] its size. Z turns the reader's zen mode on or off.
-  // C and E comment on or suggest an edit to the text selected in the page.
-  // An image's page sends ← and → too, for those keys or a sideways swipe: they move to the folder's other images.
-  // `meta_k` is ⌘K, or Ctrl+K off a Mac, which opens Drop's palette (PALETTE_KEY in ./plan-runtime).
   v.object({
     type: v.literal("key"),
     key: v.picklist([
@@ -154,7 +118,6 @@ export const FrameMessage = v.variant("type", [
     message: v.string(),
     source: v.optional(v.string()),
   }),
-  // A prototype's variants and the one showing, from the prototype skill's picker.js, for Drop's bottom bar to show.
   v.pipe(
     v.object({
       type: v.literal("variants"),
@@ -172,18 +135,12 @@ export const FrameMessage = v.variant("type", [
       current: v.pipe(v.number(), v.integer(), v.minValue(0)),
       canvas: v.boolean(),
       zoom: v.pipe(v.number(), v.minValue(0), v.maxValue(1000)),
-      /** The canvas tool: Move gives the items their clicks, Hand pans from anywhere. */
       tool: v.optional(v.picklist(["move", "hand"])),
     }),
     v.check((message) => message.current < message.variants.length),
   ),
 ])
 
-/**
- * A Markdown doc's questions, polls, and recall cards, as comark-quiz's script relays them up (`data-quiz-relay` on the
- * doc, ./documents): the blocks on the page once it starts, past the first MAX_QUIZ_BLOCKS ignored, and each answer a
- * reader gives. They carry no Drop mark, and only the fields Drop reads are kept.
- */
 const QuizMessage = v.variant("type", [
   v.object({
     type: v.literal("comark-quiz:ready"),
@@ -199,23 +156,18 @@ const QuizMessage = v.variant("type", [
 
 export type FrameMessage = v.InferOutput<typeof FrameMessage> | v.InferOutput<typeof QuizMessage>
 
-// Drop's runtimes mark every message they post; other scripts in the page post their own.
 const Marked = v.object({ __drop: v.literal(true) })
 
-/** The message, or null when it isn't one a drop frame sends. */
 export function parseFrameMessage(data: unknown): FrameMessage | null {
   const result = v.is(Marked, data) ? v.safeParse(FrameMessage, data) : v.safeParse(QuizMessage, data)
   return result.success ? result.output : null
 }
 
-// What the review script on a site in Drop's site frame posts up (shared/review-script.ts): that it's running, which Drop
-// answers with "hello", and ⌘K, for the palette.
 const ReviewScriptMessage = v.variant("type", [
   v.object({ __drop: v.literal(true), type: v.literal("review-ready") }),
   v.object({ __drop: v.literal(true), type: v.literal("key"), key: v.literal("meta_k") }),
 ])
 
-/** The message, or null when it isn't one the review script sends. */
 export function parseReviewScriptMessage(data: unknown) {
   const result = v.safeParse(ReviewScriptMessage, data)
   return result.success ? result.output : null

@@ -1,14 +1,8 @@
 <script setup lang="ts">
-// Details in sections, not a label/value table: the drop itself first (its name, type and size, who dropped it, when,
-// where), then views. The lifetime is the review pill's chip (ViewerLifetime). Versions have their own tab (ViewerHistory). A folder leads with
-// what goes in it, for the people filing into it and their agents (list_folders); whoever may change the folder edits
-// it in place. A Markdown doc shows its file, who dropped it and its views at its top (`factsInDoc`, #shared/doc-header),
-// so here it keeps only what can be changed.
 import { RelativeTime } from "vite-hub/ui"
 import type { DropDetail } from "#shared/types"
 
 const props = defineProps<{ drop: DropDetail; showDescription: boolean; factsInDoc?: boolean }>()
-// A site review holds no file of its own ("0 B"), and a folder's name is already its title: neither gets a File row.
 const site = computed(() => props.drop.kind === "site")
 const type = computed(() =>
   [
@@ -19,7 +13,6 @@ const type = computed(() =>
       : [props.drop.kind === "folder" ? itemCount(props.drop.items ?? 0) : formatBytes(props.drop.size)]),
   ].join(" · "),
 )
-// A site goes by its address, a folder by its title, anything else by its file's name.
 const name = computed(() =>
   site.value && props.drop.siteUrl
     ? props.drop.siteUrl
@@ -28,8 +21,6 @@ const name = computed(() =>
       : props.drop.filename,
 )
 const folder = computed(() => props.drop.ancestors.map((crumb) => crumb.title).join(" / "))
-// The owner's view count, then who the views came from, with the icons agents and people get on rows (AgentIcon).
-// Hovering a number says what it counts, as server/utils/views.ts counts it.
 const views = computed(() => {
   const counts = props.drop.views
   if (!counts) return null
@@ -91,7 +82,6 @@ async function save() {
           <p class="truncate text-xs text-muted tabular-nums">{{ type }}</p>
         </div>
       </div>
-      <!-- Icons stand in for the labels; the words still say what each line is. -->
       <ul class="space-y-1.5 text-sm">
         <li class="flex min-w-0 items-center gap-2">
           <AgentIcon class="size-4 shrink-0 text-muted" :kind="drop.actorKind" :name="drop.actorName" />
@@ -155,8 +145,6 @@ async function save() {
 
     <section v-if="views && !factsInDoc" aria-labelledby="details-views" class="@container space-y-2.5 p-4">
       <h3 id="details-views" class="text-xs font-medium text-muted">Views</h3>
-      <!-- A total and where the views came from, each a number over what it counts; two by two in a narrow panel.
-           Hovering says how they're counted. -->
       <dl class="grid grid-cols-2 gap-x-2 gap-y-3 @[22rem]:grid-cols-4">
         <UTooltip :text="views.tip">
           <div class="flex flex-col-reverse">

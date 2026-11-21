@@ -1,6 +1,5 @@
 import type { HostId } from "../../scripts/deployment"
 
-// The docs' sidebar, page order, and the hosts Drop deploys to (nuxt.config.ts reads DROP_HOST at build time).
 interface DocsLink {
   label: string
   to: string
@@ -11,7 +10,6 @@ interface HostDetails {
   id: HostId
   name: string
   icon: string
-  /** The hosted instance, when available. */
   live?: string
   database: string
   files: string
@@ -74,7 +72,6 @@ export const HOSTS: HostDetails[] = [
   },
 ]
 
-// Official clone flows. Deno reads its build and runtime settings from deno.jsonc.
 export const DEPLOY_URLS: Record<HostId, string> = {
   cloudflare: "https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2Fvite-hub%2Fdrop",
   vercel:

@@ -7,10 +7,6 @@ import { logDrop } from "../../../../utils/logs"
 import { routeNumber } from "../../../../utils/review-params"
 import { reviewApi, reviewSession } from "../../../../utils/review"
 
-/**
- * A reply from the site's page, as JSON or multipart with images, like a reply in Drop. A resend with the same
- * `requestId` stores nothing again. A guest writes as their token's guest id, so their resend is the same author.
- */
 export default reviewApi(async (event) => {
   const { site, claims, who, guest } = await reviewSession(event).catch(async (error) => {
     await event.req.body?.cancel().catch(() => {})
@@ -23,7 +19,6 @@ export default reviewApi(async (event) => {
   if (!thread) throw new HTTPError({ status: 404, statusText: "No comment with that number." })
   const { input, images } = await readCommentBody(event, CommentReplySchema)
   if (!input.body && !images.length) throw new HTTPError({ status: 400, statusText: "Write a reply." })
-  // The review script names nobody: an `@` from someone else's page stays plain text.
   const author = authorOf(who, who?.name ?? claims.n, guest)
   if (input.requestId && (await earlierReply(thread, input.requestId, author))) return { ok: true }
   await withImages(

@@ -1,11 +1,4 @@
 <script setup lang="ts">
-// A prototype's state in the review dock's bar, in place of the bar its picker (skills/prototype) draws on a page alone.
-// On the canvas: one zoom chip whose menu holds the camera and the Hand tool (pan from anywhere, as in Figma); the Hand
-// shows pressed beside it while it's on, so one press puts it down. In focus: the item showing with its note, a step
-// either way, and the way back to the canvas. The page keeps the state and does the switching; this shows it and sends the reader's
-// commands. While the page isn't focused, 1–9 open an item here too, ← → step in focus, and holding Space pans.
-// H and V are DropViewer's shortcuts, since H means History elsewhere. The address's #v-… names
-// the item in focus, as it does on the page alone, and opens it in focus on the next visit.
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
@@ -53,7 +46,6 @@ useEventListener("keydown", (event: KeyboardEvent) => {
   else if (props.state.canvas) return
   else if (event.key === "ArrowLeft") emit("command", "prev")
   else if (event.key === "ArrowRight") emit("command", "next")
-  // Only from the bar: on the page, Escape is Drop's, which closes what's open first.
   else if (event.key === "Escape" && inBar) emit("command", "canvas")
   else return
   event.preventDefault()

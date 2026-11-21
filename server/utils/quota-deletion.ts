@@ -4,14 +4,12 @@ import { blobCleanup, commentCleanup, dropFiles, drops, dropVersions } from "../
 import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 
-/** Removes the drop and every version of it at the batch's snapshot, including a version committed meanwhile. */
 export async function deleteRetainedDrop(
   row: DropRow,
   deleteKeys: (keys: string[]) => Promise<void>,
   comments: Pick<typeof commentCleanup.$inferInsert, "scope" | "shot">,
 ) {
   const token = crypto.randomUUID()
-  // Queue every key before its metadata disappears.
   const keys = sql`(
     SELECT ${drops.blobKey} AS blob_key FROM ${drops} WHERE ${drops.id} = ${row.id} AND ${drops.blobKey} IS NOT NULL
     UNION SELECT ${dropVersions.blobKey} AS blob_key FROM ${dropVersions} WHERE ${dropVersions.dropId} = ${row.id} AND ${dropVersions.blobKey} IS NOT NULL
@@ -40,6 +38,5 @@ export async function deleteRetainedDrop(
     .from(blobCleanup)
     .where(like(blobCleanup.id, `${token}:%`))
   const [, , , rows] = await db.batch([queue, queueComments, remove, pending])
-  // Cleanup's retry INSERT binds three values per key.
   for (const chunk of d1Chunks(rows, { perItem: 3, others: 0 })) await deleteKeys(chunk.map((item) => item.key))
 }

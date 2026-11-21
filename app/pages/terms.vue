@@ -1,6 +1,4 @@
-<script setup lang="ts">
-// Legal template. The instance owner must review and adapt this source before offering a public service.
-</script>
+<script setup lang="ts"></script>
 <template>
   <DocsPage
     title="Terms of service"

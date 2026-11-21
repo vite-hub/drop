@@ -1,11 +1,6 @@
 <script setup lang="ts">
-// One line under a comment or reply that hasn't reached the server, through vite-hub/ui's `status` slot: after a quiet
-// start, a muted "Waiting to send"; a refusal says why, with what the reader can do (deliveryLine). The words stay in
-// the message above it until the reader discards them. Retry, Edit and Discard act on the app's outbox
-// (useCommentsOutbox), which holds them; the parts' own outbox is the viewer's local copy, which has none.
 import type { CommentDelivery, CommentMessage } from "vite-hub/comments/client"
 
-// compact: the line alone, for a list row, which opens the thread where the actions are.
 const props = defineProps<{
   message: Pick<CommentMessage, "id" | "body" | "mentions" | "createdAt">
   delivery: CommentDelivery
@@ -16,7 +11,6 @@ const props = defineProps<{
 const app = useCommentsOutbox()
 const route = useRoute()
 
-// The clock moves once, when the quiet start ends; after that only the delivery changes the line.
 const now = ref(Date.now())
 const quiet = props.message.createdAt + WAITING_NOTICE_MS - now.value
 if (quiet > 0) useTimeoutFn(() => (now.value = Date.now()), quiet)
@@ -40,7 +34,6 @@ function startEdit() {
 async function save() {
   const body = words.value.trim()
   if (!body) return
-  // An edit puts it back in the queue with the new words.
   if (await app.edit(props.message.id, body, props.message.mentions)) editing.value = false
   else problem.value = "It's on its way to the server. Try again in a moment."
 }

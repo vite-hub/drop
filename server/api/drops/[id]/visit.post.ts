@@ -5,10 +5,6 @@ import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 import { countView } from "../../../utils/views"
 
-/**
- * The shared page calls this once it renders, so a person reading a link keeps the drop alive and counts as a view, and an
- * unfurler doesn't.
- */
 export default defineHandler(async (event) => {
   const drop = await findDrop(await routeId(event), event)
   const who = await identify(event)

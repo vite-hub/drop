@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// What an agent can drop, as a bento: each card opens its section of the docs and shows a small drop of its kind,
-// drawn in HTML so it stays sharp and follows the color mode.
 const KINDS = [
   {
     key: "doc",
@@ -43,7 +41,6 @@ const COLUMNS = [3, 2, 1]
         :to="kind.to"
         class="group flex h-full flex-col rounded-xl border border-default bg-default p-2 shadow-xs outline-none transition-colors hover:border-accented focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted)"
       >
-        <!-- The preview: a small drop of this kind, lifting a little on hover. -->
         <div
           aria-hidden="true"
           class="relative h-40 overflow-hidden rounded-lg bg-muted bg-[radial-gradient(var(--ui-border)_1px,transparent_1px)] [background-size:14px_14px]"
@@ -51,7 +48,6 @@ const COLUMNS = [3, 2, 1]
           <div
             class="absolute inset-x-5 top-5 bottom-0 rounded-t-lg border border-b-0 border-default bg-default p-4 shadow-sm transition-transform duration-300 ease-(--ease-out) group-hover:-translate-y-1"
           >
-            <!-- A doc with one commented sentence. -->
             <template v-if="kind.key === 'doc'">
               <div class="flex gap-6">
                 <div class="min-w-0 flex-1">
@@ -84,7 +80,6 @@ const COLUMNS = [3, 2, 1]
               </div>
             </template>
 
-            <!-- A report with a chart. -->
             <template v-else-if="kind.key === 'html'">
               <p class="text-[11px] font-semibold text-highlighted">Pricing</p>
               <div class="mt-3 flex h-16 items-end gap-1.5">
@@ -98,7 +93,6 @@ const COLUMNS = [3, 2, 1]
               </div>
             </template>
 
-            <!-- A small app: a board with three columns. -->
             <template v-else-if="kind.key === 'app'">
               <div class="grid grid-cols-3 gap-1.5">
                 <div v-for="(count, i) in COLUMNS" :key="i" class="space-y-1.5 rounded-md bg-muted p-1.5">
@@ -113,7 +107,6 @@ const COLUMNS = [3, 2, 1]
               </div>
             </template>
 
-            <!-- Before and after, for a pull request. -->
             <template v-else-if="kind.key === 'pr'">
               <p class="flex items-center gap-1 text-[10px] text-muted">
                 <UIcon name="i-simple-icons-github" class="size-3" /> PR #412
@@ -135,7 +128,6 @@ const COLUMNS = [3, 2, 1]
               </div>
             </template>
 
-            <!-- A live site with a boxed comment. -->
             <template v-else-if="kind.key === 'site'">
               <p class="truncate rounded-sm bg-muted px-1.5 font-mono text-[9px] leading-4 text-dimmed">
                 preview.acme.dev
@@ -152,7 +144,6 @@ const COLUMNS = [3, 2, 1]
               </div>
             </template>
 
-            <!-- A board: sticky notes with arrows. -->
             <template v-else>
               <div class="flex items-start gap-2">
                 <div

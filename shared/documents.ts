@@ -1,16 +1,9 @@
-// The documents the viewer's sandboxed iframe shows. Markdown arrives already rendered by the server's Comark
-// renderer (see server/utils/markdown-document.ts), so every Markdown drop looks the same at /f/ and in Drop.
 import { escapeUTF8 as escapeHtml } from "entities"
 import type { PlanKind } from "./plans"
 import { DOC_HEADER_SCRIPT } from "./doc-header"
 import { injectRuntime, THEME_CSS } from "./plan-runtime"
 import { TYPESET_CSS } from "./typeset"
 
-/**
- * How wide a Markdown doc's text column runs, the reader's choice in the viewer's More menu: a readable line, a wider
- * one for tables, or the widest, which still stops at 80rem like T3 Code's widest page so a big screen keeps margins.
- * The doc reads it from --drop-column, which the viewer's "width" message changes.
- */
 export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "80rem" } as const
 export type DocWidth = keyof typeof DOC_WIDTHS
 
@@ -40,11 +33,6 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
 
-/**
- * Asks the viewer for each image deferImages and each video or audio deferMedia left waiting (shared/embedded-images.ts)
- * as it comes within a screen and a half of view. An image shows once the viewer sends it as a data URL, every copy of
- * it, Comark zoom's too; a video or audio gets the file itself and plays it from a blob: URL of the frame's own.
- */
 const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   const waiting = document.querySelectorAll("img[data-drop-image], [data-drop-media]");
   if (!waiting.length) return;
@@ -82,12 +70,6 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   });
 })()`
 
-/**
- * Fills each `::drop` box (server/utils/markdown-document.ts) as it comes within a screen and a half of view: it asks
- * the viewer for the drop, which fetches it as the reader, and shows what comes back in a frame of its own. That frame
- * gets only allow-scripts, an opaque origin inside this one: the drop runs, but can't reach Drop, its storage, or this
- * doc. A drop the reader can't open, or one that isn't an HTML drop, leaves the viewer's reason in the box.
- */
 const EMBEDS_SCRIPT = String.raw`(() => {
   const boxes = document.querySelectorAll("[data-drop-embed]");
   if (!boxes.length) return;
@@ -126,10 +108,6 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   });
 })()`
 
-/**
- * A spreadsheet's preview (server/utils/spreadsheet.ts): Drop's table look from the docs, as a grid. The column letters
- * and row numbers stay put while the cells scroll, like a spreadsheet's, and numbers line up right in Geist Mono.
- */
 const SHEET_CSS = `
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out; padding-right: var(--drop-inset, 0px); }
 .sheets { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; padding: 1.5rem; gap: .75rem; }
@@ -154,7 +132,6 @@ tr > :last-child { border-right: 0; }
 .sheet-empty { margin: auto; }
 `
 
-/** Switches the sheet showing when a workbook has more than one. */
 const SHEET_TABS_SCRIPT = String.raw`(() => {
   const tabs = [...document.querySelectorAll(".sheet-tabs button")];
   tabs.forEach((tab) => tab.addEventListener("click", () => {
@@ -163,21 +140,12 @@ const SHEET_TABS_SCRIPT = String.raw`(() => {
   }));
 })()`
 
-/**
- * Drop's address keeps the section a reader jumps to from the side outline (comark-outline), so it can be shared from
- * the address bar. comark-outline scrolls to it; this tells the viewer.
- */
 const OUTLINE_HEADING_SCRIPT = String.raw`document.addEventListener("click", (event) => {
   const link = event.target instanceof Element && event.target.closest(".cto-rail a[href^='#']");
   const id = link && decodeURIComponent(link.getAttribute("href").slice(1));
   if (id && document.getElementById(id)) parent.postMessage({ __drop: true, type: "heading", id }, "*");
 })`
 
-/**
- * Builds the exact document an iframe shows for a drop, with Drop's theme and annotator injected. `html` is the
- * server-rendered body for Markdown, and a spreadsheet's sheets for a file. `width` is a Markdown doc's column (DOC_WIDTHS),
- * and `zen` hides its outline.
- */
 export function planDocument(
   kind: PlanKind,
   source: string,
@@ -192,8 +160,6 @@ export function planDocument(
     const src = source.trim().startsWith("<svg")
       ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
       : source
-    // A sideways swipe moves to the folder's next image (plan-runtime.ts). Overscroll stops at the page's edge, so the
-    // browser doesn't also take the swipe as Back.
     return injectRuntime(
       `<!doctype html><html style="overscroll-behavior-x:none"><head></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:var(--muted)"><img src="${escapeHtml(src)}" style="max-width:min(100%,960px);box-shadow:0 10px 40px rgb(0 0 0/.15);border-radius:10px" alt=""></body></html>`,
       dark,
@@ -212,9 +178,7 @@ export function planDocument(
       dark,
     )
   }
-  // comark-quiz's script relays the doc's questions and answers to the page building it, the viewer (useViewerQuiz).
   const relay = globalThis.location ? ` data-quiz-relay="${escapeHtml(globalThis.location.origin)}"` : ""
-  // Theme comes after typeset so its tokens win at equal specificity.
   return injectRuntime(
     `<!doctype html><html lang="en"${relay}${zen ? ' class="drop-zen"' : ""} style="--drop-column: ${DOC_WIDTHS[width]}"><head><meta charset="utf-8"><style>${TYPESET_CSS}${THEME_CSS}${DOCUMENT_EXTRA_CSS}</style></head><body><main><article class="typeset">${html}</article></main><script>${OUTLINE_HEADING_SCRIPT};${DEFERRED_FILES_SCRIPT};${EMBEDS_SCRIPT};${DOC_HEADER_SCRIPT}</script></body></html>`,
     dark,

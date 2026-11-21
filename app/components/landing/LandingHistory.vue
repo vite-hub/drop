@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Version 2 of a plan beside version 1, with the History panel: the docs' history screenshot, drawn in HTML so it stays
-// sharp at any size and follows the color mode.
 const DIFF = [
   { skip: "5 unchanged lines" },
   { text: "1. Move internal accounts first, the week of Nov 3." },

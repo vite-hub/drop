@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Who can open a drop is one choice (#shared/share). Every state stays in the list, and one this drop can't take says
-// why, so picking never makes options appear or vanish; the line under the link always takes one line, so the popover
-// keeps its height too.
 import { daysUntil } from "#shared/expiry"
 import { isPublic, type Share, SHARE_ICONS, SHARE_LABELS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
@@ -13,13 +10,11 @@ const { setShare } = useDropActions()
 const { copy } = useCopy()
 const { data: me } = useMe()
 const shared = computed(() => props.drop.share !== "private")
-// A folder above may share it wider than its own share; the choice changes its own.
 const own = computed<Share>(() => props.drop.ownShare ?? props.drop.share)
 const url = useShareUrl(() => props.drop)
 const choices = computed(() => shareItems(me.value, props.drop))
 const now = useRelativeNow()
 
-// What the link does now, in one line.
 const linkNote = computed(() => {
   if (props.drop.isOwner && !shared.value) return "Pick who can open it to turn the link on."
   if (!isPublic(props.drop.share)) return "Teammates sign in to open it."
@@ -29,9 +24,6 @@ const linkNote = computed(() => {
   return `Back to ${after} in ${left} ${left === 1 ? "day" : "days"}.${props.drop.isOwner ? " Pick it again to renew." : ""}`
 })
 
-// The list shows the new choice and what it means at once; only renewing, which may not change what it says, gets a
-// note. A pick that turns the link on copies it too, in the click itself, since a link is what Share was opened for.
-// Another pick waits for the server: a second click on the same choice would otherwise renew the link it just opened.
 const saving = ref(false)
 async function pick(next: Share) {
   const renew = next === own.value
@@ -43,7 +35,6 @@ async function pick(next: Share) {
   if (done && renew) notify.done("Public link renewed")
 }
 
-// Reka focuses the first button, the close X, and rings it. Focus the panel instead: Tab still walks in, Escape still closes.
 function focusPanel(event: Event) {
   event.preventDefault()
   if (event.target instanceof HTMLElement) event.target.focus({ preventScroll: true })
@@ -102,9 +93,6 @@ function focusPanel(event: Event) {
           </div>
         </div>
         <p v-if="!drop.isOwner" class="px-1 text-xs text-muted">Only its owner changes who can open it.</p>
-        <!-- A click anywhere on a row picks it: the label's ::after covers the row, description and padding too, and
-             takes the row's cursor, since browsers give a label the default one. The row carries the focus ring, not
-             the dot. -->
         <URadioGroup
           :aria-busy="saving"
           aria-label="Who can open it"

@@ -22,10 +22,8 @@ import { appFileChunks, bindQuotaSQL, QUOTA_RESERVATION_TTL_MS, reserveSQL, usag
 
 type Statement = BatchItem<"sqlite">
 
-// What the batch's last statement, the reservation's own update, returns: the reservation when its guard held.
 const Finished = v.array(v.object({ id: v.string() }))
 
-/** `DROP_QUOTAS`, `DROP_DEFAULT_PLAN`, and the `DROP_PRO_*` limits, typed and validated by Server Env. */
 export function quotaConfig() {
   const { enabled, plan, proDrops, proBytes, proWrites, freeKept } = useServerEnv().drop.quotas
   return { enabled, defaultPlan: plan, pro: { drops: proDrops, bytes: proBytes, writes: proWrites }, freeKept }
@@ -38,12 +36,10 @@ async function ownerUsage(ownerId: string, month: string) {
   return row ?? { drops: 0, bytes: 0, writes: 0 }
 }
 
-/** A member's plan: the tier an admin gave them in the Auth Console, else DROP_DEFAULT_PLAN. */
 function planOf(stored: string | null | undefined): Plan {
   return stored === "free" || stored === "pro" ? stored : quotaConfig().defaultPlan
 }
 
-/** Drops kept forever at once: the owner's own at the top, not their team folders, nor drops in the Trash. */
 async function keptCount(ownerId: string) {
   const [row] = await db
     .select({ kept: count() })
@@ -60,10 +56,6 @@ async function keptCount(ownerId: string) {
   return row?.kept ?? 0
 }
 
-/**
- * Someone's plan and what they've used of it. A team that pays puts each member on Pro (./teams.ts); an admin's Pro on
- * the Auth Console, or DROP_DEFAULT_PLAN, applies otherwise.
- */
 export async function getUsage(ownerId: string): Promise<Usage> {
   const config = quotaConfig()
   const [owner] = await db.select({ plan: user.plan }).from(user).where(eq(user.id, ownerId)).limit(1)
@@ -86,10 +78,6 @@ export async function getUsage(ownerId: string): Promise<Usage> {
   }
 }
 
-/**
- * Refuses keeping one more drop forever past the plan's limit. `already` says the drop is kept now, so keeping it
- * again (a new version, a renewal) never counts twice. Folders hand their lifetime down, so only drops at the top count.
- */
 export async function requireKeepSlot(ownerId: string, life: { lifetime: string }, already: boolean, top: boolean) {
   if (life.lifetime !== "keep" || already || !top || !quotaConfig().enabled) return
   const usage = await getUsage(ownerId)
@@ -111,7 +99,6 @@ export class DropQuotaError extends HTTPError {
   }
 }
 
-/** MCP limits are ordinary tool results, so agents can act on them without a protocol retry. */
 export async function quotaToolResult<T>(operation: () => Promise<T>) {
   try {
     return await operation()
@@ -129,7 +116,6 @@ interface Cost {
   app?: { files: number; bytes: number }
 }
 
-/** Reserve before touching blobs. Transfer to the write ledger in the metadata batch, or release on failure. */
 export async function withDropQuota<T>(
   ownerId: string,
   cost: Cost,
@@ -214,7 +200,6 @@ export async function withDropQuota<T>(
     const used = await ownerUsage(ownerId, usage.month)
     for (const unit of ["drops", "bytes", "writes"] as const) {
       const limit = usage[unit].limit
-      // A lowered plan doesn't block a write that adds no slots or bytes.
       if (limit !== null && cost[unit] > 0 && used[unit] + cost[unit] > limit)
         throw new DropQuotaError(quotaFailure(unit, used[unit], limit))
     }
@@ -229,7 +214,6 @@ export async function withDropQuota<T>(
     const result = await operation({
       fileInserts: (rows) => appFileChunks(rows).map((chunk) => db.insert(dropFiles).values(chunk)),
       commit: async (statements, success = sql`1`) => {
-        // A failed guard violates the ledger CHECK and rolls back the entire D1 batch.
         const finish = db
           .update(quotaReservations)
           .set({
@@ -267,7 +251,6 @@ export async function withDropQuota<T>(
   }
 }
 
-/** Release crashed publishes without deleting the committed monthly write ledger. */
 export async function cleanupQuotaReservations(now: Date) {
   const released = await db
     .delete(quotaReservations)
@@ -278,7 +261,6 @@ export async function cleanupQuotaReservations(now: Date) {
       ),
     )
     .returning()
-  // Each one is a publish that crashed before it committed.
   return {
     released: released.length,
     ...(released.length
@@ -287,10 +269,6 @@ export async function cleanupQuotaReservations(now: Date) {
   }
 }
 
-/**
- * Deletes expired code images: the blob first, then the row, so a failed delete is retried next hour and the image
- * keeps counting toward storage until it's gone. 80 keys a batch stays under D1's bind limit.
- */
 export async function cleanupCodeImages(now: Date) {
   let deleted = 0
   for (;;) {

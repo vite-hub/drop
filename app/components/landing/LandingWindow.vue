@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A window on a stage: in front, behind, or gone. A compact stage centers the front one and hides the rest.
-// A blank window is already open but empty, like a new tab, until the agent makes what it shows; then the page fades in.
 type Frame = { x: number; y: number; w: number; h: number }
 const props = defineProps<{
   title: string

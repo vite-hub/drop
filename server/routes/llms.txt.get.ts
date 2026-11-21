@@ -2,10 +2,6 @@ import { defineHandler } from "h3"
 import { DOCS_NAV } from "#shared/utils/docs"
 import { MCP_SERVER_INFO } from "#shared/mcp"
 
-/**
- * The index an agent reads first (llmstxt.org): where the start guide, the MCP server, the skills, and every docs page
- * are, each docs page as Markdown that fits in one fetch.
- */
 export default defineHandler((event) => {
   const origin = event.url.origin
   const sections = DOCS_NAV.map(

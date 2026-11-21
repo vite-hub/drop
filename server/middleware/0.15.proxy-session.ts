@@ -7,7 +7,6 @@ import { requestLog } from "../utils/logs"
 import { authProxy } from "../utils/proxy-auth"
 import { isProxyMember } from "../utils/proxy-auth-config"
 
-/** Establish the same session Drop's browser UI and OAuth consent already use, without a second login. */
 export default defineHandler(async (event) => {
   const proxy = authProxy()
   if (!proxy.enabled) return
@@ -19,7 +18,7 @@ export default defineHandler(async (event) => {
     return
   }
   const token = event.req.headers.get("x-auth-request-access-token")
-  if (!token) return // Machine OAuth requests use Drop's bearer tokens, not proxy headers.
+  if (!token) return
   if (!(await isProxyMember(token)))
     throw new HTTPError({
       status: 403,
@@ -27,7 +26,6 @@ export default defineHandler(async (event) => {
       data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
     })
   const auth = authFor(event)
-  // A failed lookup signs in again through the proxy; the wide event keeps why.
   const current = await sessionOf(event).catch((error: unknown) => {
     requestLog(event)?.warn("Session lookup failed", {
       identity: { session: error instanceof Error ? error.message : String(error) },
@@ -46,7 +44,6 @@ export default defineHandler(async (event) => {
   if (!response.ok) throw new HTTPError({ status: response.status, statusText: "Proxy sign-in failed." })
   const cookies = response.headers.getSetCookie()
   for (const cookie of cookies) event.res.headers.append("Set-Cookie", cookie)
-  // The current request must see the newly established session as well as the browser's next request.
   const pairs = cookies.map((cookie) => cookie.split(";")[0]!)
   const replaced = new Set(pairs.map((cookie) => cookie.split("=")[0]))
   const previous = (event.req.headers.get("cookie") ?? "")
@@ -56,7 +53,6 @@ export default defineHandler(async (event) => {
   try {
     event.req.headers.set("cookie", cookie)
   } catch {
-    // Deno's incoming headers are immutable: there the request gets a copy with the new cookie.
     const headers = new Headers(event.req.headers)
     headers.set("cookie", cookie)
     Object.defineProperty(event.req, "headers", { value: headers, configurable: true })

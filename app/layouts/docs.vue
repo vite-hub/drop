@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The docs: signed-in people keep the app's sidebar, where Docs expands into the section nav; signed-out visitors
-// get the landing's header and footer with the section nav beside the page.
 import DashboardLayout from "./dashboard.vue"
 
 const route = useRoute()
@@ -11,11 +9,8 @@ watch(
   () => route.path,
   () => (menuOpen.value = false),
 )
-// From /api/me, which SSR fetches with the session cookie, so the server picks the right shell.
 const { data: me } = await useMe()
 
-// Signed in, the page scrolls inside the dashboard panel, not the window, so the router's scroll to a #section misses.
-// The router has decoded the hash already; decoding it again throws on a `%`.
 function scrollToHash() {
   if (me.value && route.hash) document.getElementById(route.hash.slice(1))?.scrollIntoView()
 }
@@ -28,8 +23,6 @@ watch(() => route.hash, scrollToHash, { flush: "post" })
   <DashboardLayout v-if="me">
     <UDashboardPanel id="docs" :ui="{ body: 'p-0 sm:p-0 gap-0' }">
       <template #header>
-        <!-- The h-12 bar of every app page (PageShell), here a breadcrumb: the page's own h1 is in the prose, so the
-             bar's #left replaces its title h1. The menu toggle sits outside #left. -->
         <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-4 lg:px-6' }">
           <template #left>
             <SidebarExpand />
@@ -44,7 +37,6 @@ watch(() => route.hash, scrollToHash, { flush: "post" })
         </UDashboardNavbar>
       </template>
       <template #body>
-        <!-- The sidebar's Docs item carries the section nav, so the page is prose alone. -->
         <main class="mx-auto w-full max-w-3xl px-6 pt-6 pb-20 lg:px-8">
           <slot />
         </main>
@@ -56,7 +48,6 @@ watch(() => route.hash, scrollToHash, { flush: "post" })
     <SiteHeader wide />
 
     <div class="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-14">
-      <!-- Small screens: the nav folds into a menu above the page. -->
       <div class="border-b border-default py-3 lg:hidden">
         <button
           class="flex w-full items-center justify-between text-sm text-muted"
