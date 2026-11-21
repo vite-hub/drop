@@ -336,7 +336,6 @@ export default defineNuxtConfig({
         },
       ],
     }),
-    devServer: { runner: "node-worker" },
     devStorage: { cache: { driver: "memory" } },
     modules: [evlog(evlogOptions(release)), legacyViteHubRoutes],
     cloudflare: {
