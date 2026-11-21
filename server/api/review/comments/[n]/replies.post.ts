@@ -1,6 +1,7 @@
 import { HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
+import { clientAddress } from "../../../../utils/client-address"
 import { lists, readCommentBody, withImages } from "../../../../utils/comment-images"
 import { authorOf, earlierReply, findCommentByNumber, replyTo, withRetryAfter } from "../../../../utils/comments"
 import { logDrop } from "../../../../utils/logs"
@@ -13,7 +14,7 @@ export default reviewApi(async (event) => {
     throw error
   })
   await withRetryAfter(
-    requireRateLimit(event, "review-comment", { key: claims.u ?? undefined, limit: 20, window: "1m" }),
+    requireRateLimit(event, "review-comment", { key: claims.u ?? clientAddress(event), limit: 20, window: "1m" }),
   )
   const thread = await findCommentByNumber(site, await routeNumber(event))
   if (!thread) throw new HTTPError({ status: 404, statusText: "No comment with that number." })

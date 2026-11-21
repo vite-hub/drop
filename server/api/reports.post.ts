@@ -5,6 +5,7 @@ import { db } from "vite-hub/database"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { ReportSchema } from "#shared/schemas"
 import { reportTarget } from "#shared/trust"
+import { clientAddress } from "../utils/client-address"
 import { abuseReports } from "../databases/default/index"
 import { findDrop, findDropByBlob } from "../utils/drops"
 import { logAudit } from "../utils/logs"
@@ -12,7 +13,7 @@ import { logAudit } from "../utils/logs"
 export default defineValidatedHandler({
   validate: { body: ReportSchema },
   async handler(event) {
-    await requireRateLimit(event, "abuse-report", { limit: 5, window: "1m" })
+    await requireRateLimit(event, "abuse-report", { key: clientAddress(event), limit: 5, window: "1m" })
     const body = await event.req.json()
     const target = reportTarget(body.target)
     if (!target) throw new HTTPError({ status: 400, statusText: "Use a Drop share or file link." })

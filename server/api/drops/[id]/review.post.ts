@@ -2,6 +2,7 @@ import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteMatches } from "#shared/review"
+import { clientAddress } from "../../../utils/client-address"
 import { refuseSend, requireSender } from "../../../utils/comment-images"
 import { siteCoversDrop } from "../../../utils/content-origin"
 import { withRetryAfter } from "../../../utils/comments"
@@ -22,7 +23,9 @@ export default defineHandler(async (event) => {
   const origin = event.url.searchParams.get("origin") ?? ""
   if (!site.siteUrl || !siteMatches(site.siteUrl, origin) || siteCoversDrop(event, origin))
     throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
-  await withRetryAfter(requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" }))
+  await withRetryAfter(
+    requireRateLimit(event, "review-comment", { key: who?.userId ?? clientAddress(event), limit: 20, window: "1m" }),
+  )
   const { input, shot, images } = await readReviewComment(event)
   requireSender(who, input.as)
 
