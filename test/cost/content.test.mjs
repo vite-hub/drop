@@ -209,11 +209,19 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
   assert.equal(calls.head, 0)
 })
 
-test("reports quarantine code images while image access stays one query", async () => {
+test("code-image quarantine uses an indexed target lookup independent of other reports", async () => {
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
   const report = sql.prepare(
     "INSERT OR REPLACE INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)",
+  )
+  for (let index = 0; index < 1000; index++) report.run(`drop${index}`, `/d/drop${index}`)
+  queries.length = 0
+  assert.equal(await serveFile(imageKey), true)
+  assert.equal(queries.length, 1)
+  assert.match(
+    planOf(queries[0]),
+    /SEARCH abuse_reports USING INDEX abuse_reports_file_target_idx \(<expr>=\? AND status=\?\)/,
   )
   for (const target of [`/f/${imageKey}`, `/f///${imageKey}`]) {
     report.run(imageKey, target)

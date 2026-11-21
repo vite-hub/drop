@@ -1,8 +1,9 @@
-import { and, eq, exists, inArray, or, sql } from "drizzle-orm"
+import { and, eq, exists, inArray } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
 import { abuseReports, user } from "../databases/default/index"
+import { isFileReport, normalizedFileTarget } from "../databases/default/trust"
 import { fileReportTarget, needsShareReview } from "#shared/trust"
 
 export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwner?: typeof user.$inferSelect | null) {
@@ -13,14 +14,16 @@ export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwn
 }
 
 export function rawFileQuarantine(key: string) {
-  const target = fileReportTarget(key)
-  const legacyTarget = sql`${abuseReports.target} glob '/f//*' and ltrim(substr(${abuseReports.target}, 4), '/') = ${target.slice(3)}`
   return exists(
     db
       .select({ id: abuseReports.id })
       .from(abuseReports)
       .where(
-        and(or(eq(abuseReports.target, target), legacyTarget), inArray(abuseReports.status, ["quarantined", "banned"])),
+        and(
+          isFileReport(abuseReports.target),
+          eq(normalizedFileTarget(abuseReports.target), fileReportTarget(key)),
+          inArray(abuseReports.status, ["quarantined", "banned"]),
+        ),
       ),
   )
 }
