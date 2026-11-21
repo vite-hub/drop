@@ -1,10 +1,19 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
+import { TYPESET_CSS } from "../../shared/typeset.ts"
 
 const { renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
+const styles = (
+  await Promise.all(
+    ["typeset.css", "document-shell.css"].map((file) =>
+      readFile(new URL(`../../shared/${file}`, import.meta.url), "utf8"),
+    ),
+  )
+).join("\n")
 
 // Zen mode (the review pill's +, or Z) hides a Markdown doc's outline and gives its column back to wide blocks.
 const filler = Array.from({ length: 30 }, (_, i) => `Line ${i} of the plan.`).join("\n\n")
@@ -20,7 +29,10 @@ const compare = `::compare\n:::screenshot{src="${shot("#ed2020")}" alt="Before" 
 const wide = (await renderMarkdownCached("zen-compare", async () => `# Plan\n\n${compare}\n\n${sections}`)).html
 
 async function open(browser, body, zen = false, width = 1400) {
-  const html = planDocument("markdown", "# Plan", false, body, 0, "readable", zen)
+  const html = planDocument("markdown", "# Plan", false, body, 0, "readable", zen).replace(
+    `<style>${TYPESET_CSS}`,
+    () => `<style>${TYPESET_CSS}${styles}`,
+  )
   const escaped = html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const page = await browser.newPage({ viewport: { width, height: 800 } })
   await page.route("**/*", (route) =>
