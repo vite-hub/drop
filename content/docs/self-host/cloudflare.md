@@ -60,7 +60,7 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    DROP_URL=https://<your-domain> pnpm test:e2e:deployed
    ```
 
-To deploy on every push instead, connect the repository in Workers Builds with `CLOUDFLARE_D1_DATABASE_ID` as a build variable, `pnpm build` as the build command, and `pnpm run deploy` as the deploy command, as the button sets up. Its default, `npx wrangler deploy`, publishes without applying new migrations.
+To deploy on every push instead, connect the repository in Workers Builds with `CLOUDFLARE_D1_DATABASE_ID` as a build variable, `pnpm build` as the build command, and `pnpm run deploy` as the deploy command, as the button sets up. A Workers Builds build of `main` applies new migrations itself, so the default deploy command, `npx wrangler deploy`, also works. Preview branches never migrate; if your production branch isn't `main`, set `DROP_PRODUCTION_BRANCH` as a build variable.
 
 ## Settings {#env}
 
@@ -68,6 +68,7 @@ To deploy on every push instead, connect the repository in Workers Builds with `
 ---
 extra:
   - ["CLOUDFLARE_D1_DATABASE_ID", "The id wrangler d1 create printed. Read at build time."]
+  - ["DROP_PRODUCTION_BRANCH", "The branch whose Workers Builds builds apply D1 migrations. Defaults to main. Read at build time."]
   - ["CLOUDFLARE_D1_DATABASE_NAME", "The D1 database name, vitehub-drop by default."]
   - ["DROP_CONTENT_ORIGIN", "Optional. Where apps and HTML docs run, one subdomain per drop on the same Worker, such as https://*-drop.example.com. Needs VITEHUB_SECRET."]
 ---
