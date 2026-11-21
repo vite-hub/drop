@@ -5,6 +5,7 @@
 // are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way. They
 // go through the drop's outbox (useDrop), so a comment written offline waits with its screenshot and goes out once.
 // The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
+import { parseReviewScriptMessage } from "#shared/frame-messages"
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
 
@@ -42,6 +43,16 @@ useEventListener("keydown", (event: KeyboardEvent) => {
       { __drop: true, type: "scroll-key", ...scroll },
       new URL(open.value).origin,
     )
+})
+// The other way, the site's review script passes ⌘K on while the site has the focus, for the palette. It does once
+// Drop says it holds the frame, in answer to the script's "review-ready" on each page load.
+const openPalette = usePaletteOpener()
+useEventListener("message", (event: MessageEvent) => {
+  const frame = siteFrame.value?.contentWindow
+  if (!frame || event.source !== frame || event.origin !== new URL(open.value).origin) return
+  const message = parseReviewScriptMessage(event.data)
+  if (message?.type === "review-ready") frame.postMessage({ __drop: true, type: "hello" }, event.origin)
+  if (message?.type === "key") openPalette()
 })
 
 type Box = { left: number; top: number; width: number; height: number }
