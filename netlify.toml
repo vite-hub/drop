@@ -4,7 +4,6 @@ command = "pnpm build && pnpm db:migrate"
 publish = "dist"
 
 [build.environment]
-DROP_HOST = "netlify"
 NODE_VERSION = "24"
 
 # The deploy button prompts for these values before its first build.

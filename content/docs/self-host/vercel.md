@@ -8,7 +8,7 @@ description: Drop on Vercel Functions, with a Cloudflare D1 database, a private 
 
 ## Deploy with the button {#button}
 
-The button clones the repository, creates a Vercel project, prompts for its settings, and opens the Blob store setup. `vercel.json` selects `DROP_HOST=vercel`, installs with the pinned pnpm version, builds, and applies D1 migrations before publishing.
+The button clones the repository, creates a Vercel project, prompts for its settings, and opens the Blob store setup. Vercel's build environment selects the Vercel host. `vercel.json` installs with the pinned pnpm version, builds, and applies D1 migrations before publishing.
 
 1. [Create a D1 database and account API token](/docs/self-host#database). You need the account id, token, database id, and database name.
 2. At the Storage step, choose or create a **private** Blob store. Vercel connects it and supplies `BLOB_READ_WRITE_TOKEN`. The `stores` parameter requests Blob, but does not select its access mode.
@@ -23,7 +23,6 @@ The button clones the repository, creates a Vercel project, prompts for its sett
 ::docs-env
 ---
 extra:
-  - ["DROP_HOST", "vercel. Read at build time."]
   - ["CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN", "Cloudflare account id and an account API token with D1 edit access."]
   - ["CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME", "Your D1 database id and name."]
   - ["BLOB_READ_WRITE_TOKEN", "Added by Vercel when you connect the Blob store."]

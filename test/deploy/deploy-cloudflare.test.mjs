@@ -26,7 +26,7 @@ function project(context, files = {}) {
   mkdirSync(join(dir, ".output"))
   writeFileSync(
     join(bin, "pnpm"),
-    '#!/bin/sh\n[ "$1" = build ] && [ "$DROP_HOST" = cloudflare ] || exit 1\necho build >> steps\n',
+    '#!/bin/sh\n[ "$1" = build ] && [ "$VITEHUB_HOST" = cloudflare ] || exit 1\necho build >> steps\n',
     {
       mode: 0o755,
     },

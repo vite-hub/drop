@@ -33,7 +33,7 @@ async function main() {
 
   const { loadEnv } = await import("vite-plus")
   const env = { ...loadEnvWithoutLogging(loadEnv), ...process.env }
-  const built = run("pnpm", ["build"], { env: { ...env, DROP_HOST: "cloudflare" } })
+  const built = run("pnpm", ["build"], { env: { ...env, VITEHUB_HOST: "cloudflare" } })
   if (built !== 0) return built
 
   const manifest = JSON.parse(readFileSync(".output/deployment.json", "utf8"))

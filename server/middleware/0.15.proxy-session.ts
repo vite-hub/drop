@@ -1,14 +1,12 @@
-import { and, eq } from "drizzle-orm"
+import { APIError } from "better-auth/api"
+import { applySetCookies } from "better-auth/cookies"
 import { defineHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database"
-import { account } from "../databases/default/index"
-import { authFor, sessionOf } from "../utils/identity"
-import { requestLog } from "../utils/logs"
-import { authProxy } from "../utils/proxy-auth"
-import { isProxyMember } from "../utils/proxy-auth-config"
+import { sessionOf } from "../utils/identity"
+import { oneSignInAtATime } from "../utils/proxy-auth"
+import { isProxyMember, PROXY_TOKEN_HEADER, readAuthProxyConfig } from "../utils/proxy-auth-config"
 
 export default defineHandler(async (event) => {
-  const proxy = authProxy()
+  const proxy = readAuthProxyConfig()
   if (!proxy.enabled) return
   const path = event.url.pathname
   if (path === "/signin" || path === "/api/sign-in") return
@@ -17,7 +15,7 @@ export default defineHandler(async (event) => {
       event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
     return
   }
-  const token = event.req.headers.get("x-auth-request-access-token")
+  const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return
   if (!(await isProxyMember(token)))
     throw new HTTPError({
@@ -25,36 +23,15 @@ export default defineHandler(async (event) => {
       statusText: "Active organization membership required.",
       data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
     })
-  const auth = authFor(event)
-  const current = await sessionOf(event).catch((error: unknown) => {
-    requestLog(event)?.warn("Session lookup failed", {
-      identity: { session: error instanceof Error ? error.message : String(error) },
-    })
-    return null
+  const session = await oneSignInAtATime(token, () => sessionOf(event)).catch((error: unknown) => {
+    if (error instanceof APIError) throw new HTTPError({ status: error.statusCode, statusText: error.message })
+    throw error
   })
-  if (current) {
-    const [github] = await db
-      .select({ token: account.accessToken })
-      .from(account)
-      .where(and(eq(account.userId, current.user.id), eq(account.providerId, "github")))
-      .limit(1)
-    if (github?.token === token) return
-  }
-  const response = await auth.api.proxySignIn({ headers: event.req.headers, asResponse: true })
-  if (!response.ok) throw new HTTPError({ status: response.status, statusText: "Proxy sign-in failed." })
-  const cookies = response.headers.getSetCookie()
-  for (const cookie of cookies) event.res.headers.append("Set-Cookie", cookie)
-  const pairs = cookies.map((cookie) => cookie.split(";")[0]!)
-  const replaced = new Set(pairs.map((cookie) => cookie.split("=")[0]))
-  const previous = (event.req.headers.get("cookie") ?? "")
-    .split(";")
-    .filter((cookie) => !replaced.has(cookie.trim().split("=")[0]))
-  const cookie = [...previous, ...pairs].filter(Boolean).join("; ")
-  try {
-    event.req.headers.set("cookie", cookie)
-  } catch {
-    const headers = new Headers(event.req.headers)
-    headers.set("cookie", cookie)
-    Object.defineProperty(event.req, "headers", { value: headers, configurable: true })
-  }
+  if (!session) throw new HTTPError({ status: 403, statusText: "Proxy sign-in failed." })
+
+  const headers = new Headers(event.req.headers)
+  const cookies = event.context.dropSessionCookies
+  if (cookies?.length) applySetCookies(headers, cookies)
+  headers.delete(PROXY_TOKEN_HEADER)
+  Object.defineProperty(event.req, "headers", { value: headers, configurable: true })
 })
