@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import type { H3Event } from "h3"
+import { HTTPError, type H3Event } from "h3"
 import * as v from "valibot"
 import { db, withIdempotency } from "vite-hub/database"
 import { isRole } from "#shared/roles"
@@ -55,20 +55,30 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   return { who, input: ticket.i, id: ticket.j, expiresAt: ticket.e }
 }
 
+export function invalidUpload() {
+  return new HTTPError({
+    status: 403,
+    statusText: "This upload URL has run out or isn't valid. Call publish again for a new one.",
+  })
+}
+
 export async function publishUploadOnce<T>(
   id: string,
   expiresAt: number,
   publish: () => Promise<T>,
-  now = Date.now(),
 ): Promise<{ value: T } | null> {
+  const remaining = expiresAt - Date.now()
+  if (remaining <= 0) throw invalidUpload()
+  const seconds = Math.ceil(remaining / 1000)
   let published: { value: T } | undefined
   const [error] = await withIdempotency(
     `uploads:${id}`,
     async () => {
+      if (expiresAt <= Date.now()) throw invalidUpload()
       published = { value: await publish() }
       return true
     },
-    { ttl: Math.max(60, Math.ceil((expiresAt - now) / 1000)) },
+    { ttl: Math.max(60, seconds), timeout: seconds },
   )
   if (error && error.code !== "DATABASE_IDEMPOTENCY_IN_PROGRESS") throw error
   return published ?? null

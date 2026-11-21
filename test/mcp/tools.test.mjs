@@ -1055,8 +1055,7 @@ test("read_drop shows the errors people's browsers reported for the current app 
     await call(publish, { files: { "index.html": "<script>boom()</script>" }, note: "v1", lifetime: "temporary" })
   ).structuredContent
   const report = { kind: "error", message: "ReferenceError: boom is not defined", source: "/:1", page: "index.html" }
-  await recordRuntimeErrors(app.id, 1, [report])
-  await recordRuntimeErrors(app.id, 1, [report])
+  await Promise.all([recordRuntimeErrors(app.id, 1, [report]), recordRuntimeErrors(app.id, 1, [report])])
   const read = await call(readDrop, { id: app.id })
   assert.equal(read.structuredContent.errors.length, 1)
   assert.equal(read.structuredContent.errors[0].count, 2)
@@ -1065,8 +1064,14 @@ test("read_drop shows the errors people's browsers reported for the current app 
     /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/,
   )
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
-  await recordRuntimeErrors(app.id, 1, [report])
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
+  const newReport = { ...report, message: "Only in v2" }
+  await Promise.all([recordRuntimeErrors(app.id, 2, [newReport]), recordRuntimeErrors(app.id, 1, [report])])
+  const latest = (await call(readDrop, { id: app.id })).structuredContent.errors
+  assert.deepEqual(
+    latest.map(({ message, count }) => [message, count]),
+    [["Only in v2", 1]],
+  )
 })
 
 test("read_drop tells the owner's agents how many viewed the drop, and nobody else's", async () => {
@@ -1641,6 +1646,33 @@ test("two claims on one upload, both in flight at once, run the publish once", a
     [{ id: "drop" }],
   )
   assert.equal(await publishOnce(), null, "a later PUT finds the URL used")
+})
+
+test("a slow publish holds the claim for the ticket's lifetime", async () => {
+  const now = Date.now()
+  const clock = vi.spyOn(Date, "now").mockReturnValue(now)
+  const started = Promise.withResolvers()
+  const finish = Promise.withResolvers()
+  const expiresAt = now + 15 * 60_000
+  const first = publishUploadOnce("slow", expiresAt, async () => {
+    started.resolve()
+    await finish.promise
+    return "first"
+  })
+  try {
+    await Promise.race([started.promise, first])
+    clock.mockReturnValue(now + 5 * 60_000)
+    assert.equal(await publishUploadOnce("slow", expiresAt, async () => "second"), null)
+    clock.mockReturnValue(expiresAt)
+    await assert.rejects(
+      publishUploadOnce("slow", expiresAt, async () => "late"),
+      { status: 403 },
+    )
+  } finally {
+    finish.resolve()
+    clock.mockRestore()
+    await first
+  }
 })
 
 test("a doc saved as .md goes up through the file upload URL and publishes like markdown, versions included", async () => {

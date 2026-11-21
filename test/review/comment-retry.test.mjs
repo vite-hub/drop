@@ -6,6 +6,7 @@ const { signReviewToken } = await import("../../server/utils/review.ts")
 const { default: dropCommentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: dropComments } = await import("../../server/api/drops/[id]/comments.get.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
+const { default: externalCommentPost } = await import("../../server/api/review/comments.post.ts")
 const { default: siteReplyPost } = await import("../../server/api/review/comments/[n]/replies.post.ts")
 const { default: siteCommentPost } = await import("../../server/api/drops/[id]/review.post.ts")
 const { default: commentPatch } = await import("../../server/api/comments/[id]/index.patch.ts")
@@ -242,6 +243,36 @@ test("past the limit, a comment's 429 says when to send again", async () => {
   assert.equal(cloudflare.headers.get("retry-after"), null)
   assert.match((await cloudflare.json()).message, /Too many comments in a minute/)
   assert.equal(threads().length, 0)
+})
+
+test.each([
+  ["/api/review/comments", externalCommentPost],
+  ["/api/review/comments/1/replies", siteReplyPost],
+])("%s exposes the limiter's retry interval and message to the review origin", async (path, post) => {
+  insertDrop("site", { kind: "site", blob_key: null, filename: "site", site_url: SITE })
+  state.failBurst = true
+  const { token } = await signReviewToken(request("/"), { d: "site", u: "owner", n: "Owner", o: SITE })
+  const send = () =>
+    answer(
+      post,
+      request(path, {
+        method: "POST",
+        params: { n: "1" },
+        headers: { origin: SITE, authorization: `Bearer ${token}` },
+      }),
+    )
+  const response = await send()
+  assert.equal(response.status, 429)
+  assert.equal(response.headers.get("retry-after"), "42")
+  assert.equal(response.headers.get("access-control-expose-headers"), "Retry-After")
+  assert.equal(response.headers.get("access-control-allow-origin"), SITE)
+  assert.equal(response.headers.get("vary"), "Origin")
+  assert.equal(response.headers.get("cache-control"), "no-store")
+  assert.match((await response.json()).message, /Too many comments in a minute/)
+  state.burstRetryAfter = undefined
+  const withoutInterval = await send()
+  assert.equal(withoutInterval.headers.get("retry-after"), null)
+  assert.match((await withoutInterval.json()).message, /Too many comments in a minute/)
 })
 
 test("a comment or reply sent as someone the session isn't gets 401 and stores nothing", async () => {

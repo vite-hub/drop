@@ -5,16 +5,13 @@ import { MAX_ARCHIVE_BYTES } from "../../utils/app-archive"
 import { MAX_FILE_BYTES } from "../../utils/drops"
 import { logActor } from "../../utils/logs"
 import { publishInput } from "../../utils/publish"
-import { publishUploadOnce, readUpload } from "../../utils/uploads"
+import { invalidUpload, publishUploadOnce, readUpload } from "../../utils/uploads"
 
 export default defineHandler(async (event) => {
   const upload = await readUpload(event, getRouterParam(event, "ticket")!)
   if (!upload) {
     await event.req.body?.cancel().catch(() => {})
-    throw new HTTPError({
-      status: 403,
-      statusText: "This upload URL has run out or isn't valid. Call publish again for a new one.",
-    })
+    throw invalidUpload()
   }
   const [limit, what] = upload.input.archive ? [MAX_ARCHIVE_BYTES, "archive"] : [MAX_FILE_BYTES, "file"]
   const tooLarge = () =>
