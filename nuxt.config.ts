@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import { readForgeBuild } from "@vite-hub/forge/build/node"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
@@ -28,12 +29,7 @@ const healthRoute = "/api/health"
 
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
-  commit:
-    process.env.VITEHUB_BUILD_COMMIT ||
-    process.env.WORKERS_CI_COMMIT_SHA ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.COMMIT_REF ||
-    "",
+  commit: (await readForgeBuild(fileURLToPath(new URL(".", import.meta.url)))).commit ?? "",
 }
 const liveEditing = host === "cloudflare" || host === "vps"
 
