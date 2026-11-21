@@ -218,6 +218,7 @@
 
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
+  let dockBottom = 72, fitted = null;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
@@ -267,7 +268,7 @@
   // A pan by dx, dy that stops at the fence, with a short blue flash on the side it stopped at.
   function pan(dx, dy) {
     const from = { x: cam.x, y: cam.y };
-    cam.x += dx; cam.y += dy; touched = true;
+    cam.x += dx; cam.y += dy; touched = true; fitted = null;
     const hit = bound(from);
     if (hit) for (const side of "lrtb") if (hit[side]) flash(side);
     schedule();
@@ -321,7 +322,7 @@
   };
   function centreOn(x, y) {
     const v = view();
-    cam.x = v.w / 2 - x * cam.z; cam.y = v.h / 2 - y * cam.z; touched = true;
+    cam.x = v.w / 2 - x * cam.z; cam.y = v.h / 2 - y * cam.z; touched = true; fitted = null;
     bound(); schedule();
   }
   let mapDrag = null;
@@ -359,14 +360,15 @@
     z = clamp(z, Math.min(floor(), cam.z), MAX_Z);
     const wx = (px - cam.x) / cam.z, wy = (py - cam.y) / cam.z;
     cam.z = z; cam.x = px - wx * z; cam.y = py - wy * z;
-    touched = true; bound(); schedule(); settle();
+    touched = true; fitted = null; bound(); schedule(); settle();
   }
   const zoomCenter = (f) => { const v = view(); zoomAt(cam.z * f, v.w / 2, v.h / 2); };
   const box = (it) => ({ x: it.x, y: it.y, w: it.mw || it.w, h: it.mh || it.h || 1 });
   // Fits the given items between the top labels and the bottom bar, at 100% or less.
   function fit(list = items) {
-    const v = view(), top = 56, bottom = 72, side = 32, b = extent(list);
+    const v = view(), top = 56, bottom = dockBottom, side = 32, b = extent(list);
     if (!b) return;
+    fitted = list;
     const { x0, y0, x1, y1 } = b;
     const z = clamp(Math.min((v.w - side * 2) / (x1 - x0), (v.h - top - bottom) / (y1 - y0), 1), MIN_Z, MAX_Z);
     cam.z = z;
@@ -374,13 +376,14 @@
     cam.y = top + Math.max(0, (v.h - top - bottom - (y1 - y0) * z) / 2) - y0 * z;
     bound(); schedule(); settle();
   }
-  function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; bound(); schedule(); settle(); }
+  function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; fitted = null; bound(); schedule(); settle(); }
   // Centres an item at the current zoom, or fits it when it's bigger than the screen.
   function reveal(it) {
     const v = view(), b = box(it);
-    if (b.w * cam.z > v.w - 64 || b.h * cam.z > v.h - 128) return fit([it]);
+    if (b.w * cam.z > v.w - 64 || b.h * cam.z > v.h - 56 - dockBottom) return fit([it]);
+    fitted = null;
     cam.x = (v.w - b.w * cam.z) / 2 - b.x * cam.z;
-    cam.y = Math.max(56, (v.h - 72 - b.h * cam.z) / 2) - b.y * cam.z;
+    cam.y = Math.max(56, (v.h - dockBottom - b.h * cam.z) / 2) - b.y * cam.z;
     bound(); schedule(); settle();
   }
   const sizes = new ResizeObserver(() => {
@@ -426,6 +429,7 @@
   function toFocus(i) {
     i = (i + variants.length) % variants.length;
     if (mode === "focus" && i === current) return;
+    fitted = null;
     if (mode === "canvas") {
       saved.camera = { ...cam };
       for (const it of items) sizes.unobserve(it.el);
@@ -498,8 +502,13 @@
   };
   if (hosted) window.addEventListener("message", (e) => {
     const m = e.data;
-    if (e.source !== parent || !m || m.__drop !== true || m.type !== "picker" || !Object.hasOwn(commands, m.do)) return;
-    commands[m.do](m);
+    if (e.source !== parent || !m || m.__drop !== true) return;
+    if (m.type === "inset" && Number.isFinite(m.bottom)) {
+      const bottom = Math.max(72, m.bottom + 4);
+      if (bottom === dockBottom) return;
+      dockBottom = bottom;
+      if (mode === "canvas" && fitted) fit(fitted);
+    } else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
   });
 
   $(".prev").onclick = () => toFocus(current - 1);

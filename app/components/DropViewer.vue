@@ -8,6 +8,7 @@ import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
 import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
+import type { ViewerVariants } from "~/composables/useViewerFrame"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { isPdf, videoType } from "#shared/plans"
@@ -96,12 +97,12 @@ const wide = breakpoints.greaterOrEqual("lg")
 const phone = breakpoints.smaller("sm")
 /**
  * The drop's details and actions, in a segment that grows inside the review pill (ViewerDetailsSegment): ⓘ or I opens
- * it, and `detailsPop` is the popover open from it, the details or History.
+ * it, and `detailsPop` is whether its chip's popover is open, the details above History.
  */
 const detailsOpen = ref(false)
-const detailsPop = ref<"meta" | "history" | null>(null)
+const detailsPop = ref(false)
 const hasHistory = computed(() => drop.value.versions.length > 1)
-function showDetails(pop: "meta" | "history" | null = null) {
+function showDetails(pop = false) {
   if (editing.value) return
   detailsOpen.value = true
   detailsPop.value = pop
@@ -134,7 +135,7 @@ function showComments() {
   shareOpen.value = false
   tool.value = "browse"
   commentsOpen.value = true
-  detailsPop.value = null
+  detailsPop.value = false
 }
 function closeComments() {
   if (popover.value?.type === "thread") popover.value = null
@@ -192,12 +193,15 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
+const variants = shallowRef<ViewerVariants | null>(null)
+const prototypeCanvas = computed(() => Boolean(variants.value?.canvas))
 /** The picture the frame took of the tooltip or menu the new comment is on, among the draft's images. */
 let autoShot: File | null = null
 const annotations = useViewerAnnotations({
   drop,
   editing,
   enabled: annotationsEnabled,
+  canvas: prototypeCanvas,
   // The page takes clicks for comments while the mode is on or the dock's panel is open; putting them away ends both.
   reviewOpen: computed({
     get: () => commentMode.value || commentsOpen.value,
@@ -265,7 +269,7 @@ const framed = computed(
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
-const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
+const sizable = computed(() => framed.value && !prototypeCanvas.value && ["html", "app"].includes(drop.value.kind))
 /** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
  * clears the dock inside its own stage, so the stage's color runs under the dock, and a PDF's pages scroll under it. Apps and sites run under the dock like
  * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
@@ -286,7 +290,7 @@ const popoverRef = useTemplateRef<{ fail: (reason?: string, text?: string) => Pr
 const shareOpen = ref(false)
 watch(shareOpen, (open) => {
   if (!open) return
-  detailsPop.value = null
+  detailsPop.value = false
   if (commentsOpen.value) closeComments()
 })
 
@@ -315,7 +319,7 @@ function startEdit() {
   closeComments()
   popover.value = null
   closeChanges()
-  detailsPop.value = null
+  detailsPop.value = false
   void live.open()
 }
 // Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
@@ -538,7 +542,7 @@ function toggleCommentArea() {
   else showComments()
 }
 // A `?changes=` link opens with History over the diff, as if the version had been picked there.
-if (route.query.changes && hasHistory.value) showDetails("history")
+if (route.query.changes && hasHistory.value) showDetails(true)
 
 // A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
@@ -565,70 +569,62 @@ const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const {
-  srcdoc,
-  contentOrigin,
-  frameSrc,
-  frameKey,
-  frameScheme,
-  ready,
-  send,
-  unplaced,
-  openPath,
-  variants,
-  picker,
-  whenHeld,
-} = useViewerFrame({
-  drop,
-  frame,
-  app,
-  pinned,
-  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-  inset: ref(0),
-  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-  width: docWidth,
-  zen,
-  annotations,
-  clickComments: commentMode,
-  threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
-  comments: computed(() => ({
-    style: pinStyle.value ? "pin" : "card",
-    me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
-    only: [...shownWhileHidden.value],
-  })),
-  variantBar: true,
-  arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
-  presence,
-  heading: (id, copySection) => {
-    // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
-    const here = new URL(route.fullPath, link.value)
-    here.hash = id
-    history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
-    if (!copySection) return
-    const shared = new URL(link.value)
-    shared.hash = id
-    void copy(shared.href, { announce: "Link to the section copied" })
-  },
-  docAction: (action) => {
-    // A frame without the Clipboard API asks the viewer to copy.
-    if (action === "markdown") void copyMarkdown()
-    else if (action === "download") download()
-    else if (printsPdf.value) exportPdf()
-  },
-  docIntent: (what) => (what === "markdown" ? sendMarkdown() : void sendFolder()),
-  docCopied: (ok, error) => {
-    if (!ok) reportClientError("copy", new Error(`The doc header's Copy: ${error ?? "refused"}`))
-  },
-  openDrop: (id) => void router.push(`/drops/${id}`),
-  palette: usePaletteOpener(),
-  toggleZen,
-  escape: leaveZen,
-})
+const { bottom: frameBottom } = useElementBounding(frame)
+const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unplaced, openPath, picker, whenHeld } =
+  useViewerFrame({
+    drop,
+    frame,
+    app,
+    pinned,
+    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+    inset: ref(0),
+    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+    bottom: computed(() => {
+      const top = reviewDock.value?.top
+      if (prototypeCanvas.value && top && !lightbox.value) return Math.max(0, Math.ceil(frameBottom.value - top))
+      return hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0
+    }),
+    width: docWidth,
+    zen,
+    annotations,
+    clickComments: commentMode,
+    threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
+    comments: computed(() => ({
+      style: pinStyle.value ? "pin" : "card",
+      me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+      only: [...shownWhileHidden.value],
+    })),
+    variantBar: true,
+    variants,
+    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+    presence,
+    heading: (id, copySection) => {
+      // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
+      const here = new URL(route.fullPath, link.value)
+      here.hash = id
+      history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
+      if (!copySection) return
+      const shared = new URL(link.value)
+      shared.hash = id
+      void copy(shared.href, { announce: "Link to the section copied" })
+    },
+    docAction: (action) => {
+      // A frame without the Clipboard API asks the viewer to copy.
+      if (action === "markdown") void copyMarkdown()
+      else if (action === "download") download()
+      else if (printsPdf.value) exportPdf()
+    },
+    docIntent: (what) => (what === "markdown" ? sendMarkdown() : void sendFolder()),
+    docCopied: (ok, error) => {
+      if (!ok) reportClientError("copy", new Error(`The doc header's Copy: ${error ?? "refused"}`))
+    },
+    openDrop: (id) => void router.push(`/drops/${id}`),
+    palette: usePaletteOpener(),
+    toggleZen,
+    escape: leaveZen,
+  })
 /** A prototype's canvas is in the bar (ViewerVariants), where its Move and Hand tools are. */
-const canvasShown = computed(
-  () => Boolean(variants.value?.canvas) && !editing.value && !lightbox.value && !shownVersion.value,
-)
+const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
 /** The Hand tool pans: picking it puts Drop's comment and inspection tools down, and picking one of those puts it down. */
 function canvasTool(command: "move" | "hand") {
   if (command === "hand") {
@@ -689,7 +685,7 @@ function showVersion(version: DropVersion) {
   const opening = !shownVersion.value
   void setQuery({ changes: version.version }, { push: opening })
   if (opening) pushedChanges = true
-  if (phone.value) detailsPop.value = null
+  if (phone.value) detailsPop.value = false
 }
 function closeChanges() {
   if (!shownVersion.value) return
@@ -721,7 +717,7 @@ defineShortcuts({
   c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
   e: () => (selection.value ? commentOnSelection(true) : edit()),
   // On a prototype's canvas H is the Hand tool, as in Figma; History is still in Details.
-  h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails("history")),
+  h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
   i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
   r: toggleCommentArea,
   v: () => {
@@ -766,7 +762,7 @@ onKeyStroke("Escape", (event) => {
   if (event.defaultPrevented || shareOpen.value || lightbox.value || editing.value) return
   // The segment's popover closes itself first (Escape stops there); the next Escape folds the segment.
   if (detailsPop.value) {
-    detailsPop.value = null
+    detailsPop.value = false
     return
   }
   if (detailsOpen.value && !popover.value && !commentsOpen.value) {
@@ -944,19 +940,21 @@ watch(
   { immediate: true },
 )
 
-// The segment's chip: the size (a folder's item count) and, for its owner, the views.
-const detailsMeta = computed(() => {
+// The segment's chip: the version once there are several, else the size (a folder's item count), and for its owner the
+// views. A Markdown doc's header holds its size and views, so its chip is only the version.
+const detailsChip = computed(() => {
   const d = drop.value
+  const details = d.kind !== "markdown"
   const size =
     d.kind === "folder"
       ? itemCount(d.items ?? 0)
       : d.kind === "site" || d.kind === "link"
         ? KIND_LABELS[d.kind]
         : formatBytes(d.size)
-  // A Markdown doc's header holds its facts and the lifetime is its own chip: nothing is left to open.
-  if (d.kind === "markdown") return undefined
-  const views = d.views ? d.views.person + d.views.anonymous + d.views.agent : null
-  return views === null ? size : `${size} · ${views} ${views === 1 ? "view" : "views"}`
+  const lead = hasHistory.value ? `v${shownVersion.value?.version ?? d.version}` : details ? size : undefined
+  if (!lead) return undefined
+  const views = details && d.views ? d.views.person + d.views.anonymous + d.views.agent : null
+  return views === null ? lead : `${lead} · ${views} ${views === 1 ? "view" : "views"}`
 })
 // What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
 // Download, Copy as Markdown and Export as PDF are in its header (docHeader).
@@ -990,7 +988,7 @@ const detailsActions = computed<DetailsAction[]>(() => [
         },
       ]
     : []),
-  ...(presents.value && !slidev.value
+  ...(visitor.value && presents.value && !slidev.value
     ? [{ id: "window", label: "Open in new window", icon: "i-mingcute-external-link-line", press: openWindow }]
     : []),
   ...(visitor.value
@@ -1077,11 +1075,14 @@ const canMark = computed(() => framed.value && canDrawArea.value && !shownVersio
 const marking = computed(() => tool.value === "mark")
 /** Whether Rulers can draw over the page: any page in the frame, an image or a doc too (#shared/plan-runtime). */
 const measurable = computed(() => framed.value && annotationsEnabled.value && !lightbox.value)
-// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements.
-const previewTools = computed(() => (inspectable.value ? (["browse", "measure"] as const) : []))
+// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements, so
+// a prototype's canvas, a plane of many items, has neither until one opens in focus. Measure goes off with a second
+// press or V, so there's no Browse button.
+const inspectsPage = computed(() => inspectable.value && !prototypeCanvas.value)
+const previewTools = computed(() => (inspectsPage.value ? (["measure"] as const) : []))
 const previewViews = computed(() => [
   ...(measurable.value ? (["rulers"] as const) : []),
-  ...(inspectable.value ? (["xray"] as const) : []),
+  ...(inspectsPage.value ? (["xray"] as const) : []),
 ])
 // What's on stays beside the + while it's closed, pressed, so one press turns it off.
 const pinnedTools = computed(() => (tool.value === "measure" ? (["measure"] as const) : []))
@@ -1522,7 +1523,7 @@ usePaletteOffer("drop", () => {
           },
         ]
       : []),
-    ...(tooled && inspectable.value
+    ...(tooled && inspectsPage.value
       ? [
           {
             label: "X-ray",
@@ -1579,16 +1580,16 @@ usePaletteOffer("drop", () => {
             icon: "i-mingcute-history-line",
             // On a prototype's canvas H is the Hand tool, so History goes without its key there.
             kbds: canvasShown.value ? undefined : ["H"],
-            onSelect: () => showDetails("history"),
+            onSelect: () => showDetails(true),
           },
         ]
       : []),
     {
       label: "Details",
-      suffix: [detailsMeta.value, `dropped ${timeAgo(drop.value.createdAt, now.value)}`].filter(Boolean).join(" · "),
+      suffix: [detailsChip.value, `dropped ${timeAgo(drop.value.createdAt, now.value)}`].filter(Boolean).join(" · "),
       icon: "i-mingcute-information-line",
       kbds: ["I"],
-      onSelect: () => showDetails(detailsMeta.value ? "meta" : null),
+      onSelect: () => showDetails(Boolean(detailsChip.value)),
     },
   ]
 
@@ -2127,11 +2128,18 @@ watch(
             <!-- A plain link, so it opens in this tab and ⌘-click still opens a new one. -->
             <template v-if="!editing">
               <UTooltip :text="visitor ? 'Open Drop' : 'Go to your drops'">
-                <UButton aria-label="Drop" color="neutral" size="xs" :to="visitor ? '/' : '/drops'" variant="ghost">
+                <UButton
+                  aria-label="Drop"
+                  data-review-home
+                  color="neutral"
+                  size="xs"
+                  :to="visitor ? '/' : '/drops'"
+                  variant="ghost"
+                >
                   <DropMark class="h-3.5 w-5" /><span class="hidden sm:inline">Drop</span>
                 </UButton>
               </UTooltip>
-              <span aria-hidden="true" class="w-1 shrink-0" />
+              <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>
             <template v-if="galleryShown">
               <LazyViewerGallery
@@ -2151,7 +2159,7 @@ watch(
                     command === 'move' || command === 'hand' ? canvasTool(command) : picker(command, index)
                 "
               />
-              <span aria-hidden="true" class="w-1 shrink-0" />
+              <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>
             <template v-if="editing">
               <!-- One presence ring instead of the outline's two: its inner ring is page-colored, not the glass behind it,
@@ -2237,7 +2245,13 @@ watch(
                 :count="openCount"
                 :waiting="deliveryCount"
                 :list-open="commentsOpen && !popover"
-                :pins="!lightbox && !shownVersion && (framed || pdf) && pinned.length > 0"
+                :pins="
+                  !lightbox &&
+                  !shownVersion &&
+                  (framed || pdf) &&
+                  pinned.length > 0 &&
+                  (commentMode || commentsOpen || !overlays.pins)
+                "
                 :pins-shown="overlays.pins"
                 @toggle="toggleCommentMode"
                 @list="toggleComments"
@@ -2273,7 +2287,12 @@ watch(
                 </template>
               </ViewerCommentsSegment>
             </template>
-            <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
+            <span
+              v-if="editing || (hasComments && !trashed)"
+              aria-hidden="true"
+              class="w-1 shrink-0"
+              :class="prototypeCanvas && 'max-sm:hidden'"
+            />
             <template v-if="!editing && presence.people.value.length">
               <ViewerPresence
                 v-model:show-cursors="presence.showCursors.value"
@@ -2303,8 +2322,9 @@ watch(
                 v-model:open="detailsOpen"
                 v-model:pop="detailsPop"
                 :actions="detailsActions"
-                :meta="detailsMeta"
-                :version="hasHistory ? `v${shownVersion?.version ?? drop.version}` : undefined"
+                :chip="detailsChip"
+                :details="drop.kind !== 'markdown'"
+                :history="hasHistory"
                 :width="widens ? widths.find((item) => item.value === docWidth)?.label : undefined"
                 @width="nextWidth"
               >
