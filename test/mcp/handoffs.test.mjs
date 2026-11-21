@@ -264,6 +264,39 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
 })
 
+test("a quote-only handoff stays working until the quoted thread is answered", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  assert.equal(
+    (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
+    undefined,
+  )
+
+  state.who = ana
+  const transport = transportFor(doc.id)
+  const { code, selection, count } = await transport.startPairing()
+  assert.equal(count, 1)
+  assert.equal((await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })).status, 200)
+  const { id, status } = await transport.allow(code, selection)
+  assert.equal(status, "sent")
+
+  state.who = agentOf(ana)
+  const read = await call(readDrop, { handoff: id })
+  assert.deepEqual(read.structuredContent.handoff, { id, state: "working", asks: [], quotes: [theirs.n] })
+  assert.equal((await call(listHandoffs, {})).structuredContent.handoffs[0].id, id)
+  state.who = ana
+  assert.equal((await transport.status()).working.id, id)
+
+  state.who = agentOf(ana)
+  assert.equal(
+    (await call(reply, { id: doc.id, comment: theirs.n, body: "Thanks; I'll check the freeze." })).isError,
+    undefined,
+  )
+  state.who = ana
+  assert.equal((await transport.status()).working, undefined)
+  state.who = agentOf(ana)
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
+})
+
 test("pairing cannot send a changed selection and the copied prompt describes both inbox agents", async () => {
   const { doc, mine, theirs } = await reviewed()
   state.who = ana
