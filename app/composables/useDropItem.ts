@@ -2,11 +2,6 @@ import { isPublic, type Share, SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"
 import { dropPath } from "#shared/links"
 
-/**
- * What a drop listed on the Drops page can do, the same from a row (DropRow), a card (DropCard) or a line (DropLine):
- * its share and the choices for it, copying its link, pinning it, and its ⋯ menu. In a team folder (`inTeam`) anyone may move a
- * teammate's drop to the Trash; `trash` does that.
- */
 export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => boolean; trash: () => void }) {
   const now = useRelativeNow()
   const { copy } = useCopy()
@@ -15,22 +10,16 @@ export function useDropItem(drop: () => DropSummary, options: { inTeam?: () => b
   const moveTo = useMoveDialog()
   const { data: me } = useMe()
   const shared = computed(() => drop().share !== "private")
-  // Someone else's drop, in Shared with me or a team folder: open it and copy its link; in a team folder, trash it too.
   const theirs = computed(() => Boolean(drop().owner))
-  // The team's folders are the admins' to share.
   const changeable = computed(() => !theirs.value && (!drop().teamFolder || me.value?.role === "admin"))
   const choices = computed(() => shareItems(me.value, drop()))
   const status = computed(() => shareStatus(drop(), now.value))
   const link = useShareUrl(drop)
 
-  // The share menu shows the new choice, so picking one doesn't get a note.
   const pick = (next: Share) => next === drop().share || setShare(drop(), next)
 
-  /** The menu item closes the menu, so `announce` says it in StatusNote; the link button is a DropCopyButton of `link`. */
   const copyLink = (announce?: string) => copy(link.value, { announce })
 
-  // Copying never widens a share on its own. A private drop's link button and menu item open the choices instead,
-  // each saying who it lets in, the team first. Empty when sharing isn't this person's to change.
   const shareAndCopy = (next: Share) => async () => {
     if (await pick(next)) await copy(link.value, { announce: `${SHARED_TITLES[next]}. Link copied` })
   }

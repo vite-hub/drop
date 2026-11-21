@@ -9,9 +9,7 @@ import type { Identity } from "./identity"
 import { logError } from "./logs"
 
 interface ExpiryPolicy {
-  /** Days a `review` drop lives after its last visit (`temporary` ones get at most 14). 0 turns expiry off. */
   days: number
-  /** Whether owners and their agents may keep drops. Admins always may. */
   custom: boolean
 }
 
@@ -27,11 +25,6 @@ export function isExpired(row: ExpiryFields, now: number, days: number) {
   return at !== null && at <= now
 }
 
-/**
- * Whether an anonymous request looks like a person in a browser. Link unfurlers, crawlers, and uptime checks
- * either send a bot user agent or never run the page's script. `beacon` is the shared page's same-origin call
- * after it renders; `document` is a direct navigation to a raw file. Embedded images and hotlinks never count.
- */
 export function isHumanVisit(headers: Headers, kind: "beacon" | "document") {
   const agent = headers.get("user-agent")?.trim()
   if (!agent || isbot(agent)) return false
@@ -39,12 +32,6 @@ export function isHumanVisit(headers: Headers, kind: "beacon" | "document") {
   return headers.get("sec-fetch-mode") === "navigate" && headers.get("sec-fetch-dest") === "document"
 }
 
-/**
- * Restarts the drop's expiry window. People and agents who identify themselves always count; anonymous visitors
- * count when they pass `isHumanVisit`. Writes at most once a day per drop, and never revives an expired drop:
- * that takes an explicit renew. A drop in a folder, or a file a doc embeds, lives as long as the node at the top, so
- * the visit renews that one (its window is the one `row` carries, see ./nodes).
- */
 export async function recordVisit(
   event: H3Event,
   row: ExpiryFields & {
@@ -73,7 +60,6 @@ export async function recordVisit(
   }
 }
 
-/** Starts a fresh window for the drop. */
 export const renewDrop = (row: { id: string }, now = Date.now(), when = sql`1`) =>
   db
     .update(drops)

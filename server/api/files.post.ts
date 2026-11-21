@@ -5,19 +5,12 @@ import { createDocDrop, dropPageUrl, findDrop, MAX_FILE_BYTES, permissions } fro
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 
-/**
- * Agents upload one file. It becomes a private drop, or with `folder` (an id or link) one in that folder, shared and kept
- * with it; `url` serves the file, `page` opens it for review. In the live editor, `document` attaches an image and
- * returns a root-relative `url` so drafts can be opened and published on another hostname of the same Drop.
- */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event).catch(async (error) => {
-    // Release the unread upload before answering, or the connection can drop mid-stream instead of a clean 401.
     await event.req.body?.cancel().catch(() => {})
     throw error
   })
   requireContentType(event, "multipart/form-data")
-  // Checked from the header: h3's assertBodySize rewraps the request and drops its multipart content type.
   if (Number(event.req.headers.get("content-length") ?? 0) > MAX_FILE_BYTES + 64 * 1024)
     throw new HTTPError({ status: 413, statusText: "The file exceeds the 4 MiB limit." })
 

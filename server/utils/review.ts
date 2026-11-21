@@ -60,22 +60,6 @@ import { shareReviewFor } from "./trust"
 import { touchFolder, uniqueSlug } from "./nodes"
 import { findableBy } from "./related"
 
-/**
- * Site review. A site drop names a website by its origin, or by a pattern that covers every preview deploy (`siteUrl`,
- * see shared/review.ts); its pages load /review.js, which sends comments and screenshots to /api/review/comments.
- * Drop never frames the site, so its cookies and its login keep working, and the script never sends Drop's cookies,
- * which would be third-party there. It carries a review token instead, which the connect popup (/review/connect)
- * issues to people who may comment and hands only to the page's own origin.
- *
- * Nothing in the page names the site drop: the script has no key, and the token is sealed, so the page can't read
- * which drop it is for. Drop finds the site drops for a page by its origin when someone connects, and lists only the
- * ones that person may comment on. Neither the drop's link nor its id reaches the page, so nothing there opens the review.
- */
-
-/**
- * What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin.
- * `g` is a guest's id, their browser's in Drop (./guests.ts), so their comments from the site are theirs in Drop too.
- */
 const ReviewClaims = v.object({
   d: v.string(),
   u: v.nullable(v.string()),
@@ -86,26 +70,18 @@ const ReviewClaims = v.object({
 })
 export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
-/** What the popup sends back when someone picks a site drop: which one, for which origin and person. Sealed too. */
 const Choice = v.object({ c: v.string(), o: v.string(), u: v.nullable(v.string()), e: v.number() })
 type Choice = v.InferOutput<typeof Choice>
 
 const encoder = new TextEncoder()
 
-/** The auth secret. Not VITEHUB_SECRET: not every Drop sets it (Quiver's doesn't). */
 function authSecret(event: H3Event) {
-  // Optional: an environment without the auth secret (the tests' one) gets the 503 below, not a TypeError.
   const secret = useServerEnv(event).auth?.secret?.unseal()
-  // No fallback: a known key would let anyone mint tokens.
   if (!secret)
     throw new HTTPError({ status: 503, statusText: "Site review needs the auth secret (BETTER_AUTH_SECRET)." })
   return secret
 }
 
-/**
- * A name for `value` that only Drop can make and that always comes out the same: HMAC-SHA-256 under a key from the
- * auth secret, cut to 128 bits. Presence rooms are named this way, so a page in one never learns which drop it is.
- */
 export async function keyedName(event: H3Event, purpose: string, value: string) {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -118,18 +94,14 @@ export async function keyedName(event: H3Event, purpose: string, value: string) 
   return hex(mac.subarray(0, 16))
 }
 
-/** What a sealed value is for. Each one is sealed under its own `purpose`, so none passes as another. */
 type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presence"
 
-// ViteHub's seal() keys each purpose from a root of at least 32 characters; a digest of the auth secret always is one.
 const sealRoot = async (event: H3Event) => hex(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
 
-/** Encrypted and authenticated: the page can neither read it nor change it. */
 export async function seal(event: H3Event, purpose: SealPurpose, value: Readonly<Record<string, unknown>>) {
   return sealValue(`drop:${purpose}`, value, { secret: await sealRoot(event) })
 }
 
-/** The sealed value, when it was sealed for `purpose` and parses as `schema`. Null for anything else. */
 export async function unseal<T extends v.GenericSchema>(
   event: H3Event,
   purpose: SealPurpose,
@@ -147,13 +119,11 @@ export async function signReviewToken(event: H3Event, claims: Omit<ReviewClaims,
   return { token: await seal(event, "token", full), expiresAt: full.e }
 }
 
-/** The token's claims when it's ours and unexpired, null otherwise. Whether its site still covers its origin is for `reviewSession`. */
 export async function readReviewToken(event: H3Event, token: string, now = Date.now()): Promise<ReviewClaims | null> {
   const claims = await unseal(event, "token", ReviewClaims, token)
   return claims && claims.e > now ? claims : null
 }
 
-/** The handle the popup lists a site drop by: good for ten minutes, for this origin and this person only. */
 export const sealChoice = (
   event: H3Event,
   site: Pick<DropRow, "id">,
@@ -162,13 +132,11 @@ export const sealChoice = (
   now = Date.now(),
 ) => seal(event, "choice", { c: site.id, o: origin, u: who?.userId ?? null, e: now + 600_000 } satisfies Choice)
 
-/** The site drop id behind a choice, when it was made for this origin and person and hasn't run out. */
 export async function openChoice(event: H3Event, text: string, origin: string, who: Identity | null, now = Date.now()) {
   const choice = await unseal(event, "choice", Choice, text)
   return choice && choice.o === origin && choice.u === (who?.userId ?? null) && choice.e > now ? choice.c : null
 }
 
-/** Site drops whose address covers `origin`, found by equality: the origin itself, or the one pattern that could cover it. */
 function sitesCovering(origin: string) {
   const addresses = siteAddressesFor(origin)
   return addresses.length
@@ -181,10 +149,6 @@ function sitesCovering(origin: string) {
     : null
 }
 
-/**
- * The site drops whose address covers `origin` and that `who` may comment on, newest first, each with its owner's name.
- * Guests only find the ones whose link lets anyone comment; nobody finds one they couldn't comment on.
- */
 export async function sitesFor(origin: string, who: Identity | null, event?: H3Event) {
   const where = sitesCovering(origin)
   if (!where) return []
@@ -203,11 +167,6 @@ export async function sitesFor(origin: string, who: Identity | null, event?: H3E
   )
 }
 
-/**
- * The site review an agent means by the address of a page under review, such as a pull request's preview: the newest
- * site drop covering its origin that `who` may comment on, and the page as its comments name it, path only. Null for
- * anything that isn't an http(s) address or that no review of theirs covers.
- */
 async function siteForPage(address: string, who: Identity, event?: H3Event) {
   let url: URL
   try {
@@ -220,7 +179,6 @@ async function siteForPage(address: string, who: Identity, event?: H3Event) {
   return found ? { site: found.site, page: reviewPage(found.site, url.origin, url.pathname) } : null
 }
 
-/** A drop by its id or link, or a site review by the address of one of its pages, with that page. */
 export async function findDropOrSite(ref: string, who: Identity, event: H3Event) {
   const drop = await findDropByRef(ref, event)
   if (drop) return { drop, page: null }
@@ -228,51 +186,32 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
   return { drop: found?.site ?? null, page: found?.page ?? null }
 }
 
-/** `https://pr1.preview.example.com` from a pattern site's page, which keeps the origin in front of the path. */
 export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
 
-/**
- * Who may resolve or reopen a thread on a site review: its author when signed in, and anyone signed in who may comment
- * on the site, with their agents. A guest resolves nothing, their own comments included. The people reviewing a site
- * and the agents fixing it close each other's comments once they're fixed; otherwise fixed comments stay pinned to the
- * page until the site's owner comes by.
- */
 export const mayResolveSite = (site: DropRow, who: Identity | null, wrote: boolean) =>
   wrote || permissions(site, who).manage || (who !== null && permissions(site, who).comment)
 
-/** Whether any site drop covers `origin`. That much is all a page learns before it has a token. */
 export async function covered(origin: string) {
   const where = sitesCovering(origin)
   return Boolean(where && (await db.select({ id: drops.id }).from(drops).where(where).limit(1)).length)
 }
 
-/**
- * Whether `who` could open the site without its link: its owner, an admin, or someone a team share reaches. A public
- * link doesn't count, since finding a site by its origin is not having its link.
- */
 export function openable(site: DropRow, who: Identity | null) {
   const grants = (site.grants ?? [{ share: site.share }]).filter((grant) => !isPublic(grant.share))
   return permissions({ ...site, grants }, who).view
 }
 
-/** What a doc's handle says: which drop, until when. Sealed, so the page shows the doc without learning its link. */
 const DocHandle = v.object({ d: v.string(), e: v.number() })
 
-/** The handle the review script opens a doc by, good as long as the review token it came with. */
 export const sealDoc = (event: H3Event, doc: Pick<DropRow, "id">, until: number) =>
   seal(event, "doc", { d: doc.id, e: until } satisfies v.InferOutput<typeof DocHandle>)
 
-/** The doc behind a handle, when `who` would find it in Drop anyway. Null for anything else. */
 export async function openDoc(event: H3Event, handle: string, who: Identity, now = Date.now()) {
   const claims = await unseal(event, "doc", DocHandle, handle)
   const doc = claims && claims.e > now ? await findDrop(claims.d, event) : null
   return doc && (await findableBy(who, [doc], event)).length ? doc : null
 }
 
-/**
- * The person behind a token, as they are now: a ban or a lost membership ends their review session
- * before the token runs out. Null for a guest.
- */
 export async function reviewer(claims: Pick<ReviewClaims, "u">): Promise<Identity | null | false> {
   if (!claims.u) return membersOnly() ? false : null
   const [row] = await db.select().from(user).where(eq(user.id, claims.u)).limit(1)
@@ -289,14 +228,6 @@ export async function reviewer(claims: Pick<ReviewClaims, "u">): Promise<Identit
   }
 }
 
-/**
- * The site drop and the person behind a review request, from its bearer token. The token must have been issued for the
- * request's own origin, its site must still cover that origin, and the person must still be allowed to comment.
- *
- * CORS answers the request's origin when the token's site covers it. A request whose token doesn't hold up still gets
- * CORS when some site drop covers its origin, so the script can read the 401 and connect again. Any other origin gets
- * no CORS headers, so its page can't read the answer.
- */
 export async function reviewSession(event: H3Event) {
   const origin = event.req.headers.get("origin") ?? ""
   event.res.headers.set("Vary", "Origin")
@@ -307,17 +238,12 @@ export async function reviewSession(event: H3Event) {
   if (claims && site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, origin)) {
     event.res.headers.set("Access-Control-Allow-Origin", origin)
     const who = await reviewer(claims)
-    // A guest's token from before tokens named them stands for them until it runs out.
     const guest = who || !token ? null : (claims.g ?? (await guestIdOf(token)))
     if (who !== false && permissions(site, who).comment) return { site, claims, who, guest }
   } else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
   throw new HTTPError({ status: 401, statusText: "Your review session ended. Connect again to comment." })
 }
 
-/**
- * Server-Timing for a review request: each step's time since the one before, then the whole. The page that sent the
- * request may read it, from fetch and from its Resource Timing entries, so a slow Send says where its time went.
- */
 export function reviewTiming(event: H3Event) {
   const start = performance.now()
   let last = start
@@ -339,7 +265,6 @@ export function reviewTiming(event: H3Event) {
   }
 }
 
-/** The preflight before a review request, which carries no token yet: allowed for origins some site drop covers. */
 export async function reviewPreflight(event: H3Event) {
   const origin = event.req.headers.get("origin") ?? ""
   if (!(await covered(origin))) throw new HTTPError({ status: 404, statusText: "No site review here." })
@@ -355,17 +280,9 @@ export async function reviewPreflight(event: H3Event) {
   })
 }
 
-/**
- * Where a comment on the site was made. A pattern covers many origins, so its comments keep the page's origin; a site
- * with one origin keeps the path alone.
- */
 export const reviewPage = (site: Pick<DropRow, "siteUrl">, origin: string, page: string) =>
   site.siteUrl && isSitePattern(site.siteUrl) ? `${origin}${page}` : page
 
-/**
- * Review routes answer the site's page in every case, errors included, so the script can tell an ended session from
- * a full plan. CORS headers set by `reviewSession` would otherwise be lost to Nitro's error page.
- */
 export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | unknown) {
   return defineHandler(async (event) => {
     try {
@@ -385,10 +302,6 @@ export function reviewApi(handler: (event: H3Event<any>) => Promise<unknown> | u
 
 const SITE_REVIEWS_SLUG = /^site-reviews(-\d+)?$/
 
-/**
- * The top-level folder site reviews go in when nobody picks one: the owner's newest Site reviews folder that hasn't
- * expired, renewed since a review is going in, or a new one. Found by its slug, so renaming it keeps it.
- */
 async function siteReviewsFolder(who: Identity, event?: H3Event) {
   const now = Date.now()
   const { days } = expiryPolicy(event)
@@ -417,7 +330,6 @@ async function siteReviewsFolder(who: Identity, event?: H3Event) {
   return folder
 }
 
-/** A new site drop: no file, just the address people review. In a folder it lives with the folder, like any drop. */
 export async function createSiteDrop(
   who: Identity,
   input: LifetimeInput & {
@@ -437,8 +349,6 @@ export async function createSiteDrop(
       status: 400,
       statusText: "That address is Drop itself or where it shows drops, which can't be a site to review.",
     })
-  // Without a folder, a review goes in the owner's Site reviews folder, unless it asks to live longer or shorter than
-  // the folder does: a drop in a folder lives with it.
   const folder =
     input.folder ?? (!input.lifetime || input.lifetime === "review" ? await siteReviewsFolder(who, event) : null)
   const ownerId = folder && !folder.teamFolder ? folder.ownerId : who.userId
@@ -496,17 +406,11 @@ export type Screenshot = { bytes: Uint8Array; contentType: "image/png" | "image/
 
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const
 
-/** The image's real type from its first bytes, whatever the page claimed. Only the three a browser canvas makes. */
 function screenshotType(bytes: Uint8Array): Screenshot["contentType"] | null {
   const type = detectContentType(bytes)
   return type === "image/png" || type === "image/jpeg" || type === "image/webp" ? type : null
 }
 
-/**
- * A review comment as multipart: `data` (JSON, ReviewCommentSchema), an optional `screenshot`, and the `image`s the
- * reviewer added. Both the review script on the site and Drop's own embedded review send it. Every file is checked by
- * its bytes, not its claimed type, and at most 4 MiB.
- */
 export async function readReviewComment(
   event: H3Event,
 ): Promise<{ input: ReviewCommentInput; shot: Screenshot | null; images: CommentImage[] }> {
@@ -532,20 +436,6 @@ export async function readReviewComment(
   return { input, shot: { bytes, contentType }, images }
 }
 
-/**
- * Stores what someone sent from the site. With a screenshot, the screenshot becomes a private image of the site (like
- * a doc's attachment, it shares the site's sharing, lifetime, and Trash) and the comment marks the box on it, so
- * Drop's image view draws it and takes replies. Without one, the comment goes on the site itself.
- *
- * The page's element is kept the same way in both: `label` holds its selector and `quote` its tag and text, which
- * the comment lists show. The comment's own `selector` is its anchor in Drop: the screenshot (`body > img` in the
- * image view), or the element itself on the site. `origin` is the page's, from its token. `spot` is where on the
- * element the pin goes, so the script can put it back on the live page. `images` are what the reviewer added, stored
- * under the site like its screenshots.
- *
- * Returns the thread with the images it stored, so the answer can carry the thread without reading it back.
- * `attachments` is null when the request id names an earlier submission, whose images this request didn't store.
- */
 export async function addReviewComment(
   site: DropRow,
   author: { who: Identity | null; name: string; guest: string | null },
@@ -578,7 +468,6 @@ export async function addReviewComment(
       },
       (added) => ({ commentId: added.messages[0]!.id, replyId: null }),
     )
-    // The claim is visible before its images are linked. Only publish it once no work can roll it back.
     if (row.meta.requestPending) {
       const threads = commentsSchema.vitehubCommentThreads
       await db
@@ -593,8 +482,6 @@ export async function addReviewComment(
       await removeThread(created)
       if (shotDrop) await deleteDrop(shotDrop)
     }
-    // A competing POST may have committed after the lookup above. The database claim rejects our whole Comments
-    // batch, and insertReviewComment removes any extra screenshot before we reuse the winning thread.
     if (input.requestId) {
       const existing = await submittedReview(site, input.requestId)
       if (existing) return { row: existing, attachments: null }
@@ -639,7 +526,6 @@ async function insertReviewComment(
     elementY: input.selector && input.spot ? input.spot.y : null,
   }
   const thread = { body: input.body, author: authorOf(author.who, author.name, author.guest), attachments }
-  // The page's path, without its query and hash.
   const path = input.page.replace(/[?#].*$/, "") || "/"
   if (!shot)
     return addThread(
@@ -647,8 +533,6 @@ async function insertReviewComment(
       { ...thread, fields: { ...element, kind: "area", selector: input.selector || "body" } },
       siteCommentList(site),
     )
-  // The site's owner pays for the bytes, as for anything else in their drops. No publish burst: the route's own rate
-  // limit is per reviewer, and reviewers shouldn't use up the owner's agents' publishes.
   const image = await withDropQuota(
     site.ownerId,
     { drops: 0, bytes: shot.bytes.byteLength, writes: 1 },
@@ -687,17 +571,11 @@ async function insertReviewComment(
       siteCommentList(site, true),
     )
   } catch (error) {
-    // Without its comment, nothing would show the screenshot, so it goes too.
     await deleteDrop(image)
     throw error
   }
 }
 
-/**
- * The site's review list, newest first, each comment with the screenshot it came with. `page` is as `reviewPage` keeps
- * it. Comments reads at most 500 threads at once, so a site with more lists its 500 most active; `open` lists every open
- * one instead.
- */
 export async function siteItems(
   site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
   reader: Reader,
@@ -713,7 +591,6 @@ export async function siteItems(
       .where(and(eq(drops.parentId, site.id), eq(drops.kind, "image"))),
   ])
   const byId = new Map(shots.map((shot) => [shot.id, shot]))
-  // The browser uses this list to acknowledge a lost POST. Pending claims may still be rolled back.
   return threads
     .filter(({ meta }) => !meta.requestPending)
     .filter(({ meta }) => !page || meta.page === page || Boolean(meta.page?.startsWith(`${page}#`)))
@@ -742,22 +619,13 @@ const spotOf = (meta: DropThread["meta"]) =>
 
 const reviewImages = (files: SiteReviewItem["attachments"]) => files.map(({ id, filename }) => ({ id, filename }))
 
-/** What `reviewThread` reads of a site's review item. The script names the screenshot by its id only. */
 type ReviewItem = Omit<SiteReviewItem, "screenshot"> & { screenshot: { id: string } | null }
 
-/**
- * A site's threads as the review script shows them on the page (ReviewThread): no ids or links that would open the
- * review in Drop, and images by the ids /api/review/images serves with the token.
- */
 export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
   const others = mayResolveSite(site, who, false)
   return items.map((item) => reviewThread(item, others, who !== null))
 }
 
-/**
- * The thread a review POST just stored, as `reviewThreads` would list it, from what the POST holds: the script draws
- * its pin from the answer instead of asking for the page's threads again.
- */
 export function reviewThreadOf(
   site: DropRow,
   who: Identity | null,
@@ -779,13 +647,11 @@ export function reviewThreadOf(
   )
 }
 
-/** `others`: the reader may resolve anyone's thread. A guest's own (`mine`) aren't theirs to resolve. */
 function reviewThread(item: ReviewItem, others: boolean, signedIn: boolean): ReviewThread {
   return {
     n: item.n,
     requestId: item.requestId,
     body: item.body,
-    // An agent's comment never shows the picture of the person it wrote for; the page has no logo to show instead.
     author: { name: writtenBy(item), image: item.agent ? null : item.authorImage },
     createdAt: item.createdAt,
     resolved: item.resolved,
@@ -806,10 +672,6 @@ function reviewThread(item: ReviewItem, others: boolean, signedIn: boolean): Rev
   }
 }
 
-/**
- * An image the review script may show: a screenshot sent from the site or an image in one of its threads. Both are
- * the site's own children; anything else is no image of this review's.
- */
 export async function reviewImage(site: Pick<DropRow, "id">, id: string) {
   const image = await findDrop(id)
   return image?.kind === "image" && image.parentId === site.id && image.blobKey ? image : null

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A public skill hub's Install button, and on each of its skills' folders: a click copies `npx skills add <hub link>`
-// (`--skill <name>` on a skill's folder) and shows the command under the button, with how to update later.
 import { skillsAddCommand } from "#shared/links"
 import type { SkillInstall } from "#shared/types"
 

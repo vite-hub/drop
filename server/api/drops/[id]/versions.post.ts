@@ -7,12 +7,6 @@ import { identify } from "../../../utils/identity"
 import { deleteDrafts, readDraft } from "../../../utils/live-drafts"
 import { routeId } from "../../../utils/params"
 
-/**
- * Publishes a Markdown drop's live draft of `version` as its next version. The text comes from the draft the room last
- * checkpointed, with the published front matter put back. If someone (often an agent) published a newer version
- * meanwhile, this is a 409 naming it, unless `force` puts the draft on top of it. People only: agents publish with
- * publish.
- */
 export default defineValidatedHandler({
   validate: {
     body: v.object({ version: v.optional(v.pipe(v.number(), v.integer())), force: v.optional(v.boolean()) }),

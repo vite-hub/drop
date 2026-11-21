@@ -11,11 +11,8 @@ import { countView } from "./views"
 
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 
-/** One owner join per file. A blob without a drop or a code image behind it is never served. */
 export async function requireBlobAccess(event: H3Event, key: string) {
-  // Shared content must be rechecked after a ban or deletion, including raw downloads and images.
   event.res.headers.set("Cache-Control", "private, no-store")
-  // App files are served from the app's own origin; live drafts only through their Realtime room.
   if (key.startsWith("apps/") || key.startsWith("drafts/")) throw notFound()
   if (key.startsWith("code-images/")) {
     if (isExpiredCodeImage(key, new Date())) throw notFound()
@@ -29,12 +26,10 @@ export async function requireBlobAccess(event: H3Event, key: string) {
     return
   }
 
-  // Only a file that isn't public needs to know who asks, but asking alongside the lookup keeps that to one round trip.
   const [drop, caller] = await Promise.all([findDropByBlob(key, event), identify(event)])
   if (!drop || drop.ownerBanned || drop.quarantinedAt) throw notFound()
   const publicView = permissions(drop, null).view
   const who = publicView ? null : caller
   if (!publicView && !permissions(drop, who).view) throw notFound()
-  // Opening a raw file in the browser is a visit; images embedded elsewhere are not.
   await Promise.all([recordVisit(event, drop, who, "document"), countView(event, drop, who, "document")])
 }

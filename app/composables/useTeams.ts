@@ -1,10 +1,7 @@
-// Teams on a personal Drop (server/utils/teams.ts), through Better Auth's organization and Stripe plugins. Each call
-// answers with `{ data, error }`; these turn an error into a thrown one so callers notify like any other request.
 type Result<T> = { data: T | null; error: { message?: string; statusText?: string; status: number } | null }
 
 async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error } = await call
-  // The answer's status goes along, so a refusal reads as one and isn't reported as a failure (reportClientError).
   if (error) throw answerError(error.message || error.statusText || "Something went wrong.", error.status)
   if (data === null) throw new Error("Something went wrong.")
   return data
@@ -19,12 +16,10 @@ const slugOf = (name: string) =>
       .slice(0, 40) || "team"
   }-${crypto.randomUUID().slice(0, 6)}`
 
-/** The link someone opens to join: Drop sends no email, so whoever invites shares it. */
 export const inviteLink = (id: string) => `${useRequestURL().origin}/teams/join/${id}`
 
 const reload = () => refreshNuxtData([keys.me, keys.sharedWithMe, keys.pinned])
 
-/** One of the team's folders, which its owner and admins make. */
 async function addFolder(id: string, folder: { title: string; description?: string }) {
   await $fetch("/api/folders", { method: "POST", body: { ...folder, teamId: id } })
   await refreshNuxtData(keys.sharedWithMe)
@@ -33,7 +28,6 @@ async function addFolder(id: string, folder: { title: string; description?: stri
 export function useTeams() {
   const { $auth } = useNuxtApp()
 
-  /** Makes a team and its first folder, named after it, where its drops go. */
   async function create(name: string) {
     const team = await unwrap(
       $auth.organization.create({ name, slug: slugOf(name), keepCurrentActiveOrganization: true }),
@@ -71,13 +65,11 @@ export function useTeams() {
     await reload()
   }
 
-  /** Stripe Checkout for the Team plan, one seat per member, monthly or yearly; Stripe sends them back to the team's page. */
   const upgrade = async (id: string, annual = false) => {
     const team = await full(id)
     const seats = team.members.length
     return unwrap(
       $auth.subscription.upgrade({
-        // Each interval is its own plan (server/utils/teams.ts `teamPlans`).
         plan: annual ? "team-annual" : "team",
         referenceId: id,
         customerType: "organization",
@@ -88,7 +80,6 @@ export function useTeams() {
     )
   }
 
-  /** Stripe's portal: card, invoices, cancel. */
   const manageBilling = (id: string) =>
     unwrap(
       $auth.subscription.billingPortal({

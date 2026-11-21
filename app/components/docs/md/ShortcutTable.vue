@@ -1,6 +1,4 @@
-<script setup lang="ts">
-// `::shortcut-table`: a table of every keyboard shortcut, with its keys and where it works, from the list the ? dialog shows.
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-default">

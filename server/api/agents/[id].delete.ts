@@ -6,10 +6,6 @@ import { requireIdentity } from "../../utils/identity"
 import { logAudit } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 
-/**
- * Disconnects an agent: its approval and refresh tokens go, so it has to ask again. An access token it
- * already holds is a signed JWT and works until it expires (an hour at most).
- */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const [consent] = await db

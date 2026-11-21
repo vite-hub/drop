@@ -1,9 +1,6 @@
 import * as v from "valibot"
 import { BOARD_COLORS, BOARD_ITEM_TYPES } from "#shared/board"
 
-// The board format agents write (shared/board.ts turns it into Excalidraw elements). No transforms: every input schema
-// becomes JSON Schema for tools/list.
-
 const id = v.pipe(
   v.string(),
   v.regex(/^[\w-]{1,64}$/),

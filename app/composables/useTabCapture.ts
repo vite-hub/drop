@@ -1,33 +1,21 @@
+import { promiseTimeout } from "@vueuse/core"
 const supported = () => import.meta.client && "mediaDevices" in navigator && "getDisplayMedia" in navigator.mediaDevices
 
-/** Waits for a frame painted after now, so whatever was just hidden is gone from it. */
 function freshFrame(element: HTMLVideoElement) {
-  return new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, 300)
-    element.requestVideoFrameCallback?.(() => {
-      clearTimeout(timeout)
-      resolve()
-    })
-  })
+  return Promise.race([
+    promiseTimeout(300),
+    new Promise<void>((resolve) => element.requestVideoFrameCallback?.(() => resolve())),
+  ])
 }
 
-/**
- * Screenshots of something Drop can't read itself, like a site in a frame on another origin: the browser's screen
- * capture, asked for once and kept open while the review lasts. Chromium offers "This tab", which captures exactly
- * the page. Firefox, Zen and Safari only share a window or a screen, so the page's place in the capture is worked out
- * from the window's size and position (toolbars and a sidebar assumed on the left and top); `exact` says which.
- */
 export function useTabCapture() {
   const active = ref(false)
-  /** The capture is this tab, so a crop lands exactly; otherwise it's a window or a screen and may be a little off. */
   const exact = ref(false)
   let stream: MediaStream | null = null
   let video: HTMLVideoElement | null = null
 
   async function start() {
     if (stream?.active) return
-    // preferCurrentTab and selfBrowserSurface aren't in TypeScript's DOM types yet, so they ride along on a variable
-    // (only an object literal written in the call gets excess-property checks).
     const options = {
       video: { displaySurface: "browser" },
       audio: false,
@@ -52,16 +40,13 @@ export function useTabCapture() {
     stream = video = null
     active.value = false
   }
-  // Leaving the review ends the screen share, so the browser's sharing indicator doesn't stay on.
   onScopeDispose(stop)
 
-  /** `area` (CSS pixels of this window's viewport) as an image, from the next frame of the capture. */
   async function grab(area: { left: number; top: number; width: number; height: number }): Promise<Blob> {
     if (!stream?.active || !video) throw new Error("The screen capture stopped. Press Comment to share again.")
     await freshFrame(video)
     const { videoWidth, videoHeight } = video
     const surface = stream.getVideoTracks()[0]!.getSettings().displaySurface
-    // Where this window's viewport starts in the capture, and how many captured pixels make one CSS pixel.
     let left = 0,
       top = 0,
       scale = videoWidth / innerWidth
@@ -83,8 +68,6 @@ export function useTabCapture() {
     canvas.width = sw
     canvas.height = sh
     canvas.getContext("2d")!.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
-    // WebP keeps a full-screen capture well under the 4 MiB limit. Safari can't encode it and hands back a PNG; the
-    // server reads the real type from the bytes.
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9))
     if (!blob) throw new Error("Couldn't encode the screenshot.")
     return blob

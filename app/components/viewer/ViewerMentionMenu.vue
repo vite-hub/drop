@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// "@" names people in the doc. Nuxt UI's UEditorMentionMenu inserts a mention node, which the Realtime schema lacks
-// (it would vanish on the next checkpoint), so this is the same menu writing plain "@Name" text, which Markdown keeps.
 import theme from "#build/ui/editor-mention-menu"
 import { useEditorMenu } from "@nuxt/ui/runtime/composables/useEditorMenu.js"
 import { tv } from "@nuxt/ui/runtime/utils/tv.js"

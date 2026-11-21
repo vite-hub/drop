@@ -4,7 +4,6 @@ import { db } from "vite-hub/database"
 import { oauthClient, oauthConsent } from "../../databases/default/index"
 import { requireIdentity } from "../../utils/identity"
 
-/** The agents (MCP clients) this person approved, newest first. */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const rows = await db

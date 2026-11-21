@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A folder's search results: drops anywhere below it whose name or text has every word, with the folders between and
-// the words around a match in a doc. Searching needs a signed-in person (/api/drops), so public visitors never see it.
 import { RelativeTime } from "vite-hub/ui"
 import { dropPath } from "#shared/links"
 import type { DropSummary } from "#shared/types"
@@ -14,10 +12,8 @@ const { data: found, status } = useApi<DropSummary[]>("/api/drops", {
   key: () => keys.folderSearch(props.folder),
   query: computed(() => ({ folder: props.folder, q: query.value })),
   default: () => [],
-  // It mounts with the first word typed, so that fetch goes out at once; later words refetch through `query`.
   server: false,
 })
-// Until the debounced words reach the server, the last results would answer the new words.
 const pending = computed(() => status.value === "pending" || query.value !== props.query.trim())
 const to = (drop: DropSummary) => (props.publicView ? dropPath(drop) : `/drops/${drop.id}`)
 const meta = (drop: DropSummary) =>

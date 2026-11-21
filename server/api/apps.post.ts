@@ -3,10 +3,6 @@ import { AppSchema } from "#shared/schemas"
 import { dropPageUrl, publishApp } from "../utils/drops"
 import { requireIdentity } from "../utils/identity"
 
-/**
- * Agents publish a static app: files keyed by path, with an index.html. Pass `id` to publish the next version with
- * only the files that changed, and `removes` to delete files. `warnings` names references to files the app lacks.
- */
 export default defineValidatedHandler({
   validate: { body: AppSchema },
   async handler(event) {

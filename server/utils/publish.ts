@@ -32,7 +32,6 @@ import { addedResources, frontmatterResources, resourceList, ResourcesInput, sav
 import { MAX_RESOURCE_URL } from "#shared/resources"
 import { signUpload } from "./uploads"
 
-// No v.trim() or other transformations: they can't become JSON Schema, and tools/list publishes every input schema.
 export const PublishInput = v.object({
   agent: v.optional(
     v.pipe(
@@ -213,11 +212,6 @@ export const PublishInput = v.object({
 
 export type PublishInput = v.InferOutput<typeof PublishInput>
 
-/**
- * One `publish` call: what the MCP tool does, and what an upload URL finishes. `upload` carries the bytes of a file or
- * an app's archive sent to that URL; without them, a file with no base64, or an archive, gets an upload URL instead of
- * a drop, after the same checks.
- */
 export async function publishInput(who: Identity, input: PublishInput, event: H3Event, upload?: Uint8Array) {
   const agent = agentMetadata(input.agent)
   const given = (["markdown", "html", "files", "archive", "file", "site", "board", "link"] as const).filter(
@@ -239,7 +233,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (input.slug !== undefined && !slugify(input.slug))
     throw new HTTPError({ status: 400, message: "Use letters or numbers in the slug." })
   const links = input.resources ? resourceList(input.resources) : undefined
-  // The upload URL carries the call, and room in it is short.
   if (links && input.file && input.file.base64 === undefined && !upload)
     throw new HTTPError({
       status: 400,
@@ -315,8 +308,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: `previous is a ${previous.kind}, which has no versions. Change it with update_drop.`,
     })
-  // An earlier version (a `?v=` link) names the drop too; the next version goes on top of the latest, unless `base`
-  // says the agent read an older one.
   if (previous?.head) previous = await findDrop(previous.id, event)
   if (previous) requireBase(previous, input.base)
   let resources = links && addedResources(previous, links)
@@ -341,7 +332,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
         message: "An archive replaces the whole app: leave removes out and upload the whole folder.",
       })
     if (input.archive && !upload) {
-      // The checks above passed, so the upload will too unless something changes in the meantime; it runs them again.
       const { url, expiresAt } = await signUpload(event, who, input)
       return {
         text: `Upload the built folder within 15 minutes, once:\ntar -czf - -C <folder> . | curl -T - '${url}'\nIt publishes the app and prints it as JSON, with any warnings.`,
@@ -374,7 +364,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       filename = input.file.name
       if (upload) bytes = upload
       else if (input.file.base64 === undefined) {
-        // The checks above passed, so the upload will too unless something changes in the meantime; it runs them again.
         const { url, expiresAt } = await signUpload(event, who, input)
         return {
           text: `Upload ${filename} within 15 minutes, once:\ncurl -T <path to ${filename}> '${url}'\nIt creates the drop and prints it as JSON, with fileUrl to embed in a doc.`,
@@ -405,10 +394,8 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
-    // Checked before the drop exists, so a bad list publishes nothing, the same as bad resources in the input.
     const listed = /\.(?:md|markdown)$/i.test(filename) ? frontmatterResources(new TextDecoder().decode(bytes)) : []
     if (listed.length) resources = addedResources(previous, [...(links ?? []), ...listed])
-    // Markdown and HTML sent as text are named after the link's slug; a file keeps its own name.
     row = await createDocDrop(
       who,
       {
@@ -424,14 +411,11 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       },
       event,
     )
-    // An HTML doc is one file, so anything it loads by relative path is missing, including on file uploads.
     if (row.kind === "html")
       warnings = appLinkIssues({ "doc.html": new TextDecoder().decode(bytes) }, ["doc.html"]).filter(
         (issue) => !issue.startsWith("doc.html links to"),
       )
-    // createDocDrop refused a Markdown doc with errors (requirePublishableMarkdown); these are what it published with.
     if (row.warnings.length) warnings = row.warnings.map(problemLine)
-    // The share and the slug apply to every version, like a change on the drop's page.
     if (previous && (input.share || input.slug))
       await updateDrop(
         (await findDrop(row.id, event))!,
@@ -442,7 +426,6 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   }
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
-  // Comments carry over from earlier versions (listComments), so this looks across the whole chain.
   const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves, who) : []
 
   const fresh = (await findDrop(row.id, event)) ?? row

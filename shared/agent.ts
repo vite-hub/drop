@@ -2,10 +2,6 @@ import * as v from "valibot"
 
 const label = v.pipe(v.string(), v.minLength(1), v.maxLength(160), v.regex(/\S/))
 
-/**
- * An identifier for one session field: one line, so it can't start lines of its own in read_drop's text. One regex
- * says both that and label's "not blank": JSON Schema has room for one pattern, and tools/list fails on a second.
- */
 const identifier = (max: number) =>
   v.pipe(
     v.string(),
@@ -14,10 +10,6 @@ const identifier = (max: number) =>
     v.regex(new RegExp(`^(?!\\s{1,${max}}$)[^\\u0000-\\u001f\\u007f\\u2028\\u2029]{1,${max}}$`)),
   )
 
-/**
- * Where the publishing agent runs, so the next round's comments can reach the same session. Identifiers only, never
- * credentials or content.
- */
 const AgentSessionSchema = v.object({
   harness: v.optional(v.pipe(identifier(160), v.description("The app that runs the session, e.g. T3 Code."))),
   thread: v.optional(
@@ -33,7 +25,6 @@ const AgentSessionSchema = v.object({
   branch: v.optional(v.pipe(identifier(160), v.description("The git branch it works on."))),
 })
 
-/** Self-reported for this publish. Omit values the agent's runtime does not expose. */
 const AgentMetadataSchema = v.object({
   model: v.optional(v.pipe(label, v.description("Exact model name or id from your runtime, when known."))),
   harness: v.optional(v.pipe(label, v.description("Agent harness, e.g. Codex or Claude Code, when known."))),
@@ -52,7 +43,6 @@ const AgentMetadataSchema = v.object({
 
 export type AgentMetadata = v.InferOutput<typeof AgentMetadataSchema>
 
-/** What publish takes: the metadata, or only the model name as a string, which is what an agent passes first. */
 export const AgentInputSchema = v.union([label, AgentMetadataSchema])
 
 export function agentMetadata(agent: v.InferOutput<typeof AgentInputSchema> | undefined): AgentMetadata | undefined {
@@ -65,7 +55,6 @@ export function agentLabel(agent: AgentMetadata | null) {
     .join(" · ")
 }
 
-/** `session harness "T3 Code", thread "t-1", branch "feat/x"`, or nothing without a session. */
 export function sessionLabel(agent: AgentMetadata | null) {
   const fields = Object.entries(agent?.session ?? {}).filter(([, value]) => value)
   return fields.length ? `session ${fields.map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(", ")}` : ""

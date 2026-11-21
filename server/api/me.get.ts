@@ -16,8 +16,6 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
   const { mode, publicLinkDays } = sharePolicy(event)
   const ids = Object.keys(who.teams ?? {})
   const billing = billingConfig(event)
-  // The page waits for /api/me before loading the drop. These reads depend only on the identity, so start them
-  // together: separate awaits add database round trips, including the first skill-settings read per isolate.
   const [rows, skills, { paid, pastDue }] = await Promise.all([
     ids.length
       ? db
@@ -25,7 +23,6 @@ export default defineHandler(async (event): Promise<Viewer | null> => {
           .from(organization)
           .where(inArray(organization.id, ids))
       : [],
-    // The sidebar hides Skills from members while none is on.
     enabledSkills().then((enabled) => enabled.length),
     billing.enabled ? teamBilling(ids) : { paid: new Set<string>(), pastDue: new Set<string>() },
   ])

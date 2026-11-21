@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A file on its way up (PendingUpload), drawn where its drop will land: a card on the Drops page's grid, a line in its
-// list, or a row in a folder. An image or a video shows itself at once from the reader's own copy. The bar and the
-// percentage say how much has gone; at 100% the server still stores it, so it says "Saving" until the drop is in.
 import type { PendingUpload } from "~/composables/useUploads"
 
 const { upload, layout } = defineProps<{ upload: PendingUpload; layout: "card" | "line" | "row" }>()

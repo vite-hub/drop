@@ -2,17 +2,14 @@ import type { DropDetail } from "#shared/types"
 import type { RealtimeRoom } from "@vite-hub/realtime/client"
 import * as v from "valibot"
 
-/** Someone else looking at the drop right now: who, in their presence color, and where they are. */
 export interface PresencePerson {
   id: string
   name: string
   image?: string
   color: string
-  /** Where they are: a doc's version (`v3`, an app's page after it), a reviewed site's page, or null in Drop. */
   at: string | null
 }
 
-/** Another person's pointer, said as the element under it and the spot inside it (PRESENCE_CURSORS). */
 export interface PresenceCursor {
   key: string
   name: string
@@ -22,10 +19,6 @@ export interface PresenceCursor {
   y: number
 }
 
-/**
- * What one person shares in the room's awareness, as this app's clients set it: anyone in the room can send anything,
- * so each state is parsed here, and a field that doesn't fit counts as unset.
- */
 const Spot = v.object({ selector: v.pipe(v.string(), v.maxLength(1000)), x: v.number(), y: v.number() })
 type Spot = v.InferOutput<typeof Spot>
 const PresenceState = v.object({
@@ -41,14 +34,6 @@ const stateOf = (state: unknown) => {
 
 const IDLE_MS = 60_000
 
-/**
- * Who else has a drop open right now, through its presence room (server/realtime/presence.ts), and their cursors on the
- * page this reader is on. Only people who could open the drop without its link join, so the room's name comes from
- * the server, which answers nobody else; a stranger on a public link never joins and never shows. The Realtime client
- * loads once the page shows. Run in a component's setup: leaving it leaves the room.
- *
- * `at` says where this reader is, so only the people on the same version or page see each other's cursors.
- */
 export function usePresence(drop: Ref<DropDetail>, options: { at: () => string | null; enabled: () => boolean }) {
   const config = useRuntimeConfig()
   const { data: me } = useMe()
@@ -59,7 +44,6 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
   const active = computed(() => !idle.value && visibility.value === "visible")
 
   const room = shallowRef<RealtimeRoom>()
-  // RealtimeRoom isn't reactive: each update bumps this, and what reads the room reads it first.
   const tick = ref(0)
   let generation = 0
   function leave() {
@@ -99,10 +83,6 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     room.value?.setLocal("cursor", null)
   })
 
-  /**
-   * Everyone else looking at the drop now, each person once. A person whose every tab is hidden or idle for a minute
-   * doesn't show: the faces say who's here, not who opened it earlier.
-   */
   const people = computed<PresencePerson[]>(() => {
     void tick.value
     const current = room.value
@@ -124,7 +104,6 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     return [...byId.values()]
   })
 
-  /** The cursors of the people on this reader's version or page, unless they hid cursors. */
   const cursors = computed<PresenceCursor[]>(() => {
     void tick.value
     const current = room.value
@@ -141,20 +120,16 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     return list
   })
 
-  /** Whether this reader's pointer goes out: only while someone else is here to see it. */
   const sharing = computed(() => people.value.length > 0)
 
-  /** Where this reader's pointer is, or null once it leaves the page. */
   function point(spot: Spot | null) {
     if (room.value && (sharing.value || spot === null)) room.value.setLocal("cursor", spot)
   }
 
-  /** Tells the others the comments changed, so their lists load them now rather than on their next poll. */
   function commented() {
     room.value?.setLocal("comments", crypto.randomUUID())
   }
 
-  /** Changes each time someone else says the comments changed. */
   const commentsChange = computed(() => {
     void tick.value
     const current = room.value
@@ -162,7 +137,6 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     return [...current.states().values()].map((state) => stateOf(state).comments ?? "").join()
   })
 
-  // Input in the cross-origin frame never reaches useIdle's window listeners (useViewerFrame forwards it).
   return { people, cursors, sharing, showCursors, point, activity, commented, commentsChange }
 }
 

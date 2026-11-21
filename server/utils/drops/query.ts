@@ -47,11 +47,6 @@ import { d1Chunks } from "../d1"
 import { liveEditorKeeps } from "../live-editor"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
-/**
- * The drop `hit` selects (a query for at most one id) with its owner, and the ancestors of a drop in a folder or a file a
- * doc embeds, which it is shared, kept, and trashed with (see ./nodes): one query, whatever the depth. Review policy
- * reuses the joined owner, so it adds none.
- */
 async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
   const rows = await db
     .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
@@ -76,26 +71,16 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
   return found
 }
 
-/**
- * `drop` as review policy stands now: a review its path stored while sharing is dropped once the policy no longer asks
- * for one (approval turned off, or the owner approved since). `owner` is the drop's owner row, joined by the caller's
- * query, so this adds none. Without an event, the stored review stands.
- */
 export async function currentReview(drop: DropRow, owner: typeof user.$inferSelect | null, event?: H3Event) {
   if (event && drop.shareReview && (await shareReviewFor(drop.ownerId, event, owner)) === null) drop.shareReview = null
   return drop
 }
 
-/** Rows as their ancestors make them, with one ancestor query per 90 rows. */
 async function resolveRows(rows: (typeof drops.$inferSelect)[], days: number) {
   const ancestors = await ancestorsOf(rows)
   return rows.map((row) => resolveNode(row, ancestors.get(row.id) ?? [], days))
 }
 
-/**
- * Listed rows as summaries: app paths for the owner's apps, how many drops each folder holds, image thumbnails, with
- * `path` the folders each one sits in, up to (not including) `below`, and a search's snippets.
- */
 async function summarize(
   rows: DropRow[],
   days: number,
@@ -107,8 +92,6 @@ async function summarize(
     folderIds?: SQL
   } = {},
 ) {
-  // By owner, not by a list of app ids: D1 binds at most 100 parameters per query. Both reads start together: each is a
-  // round trip to D1.
   const [files, counts] = await Promise.all([
     options.ownerId && rows.some((row) => row.kind === "app")
       ? db
@@ -145,29 +128,22 @@ async function summarize(
 const newest = (where: SQL | undefined, limit: number) =>
   db.select().from(drops).where(where).orderBy(desc(drops.updatedAt)).limit(limit)
 
-/** Drops in `where`, or with words the ones matching them (name or text), and each match's snippet. */
 async function dropsMatching(where: SQL | undefined, words: string[], limit: number) {
   if (!words.length) return { rows: await newest(where, limit), snippets: undefined }
   const found = await searchDrops(where, words, limit)
   return { rows: found.map((item) => item.drop), snippets: new Map(found.map((item) => [item.drop.id, item.snippet])) }
 }
 
-/** A drop by its id, which is its share link's key, as it is now. */
 export function findDrop(id: string, event?: H3Event) {
   return findOne(sql`${id}`, event)
 }
 
-/** A drop an agent names: its id, or its share link (`…/d/<id>/<slug>?v=2` pins a version). */
 export async function findDropByRef(ref: string, event?: H3Event) {
   const link = ref.trim().match(/\/d\/([^/?#]+)[^?#]*(?:\?(?:[^#]*&)?v=(\d+))?/)
   if (!link) return findDrop(ref.trim(), event)
   return findDropAt(link[1]!, link[2] ? Number(link[2]) : undefined, event)
 }
 
-/**
- * A version of a drop: its latest, or an earlier one from `drop_versions`. An earlier one is the drop with that
- * version's file, title, and note, and keeps the drop as it is now in `head`; sharing and lifetime are the drop's.
- */
 export async function findDropAt(id: string, version?: number, event?: H3Event) {
   const [row, older] = await Promise.all([
     findDrop(id, event),
@@ -183,13 +159,11 @@ export async function findDropAt(id: string, version?: number, event?: H3Event) 
   return older[0] ? atVersion(row, older[0]) : null
 }
 
-/** The drop as it read at an earlier version. */
 function atVersion(row: DropRow, older: typeof dropVersions.$inferSelect): DropRow {
   const { dropId: _, ...fields } = older
   return { ...row, ...fields, head: row.head ?? row.raw ?? row }
 }
 
-/** The drop, or the earlier version of it, whose file is `key`. */
 export async function findDropByBlob(key: string, event?: H3Event) {
   const found = await findOne(
     sql`coalesce((SELECT id FROM drops WHERE blob_key = ${key}), (SELECT drop_id FROM drop_versions WHERE blob_key = ${key}))`,
@@ -200,15 +174,8 @@ export async function findDropByBlob(key: string, event?: H3Event) {
   return older ? atVersion(found, older) : null
 }
 
-/** Drops of these kinds, or of any kind when there are none. */
 const ofKinds = (kinds?: DropKind[]) => (kinds?.length ? inArray(drops.kind, kinds) : undefined)
 
-/**
- * Your drops, newest first: the ones at the top (folders hold the rest), the ones in your Trash, or with `query` the
- * matches at any depth; `kinds` keeps those kinds only, at any depth too. Older versions of a doc hide behind their
- * latest, and files a doc embeds hide behind the doc. A folder in the Trash takes its drops along, so only the top-most
- * node in the Trash lists.
- */
 export async function listDrops(
   who: Identity,
   event?: H3Event,
@@ -217,7 +184,6 @@ export async function listDrops(
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
   const deep = words.length > 0 || Boolean(options.kinds?.length)
-  // The team's folders list for everyone (listSharedWithMe), not as their creator's.
   const scope = options.trash
     ? and(listedNode, or(isNull(drops.parentId), isNotNull(drops.trashedAt)))
     : deep
@@ -229,10 +195,6 @@ export async function listDrops(
   return summarize(listed, days, { ownerId: who.userId, path: deep, snippets: found.snippets })
 }
 
-/**
- * The sidebar's share of `listDrops`: the newest TREE_ROWS at the top, and `open` wherever it sits, with how many there
- * are in all. Only those get summarized and sent, instead of every drop on every page.
- */
 export async function listTree(who: Identity, event?: H3Event, open?: string): Promise<DropTree> {
   const { days } = expiryPolicy(event)
   const found = await newest(
@@ -244,11 +206,6 @@ export async function listTree(who: Identity, event?: H3Event, open?: string): P
   return { drops: await summarize(listed, days, { ownerId: who.userId }), total: rows.length }
 }
 
-/**
- * A folder's drops, newest first: the ones directly inside, or with `query` or `kinds` the matches anywhere below it. Drops someone
- * moved to the Trash on their own list there instead. Anyone who may open the folder may open what it holds. A team
- * folder holds everyone's drops; any other folder only its owner's.
- */
 export async function listFolder(
   folder: DropRow,
   event?: H3Event,
@@ -264,10 +221,8 @@ export async function listFolder(
     words,
     Math.min(options.limit ?? 500, deep ? 200 : 500),
   )
-  // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
   const rows = deep ? await resolveRows(found.rows, days) : found.rows.map((row) => resolveNode(row, above, days))
-  // The owner may open a folder in the Trash, and sees what it holds as it was.
   const listed = rows
     .filter((row) => folder.expired || !row.expired)
     .map((row) => ({ ...row, ownerBanned: folder.ownerBanned }))
@@ -278,7 +233,6 @@ export async function listFolder(
     snippets: found.snippets,
   })
   if (!folder.teamFolder) return summaries
-  // A team folder holds everyone's drops: each says whose it is, unless it's the reader's own.
   const ownerIds = [...new Set(listed.map((row) => row.ownerId).filter((id) => id !== options.who?.userId))]
   const owners = new Map<string, { name: string; image: string | null }>()
   for (const chunk of d1Chunks(ownerIds))
@@ -294,11 +248,6 @@ export async function listFolder(
   })
 }
 
-/**
- * The images in an image's folder, in the folder's order, for moving between them in the viewer: the ones `listFolder`
- * lists there, read on their own so the folder's other drops cost nothing. Only for a reader who may open the folder,
- * and only when there's another image to move to.
- */
 async function galleryOf(row: DropRow, who: Identity | null, days: number): Promise<DropGalleryItem[] | undefined> {
   const [parent, ...above] = row.ancestors ?? []
   if (row.kind !== "image" || parent?.kind !== "folder") return undefined
@@ -310,15 +259,10 @@ async function galleryOf(row: DropRow, who: Identity | null, days: number): Prom
   )
     .map((image) => resolveNode(image, [parent, ...above], days))
     .filter((image) => (folder.expired || !image.expired) && image.blobKey)
-  // An image in the Trash, which its owner may still open, isn't among them.
   if (images.length < 2 || !images.some((image) => image.id === row.id)) return undefined
   return images.map((image) => ({ ...toCrumb(image), thumbnail: `/f/${image.blobKey}` }))
 }
 
-/**
- * Every folder a drop of yours may go in, for picking where it goes: your own and the team's. Folders in the Trash stay
- * out. Each carries its description (`note`), which agents read to choose one.
- */
 export async function listFolders(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const mine = and(eq(drops.ownerId, who.userId), eq(drops.teamFolder, false))
@@ -333,10 +277,6 @@ export async function listFolders(who: Identity, event?: H3Event): Promise<DropS
   )
 }
 
-/**
- * SQL for a team folder, at table alias `node`, on the caller's team: every one on a team Drop, and on a personal Drop
- * the ones of the teams they're on.
- */
 function teamFolderSql(node: string, who: Identity, event?: H3Event) {
   const at = sql.raw(node)
   if (sharePolicy(event).mode === "team") return sql`(${at}.team_folder = 1)`
@@ -348,10 +288,6 @@ function teamFolderSql(node: string, who: Identity, event?: H3Event) {
   )}))`
 }
 
-/**
- * SQL for a drop, at table alias `node`, that reaches someone besides its owner: on a team Drop anything not kept
- * private; on a personal one a public link that's open and approved, which they opened while signed in.
- */
 function reachableSql(node: string, who: Identity, now: number, event?: H3Event) {
   const at = sql.raw(node)
   if (sharePolicy(event).mode === "team") return sql`(${at}.share != 'private')`
@@ -359,11 +295,6 @@ function reachableSql(node: string, who: Identity, now: number, event?: H3Event)
     AND EXISTS (SELECT 1 FROM drop_visits v WHERE v.user_id = ${who.userId} AND v.drop_id = ${at}.id))`
 }
 
-/**
- * What others share with you. On a team Drop: the team's folders, then everyone else's drops shared with the team. On a
- * personal Drop: public links you opened while signed in. Newest first; drops in the Trash, quarantined, or from banned
- * owners stay out. A folder shared with you lists once: the drops inside open from it.
- */
 export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const now = Date.now()
   const others = and(ne(drops.ownerId, who.userId), reachableSql(`"drops"`, who, now, event))
@@ -405,11 +336,6 @@ export async function listSharedWithMe(who: Identity, event?: H3Event): Promise<
   }))
 }
 
-/**
- * The drops you pinned that you can still open, most recently pinned first: yours and other people's, at any depth. A
- * pin to a drop in the Trash, expired, quarantined, or no longer shared with you doesn't list. Other people's drops say
- * whose they are, and every drop in a folder says where it sits.
- */
 export async function listPinned(who: Identity, event?: H3Event): Promise<DropSummary[]> {
   const pinnedIds = sql`SELECT ${dropPins.dropId} FROM ${dropPins} WHERE ${dropPins.userId} = ${who.userId}`
   const rows = await db
@@ -456,7 +382,6 @@ export async function listPinned(who: Identity, event?: H3Event): Promise<DropSu
 export const canPinDrop = (drop: DropRow, who: Identity) =>
   !drop.expired && !isAttachment(drop) && permissions(drop, who).view
 
-/** Whether `who` pinned the drop. */
 async function isPinned(dropId: string, who: Identity) {
   const [row] = await db
     .select({ at: dropPins.at })
@@ -465,17 +390,11 @@ async function isPinned(dropId: string, who: Identity) {
   return Boolean(row)
 }
 
-/** Pins the drop for `who`, or unpins it. Pinning twice keeps the first pin's place. */
 export async function setPinned(dropId: string, who: Identity, pinned: boolean) {
   if (pinned) await db.insert(dropPins).values({ userId: who.userId, dropId, at: Date.now() }).onConflictDoNothing()
   else await db.delete(dropPins).where(and(eq(dropPins.userId, who.userId), eq(dropPins.dropId, dropId)))
 }
 
-/**
- * Other people's drops you can open that match a search: what Shared with me lists, and everything inside the folders
- * it lists, at any depth. The same rules hold: nothing waiting for review, quarantined, in the Trash, or from a banned
- * owner, and admins find no one's private drops here. A path shows only the folders you may open.
- */
 async function searchShared(
   who: Identity,
   words: string[],
@@ -486,7 +405,6 @@ async function searchShared(
   const now = Date.now()
   const team = sharePolicy(event).mode === "team"
   const reachable = (node: string) => reachableSql(node, who, now, event)
-  // Folders that open to you, yours aside, and the team's, whoever made them: what's in them opens through them.
   const openFolders = sql`(
     WITH RECURSIVE open(id, depth) AS (
       SELECT d.id, 0 FROM drops d WHERE d.kind = 'folder' AND ((d.owner_id != ${who.userId} AND ${reachable("d")}) OR ${teamFolderSql("d", who, event)})
@@ -509,7 +427,6 @@ async function searchShared(
     limit,
   )
   const { days } = expiryPolicy(event)
-  // Review, quarantine and the Trash anywhere above hold a drop too: resolving its path says.
   const nodes = (
     await resolveRows(
       found.map((item) => item.drop),
@@ -535,11 +452,6 @@ async function searchShared(
   }))
 }
 
-/**
- * Everything you can open that matches a search, for the search palette: your drops at any depth first, then other
- * people's (see `searchShared`). Each list keeps its newest `limit`. `kinds` keeps those kinds only, and searches with
- * no words too.
- */
 export async function searchEverything(
   who: Identity,
   query: string,
@@ -555,7 +467,6 @@ export async function searchEverything(
   ]
 }
 
-/** Remembers a public drop a signed-in person opened, at most once a day per drop. */
 export async function recordSharedVisit(drop: DropRow, who: Identity | null, event?: H3Event) {
   if (!who || who.actorKind !== "browser" || who.userId === drop.ownerId || !isPublic(drop.share) || isAttachment(drop))
     return
@@ -574,7 +485,6 @@ export async function recordSharedVisit(drop: DropRow, who: Identity | null, eve
   }
 }
 
-/** A Blob failure as the 503 a request answers with; the request's wide event logs it, with the cause, when it's thrown. */
 export function storageFailure(error: Error) {
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
@@ -590,18 +500,12 @@ export const readText = async (key: string) => (await readFile(key)).text()
 
 export const readBytes = async (key: string) => new Uint8Array(await (await readFile(key)).arrayBuffer())
 
-/**
- * Whether someone may open this drop in the live editor: a person in the browser (never an agent) who may edit the
- * current version of a Markdown drop, on a host with Realtime rooms. Older versions stay read-only so a draft always
- * continues the latest text.
- */
 export function liveEditable(row: DropRow, who: Identity | null) {
   return (
     LIVE_EDITING && who?.actorKind === "browser" && permissions(row, who).edit && row.kind === "markdown" && !row.head
   )
 }
 
-/** A drop's versions, newest first: the latest, then the ones `drop_versions` keeps, at most 100 in all. */
 export async function versionsOf(row: DropRow, who: Identity | null = null): Promise<DropVersion[]> {
   const head = row.head ?? row.raw ?? row
   const older = await db
@@ -627,12 +531,7 @@ function versionAgent(agent: DropVersion["agent"], isOwner: boolean): DropVersio
   return attribution
 }
 
-/**
- * What an app's detail reads of its files: `all` its text files, for the viewer to build pages from; `none` when its
- * origin serves them all, its pages too; `agent` the smaller text files, for read_drop, and only sizes for the rest.
- */
 type AppText = "all" | "none" | "agent"
-// read_drop's share of a built app: enough to see what it is without pasting a bundle into an agent's context.
 const AGENT_FILE_BYTES = 64 * 1024
 const AGENT_FILES = 40
 
@@ -651,7 +550,6 @@ export async function dropDetail(
   const can = permissions(row, who)
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
-  // No part waits for another, so their queries reach the database together instead of one round trip each.
   const [versions, body, attachments, views, quiz, gallery, owner, pinned] = await Promise.all([
     versionsOf(row, who),
     bodyOf(row, who, origin, event, appText),
@@ -659,11 +557,9 @@ export async function dropDetail(
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId, event) : undefined,
     galleryOf(row, who, days),
-    // Whose it is, for signed-in readers only: a public link doesn't name the person who shared it.
     who ? (row.ownerProfile ?? ownerProfileOf(row.ownerId)) : null,
     who && canPinDrop(row, who) ? isPinned(row.id, who) : false,
   ])
-  // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
   const detail: DropDetail = {
     ...toSummary(row, undefined, days),
@@ -687,13 +583,11 @@ export async function dropDetail(
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
   if (gallery) detail.gallery = gallery
-  // Who dropped it, for a doc's header: the person, beside the agent that published the version.
   if (owner) detail.owner = owner
   if (pinned) detail.pinned = true
   return detail
 }
 
-/** What a drop holds: a folder's drops, an app's files, a doc's text and rendering, and the excerpt read from them. */
 async function bodyOf(
   row: DropRow,
   who: Identity | null,
@@ -719,14 +613,11 @@ async function bodyOf(
     detail.paths = files.map((file) => file.path).sort()
     detail.sizes = Object.fromEntries(files.map((file) => [file.path, file.size]))
   } else if (row.blobKey) {
-    // The Markdown renderer (Comark, Shiki, charts) and the spreadsheet readers load with the first drop that needs
-    // them, not with every route that lists drops: on a fresh Worker that's most of the first request's code.
     if (row.kind === "markdown") {
       const { renderMarkdownCached, withDocProperties } = await import("../markdown-document")
       const rendered = await renderMarkdownCached(row.blobKey, () => readText(row.blobKey!), event)
       detail.content = rendered.source
       const { absoluteFavicons } = await import("../favicons")
-      // The viewer's frame is on another origin, so the icons' Drop-relative addresses name Drop's.
       detail.html = absoluteFavicons(
         await withDocProperties(rendered.html, {
           resources: isAttachment(row) ? [] : resourcesOf(row),
@@ -736,7 +627,6 @@ async function bodyOf(
       )
     } else if (TEXT_KINDS.has(row.kind)) detail.content = await readText(row.blobKey)
     else if (row.kind === "file") {
-      // Read-only: what each cell shows, rendered once per blob like a Markdown doc.
       const sheets = await import("../spreadsheet")
       const extension = sheets.spreadsheetExtension(row.filename)
       const key = row.blobKey
@@ -749,10 +639,6 @@ async function bodyOf(
   return detail
 }
 
-/**
- * The nodes above a drop that the caller may open, top-most first. A share widens going down, so the ones the caller
- * can't open are always the top-most: someone sent one drop from a private folder sees no folder names.
- */
 function openableAncestors(row: DropRow, who: Identity | null, days: number): DropCrumb[] {
   const above = row.ancestors ?? []
   return above
@@ -764,10 +650,8 @@ function openableAncestors(row: DropRow, who: Identity | null, days: number): Dr
     .reverse()
 }
 
-/** Images sent in comments (server/utils/comment-images.ts) are the doc's children too, but it doesn't embed them. */
 const notCommentImage = sql`NOT EXISTS (SELECT 1 FROM comment_attachments WHERE comment_attachments.drop_id = ${drops.id})`
 
-/** Files a doc embeds from this Drop, across every version of the doc. */
 async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachment[]> {
   const rows = await db
     .select()

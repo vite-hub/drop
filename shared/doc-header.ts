@@ -1,27 +1,11 @@
-// A Markdown doc's header in the viewer: the properties box at the top (withDocProperties in
-// server/utils/markdown-document.ts) takes what the review dock used to hold. Its links are comark-chips' chips with
-// their site's icon (from Drop, server/utils/favicons.ts), the drops related to this one join its Links row as more chips
-// after them, and a row of more than LINKS_ALL chips shows its first LINKS_SHOWN behind "N more". Copy as Markdown,
-// Download and Export as PDF sit at its top right, and the read-only facts (views, file, who dropped it, folder) fold
-// under its last row behind See more.
-//
-// The frame is on another origin than Drop, so the viewer sends what to show ("doc-header", DocHeader) and the buttons
-// ask the viewer to act ("doc-action", "doc-open" in ./frame-messages). Everything goes after the box's own rows, so
-// the rows keep the element paths comments anchor to.
-//
-// Copy writes the clipboard here, in the click that asked for it: the frame has the click's activation, and the
-// viewer's Markdown arrives ahead of it ("doc-intent" on hover or focus, answered with "doc-markdown"). Before it has
-// arrived, the write takes a promise of it. A frame without the Clipboard API asks the viewer to copy instead.
 import COPY_ICON_CSS from "./copy-icon.css?raw"
 import { siteTile } from "./site-tile"
 
 type DocHeaderAction = { id: "markdown" | "download" | "pdf"; label: string; kbd?: string }
-/** A person with the agent that acted for them: "[avatar] Max · [logo] Claude Code", the rest on hover. */
 export type DocHeaderWho = {
   name: string
   image: string | null
   agent?: { label: string; logo: string }
-  /** On hover: through what, the model, the reasoning level. */
   tip?: string
 }
 export type DocHeaderFact = {
@@ -29,20 +13,15 @@ export type DocHeaderFact = {
   label: string
   value: string
   detail?: string
-  /** Small icon-and-number pairs after the value, each saying what it counts on hover: who the views came from. */
   parts?: { icon: "person" | "anonymous" | "agent"; n: number; tip: string }[]
-  /** Who, drawn in place of the value. */
   who?: DocHeaderWho
-  /** The id of the folder the doc is in: the value opens a list of its drops (DocHeaderFolderItem), asked for on hover. */
   folder?: string
 }
 export type DocHeader = {
   actions: DocHeaderAction[]
   facts: DocHeaderFact[]
-  /** Drops related to this one through the pages they link to (server/utils/related.ts), opened in the viewer. */
   related: { id: string; title: string; href: string; icon: string }[]
 }
-/** A row of the folder list ("doc-folder-items"); `at` is already words, such as "3 days ago", with `tip` the date. */
 type DocHeaderFolderItem = {
   id: string
   title: string
@@ -57,7 +36,6 @@ export type DocHeaderKindIcon = "doc" | "code" | "image" | "file" | "folder" | "
 const svg = (body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
 
-// Lucide, as comark-ui's properties draw their rows.
 const ICONS = {
   copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   check: '<path d="M20 6L9 17l-5-5"/>',
@@ -83,7 +61,6 @@ const ICONS = {
   open: '<path d="M15 3h6v6m-11 5L21 3m-3 10v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
 }
 const SVGS = Object.fromEntries(Object.entries(ICONS).map(([name, body]) => [name, svg(body)]))
-// A row's icon is a mask over the label's color, like the box's own rows (--cfm-icon).
 const MASKS = Object.fromEntries(
   (["views", "file", "person", "folder"] as const).map((name) => [
     name,
@@ -91,9 +68,6 @@ const MASKS = Object.fromEntries(
   ]),
 )
 
-// The menu and the folder list are popovers in the top layer, placed on their button by CSS anchor positioning: they
-// open with the header's motion (140 ms, from .98), and Escape, a click elsewhere, and focus going back are the
-// browser's.
 const CSS = `
 .drop-head { position: relative; }
 .drop-head.drop-acts > div:first-of-type > dd { padding-right: 7.5rem; }
@@ -168,13 +142,10 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
 ${COPY_ICON_CSS}
 `
 
-/** How long Copy shows its check, as Drop's other copy buttons (COPY_MS in app/composables/usePreferences.ts). */
 const COPIED_MS = 1400
-/** A Links row of up to LINKS_ALL chips shows them all; a longer one shows its first LINKS_SHOWN, so "N more" never hides one or two. */
 const LINKS_ALL = 8
 const LINKS_SHOWN = 6
 
-/** Runs in a Markdown doc's frame (planDocument in ./documents). */
 export const DOC_HEADER_SCRIPT = String.raw`(() => {
   const box = document.querySelector("article > dl.cfm");
   if (!box) return;

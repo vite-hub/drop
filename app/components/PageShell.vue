@@ -1,13 +1,8 @@
 <script setup lang="ts">
-// A page under one h-12 bar, like the doc viewer's: it continues the sidebar header's hairline and holds the title
-// with its count in mono (Executor v2's), the description beside them, muted, and the page's actions. Below lg the
-// description moves under the bar, where there's room for all of it. The page follows in a max-w-5xl column with
-// p-4 lg:p-6.
 const { wide = false } = defineProps<{
   id: string
   title: string
   description?: string
-  /** How many things the page lists. Left out while they load. */
   count?: number
   wide?: boolean
 }>()

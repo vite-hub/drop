@@ -12,13 +12,6 @@ import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 import { addReviewComment, readReviewComment } from "../../../utils/review"
 
-/**
- * A comment from Drop's embedded review: the site open in a frame on its own page, a box drawn over it, and a
- * screenshot the browser's screen capture took. Same multipart body as the review script's, and stored the same way;
- * the reviewer is the one signed in here, so no review token. `?origin=` is the address open in the frame, and the
- * site must cover it. Drop can't see inside the frame, so the comment has no element, and its page is the address
- * typed above the frame. One sent `as` someone the session isn't answers 401 (requireSender).
- */
 export default defineHandler(async (event) => {
   const site = await findDrop(await routeId(event), event)
   const who = await identify(event)

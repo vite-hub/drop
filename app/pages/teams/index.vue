@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The teams you're on, and a new one. A team shares its folders with its members only (server/utils/teams.ts).
 useSeoMeta({ title: "Teams" })
 
 const { data: me } = useMe()

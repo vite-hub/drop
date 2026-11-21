@@ -11,7 +11,6 @@ import { requireIdentity } from "../../utils/identity"
 import { quotaToolResult } from "../../utils/quotas"
 import { dropLine, folderLife, mcpDrop, SHARE_INPUT } from "../format"
 
-// No v.trim() or other transformations: they can't become JSON Schema (see publish.ts).
 export default defineMcpTool({
   name: "create_folder",
   title: "Create a folder",

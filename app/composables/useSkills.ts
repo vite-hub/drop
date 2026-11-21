@@ -1,6 +1,5 @@
 import type { SkillSummary } from "#shared/types"
 
-/** The Agent Skills catalog, and the admin switch that turns a skill on or off for everyone. */
 export function useSkills() {
   const { data: skills, status, refresh } = useApi("/api/skills", { key: keys.skills, default: () => [] })
   const notify = useNotify()

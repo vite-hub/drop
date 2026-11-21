@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The Marker's controls, in the review dock while the reader draws on a snapshot of the page: the tip, its size, its
-// colour, Undo, and Cancel or Done. Done sends the snapshot with the strokes as one comment.
 const { pen, marks, finishing } = defineProps<{ pen: MarkPen; marks: number; finishing: boolean }>()
 const emit = defineEmits<{
   tip: [tip: MarkTip]
@@ -11,7 +9,6 @@ const emit = defineEmits<{
   done: []
 }>()
 
-// The dots grow with the size; the marker's are see-through like its ink.
 const DOTS = [5, 8, 11, 15]
 const sizes = computed(() => MARK_TIPS[pen.tip].sizes.map((px, index) => ({ px, index, dot: DOTS[index]! })))
 const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)

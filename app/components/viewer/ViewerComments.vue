@@ -1,10 +1,4 @@
 <script setup lang="ts">
-// The review dock's list: vite-hub/ui's CommentPanel, docked, over the drop's comments (useDropComments). Open and
-// Resolved switch it; the box at the bottom comments on the page as a whole, with images and "@" for people who may read
-// the drop. A row opens its thread where the viewer shows threads, beside its pin. Open comments whose text or element
-// this version no longer has sit apart, under "From earlier versions" (`outdated` in DropViewer.vue). A row shows the
-// picture of what it's about: a site review's screenshot, or the one the frame took of the box (an image named
-// "screenshot.*", plan-runtime's shoot). The row opens the thread, whose images open full size.
 import { CommentPanel } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
@@ -24,7 +18,6 @@ defineExpose({
     root.value?.querySelector<HTMLButtonElement>(`[data-thread-id="${CSS.escape(id)}"]`)?.focus(),
 })
 
-// A suggestion with no note has no text of its own, so its row shows the redline instead.
 const suggestions = computed(() => {
   const rows = new Map<string, { quote: string; suggestion: string }>()
   for (const { id, quote, suggestion } of props.comments)

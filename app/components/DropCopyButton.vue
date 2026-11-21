@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// vite-hub/ui's CopyButton (value, label, icon, size, variant, preload) on Drop's timing: the check holds for COPY_MS,
-// as every other copy in Drop does. A copy the browser refuses says so in a toast, besides the button's own "Copy
-// failed" for screen readers, and reaches the client-error log.
 import { CopyButton, type CopyValue } from "vite-hub/ui"
 import "#shared/copy-icon.css"
 

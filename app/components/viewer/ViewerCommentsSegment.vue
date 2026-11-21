@@ -1,18 +1,10 @@
 <script setup lang="ts">
-// Comments as a mode, not a panel over the page: pressing it (C) lets the reader click or drag on the page to comment
-// on that spot, and the button says so ("Click anywhere"). A segment grows beside it inside the pill, holding only
-// actions: Whole page (a comment on the page itself, in the dock), All comments with the open count (the dock's list),
-// and × to stop. On a phone the segment takes its own row above the pill's. With `pins`, the eye that hides the
-// comments on the page sits against Comments, the thing it hides. With `style` (a Markdown doc), the segment opens with
-// two icons that pick how comments on the text show, Cards or Pins (useCommentStyle).
-// The `tools` slot adds buttons that act on the same comments, such as Send or Copy prompt, to the track Comments sits in.
 import type { CommentStyle } from "~/composables/usePreferences"
 
 const on = defineModel<boolean>("on", { required: true })
 const style = defineModel<CommentStyle>("style")
 defineProps<{
   count: number
-  /** The drop's comments and replies still on their way (waitingCount), shown only when there are some. */
   waiting?: number
   listOpen: boolean
   canComment: boolean
@@ -31,7 +23,6 @@ const item =
 </script>
 
 <template>
-  <!-- Comments, the eye, and Send or Copy prompt act on the same comments, so they share one track inside the pill. -->
   <div
     class="comment-track @max-3xl/review-dock:contents flex shrink-0 items-center gap-0.5 rounded-lg"
     role="group"
@@ -64,7 +55,6 @@ const item =
         >
       </button>
     </UTooltip>
-    <!-- One count for what hasn't gone out; each comment says why under its words. -->
     <span
       v-if="waiting"
       class="inline-flex h-7 shrink-0 items-center gap-1 px-1.5 text-xs text-toned tabular-nums"
@@ -73,7 +63,6 @@ const item =
     >
       <UIcon name="i-mingcute-time-line" class="size-3.5" />{{ waiting }} waiting
     </span>
-    <!-- Pressed means hidden: pressed is the state that changes the page. -->
     <UTooltip v-if="pins" text="Hide comments" :content="{ side: 'top', sideOffset: 8 }">
       <button
         aria-label="Hide comments"

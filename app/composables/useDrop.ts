@@ -4,13 +4,8 @@ import * as v from "valibot"
 import { replyMessageId } from "vite-hub/comments/client"
 import type { CommentPlace, SiteCommentPlace } from "../utils/comment-outbox"
 
-/** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }
 
-/**
- * One drop and its comments, with the actions the viewer needs: its latest version, or the earlier one `version`
- * names. Keys follow both, so the cache stays right when the router reuses the page for another drop or version.
- */
 function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number | undefined>) {
   const notify = useNotify()
   const query = computed(() => (toValue(version) ? { v: toValue(version) } : {}))
@@ -24,13 +19,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     default: () => [],
   })
 
-  // Each comment this reader writes, once the server took it: the presence room tells the others to load them now
-  // (usePresence's `commented`). Loading them again never fires it, so two viewers can't keep waking each other.
   const wrote = createEventHook<void>()
 
-  // New comments and replies go through the app's outbox (useCommentsOutbox): saved in the browser with their images,
-  // shown at once, and sent to Drop's routes once each, in order, as soon as the network lets them, on whatever page
-  // the reader is by then. While this page is open, they land in its list.
   const subject = () => ({ kind: "drop", id: toValue(id) })
   const app = useCommentsOutbox()
   app.attach({
@@ -44,7 +34,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       setReplies(threadId, (replies) => [...replies.filter((item) => item.id !== reply.id), reply])
       void wrote.trigger()
     },
-    // Another tab sent it, and told nobody here: the list has it now. That tab announced it.
     refresh: () => Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))]),
   })
   const view = () => ({
@@ -52,8 +41,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     author: app.author,
     accepted: app.accepted,
   })
-  // The id the server gives each waiting reply, so a list that already holds its copy (loaded before the reply's own
-  // answer came back, or in another tab) shows it once. Worked out in the browser, which hashes asynchronously.
   const replyIds = shallowRef<ReadonlyMap<string, string>>(new Map())
   watch(
     () => waitingReplies(comments.data.value, app.entries.value, view()),
@@ -62,7 +49,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       if (!missing.length) return
       const found = await Promise.all(
         missing.map(async ([thread, requestId]) => {
-          // crypto.subtle exists only on HTTPS and localhost: elsewhere the reply's requestId alone matches it.
           const message = await replyMessageId(thread, requestId).catch(() => undefined)
           return message ? [[replyKey(thread, requestId), message] as const] : []
         }),
@@ -71,11 +57,9 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     },
     { immediate: true },
   )
-  // A waiting comment's images show from the browser's copy; their addresses go once their entry leaves the outbox.
   const imageUrls = fileUrls()
   watch(app.entries, (entries) => imageUrls.keep(fileKeys(entries)))
   onScopeDispose(() => imageUrls.clear())
-  /** The drop's comments with the ones that wait to go out, each shown once. */
   const list = computed(() =>
     withOutbox(comments.data.value, app.entries.value, {
       ...view(),
@@ -85,10 +69,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
 
-  /**
-   * Saves the comment and returns it at once, waiting to go out. No toast either way: the new pin shows it, and the
-   * comment itself says when it waits or was refused. Fails only when the browser can't keep it.
-   */
   async function addComment(
     input: CommentPlace,
     body: string,
@@ -127,10 +107,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
-  /**
-   * A comment drawn on a site in Drop's frame, with the screenshot of its box first among its images: it goes to the
-   * site review's route (POST /api/drops/:id/review) through the same outbox.
-   */
   async function addSiteComment(origin: string, place: SiteCommentPlace, body: string, files: Blob[]) {
     try {
       const inputSubject = subject()
@@ -157,25 +133,20 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
-  /** Whether the message (a comment's own `messageId`, or a reply's id) still waits in the outbox. */
   const waiting = (commentId: string, messageId = commentId) => {
     const comment = findComment(commentId)
     if (!comment) return false
     if (comment.messageId === messageId) return Boolean(comment.delivery)
     return Boolean(comment.replies.find((reply) => reply.id === messageId)?.delivery)
   }
-  /** Takes a waiting comment or reply out of the outbox, unless it's already on its way. */
   async function discard(messageId: string, title: string) {
     if (await app.discard(messageId)) return
     notify.alert(title, "It's on its way to the server. Delete it once it's there.")
   }
 
-  // Optimistic: the checkbox flips at once and rolls back if the server says no.
   async function resolveComment(commentId: string, resolved: boolean) {
-    // A waiting comment has nothing to resolve on the server yet.
     if (waiting(commentId)) return
     const before = comments.data.value
-    // Resolving again marks the replies since the last time seen, so it counts from the newest one.
     const resolvedAt = (comment: DropComment) =>
       resolved ? Math.max(Date.now(), ...comment.replies.map((reply) => reply.createdAt)) : null
     comments.data.value = before.map((comment) =>
@@ -206,7 +177,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
     ))
 
-  /** Saves the reply and returns it at once, as addComment does. A reply to a waiting comment goes out after it. */
   async function addReply(
     commentId: string,
     body: string,
@@ -226,14 +196,12 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
-  /** New words for one's own comment (its `messageId`) or reply. */
   async function editMessage(
     commentId: string,
     messageId: string,
     body: string,
     mentions: string[] = [],
   ): Promise<Sent<CommentReply>> {
-    // Waiting words change in the outbox and go out as edited.
     if (waiting(commentId, messageId)) {
       if (!(await app.edit(messageId, body, mentions)))
         return { error: "It's on its way to the server. Edit it once it's there." }
@@ -275,14 +243,9 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     }
   }
 
-  // A new version adds bytes and a write, so the lists and the plan usage move too.
   const reloadVersion = () =>
     Promise.all([drop.refresh(), comments.refresh(), refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage])])
 
-  /**
-   * Puts a suggestion's words into the doc as its next version and resolves it. The drop keeps its id, so the page
-   * reloads its data and shows the new version. Resolves to whether it went through; a failure says why in a toast.
-   */
   async function acceptSuggestion(commentId: string) {
     try {
       const next = await $fetch<DropSummary>(`/api/comments/${commentId}/accept`, { method: "POST" })
@@ -290,7 +253,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       notify.say(`Published v${next.version}`, { action: { label: "Undo", onClick: () => void undo(commentId) } })
       return true
     } catch (error) {
-      // The version may already be published while its comment still needs resolution on retry.
       await Promise.allSettled([
         drop.refresh(),
         comments.refresh(),
@@ -300,7 +262,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       return false
     }
   }
-  /** Takes an accepted suggestion back: the text from before is published again, and the suggestion opens again. */
   async function undo(commentId: string) {
     try {
       const next = await $fetch<DropSummary>(`/api/comments/${commentId}/accept`, { method: "DELETE" })
@@ -319,11 +280,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   return {
     drop,
     comments,
-    /** What the viewer shows: the server's comments and the ones that wait in the outbox, marked by `delivery`. */
     list,
-    /** The saved comments and replies that haven't gone out, of every drop, for the dock. */
     outboxEntries: app.entries,
-    /** Runs after each comment write of this reader's, for whoever else should hear of it. */
     onWrote: wrote.on,
     findComment,
     addComment,
@@ -337,10 +295,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   }
 }
 
-/** The drop page provides its drop; the viewer and its panels inject it instead of threading props. */
 export const [provideDrop, injectDrop] = createInjectionState(useDrop)
 
-/** Where a version of the viewed drop opens: its pinned link on a shared page (no sign-in), its page in the app otherwise. */
 export function useVersionTo() {
   const route = useRoute()
   const state = injectDrop()!
@@ -350,11 +306,9 @@ export function useVersionTo() {
       : `/drops/${state.drop.data.value?.id}?v=${version.version}`
 }
 
-/** The drop API refused because the drop's share waits for the operator's review (server/api/drops/[id].get.ts). */
 export const waitingForReview = (error: unknown) =>
   errorData(error, v.object({ shareReview: v.literal("pending") })) !== undefined
 
-/** Where the visitor is, for the sign-in redirect and the retry link: the path and query, not the hash SSR never sees. */
 export function useHerePath() {
   const route = useRoute()
   const router = useRouter()

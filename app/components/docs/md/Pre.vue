@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Node } from "@comark/vue"
 
-// A code block in the docs is a copyable snippet. `$ORIGIN` in it becomes this Drop's address, so commands paste as-is.
 const props = defineProps<{ __node: Node }>()
 const origin = useRequestURL().origin
 // SAFETY: an element node is [tag, attributes, ...children], so what follows its first two entries are child nodes.

@@ -4,12 +4,6 @@ import { dropPageUrl, findDrop } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { openable, openDoc, readReviewToken } from "../../utils/review"
 
-/**
- * Where "Open in Drop", "Copy link", and docs from "Related links" on a reviewed site go (/review/open). The page
- * holds a review token or a doc's handle, so neither alone can be enough: this opens the review or the doc, or hands
- * over the review's link, only for people who could open it without its link, with Drop's session. The answer reaches
- * Drop's own page, never the reviewed site.
- */
 export default defineValidatedHandler({
   validate: { body: ReviewOpenSchema },
   async handler(event) {

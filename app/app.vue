@@ -2,10 +2,8 @@
 import geist from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url"
 import { provideRelativeNow } from "vite-hub/ui"
 
-// Every RelativeTime counts from Drop's one clock (useRelativeNow), which the expiry badges and lists read too.
 provideRelativeNow(useRelativeNow())
 
-// Link previews need an absolute image URL, so it follows whichever host serves Drop.
 const origin = useRequestURL().origin
 useSeoMeta({
   titleTemplate: (title) => (title && title !== "Drop" ? `${title} · Drop` : "Drop"),
@@ -20,15 +18,12 @@ useSeoMeta({
   twitterCard: "summary_large_image",
 })
 
-// The pages search engines index (INDEXED_PATHS) name their one address, without a query or trailing slash, so
-// /?signin=1 and /docs/ count as / and /docs. The rest answer with noindex instead (server/plugins/content-headers.ts).
 const route = useRoute()
 const canonical = computed(() =>
   isIndexedPath(route.path) ? `${origin}${route.path.length > 1 ? route.path.replace(/\/+$/, "") : "/"}` : undefined,
 )
 useSeoMeta({ ogUrl: canonical })
 useHead({ link: () => (canonical.value ? [{ rel: "canonical", href: canonical.value }] : []) })
-// Geist loads with the stylesheet instead of after it, so text doesn't paint in the fallback font and then shift.
 useHead({ link: [{ rel: "preload", as: "font", type: "font/woff2", href: geist, crossorigin: "anonymous" }] })
 </script>
 

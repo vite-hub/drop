@@ -1,5 +1,3 @@
-// Request bodies, defined once. Server routes validate with them (readValidatedBody) and forms reuse them
-// (UForm :schema), so a field's rules and messages are the same on both sides.
 import * as v from "valibot"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
@@ -7,12 +5,9 @@ import { MIB } from "./quotas"
 import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
 import { SHARES } from "./share"
 
-/** 4 MiB: the most one doc or file may weigh. Apps have their own limit, MAX_APP_BYTES. */
 export const MAX_FILE_BYTES = 4 * MIB
 
-/** Images one comment or reply may carry, each at most MAX_FILE_BYTES. */
 export const MAX_COMMENT_IMAGES = 4
-/** The image types a comment takes: what browsers paste and screenshot tools save. */
 export const COMMENT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const
 
 export const NewDocSchema = v.object({
@@ -23,14 +18,10 @@ export const NewDocSchema = v.object({
 })
 
 export const DropPatchSchema = v.object({
-  /** Who can open it, as one state (#shared/share). */
   share: v.optional(v.picklist(SHARES)),
-  /** Folders: what goes in them and how, which agents read to pick the folder. Links: what the page is. Empty clears it. */
   description: v.optional(v.pipe(v.string(), v.maxLength(2000, "Keep the description under 2,000 characters."))),
-  /** Links: the page it opens. */
   url: v.optional(v.pipe(v.string(), v.maxLength(2000))),
   title: v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(160))),
-  /** The readable part of the link, for every version. The link keeps working with the old one. */
   slug: v.optional(
     v.pipe(
       v.string(),
@@ -39,59 +30,40 @@ export const DropPatchSchema = v.object({
     ),
   ),
   lifetime: v.optional(v.picklist(LIFETIMES)),
-  /** Required when an agent keeps a drop. */
   keepReason: v.optional(
     v.pipe(v.string(), v.maxLength(MAX_KEEP_REASON, `Keep the reason under ${MAX_KEEP_REASON} characters.`)),
   ),
-  /** Start a fresh expiry window. */
   renew: v.optional(v.literal(true)),
-  /** True moves the drop to the Trash; false restores it with a fresh window. */
   trashed: v.optional(v.boolean()),
-  /** The folder to move the drop into (its id or link), or null to move it to the top. */
   folder: v.optional(v.nullable(v.pipe(v.string(), v.maxLength(600)))),
 })
 
 export const FolderSchema = v.object({
   title: v.pipe(v.string(), v.trim(), v.minLength(1, "Name the folder."), v.maxLength(160)),
-  /** What goes in it and how, for people and the agents that publish into it. */
   description: v.optional(
     v.pipe(v.string(), v.trim(), v.maxLength(2000, "Keep the description under 2,000 characters.")),
   ),
-  /** A team folder: on a team Drop, admins only. */
   team: v.optional(v.boolean()),
-  /** On a personal Drop with teams: the team it's for, whose owner and admins make its folders. */
   teamId: v.optional(v.pipe(v.string(), v.maxLength(100))),
-  /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
 
 export const AppSchema = v.object({
   id: v.optional(v.string()),
   name: v.optional(v.pipe(v.string(), v.maxLength(160))),
-  /** The readable part of its link. Later versions keep it unless they pass another. */
   slug: v.optional(v.pipe(v.string(), v.maxLength(MAX_SLUG))),
-  /** With `id`, only the files that changed: the rest carry over from the previous version. */
   files: v.record(v.string(), v.string()),
-  /** Paths to delete from the previous version. A file leaves an app only when it's named here. */
   removes: v.optional(v.pipe(v.array(v.string()), v.maxLength(200))),
 })
 
-/** The ids of the people a comment's `@`s name. ViteHub Comments checks each one may read the drop. */
 const MentionsSchema = v.optional(v.pipe(v.array(v.pipe(v.string(), v.maxLength(200))), v.maxLength(20)), [])
 
 const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))
 
-/** Most strokes, and most points across them, that a Marker comment keeps for the page to draw. */
 export const MAX_INK_STROKES = 60
 export const MAX_INK_POINTS = 6000
 const inkCoordinate = v.pipe(v.number(), v.minValue(-100_000), v.maxValue(100_000))
 
-/**
- * The Marker's strokes on an area comment, for the page to draw over the area as the reader drew them. `w`/`h` are the
- * area's size in CSS pixels when it was drawn; a stroke's points are pixels from the area's top-left corner, so they
- * scale with the area when the anchor reflows. `width` is the tip's size (a label's font size); a text stroke is a
- * label whose one point is the middle of its left edge.
- */
 export const InkSchema = v.pipe(
   v.object({
     w: v.pipe(v.number(), v.minValue(1), v.maxValue(100_000)),
@@ -118,18 +90,9 @@ export const InkSchema = v.pipe(
 )
 export type Ink = v.InferOutput<typeof InkSchema>
 
-/**
- * A comment's or reply's retry key, a new `crypto.randomUUID()` for each one. Sent again with the same words, it gets
- * the comment or reply the first send added, so a client that lost the answer resends without posting twice.
- */
 const RequestIdSchema = v.optional(v.pipe(v.string(), v.uuid()))
-/** Whom the viewer's outbox wrote it as: their user id, absent for a guest. A session that isn't them gets 401. */
 const SenderSchema = v.optional(v.pipe(v.string(), v.minLength(1), v.maxLength(100)))
 
-/**
- * Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. A `page` comment is
- * about the page as a whole: no anchor, an empty selector, and zero positions.
- */
 export const CommentSchema = v.pipe(
   v.object({
     kind: v.picklist(["text", "image", "area", "page"]),
@@ -141,15 +104,10 @@ export const CommentSchema = v.pipe(
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
     label: v.optional(v.pipe(v.string(), v.maxLength(200))),
     page: v.optional(v.pipe(v.string(), v.maxLength(300))),
-    /** A suggested edit: the words that replace the quote. Empty suggests deleting it. */
     suggestion: v.optional(v.pipe(v.string(), v.maxLength(2000))),
-    /** A comment on a video's frame: the second it's at. The spot or area is on that frame. */
     at: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(86_400))),
-    /** A comment on a PDF's page: its number, from 1. The spot or area is on that page. */
     pdfPage: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100_000))),
-    /** From the Marker: its strokes, which the page draws over the area. */
     ink: v.optional(InkSchema),
-    // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
     mentions: MentionsSchema,
     requestId: RequestIdSchema,
@@ -159,7 +117,6 @@ export const CommentSchema = v.pipe(
     (input) => input.ox + input.ow <= 1000 && input.oy + input.oh <= 1000,
     "The area must stay inside its anchor.",
   ),
-  // A spot on an element (the Comment tool's click) has neither.
   v.check(
     (input) => input.kind !== "area" || input.ow > 0 === input.oh > 0,
     "An area needs both a width and a height.",
@@ -185,10 +142,6 @@ export const CommentSchema = v.pipe(
   ),
 )
 
-/**
- * What a site's review script sends with a comment. All of it comes from someone else's page, so every field is
- * bounded. The box is in thousandths of the viewport, which is also the screenshot.
- */
 export const ReviewCommentSchema = v.pipe(
   v.object({
     body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
@@ -201,7 +154,6 @@ export const ReviewCommentSchema = v.pipe(
     oy: thousandths,
     ow: thousandths,
     oh: thousandths,
-    /** Where the pin sits on the element, in thousandths of its box. */
     spot: v.optional(v.object({ x: thousandths, y: thousandths })),
     viewport: v.object({
       width: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(20_000)),
@@ -212,28 +164,21 @@ export const ReviewCommentSchema = v.pipe(
   v.check((input) => input.ow > 0 && input.oh > 0, "An area needs a width and a height."),
 )
 
-/** The connect popup asks which site drops cover the page that opened it, by the page's origin. */
 export const ReviewSitesSchema = v.object({
   origin: v.pipe(v.string(), v.maxLength(300)),
 })
 
-/** Then a review token for the one the person picked, by the handle the list gave it. Guests may give a name. */
 export const ReviewTokenSchema = v.object({
   origin: v.pipe(v.string(), v.maxLength(300)),
   choice: v.pipe(v.string(), v.maxLength(2048)),
   name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 })
 
-/**
- * Opening the review in Drop from the site, by the review token the page holds, or a doc that links to the site, by the
- * handle its "Drop document" menu got.
- */
 export const ReviewOpenSchema = v.union([
   v.object({ token: v.pipe(v.string(), v.maxLength(2048)) }),
   v.object({ doc: v.pipe(v.string(), v.maxLength(2048)) }),
 ])
 
-/** A site review created in the app: the address it covers (an origin or a `*.` pattern) and its name. */
 export const SiteSchema = v.object({
   url: v.pipe(
     v.string(),
@@ -243,13 +188,11 @@ export const SiteSchema = v.object({
     v.check((url) => siteAddress(url) !== null, SITE_ADDRESS_RULE),
   ),
   title: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(160))),
-  /** The folder to create it in, by id or link. */
   folder: v.optional(v.pipe(v.string(), v.maxLength(600))),
 })
 
 export const CommentPatchSchema = v.object({ resolved: v.boolean() })
 
-/** A reply: words, or only images. The endpoint checks once it has read them. */
 export const CommentReplySchema = v.object({
   body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
   mentions: MentionsSchema,
@@ -257,7 +200,6 @@ export const CommentReplySchema = v.object({
   as: SenderSchema,
 })
 
-/** A new text for one's own comment or reply. */
 export const CommentEditSchema = v.object({
   body: v.pipe(v.string(), v.trim(), v.minLength(1, "Write a comment."), v.maxLength(4000)),
   mentions: MentionsSchema,
@@ -275,7 +217,6 @@ export const CodeImageSchema = v.strictObject({
     v.minLength(1, "Send some code."),
     v.maxLength(20_000, "Code images take at most 20,000 characters."),
   ),
-  // No default here: PNG where the Drop can render it (Cloudflare), SVG elsewhere. See server/utils/code-image-store.ts.
   format: v.optional(v.picklist(["png", "svg"], "Format must be png or svg.")),
   language: v.optional(v.string()),
   scale: v.optional(v.picklist([2, 4, 6], "Scale must be 2, 4, or 6."), 4),
@@ -291,11 +232,6 @@ export const ReportSchema = v.object({
 export const ReviewSchema = v.object({ action: v.picklist(["approve", "reject"]) })
 export const ReportActionSchema = v.object({ action: v.picklist(["dismiss", "quarantine", "ban"]) })
 
-/**
- * Query strings stay strings here. Routes convert and cut them after h3 has validated the shape: a search box or a
- * reviewed page's URL can run long, and those requests should still answer, with the first part.
- */
-/** The Drops page's previews: up to 90 ids, comma-separated. */
 export const PeeksQuerySchema = v.object({ ids: v.pipe(v.string(), v.maxLength(90 * 24)) })
 
 export const DropsQuerySchema = v.object({
@@ -306,14 +242,12 @@ export const DropsQuerySchema = v.object({
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
   pinned: v.optional(v.string()),
-  /** With `folder`: at most this many of its newest drops. */
   limit: v.optional(v.pipe(v.string(), v.regex(/^[1-9]\d{0,2}$/))),
 })
 
 export const DropTreeQuerySchema = v.object({ open: v.optional(v.pipe(v.string(), v.maxLength(100))) })
 
 export const SearchQuerySchema = v.object({ q: v.optional(v.string()), kind: v.optional(v.string()) })
-// The page forwards whatever `?v=` it was given; the route ignores what isn't a version number.
 export const LinkQuerySchema = v.object({ v: v.optional(v.string()) })
 export const ReviewCommentsQuerySchema = v.object({ page: v.optional(v.string()) })
 
@@ -324,14 +258,12 @@ export const RuntimeErrorSchema = v.object({
   page: v.optional(v.pipe(v.string(), v.maxLength(300))),
 })
 
-/** A failure in someone's browser, reported without who it was: what broke, where, and the browser's message. */
 export const ClientErrorSchema = v.object({
   action: v.pipe(v.string(), v.maxLength(60)),
   path: v.pipe(v.string(), v.maxLength(600)),
   name: v.optional(v.pipe(v.string(), v.maxLength(120))),
   message: v.pipe(v.string(), v.maxLength(1000)),
   stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
-  // A failed request's answer, which finds it in the server's logs, and where in Drop it happened.
   status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
   requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   drop: v.optional(v.pipe(v.string(), v.maxLength(40))),

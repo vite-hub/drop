@@ -29,11 +29,8 @@ export const KIND_LABELS: Record<DropKind, string> = {
 
 export const VIA_LABELS: Record<ActorKind, string> = { agent: "MCP", browser: "the browser" }
 
-/** "3 items", "1 item". */
 export const itemCount = (n: number) => `${n} ${n === 1 ? "item" : "items"}`
 
-// One formatter for every relative time: building an Intl formatter costs more than formatting, and a list has two per
-// row.
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "auto", style: "short" })
 const UNITS = [
   ["second", 60],
@@ -45,10 +42,8 @@ const UNITS = [
 ] as const
 const SECONDS = { second: 1, minute: 60, hour: 3600, day: 86400, month: 2592000, year: 31536000 }
 
-/** "3 min. ago", against `now`, the page's one shared clock (useRelativeNow). */
 export function timeAgo(at: number | string | Date, now: number) {
   const seconds = (new Date(at).getTime() - now) / 1000
-  // The shared clock ticks every 30 seconds, so something you just posted is ahead of it: "in 12 sec." read as a bug.
   if (seconds > -45) return "just now"
   const [unit] = UNITS.find(([name, limit]) => Math.abs(seconds / SECONDS[name]) < limit)!
   return relative.format(Math.round(seconds / SECONDS[unit]), unit)

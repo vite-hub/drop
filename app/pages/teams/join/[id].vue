@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// An invitation link. Signed in with the invited email, you join the team and its folders; Better Auth checks the email.
 useSeoMeta({ title: "Join a team" })
 
 const route = useRoute()

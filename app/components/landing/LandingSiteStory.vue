@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Ana reviews a pull request's preview deploy where it runs: Drop's Comment button sits in the page's corner, she drags
-// a box over the button and writes a note, and it lands in Drop with a screenshot. Claude Code reads it, fixes the
-// page, and resolves it, and the preview shows the fix.
 import type { Beat } from "~/composables/useStoryboard"
 
 const BEATS = [
@@ -32,7 +29,6 @@ const onTerminal = computed(() => at("a.prompt") && !at("s.fixed"))
 const drawing = computed(() => at("s.press") && !at("s.sent"))
 const fixed = computed(() => at("s.fixed"))
 
-// Ana's pointer, and the beats that end in a click where it rests: the next beat shows what the click did.
 const TARGETS: Partial<Record<Name, string>> = {
   "s.open": "comment",
   "s.press": "box-start",
@@ -107,7 +103,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
             url
           >
             <div class="relative h-full overflow-hidden text-xs">
-              <!-- The site under review: Acme's own page, not Drop. -->
               <div class="flex h-11 items-center gap-5 border-b border-default px-5">
                 <span class="flex items-center gap-1.5 font-semibold text-highlighted"
                   ><span class="size-3.5 rounded-sm bg-inverted" />Acme</span
@@ -154,7 +149,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                 </div>
               </div>
 
-              <!-- Drop's review script: the corner bar, the drawing layer, the note, and the toast. -->
               <div v-if="drawing" class="absolute inset-0 bg-black/[.04] [animation:fade-in_250ms_ease-out]">
                 <p
                   v-if="!at('s.type')"

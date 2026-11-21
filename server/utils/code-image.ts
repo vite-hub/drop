@@ -2,14 +2,8 @@ import type { ThemedToken } from "shiki/core"
 import { type CodeTheme, isCodeTheme, loadHighlighter } from "#shared/highlighter"
 import { escapeUTF8 as escapeXml } from "entities"
 
-/**
- * Code images, rendered here instead of scraped from another site: Shiki tokenizes the code, and the tokens
- * become a self-contained SVG with a ray.so-style window. PNGs are a browser screenshot of that SVG.
- */
-
 const DEFAULT_CODE_THEME: CodeTheme = "github-dark"
 
-/** Theme names agents learned from the old Ray.so renderer keep working. */
 const THEME_ALIASES = new Map<string, CodeTheme>([
   ["nuxt", "vitesse-dark"],
   ["midnight", "night-owl"],
@@ -29,7 +23,7 @@ async function prepare(language: string | undefined, theme: string | undefined) 
 
 const FONT_SIZE = 14
 const LINE_HEIGHT = 22
-const CHAR_WIDTH = 8.43 // A 14px monospace advance; the SVG is laid out without measuring text.
+const CHAR_WIDTH = 8.43
 const FRAME = 32
 const PADDING = 20
 const BAR = 34
@@ -47,7 +41,6 @@ function tokenSpan(token: ThemedToken) {
   return `<tspan ${attrs}>${escapeXml(token.content)}</tspan>`
 }
 
-/** A ray.so-style code card as SVG: gradient frame, window with traffic lights, highlighted code. */
 export async function renderCodeSvg(input: { code: string; language?: string; theme?: string }) {
   const { shiki, lang, theme } = await prepare(input.language, input.theme)
   const code = input.code.replace(/\t/g, "  ").replace(/\s+$/, "")
@@ -77,7 +70,6 @@ ${lines.join("\n")}
 const CODE_IMAGE_PREFIX = "code-images/"
 const CODE_IMAGE_TTL_MS = 5 * 60 * 1000
 
-/** Code images are public and short-lived: the expiry is part of the key, and an hourly schedule sweeps them. */
 export function createCodeImageLocation(format: "png" | "svg", now = new Date()) {
   const expiresAt = new Date(now.getTime() + CODE_IMAGE_TTL_MS)
   return { expiresAt, key: `${CODE_IMAGE_PREFIX}${expiresAt.getTime()}/${crypto.randomUUID()}.${format}` }

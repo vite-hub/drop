@@ -9,17 +9,12 @@ import type { DropRow } from "./drops"
 import type { Identity } from "./identity"
 import { logError } from "./logs"
 
-// What signed-in readers answered to a Markdown doc's questions, polls, and recall cards (#shared/quiz): one row per
-// person and block, keyed on the doc's stable id so answers carry across versions, with the first answer kept beside
-// the latest. Each isolate creates the table before its first write or a read that finds none, so neither production
-// D1 nor Quiver needs a step of its own. The primary key serves the counts; the index serves a reader's own answers.
 const TABLE = [
   "CREATE TABLE IF NOT EXISTS `drop_answers` (`link` text NOT NULL, `question` text NOT NULL, `user_id` text NOT NULL, `kind` text NOT NULL, `first_choice` text NOT NULL, `first_correct` integer, `choice` text NOT NULL, `correct` integer, `attempts` integer NOT NULL, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`link`, `question`, `user_id`))",
   "CREATE INDEX IF NOT EXISTS `drop_answers_user_idx` ON `drop_answers` (`link`, `user_id`)",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` BEGIN DELETE FROM `drop_answers` WHERE `link` = OLD.id; END",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_user_delete` AFTER DELETE ON `user` BEGIN DELETE FROM `drop_answers` WHERE `user_id` = OLD.id; END",
 ]
-// Added lazily to existing installations, just like the table itself. Action times compare independent page sequences.
 const ORDER_COLUMNS = {
   first_session: "text",
   first_sequence: "integer",
@@ -38,7 +33,6 @@ function ensureTable() {
       try {
         await db.run(sql.raw(`ALTER TABLE drop_answers ADD COLUMN ${name} ${type}`))
       } catch (error) {
-        // Another isolate may have added it since our PRAGMA read.
         if (!/duplicate column name/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`))
           throw error
       }
@@ -50,38 +44,25 @@ function ensureTable() {
   return table
 }
 
-/** A read doesn't wait for the table's statements: it creates the table only when it finds none. */
 const reading = <T>(read: () => Promise<T>) =>
   read().catch(async (error: unknown) => {
-    // Drizzle wraps the database's error, which names the missing table, as its cause.
     if (!/no such table/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`)) throw error
     await ensureTable()
     return read()
   })
 
-/** Whether `who`'s answers on a drop count: a person signed in, in the browser, on a Markdown doc out of the Trash. */
 export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity | null) =>
   who?.actorKind === "browser" && row.kind === "markdown" && !row.expired
 
-/**
- * Keeps a reader's first and latest actions even when requests from different pages arrive out of order. Legacy
- * unordered requests still work until the reader uses an ordered client. A block the doc has no answers to yet counts
- * against MAX_QUIZ_BLOCKS, checked in the same statement; past it nothing is kept, and this returns false. Otherwise it
- * returns the latest stored answer.
- */
 export async function recordAnswer(link: string, userId: string, answer: QuizAnswerRequest, now = Date.now()) {
   await ensureTable()
   const choice = JSON.stringify(answer.choice)
   const correct = answer.correct === null ? null : Number(answer.correct)
   const session = answer.order?.session ?? null
   const sequence = answer.order?.sequence ?? null
-  // A future client clock must never pin the latest action. Retain microseconds within the server's receipt
-  // millisecond, since Date.now() has lower precision than the browser clock used for cross-page ordering.
   const issuedAt = answer.order?.issuedAt === undefined ? null : Math.min(answer.order.issuedAt, (now + 1) * 1000 - 1)
-  // Apply the same bound to rows accepted before this cap existed, using their trusted server receipt time.
   const previousFirstIssuedAt = sql`min(first_issued_at, (created_at + 1) * 1000 - 1)`
   const previousIssuedAt = sql`min(issued_at, (updated_at + 1) * 1000 - 1)`
-  // Sequences take precedence within a page. Across pages, action time wins, with a stable session tie-break.
   const first = sql`(excluded.first_session = first_session AND excluded.first_sequence < first_sequence)
     OR (excluded.first_session <> first_session AND (excluded.first_issued_at < ${previousFirstIssuedAt}
       OR (excluded.first_issued_at = ${previousFirstIssuedAt} AND excluded.first_session < first_session)))`
@@ -133,7 +114,6 @@ const AnswerRow = v.object({
   updated_at: v.number(),
 })
 
-/** One reader's answer to a block: their first and their latest. */
 export interface StoredAnswer {
   id: string
   kind: QuizKind
@@ -143,7 +123,6 @@ export interface StoredAnswer {
   answeredAt: number
 }
 
-/** Everything one reader answered on a doc, in the order they first did. */
 export async function answersOf(link: string, userId: string): Promise<StoredAnswer[]> {
   const rows = await reading(() =>
     db.all(sql`SELECT question, kind, first_choice, first_correct, choice, correct, attempts, updated_at
@@ -162,14 +141,8 @@ export async function answersOf(link: string, userId: string): Promise<StoredAns
   })
 }
 
-/** A block's results, with whether it's a question or a poll. */
 export type QuizTally = QuizResult & { kind: Exclude<QuizKind, "recall"> }
 
-/**
- * How everyone answered a doc's questions and polls: each person once, by their first try at a question and their
- * current vote in a poll. Recall cards don't count. `answeredBy` keeps the blocks one reader answered, `question` one
- * block.
- */
 export async function quizResults(
   link: string,
   among: { answeredBy?: string; question?: string } = {},
@@ -181,7 +154,6 @@ export async function quizResults(
         ? sql` AND a.question IN (SELECT question FROM drop_answers WHERE link = ${link} AND user_id = ${among.answeredBy})`
         : sql``
   const counted = sql`CASE a.kind WHEN 'poll' THEN a.choice ELSE a.first_choice END`
-  // A row per block and option, and one per block (option null) with how many people it counts.
   const rows = await reading(() =>
     db.all<{ question: string; option: string | null; people: number; kind: string | null }>(sql`
       SELECT a.question, o.value AS option, count(*) AS people, NULL AS kind
@@ -193,7 +165,6 @@ export async function quizResults(
       WHERE a.link = ${link} AND a.kind <> 'recall' AND ${counted} <> '[]'${only}
       GROUP BY a.question`),
   )
-  // Maps, then Object.fromEntries: ids and keys come from the doc, and `__proto__` must stay an ordinary key.
   const tallies = new Map<string, { kind: QuizTally["kind"]; counts: Map<string, number>; total: number }>()
   for (const row of rows) {
     let tally = tallies.get(row.question)
@@ -208,7 +179,6 @@ export async function quizResults(
   )
 }
 
-/** The reader's side of a doc's blocks, for its page: their answers, and results for the ones they answered. */
 export async function quizOf(row: Pick<DropRow, "id">, userId: string, event?: H3Event): Promise<DropQuiz> {
   const link = row.id
   try {
@@ -218,16 +188,11 @@ export async function quizOf(row: Pick<DropRow, "id">, userId: string, event?: H
       results: Object.fromEntries([...results].map(([id, { counts, total }]) => [id, { counts, total }])),
     }
   } catch (error) {
-    // The page still opens, and an answer still saves.
     logError(event, error, { action: "drop-answers" })
     return { answers: {}, results: {} }
   }
 }
 
-/**
- * The blocks a rendered doc holds, in order: comark-quiz marks each with data-quiz-id and data-quiz-kind, and each of
- * its options with data-key and the right ones with data-correct. A block's options are between it and the next block.
- */
 export function quizBlocks(html: string) {
   const blocks = new Map<string, { kind: string; keys: Set<string>; correct: Set<string> }>()
   const found = [...html.matchAll(/<[a-z][^>]*\sdata-quiz-id="([^"]*)"[^>]*>/gi)].slice(0, MAX_QUIZ_BLOCKS)

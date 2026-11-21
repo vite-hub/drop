@@ -1,5 +1,3 @@
-// A drop's resources: links it points to, like the pull request it documents and that PR's preview. They show with
-// their sites' icons at the top of the drop's page. Agents set them when they publish (server/utils/resources.ts).
 import { isLocal } from "./review"
 import type { DropResource } from "./types"
 
@@ -7,7 +5,6 @@ export const MAX_RESOURCES = 8
 export const MAX_RESOURCE_URL = 2000
 export const MAX_RESOURCE_TITLE = 100
 
-/** What a resource may link to: https, or http on this computer. Normalized, so one page is one resource. */
 export function resourceUrl(url: string): string | null {
   let parsed: URL
   try {
@@ -23,20 +20,16 @@ export function resourceUrl(url: string): string | null {
 const REFERENCE =
   /^https:\/\/(?:www\.)?(?:github\.com|gitlab\.com)\/([\w.-]+\/[\w.-]+)\/(?:-\/)?(?:pull|issues|merge_requests)\/(\d+)\/?(?:[?#].*)?$/
 
-/** Its title, `owner/repo#123` for a pull request or issue, or the host it's on without `www.`. */
 export function resourceLabel(resource: DropResource) {
   if (resource.title) return resource.title
   const reference = REFERENCE.exec(resource.url)
   return reference ? `${reference[1]}#${reference[2]}` : new URL(resource.url).hostname.replace(/^www\./, "")
 }
 
-/** Where Drop serves a site's icon (server/api/favicons/[host].get.ts). */
 export const FAVICON_PATH = "/api/favicons/"
 
-/** A link's site icon, from Drop: relative to Drop's origin, or under `origin` for a page on another one. */
 export const faviconUrl = (url: string, origin = "") => `${origin}${FAVICON_PATH}${new URL(url).hostname}`
 
-/** `next` added to `current`: a link already there keeps its place and takes the new title, if it has one. */
 export function mergeResources(current: DropResource[], next: DropResource[]): DropResource[] {
   const merged = current.map((resource) => ({ ...resource }))
   for (const resource of next) {
@@ -47,20 +40,17 @@ export function mergeResources(current: DropResource[], next: DropResource[]): D
   return merged
 }
 
-/** A GitHub pull request's repository and number, from its address: `quiverdk/website` and 33. */
 export function pullRequestOf(url: string): { repo: string; number: number } | null {
   const { hostname, pathname } = new URL(url)
   const match = hostname === "github.com" ? pathname.match(/^\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)(?:\/|$)/) : null
   return match ? { repo: match[1]!, number: Number(match[2]) } : null
 }
 
-/** What a link item says under its title: `quiverdk/website#33` for a pull request, its host for anything else. */
 export function linkSource(url: string) {
   const pull = pullRequestOf(url)
   return pull ? `${pull.repo}#${pull.number}` : new URL(url).hostname.replace(/^www\./, "")
 }
 
-/** A link's words in a doc's properties: its title, `owner/repo#123` for a pull request or issue, or its address. */
 export function linkText(resource: DropResource) {
   if (resource.title) return resource.title
   const reference = REFERENCE.exec(resource.url)

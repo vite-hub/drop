@@ -2,27 +2,20 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropSummary } from "#shared/types"
 import type { InjectionKey, ShallowRef } from "vue"
 
-/**
- * The drop open on the page, offered to the ⌘K palette (SearchPalette): what you can do with it, in groups, the first
- * one under the drop's title. Groups, because Nuxt UI's palette shows at most 12 items in each.
- */
 interface PaletteDrop {
   groups: { id: string; label: string; items: CommandPaletteItem[] }[]
 }
-/** The folder open on the page, which ⌘K's new drops go into. `folders`: whether you may add folders to it too. */
 interface PaletteFolder extends Pick<DropSummary, "id" | "title"> {
   folders: boolean
 }
 interface PaletteContext {
   drop: ShallowRef<PaletteDrop | null>
   folder: ShallowRef<PaletteFolder | null>
-  /** The folder open on the page, which `in:` searches can name, whoever may add to it. */
   scope: ShallowRef<Pick<DropSummary, "id" | "title"> | null>
 }
 
 const KEY: InjectionKey<PaletteContext> = Symbol("palette-context")
 
-/** The dashboard layout holds the context; the page inside it fills it in, and the palette beside the page reads it. */
 export function providePaletteContext() {
   const context: PaletteContext = { drop: shallowRef(null), folder: shallowRef(null), scope: shallowRef(null) }
   provide(KEY, context)
@@ -31,11 +24,6 @@ export function providePaletteContext() {
 
 export const injectPaletteContext = () => inject(KEY, null)
 
-/**
- * Offers `value` to the palette while the calling component is mounted. The next drop's viewer can mount before the
- * last one unmounts, so leaving clears the slot only when it still holds this component's value. Pages outside the
- * dashboard layout have no palette, and nothing happens.
- */
 export function usePaletteOffer<K extends keyof PaletteContext>(key: K, value: () => PaletteContext[K]["value"]) {
   // SAFETY: PaletteContext[K] is that slot's ShallowRef; TypeScript loses the link between K and its value type.
   const slot = injectPaletteContext()?.[key] as ShallowRef<PaletteContext[K]["value"]> | undefined
@@ -47,10 +35,8 @@ export function usePaletteOffer<K extends keyof PaletteContext>(key: K, value: (
   })
 }
 
-/** What the palette's search holds. Shared, so a folder's search box opens it with the folder's `in:` typed in. */
 export const usePaletteTerm = () => useState("palette-term", () => "")
 
-/** Opens the ⌘K palette with a term in its search. Call it in setup; the function it returns, anywhere. */
 export function usePaletteOpener() {
   const term = usePaletteTerm()
   const nuxtApp = useNuxtApp()

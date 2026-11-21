@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Signed in, / opens your drops; the landing page stays at /home for everyone. Runs on the server too, so the
-// redirect happens before any HTML renders.
 definePageMeta({
   alias: "/home",
   middleware: async (to) => {
@@ -16,7 +14,6 @@ const DESCRIPTION =
 
 useSeoMeta({ title: "Review what your agent makes", description: DESCRIPTION })
 
-// What search engines show for the site and the app: its name, that it is a web app, and the questions below.
 const origin = useRequestURL().origin
 useHead({
   script: [
@@ -44,10 +41,8 @@ useHead({
 const route = useRoute("index")
 const { signedIn, signInHref } = useGitHubSignIn()
 
-// `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
 
-// The loop, in what you type and what Drop shows back. The middle step is people: everyone you share it with.
 const STEPS = [
   {
     title: "Your agent drops it",
@@ -66,7 +61,6 @@ const STEPS = [
   },
 ] as const
 
-// Who commented in step 2, as initials on a tint.
 const PEOPLE = [
   { initials: "AL", tint: "bg-sky-100 text-sky-800 dark:bg-sky-400/15 dark:text-sky-200" },
   { initials: "MR", tint: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200" },
@@ -122,7 +116,6 @@ const FAQ = [
     <SiteHeader wide />
 
     <main>
-      <!-- Hero: what it is on the left, the command to try it on the right, with the agents as the picker. -->
       <div class="relative isolate">
         <LandingShader
           class="absolute inset-x-0 top-0 -z-10 h-[72rem] w-full [mask-image:radial-gradient(ellipse_70%_45%_at_50%_72%,black_30%,transparent)]"
@@ -135,7 +128,6 @@ const FAQ = [
               class="max-w-[16ch] text-[clamp(2.5rem,5.5vw,3.75rem)] leading-[1.1] font-semibold tracking-[-0.045em] text-balance text-highlighted"
             >
               Review what your
-              <!-- The word looks the way a commented sentence looks in Drop: highlighted, with its pin. -->
               <span class="relative whitespace-nowrap"
                 ><span class="inline-block rounded-lg bg-amber-200/70 px-1.5 pb-1 leading-[0.95] dark:bg-amber-400/25"
                   >agent</span
@@ -178,7 +170,6 @@ const FAQ = [
           <LandingSetup />
         </section>
 
-        <!-- The loop itself, played out: Claude Code drops a plan, you comment on a line, it publishes v2. -->
         <section class="mx-auto max-w-6xl px-4 sm:px-6">
           <figure>
             <LandingLoopStory />

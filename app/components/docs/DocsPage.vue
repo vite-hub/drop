@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// One docs page: its H1 and lead, the sections, and links to the previous and next pages.
 const props = defineProps<{ title: string; lead: string }>()
 
 const route = useRoute()

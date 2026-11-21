@@ -7,11 +7,6 @@ import { guestOf } from "../../utils/guests"
 import { identify } from "../../utils/identity"
 import { openChoice, signReviewToken } from "../../utils/review"
 
-/**
- * The connect popup asks here for a review token for the site drop the person picked (/api/review/sites). The token
- * is for that drop and the page's origin only, and the popup posts it to that origin only: any page could open the
- * popup, but none other gets the token.
- */
 export default defineValidatedHandler({
   validate: { body: ReviewTokenSchema },
   async handler(event) {
@@ -32,14 +27,12 @@ export default defineValidatedHandler({
         statusText:
           "You can't comment on this site anymore, or its review was deleted. Press Comment on the site again.",
       })
-    // A guest's name says it's a guest's, so nobody signs a comment as the site's owner.
     const author = who ? who.name : name?.trim() ? `${name.trim()} (guest)` : "Guest"
     const { token, expiresAt } = await signReviewToken(event, {
       d: site.id,
       u: who?.userId ?? null,
       n: author,
       o: origin,
-      // The popup is on Drop, so a guest's token carries their browser's guest id there.
       ...(who ? {} : { g: await guestOf(event, { mint: true }) }),
     })
     event.res.headers.set("Cache-Control", "no-store")

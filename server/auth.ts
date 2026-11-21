@@ -29,10 +29,8 @@ import { lazyClient } from "./utils/lazy-client"
 import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
-// The account's creation date, a review signal (shared/trust.ts).
 const GitHubProfile = v.object({ created_at: v.optional(v.string()) })
 
-/** An account deleted by its owner, or by an admin. */
 function auditDeletion(
   user: { id: string },
   context: { context: { session?: { user: { id: string } } | null } } | null,
@@ -48,38 +46,12 @@ function auditDeletion(
   )
 }
 
-/**
- * Who can sign in, and how.
- *
- * Drop signs in with GitHub. To use another provider, swap `socialProviders` (Google, GitLab, Discord…),
- * or add `emailAndPassword: { enabled: true }`, then set its secrets in nuxt.config.ts `vite.env.server.auth`.
- *
- * Anyone with a GitHub account can sign in and joins as a member. `VITEHUB_MEMBERS`, when set, lists the only people
- * who may: GitHub accounts, verified emails, email domains, or a GitHub organization (`github-org:acme`). ViteHub Auth
- * checks it at sign-up, at sign-in, and on running sessions, and adds `read:org` for an organization. Admins always
- * may. `DROP_ADMINS` lists the admins by email: whoever signs in with one, verified by the sign-in method, is an admin,
- * so swapping GitHub for another provider keeps the list. `roleOf` decides on every request; each new session writes
- * it down for Better Auth's admin endpoints. Nobody else changes roles, so the admin plugin's set-role is off, and so is
- * its impersonation, which Drop doesn't offer.
- *
- * Agents have no keys. Drop is an OAuth 2.1 authorization server for its own MCP endpoint (`oauthProvider`):
- * an MCP client registers itself, opens the browser once, and the person approves it on /oauth (signing in
- * with GitHub first if needed). The client keeps the token; `jwt` signs it, scoped to `<origin>/mcp`.
- * `/token` is the JWT plugin's session-to-JWT endpoint, which agents don't need.
- *
- * Local dev has no GitHub OAuth app, so email and password sign-in is on in `nuxt dev` only.
- *
- * Teams (`DROP_TEAMS`, ./utils/teams.ts) are Better Auth organizations; Drop sends no invitation emails, so whoever
- * invites copies the link. With Stripe set up (`STRIPE_*`), a team past its free members needs a subscription, one seat
- * per member, which Stripe's plugin keeps in step as people join and leave.
- */
 export default defineAuth(({ env, requestOrigin }) => {
   const proxied = authProxy().enabled
   const teams = teamsEnabled()
   const billing = billingConfig()
   const teamBilling = billing.enabled
     ? {
-        // Stripe's SDK loads on the first billing call, so a Drop without billing never loads it.
         stripeClient: lazyClient<Stripe>(() =>
           import("stripe").then(
             ({ Stripe }) => new Stripe(billing.secretKey, { httpClient: Stripe.createFetchHttpClient() }),
@@ -97,21 +69,12 @@ export default defineAuth(({ env, requestOrigin }) => {
     database: currentRoleAdapter(teamLimitAdapter(drizzleAdapter(db, { provider: "sqlite", schema })), (person) =>
       roleOf(person, env.drop.admins.unseal()),
     ),
-    // Default retention: 90 days / 100,000 events. ViteHub strips IPs and secrets and isolates write failures.
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
-    // Better Auth's limits: 5 client registrations a minute per IP, 3 sign-in attempts in 10 seconds, and more. It turns
-    // them on only when NODE_ENV is production, which a Worker doesn't set, so they're on here outside `nuxt dev`. Each
-    // request builds its own Auth (`requestOrigin`), so the default memory store would start every counter at zero:
-    // they count in the database (rate_limit).
     rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
     route: false,
     advanced: {
-      // Only the platform/proxy's client address; never fall back to a caller's X-Forwarded-For. Without a header
-      // (Cloudflare, Deno), ViteHub's default: the address the runtime reports.
       ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
-      // `__Host-` cookies can't be set or replaced from another subdomain, such as the content origin where drops run
-      // their own scripts. Better Auth would prefix `__Secure-`, which a subdomain can still overwrite.
       ...(requestOrigin.startsWith("https://")
         ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
         : {}),
@@ -131,7 +94,6 @@ export default defineAuth(({ env, requestOrigin }) => {
         },
     emailAndPassword: { enabled: password },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
-    // Free or Pro (shared/quotas.ts TIERS). The Console edits it through Better Auth's admin plugin.
     user: { additionalFields: { plan: { type: [...TIERS], required: false, input: false, returned: quotas } } },
     console: {
       fields: { plan: { label: "Plan", editable: quotas, reason: "Plans apply only when DROP_QUOTAS is on." } },
@@ -142,7 +104,6 @@ export default defineAuth(({ env, requestOrigin }) => {
           read: (people) => countDropsByUser(people.map((person) => person.id)),
         },
       },
-      // Labels and the Admins filter show the role DROP_ADMINS gives each account now, not the one stored at sign-in.
       roles: {
         editable: false,
         reason: "Admins come from DROP_ADMINS, set where Drop is deployed.",
@@ -156,7 +117,6 @@ export default defineAuth(({ env, requestOrigin }) => {
         create: {
           after: async (account) => {
             if (account.providerId !== "github") return
-            // Public GitHub metadata is a review signal; a lookup failure never blocks private use.
             const profile = await fetch(`https://api.github.com/user/${encodeURIComponent(account.accountId)}`, {
               headers: { "User-Agent": "Drop", Accept: "application/vnd.github+json" },
               signal: AbortSignal.timeout(3000),
@@ -177,8 +137,6 @@ export default defineAuth(({ env, requestOrigin }) => {
       },
       user: {
         create: { before: async (user) => ({ data: { ...user, role: roleOf(user, env.drop.admins.unseal()) } }) },
-        // Their memberships go first, so the team's seats in Stripe drop and its ownership passes on.
-        // The audit is written once the outcome is known: after the account is gone, or when leaving its teams fails.
         delete: {
           before: async (user, context) => {
             try {
@@ -191,7 +149,6 @@ export default defineAuth(({ env, requestOrigin }) => {
           after: async (user, context) => auditDeletion(user, context, "success"),
         },
       },
-      // A sign-in may verify the email (or DROP_ADMINS may have changed since the account was made).
       session: {
         create: {
           after: async (session) => {
@@ -216,7 +173,6 @@ export default defineAuth(({ env, requestOrigin }) => {
               subscription: {
                 enabled: true,
                 plans: teamBilling.plans,
-                // Only a team's owner and admins pay for it, see its billing, or cancel.
                 authorizeReference: authorizeBilling,
                 getCheckoutSessionParams: () => checkoutParams(billing.managedPayments),
                 onSubscriptionCreated: logSubscription("created"),
@@ -232,8 +188,6 @@ export default defineAuth(({ env, requestOrigin }) => {
         resource: `${requestOrigin}/mcp`,
         loginPage: "/oauth",
         provider: {
-          // The browser approval can involve a GitHub sign-in and a separate executor redirect.
-          // Keep the signed handoff alive long enough for that round trip to finish.
           codeExpiresIn: 30 * 60,
           enforcePerClientResources: false,
         },

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A site drop's page: the address to open the website at, then its comments. The other ways to comment (the bookmarklet
-// for sites that refuse frames, the tag for preview builds) fold away below once there's feedback to read. A comment's
-// thread opens in the viewer's bottom review dock.
 import { isSitePattern, reviewBookmarklet, reviewSnippet, siteCovers, siteHost } from "#shared/review"
 import type { DropComment, DropDetail, SiteReviewItem } from "#shared/types"
 
@@ -19,10 +16,7 @@ const snippet = reviewSnippet(origin)
 const bookmarklet = reviewBookmarklet(origin)
 const host = computed(() => (props.drop.siteUrl ? siteHost(props.drop.siteUrl) : ""))
 const pattern = computed(() => Boolean(props.drop.siteUrl && isSitePattern(props.drop.siteUrl)))
-// A pattern has no one address to open; its comments carry their page's origin instead.
 const siteLink = computed(() => (props.drop.siteUrl && !pattern.value ? props.drop.siteUrl : null))
-// Where the bookmarklet goes in the reader's browser. Guessed after mounting, so the server's HTML (Chrome's wording)
-// and the first client render match. Firefox also bookmarks it from the right-click menu, for anyone who can't drag.
 type Browser = "chrome" | "firefox" | "safari"
 const browser = ref<Browser>("chrome")
 onMounted(() => {
@@ -39,7 +33,6 @@ const afterBar = computed(
     (browser.value === "firefox" ? ", or right-click it and choose Bookmark Link. Then click" : ", then click") +
     ` it on any page of ${host.value}.`,
 )
-// The address to open in ViewerSiteFrame. A pattern starts empty, since each preview has its own.
 const address = ref("")
 watch(siteLink, (link) => (address.value ||= link ?? ""), { immediate: true })
 const addressCovered = computed(() => siteCovers(props.drop.siteUrl, address.value))
@@ -56,7 +49,6 @@ defineExpose({
   canDraw: computed(() => Boolean(framed.value)),
   pending: computed(() => siteFrame.value?.pending ?? false),
 })
-// Where a comment was written, as an address the frame can open: a pattern's comments carry their preview's origin.
 function pageUrl(comment: DropComment) {
   const page = comment.page
   if (!page) return undefined
@@ -67,7 +59,6 @@ function pageUrl(comment: DropComment) {
       : ""
   return url && siteCovers(props.drop.siteUrl, url) ? url : undefined
 }
-// Ways to comment start open until the first comment, then fold away under the feedback.
 const setupOpen = ref(props.comments.length === 0)
 function openHere(event: SubmitEvent) {
   if (addressCovered.value) {
@@ -92,7 +83,6 @@ function openHere(event: SubmitEvent) {
     @close="framed = null"
   />
   <div v-else class="min-h-0 flex-1 overflow-y-auto">
-    <!-- The review dock floats over this page, so its end clears it. -->
     <div class="mx-auto max-w-3xl space-y-8 px-4 pt-10 pb-36 sm:px-6 sm:pb-28">
       <section class="space-y-3">
         <form v-if="drop.canComment" class="flex items-center gap-2" novalidate @submit.prevent="openHere">
@@ -207,7 +197,6 @@ function openHere(event: SubmitEvent) {
                 >{{ afterBar }}
               </p>
             </div>
-            <!-- A bookmarklet: dragged to the bookmarks bar, never run here. -->
             <UTooltip :text="`Drag it to your ${bar}, then click it on any page of ${host}`">
               <a
                 class="inline-flex h-8 shrink-0 cursor-grab items-center gap-1.5 rounded-md border border-default bg-elevated px-3 text-sm font-medium text-highlighted transition-colors hover:bg-accented focus-visible:ring-2 focus-visible:ring-inverted focus-visible:outline-none active:cursor-grabbing"

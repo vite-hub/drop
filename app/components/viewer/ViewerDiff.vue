@@ -1,14 +1,10 @@
 <script setup lang="ts">
-// What one version changed, against the version before it, shown in place of the document while History stays open
-// beside it: a line diff of the source for Markdown and HTML docs, the two images side by side, or just the two files
-// for anything else. The first version shows all of itself as added.
 import { diffHunks, diffLines } from "#shared/line-diff"
 import type { DropDetail, DropVersion } from "#shared/types"
 
 const props = defineProps<{
   version: DropVersion
   previous: DropVersion | null
-  /** The drop's link with these changes showing, for the copy button. */
   link: string
 }>()
 const emit = defineEmits<{ close: [] }>()
@@ -21,7 +17,6 @@ const after = useApi<DropDetail>(() => `/api/drops/${id.value}`, {
   query: computed(() => ({ v: props.version.version })),
   ...options,
 })
-// The first version has nothing before it; the same request (same key) stands in rather than a conditional fetch.
 const before = useApi<DropDetail>(() => `/api/drops/${id.value}`, {
   key: () => keys.version(id.value, (props.previous ?? props.version).version),
   query: computed(() => ({ v: (props.previous ?? props.version).version })),
@@ -53,7 +48,6 @@ const counts = computed(() => ({
 <template>
   <section :aria-label="`What changed in v${version.version}`" class="absolute inset-0 z-10 flex flex-col bg-default">
     <div class="flex h-10 shrink-0 items-center gap-2 border-b border-default pr-2 pl-2 text-sm">
-      <!-- The way back leads the bar with a label, where it reads first; Esc and the browser's Back do the same. -->
       <UTooltip :kbds="['Esc']" text="Back to the document">
         <UButton
           class="shrink-0"
@@ -143,7 +137,6 @@ const counts = computed(() => ({
         </figure>
       </div>
 
-      <!-- TODO(diff): PDFs and other files have no preview to compare yet, so this only names the files. -->
       <ul v-else class="mx-auto max-w-md space-y-2 py-6 text-sm">
         <li
           v-for="side in [older, after.data.value!].filter(Boolean) as DropDetail[]"

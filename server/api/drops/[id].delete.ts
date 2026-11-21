@@ -7,10 +7,6 @@ import { logAudit, logDrop } from "../../utils/logs"
 import { isAttachment } from "../../utils/nodes"
 import { routeId } from "../../utils/params"
 
-/**
- * Moves a drop to the Trash, and a folder with everything in it; anyone on the team may for a drop in a team folder.
- * `?forever` deletes it now: its owner or an admin, people only, never their agents.
- */
 export default defineValidatedHandler({
   validate: { query: v.object({ forever: v.optional(v.string()) }) },
   async handler(event) {

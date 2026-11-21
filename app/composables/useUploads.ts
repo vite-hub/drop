@@ -1,10 +1,5 @@
 import type { DropSummary } from "#shared/types"
 
-/**
- * A file on its way up, shown in the list before the server has its drop. `progress` is how much of it has gone, from 0
- * to 1, and null while it waits for the files before it. `preview` is a local URL for an image or a video, so its row
- * shows the file at once.
- */
 export interface PendingUpload {
   key: number
   name: string
@@ -15,12 +10,6 @@ export interface PendingUpload {
 
 let lastKey = 0
 
-/**
- * Files someone adds to a list of drops, uploaded one after another: from the file picker, dropped on `root`, or handed
- * to `uploadFiles`. They go into `folder`, or to the top without one. Each one waits in `pending` until its drop is in the
- * list, so the list shows it from the moment it's added. On a wide screen the last one shows in the list's preview
- * (`selected`); on a narrow one a single file opens instead.
- */
 export function useUploads(
   root: Readonly<Ref<HTMLElement | null>>,
   options: {

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Official mark for known agents (Claude Code, Codex, Cursor…), otherwise a neutral icon by how it connected.
 const props = defineProps<{ name: string; kind?: string }>()
 const logo = computed(() => agentLogo(props.name))
 const fallback = computed(
@@ -11,7 +10,6 @@ const fallback = computed(
 
 <template>
   <UIcon v-if="logo?.icon" :name="logo.icon" class="shrink-0" :style="logo.color ? { color: logo.color } : undefined" />
-  <!-- A mark Simple Icons doesn't have (Executor) is its round logo file. -->
   <img v-else-if="logo" alt="" class="inline-block shrink-0 rounded-full" :src="logo.logo" />
   <UIcon v-else :name="fallback" class="shrink-0 text-muted" />
 </template>

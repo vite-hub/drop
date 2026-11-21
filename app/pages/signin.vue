@@ -3,7 +3,6 @@ import { signInPath } from "#shared/sign-in"
 
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
-// Both requests at once: the page waits for the slower one, not the two in turn.
 const [{ data: me }, { data: method }] = await Promise.all([useMe(), useSignInMethod()])
 const { next, signIn } = useGitHubSignIn()
 const { signOut } = useUserSession(useNuxtApp().$auth)
@@ -16,8 +15,6 @@ async function connect() {
   error.value = ""
   try {
     if (method.value?.proxy) {
-      // One navigation: oauth2-proxy clears its cookie, then starts a fresh login. Signing out over fetch first
-      // let the session refetch start a second login that overwrote this one's CSRF cookie.
       const start = signInPath(next.value, { proxy: true })
       await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
       return
@@ -36,7 +33,6 @@ async function connect() {
   } catch (cause) {
     reportClientError("signin", cause)
     error.value = errorText(cause)
-    // Only a failure frees the button: on success the page is leaving, and a second press would start a second login.
     pending.value = false
   }
 }

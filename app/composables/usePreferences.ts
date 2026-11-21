@@ -3,45 +3,28 @@ import type { DeviceFrameSize } from "vite-hub/ui"
 
 const year = 60 * 60 * 24 * 365
 
-// UI preferences that change the layout live in cookies, not localStorage, so the server renders the same layout the
-// browser will show: no flash, no hydration mismatch.
-
-/** How wide a folder's preview pane is, in rem, dragged from its left edge. */
 export const useFolderPreviewWidth = () =>
   useCookie<number>("drop-folder-preview-width", { default: () => 22, maxAge: year, sameSite: "lax" })
 
-/** How the Drops page opens: the drops you pinned (Pinned), yours newest first (Recent), or folders first (Folders). */
 export const useDropsView = () =>
   useCookie<"pinned" | "recent" | "folders">("drop-drops-view", {
     default: () => "pinned",
     maxAge: year,
     sameSite: "lax",
   })
-/** Whether the Drops page shows cards with previews or a list. */
 export const useDropsLayout = () =>
   useCookie<"grid" | "list">("drop-drops-layout", { default: () => "grid", maxAge: year, sameSite: "lax" })
-/** How wide Markdown docs read (DOC_WIDTHS), for every doc, from the viewer's More menu or W. */
 export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
-/**
- * Zen mode, from the review pill's + or Z, for every drop: a Markdown doc reads without its outline, and the pill folds
- * to a small handle while nothing needs it (DropViewer).
- */
 export const useZen = () => useCookie<boolean>("drop-zen", { default: () => false, maxAge: year, sameSite: "lax" })
 
-/**
- * How comments on a Markdown doc's text show: "card", the cards in the margin and the composer floating over its place
- * (89c9927), or "pin", an avatar pin in the gutter with a small bubble beside it. Chosen in the Details panel.
- */
 export type CommentStyle = "card" | "pin"
 export const useCommentStyle = () =>
   useCookie<CommentStyle>("drop-comment-style", { default: () => "card", maxAge: year, sameSite: "lax" })
-/** Whether the page shows its comments' pins and highlights: the review pill's eye (Hide comments), for every drop. */
 export const useCommentsShown = () =>
   useCookie<boolean>("drop-comments-shown", { default: () => true, maxAge: year, sameSite: "lax" })
 
-/** Device mode for HTML docs, apps, and reviewed sites (ViewerDevice), for every drop. */
 export const useDeviceSize = () =>
   useCookie<DeviceFrameSize>("drop-device-mode", {
     default: () => ({ on: false, id: "iphone", width: 393, height: 852, zoom: null }),
@@ -49,30 +32,18 @@ export const useDeviceSize = () =>
     sameSite: "lax",
   })
 
-/** Whether the Drops page's Get started checklist was dismissed. A cookie, so a dismissed checklist never flashes in. */
 export const useGetStartedHidden = () =>
   useCookie<boolean>("drop-get-started-hidden", { default: () => false, maxAge: year, sameSite: "lax" })
 
-/**
- * Whether the sidebar is folded away (⌘B). The dashboard layout binds it to the sidebar, which keeps it in its cookie;
- * the pages' top bars read it to show the button that brings the sidebar back. It starts from that cookie (Nuxt UI's
- * `<storage-key>-sidebar-<id>`): the sidebar reads it only in its own setup, after the server rendered the layout.
- */
 export const useSidebarCollapsed = () =>
   useState<boolean>(
     "drop-sidebar-collapsed",
     () => !!useCookie<{ collapsed?: boolean } | null>("drop-sidebar-nav").value?.collapsed,
   )
 
-/**
- * Whether the app opened on a drop's link, from a pull request or a chat. That first page reads without the sidebar,
- * whatever ⌘B saved, and leaves the saved choice alone: the sidebar comes back on the next page, with ⌘B, or with Show
- * sidebar. Decided on the server, so the page renders without it.
- */
 export const useOpenedOnLink = () =>
   useState<boolean>("drop-opened-on-link", () => import.meta.server && useRoute().name === "d-id-slug")
 
-/** Whether the sidebar is out of sight, folded or skipped on a link, and the ⌘B toggle that shows it or folds it. */
 export function useSidebarHidden() {
   const collapsed = useSidebarCollapsed()
   const onLink = useOpenedOnLink()
@@ -85,37 +56,22 @@ export function useSidebarHidden() {
   return { hidden, toggle }
 }
 
-/** Which folders and apps are expanded in the sidebar tree. Shared state, so it survives navigation. */
 export const useTreeOpen = () => useState<Record<string, boolean>>("drop-tree-open", () => ({}))
 
-// One timer for every relative time on the page, alive while any of them is mounted. It catches up first, since
-// `now` may have sat still while nothing showed a time.
 const tick = createSharedComposable(() => {
   const now = useState<number>("now")
   now.value = Date.now()
   useIntervalFn(() => (now.value = Date.now()), 30_000)
 })
 
-/**
- * "Now" for relative times ("3m ago"). Taken once on the server and reused on hydration, so server and
- * client print the same text; then it ticks every 30 seconds in the browser. app.vue gives it to vite-hub/ui's
- * RelativeTime (provideRelativeNow), so the words and Drop's own countdowns move together.
- */
 export function useRelativeNow() {
   const now = useState("now", () => Date.now())
-  // Client only: on the server a shared composable would be shared across requests.
   if (import.meta.client) onMounted(tick)
   return now
 }
 
-/** How long a copy button shows its check, in ms. */
 export const COPY_MS = 1400
 
-/**
- * Copy without a toast: the button that copied shows a check while `copied(key)` holds, for a moment. A copy whose
- * button goes away with the click (a menu item, ⌘K, a shortcut) passes `announce`, and StatusNote says it in a small
- * pill that leaves on its own. A failure toasts.
- */
 export function useCopy() {
   const notify = useNotify()
   const { copy: write } = useClipboard({ legacy: true })
@@ -141,10 +97,6 @@ export function useCopy() {
         failed(error)
       }
     },
-    /**
-     * Copy text that's still loading. Safari only lets a click write the clipboard straight away, so where it can the
-     * write starts now and the browser waits for the text.
-     */
     copyLoading: async (text: Promise<string>, options: Options = {}) => {
       try {
         if ("ClipboardItem" in globalThis && navigator.clipboard?.write)

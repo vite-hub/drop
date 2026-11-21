@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// One team: its folders, its people and the invitations out, and, where teams pay, its plan. The owner and admins
-// invite, remove, make folders, and pay; members see who's on it and may leave (server/utils/teams.ts).
 import type { DropdownMenuItem } from "@nuxt/ui"
 
 const route = useRoute()
@@ -14,7 +12,6 @@ const newFolder = useFolderDialog()
 
 const team = computed(() => me.value?.teams?.find((item) => item.id === id.value))
 const runs = computed(() => team.value?.role === "owner" || team.value?.role === "admin")
-// Better Auth's client calls go from the browser, with its session cookie.
 const {
   data: detail,
   status,
@@ -34,7 +31,6 @@ const members = computed(() =>
 const pending = computed(() => (detail.value?.invitations ?? []).filter((item) => item.status === "pending"))
 const ROLE_ORDER = ["owner", "admin", "member"]
 
-// Billing: a free team holds up to `freeMembers` people, counting the invitations out.
 const billing = computed(() => me.value?.billing)
 const seats = computed(() => members.value.length + pending.value.length)
 const full = computed(() => Boolean(billing.value && !team.value?.paid && seats.value >= billing.value.freeMembers))
@@ -61,7 +57,6 @@ async function invite() {
   }
 }
 
-// A blocked clipboard says so and shows the link to copy by hand, instead of a "copied" note over an empty clipboard.
 async function copy(invitationId: string, title = "Link copied") {
   const link = inviteLink(invitationId)
   const written = await navigator.clipboard.writeText(link).then(
@@ -72,7 +67,6 @@ async function copy(invitationId: string, title = "Link copied") {
   else notify.alert("Couldn't copy the link", link)
 }
 
-// One row's Cancel at a time, so a double press doesn't send it twice.
 const cancelling = ref<string | null>(null)
 async function cancelInvite(invitationId: string) {
   cancelling.value = invitationId
@@ -151,7 +145,6 @@ async function makeFolder() {
   }
 }
 
-// Which billing button was pressed: it spins, the others wait.
 const paying = ref<"manage" | "monthly" | "yearly" | null>(null)
 async function pay(button: NonNullable<typeof paying.value>, action: () => Promise<{ url?: string | null }>) {
   paying.value = button

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The sidebar row a newer deploy brings in, above the account menu so both panes show it: a SidebarItem-shaped button
-// whose icon carries a dot, and a click reloads onto the new build. The open page keeps the old one until then.
 const ready = useUpdateReady()
 </script>
 

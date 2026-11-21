@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Opened through useSiteDialog(): the address a new site review covers and its name. Resolves both, or null on cancel.
-// The address follows the server's rules (SiteSchema), so a typo shows here instead of after a round trip.
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 import { siteAddress, siteHost } from "#shared/review"

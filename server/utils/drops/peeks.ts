@@ -6,22 +6,13 @@ import { ancestorsOf } from "../nodes"
 import { SEARCH_KINDS } from "../search"
 import { d1Chunks } from "../d1"
 
-/** About a card's worth of a doc: the Drops page shows its first lines, not the whole text. */
 export const PEEK_TEXT = 360
-/** How many of a folder's drops its card fans out. */
 export const PEEK_INSIDE = 3
-/** At most this many drops per request: D1 binds at most 100 parameters per query. */
 const MAX_PEEKS = 90
 
-// Search text keeps a callout's marker (`[!NOTE]`), which a preview reads as noise.
 const CALLOUT = /\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/gi
 const hasText = (kind: string) => SEARCH_KINDS.some((searched) => searched === kind)
 
-/**
- * What the Drops page's cards preview, for `ids` the owner has: a text doc's or board's first words (its search text,
- * so no file is read), an image's file, and a folder's newest PEEK_INSIDE drops with theirs. Nothing here touches a
- * drop's views or its expiry, which only opening it does.
- */
 export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks> {
   const wanted = [...new Set(ids)].slice(0, MAX_PEEKS)
   if (!wanted.length) return {}
@@ -67,7 +58,6 @@ export async function peeksOf(ownerId: string, ids: string[]): Promise<DropPeeks
   )
 }
 
-/** Each visible folder's newest owned, non-quarantined drops, ranked in the query so a folder of hundreds sends three. */
 function newestInside(ownerId: string, folders: string[]) {
   const ranked = db
     .select({
@@ -79,7 +69,6 @@ function newestInside(ownerId: string, folders: string[]) {
       rank: sql<number>`row_number() over (partition by ${drops.parentId} order by ${drops.updatedAt} desc)`.as("rank"),
     })
     .from(drops)
-    // Their ancestors are the visible folder's path, already checked above.
     .where(
       and(
         eq(drops.ownerId, ownerId),

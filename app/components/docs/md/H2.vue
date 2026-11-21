@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// A section heading that links to itself. Pages set the id with `## Title {#id}` so links keep working when titles change.
 defineProps<{ id?: string }>()
 </script>
 

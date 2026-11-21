@@ -1,6 +1,3 @@
-// Fails when a change edits, renames or deletes a migration that is already on the base branch. D1 and SQLite record a
-// migration by name once it runs, so an edited one never runs again where it has shipped (drop#28).
-// Usage: node scripts/check-migrations.mjs [base], default origin/main. Compares the working tree with the merge base.
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 

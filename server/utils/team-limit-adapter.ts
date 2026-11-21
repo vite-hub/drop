@@ -5,7 +5,6 @@ import { organization } from "better-auth/plugins"
 
 const errors = organization().$ERROR_CODES
 
-/** Give trigger refusals the same response as Better Auth's limit checks, before its error handler runs. */
 export function teamLimitAdapter(database: ReturnType<typeof drizzleAdapter>): ReturnType<typeof drizzleAdapter> {
   return (options) => {
     const adapter = database(options)

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// The team's folders, for the sidebar on a team Drop, or one team's (`team`) on a personal Drop with teams. Each opens
-// to what's in it, like any folder (DropTreeItem).
 const { team } = defineProps<{ team?: string }>()
 const emit = defineEmits<{ navigate: [] }>()
 const { data: shared, status } = useSharedWithMe()

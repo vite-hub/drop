@@ -7,10 +7,6 @@ import { identify } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 import { recordRuntimeErrors } from "../../../utils/runtime-errors"
 
-/**
- * The viewer forwards what an app or HTML page reported going wrong, so the agent that published it reads the
- * errors in read_drop. Anyone who can open the drop reports; the text comes from the page, so it's untrusted.
- */
 export default defineValidatedHandler({
   validate: {
     body: v.object({

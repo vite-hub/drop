@@ -1,21 +1,14 @@
 <script setup lang="ts">
-// The first-run checklist on the Drops page. Every step ticks itself off from real data (connected agents, your drops),
-// so it never asks you to confirm anything; it hides for good once the three main steps are done, or when dismissed.
-// The dismissal is a cookie, read on the server too, so a dismissed checklist never flashes in.
 import type { DropSummary } from "#shared/types"
 
 const props = defineProps<{ drops: DropSummary[] }>()
 const emit = defineEmits<{ upload: []; site: [] }>()
 
 const hidden = useGetStartedHidden()
-// Your agents decide only the first step, so they're fetched only when no drop came from one yet: on a Drops page with
-// agents' drops the fetch only held up the render by another round trip.
 const agents = hidden.value || props.drops.some((drop) => drop.actorKind === "agent") ? ref([]) : useAgentList().data
-// On a team Drop a drop is the team's from the start, so sharing is done once there's one.
 const { data: me } = useMe()
 const team = computed(() => me.value?.mode === "team")
 
-// Docs and apps count as a first drop; a folder or a site review alone has nothing to read yet.
 const docs = computed(() => props.drops.filter((drop) => drop.kind !== "folder" && drop.kind !== "site"))
 const steps = computed(() => [
   {
@@ -43,8 +36,6 @@ const required = computed(() => steps.value.filter((step) => !step.optional))
 const finished = computed(() => required.value.filter((step) => step.done).length)
 const visible = computed(() => !hidden.value && finished.value < required.value.length)
 
-// The first run is the whole page: the steps run down a column and the first open one starts expanded. Once there are
-// drops the steps fold into a row of small cards above them, and each opens its instructions in a popover.
 const picked = ref<string>()
 const active = computed(() => {
   const step = steps.value.find((item) => item.id === picked.value)

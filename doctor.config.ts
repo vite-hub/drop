@@ -10,6 +10,21 @@ export default defineDoctorConfig({
     // comark-ui's own skill (server/utils/skills.ts), so links to them resolve only once served.
     comark({ include: "skills/**/*.md", links: { skip: [/^references\/(?:annotations\.md|comark-ui\/)/] } }),
   ],
+  rules: {
+    "typescript/strict/no-comments": ["error", { apiDocs: "none" }],
+    "vueuse/prefer-use-timers": "error",
+    "nuxt/imports/prefer-alias-over-relative-parent": "off",
+    "nitro/h3/prefer-nitro-h3": "off",
+    "typescript/boundaries/no-inherited-key-lookup": "off",
+    "typescript/boundaries/no-cross-realm-builtin-instanceof": "off",
+    "vue/ssr/data-allow-mismatch-surgical": "off",
+  },
+  overrides: [
+    {
+      files: ["skills/**"],
+      rules: { "typescript/strict/no-comments": "off", "vueuse/prefer-use-timers": "off" },
+    },
+  ],
   suppressions: [
     {
       ruleId: "nuxt/imports/no-explicit-auto-import",

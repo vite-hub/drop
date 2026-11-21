@@ -3,10 +3,6 @@ import { blob } from "vite-hub/blob"
 import { routeId } from "../../../utils/params"
 import { reviewApi, reviewImage, reviewSession } from "../../../utils/review"
 
-/**
- * A screenshot or a thread's image, for the review script to show on the site's page. The page can't send Drop's
- * cookies, so /f/ won't do: the script fetches this with its token and shows the bytes from a blob URL.
- */
 export default reviewApi(async (event) => {
   const { site } = await reviewSession(event)
   const image = await reviewImage(site, await routeId(event))

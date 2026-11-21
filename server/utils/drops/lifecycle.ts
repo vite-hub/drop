@@ -15,23 +15,14 @@ import type { DropRow } from "./types"
 import { listDrops, findDrop } from "./query"
 import { drainBlobCleanup, deleteBlobKeys } from "./write"
 
-/**
- * Moves a drop to the Trash. Its links stop working; it's purged after 15 days. Everything below it goes with it: the
- * drops below read the Trash from their ancestors, so a folder takes one write.
- */
 export async function trashDrop(row: DropRow, now = Date.now()) {
   await db.update(drops).set({ trashedAt: now, trashReason: "deleted" }).where(eq(drops.id, row.id))
 }
 
-/** Brings a drop back from the Trash with a fresh window, whether it was deleted or expired, and everything below it. */
 export async function restoreDrop(row: DropRow, now = Date.now()) {
   await db.update(drops).set({ trashedAt: null, trashReason: null, lastAccessedAt: now }).where(eq(drops.id, row.id))
 }
 
-/**
- * Removes a drop for good: every version, its files, its comments, the files it embeds, and for a folder everything
- * in it, depth first. `gone` collects the deleted ids, so nothing is deleted twice.
- */
 export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
   await drainBlobCleanup()
   gone.add(row.id)
@@ -40,15 +31,12 @@ export async function deleteDrop(row: DropRow, gone = new Set<string>()) {
     db.select({ version: dropVersions.version }).from(dropVersions).where(eq(dropVersions.dropId, row.id)),
   ])
   for (const child of children) if (!gone.has(child.id)) await deleteDrop(child, gone)
-  // Queue Comments cleanup in the deletion batch, before its scope can no longer be found from the Drop rows.
   await deleteRetainedDrop(row, deleteBlobKeys, await commentCleanupFor(row))
   await drainCommentCleanup()
-  // Live drafts are Blob files too (utils/live-drafts.ts), one per version anyone opened in the editor.
   if (row.kind === "markdown" && LIVE_EDITING)
     await deleteBlobKeys([row.version, ...versions.map((item) => item.version)].map((n) => draftPath(row.id, n)))
 }
 
-/** Every drop in someone's Trash, for "Empty Trash". */
 export async function emptyTrash(who: Identity, event?: H3Event) {
   const trashed = await listDrops(who, event, { trash: true })
   for (const summary of trashed) {
@@ -59,12 +47,6 @@ export async function emptyTrash(who: Identity, event?: H3Event) {
   return trashed.length
 }
 
-/**
- * The hourly cleanup, in bounded batches (the next run picks up the rest). Drops at the top past their window move to
- * the Trash as of when they expired (the drops below follow them); drops 15 days into the Trash, with everything below
- * them, and nodes whose parent is gone, are deleted. `note` hears of each deletion as it happens, so a run that fails
- * halfway still says what it deleted.
- */
 export async function deleteExpiredDrops(
   now: Date,
   limit = 50,
@@ -105,7 +87,6 @@ export async function deleteExpiredDrops(
     .limit(limit)
   await drainBlobCleanup()
   await drainCommentCleanup()
-  // Drops whose Trash time ran out, then drops whose parent was gone.
   for (const row of due) {
     await deleteDrop(row)
     note({ id: row.id, owner: row.ownerId, reason: row.trashReason })
@@ -117,6 +98,5 @@ export async function deleteExpiredDrops(
   return { expired, purged: due.length, orphans: orphans.length }
 }
 
-/** The drop's share link, which opens its latest version. */
 export const dropPageUrl = (origin: string, drop: Pick<DropRow, "id" | "title" | "slug">) =>
   new URL(dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) }), origin).href

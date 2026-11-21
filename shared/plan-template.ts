@@ -1,5 +1,3 @@
-// Starter HTML plan. Agents copy it, replace the content, and keep the structure.
-// It only uses the theme tokens Drop (and T3 Code) inject, so it follows light/dark mode.
 export const PLAN_TEMPLATE = String.raw`<!doctype html>
 <html lang="en">
 <head>

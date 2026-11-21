@@ -4,7 +4,6 @@ import { sendAgent } from "../../utils/send-endpoint"
 import { lastSentAt } from "../../utils/handoffs"
 import { requireIdentity } from "../../utils/identity"
 
-/** The agent the caller paired for Send, for the Agents page, or null. It never carries the URL or the secret. */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const [error, endpoint] = await getMemberEndpoint(who.userId)

@@ -1,17 +1,10 @@
 <script setup lang="ts">
-// The review pill's + (I), at its right end: it grows the pill to the right, the + turning into a ×, with what the pill
-// keeps out of sight. First the preview tools and Edit (#tools), then the lifetime chip (#lifetime), one chip (H) with
-// the version or size and the views that opens the details (#details) above History (#history) in a popover, the width
-// button (W) that steps the reading width, and the drop's actions as icons with tooltips. The chips show their words, so
-// they have no tooltip (one inside a popover's trigger loses its provider). Escape closes the popover first, then the
-// segment. On a phone the segment takes its own rows above the pill's, wrapping rather than hiding anything.
 export type DetailsAction = {
   id: string
   label: string
   icon: string
   kbd?: string
   destructive?: boolean
-  /** A toggle that's on, like Pin on a pinned drop: the button shows pressed. */
   pressed?: boolean
   to?: string | { path: string; query?: Record<string, string> }
   press?: () => void
@@ -20,9 +13,7 @@ export type DetailsAction = {
 const open = defineModel<boolean>("open", { required: true })
 const pop = defineModel<boolean>("pop", { required: true })
 const props = defineProps<{
-  /** The chip's words, such as "v4 · 34 views"; none hides it. */
   chip?: string
-  /** What its popover holds: the details (none on a Markdown doc, whose header has its facts) and History. */
   details: boolean
   history: boolean
   width?: string
@@ -38,17 +29,20 @@ const chipLabel = computed(() => {
 const main = computed(() => props.actions.filter((action) => !action.destructive))
 const danger = computed(() => props.actions.filter((action) => action.destructive))
 watch(open, (value) => !value && (pop.value = false))
-// The row wraps on a narrow pill, but only once it has grown: while it is closed or easing open its width is too small
-// for anything, and wrapping then would stack every button into a tall column.
 const grown = ref(false)
 const reduced = usePreferredReducedMotion()
-let growing: ReturnType<typeof setTimeout> | undefined
+const growing = useTimeoutFn(
+  () => (grown.value = true),
+  () => (reduced.value === "reduce" ? 0 : 260),
+  {
+    immediate: false,
+  },
+)
 watch(open, (value) => {
-  clearTimeout(growing)
+  growing.stop()
   grown.value = false
-  if (value) growing = setTimeout(() => (grown.value = true), reduced.value === "reduce" ? 0 : 260)
+  if (value) growing.start()
 })
-onBeforeUnmount(() => clearTimeout(growing))
 
 const chipClass =
   "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned tabular-nums transition-colors hover:bg-elevated hover:text-highlighted aria-expanded:bg-inverted aria-expanded:text-inverted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
@@ -60,8 +54,6 @@ const popoverUi = {
 </script>
 
 <template>
-  <!-- Grows from nothing left of the +, pushing it right: the column eases open, then its buttons fade in. A phone gives
-       it a row of its own. -->
   <div
     id="drop-details"
     class="grid min-w-0 max-w-full transition-[grid-template-columns,visibility] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
@@ -151,8 +143,6 @@ const popoverUi = {
       type="button"
       @click="open = !open"
     >
-      <!-- The + turns into a × as the pill grows, at the segment's own pace. An inline SVG, not the icon mask, so the
-           closed + snaps its two bars to whole pixels instead of blurring them at 1x; the × keeps its smooth edges. -->
       <UIcon
         name="i-mingcute-add-line"
         mode="svg"

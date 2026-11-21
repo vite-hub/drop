@@ -1,6 +1,5 @@
 <script setup lang="ts">
 const route = useRoute("drops-id")
-// `?v=<n>` opens an earlier version, as History does.
 const { drop, comments } = provideDrop(
   () => route.params.id,
   () => Number(route.query.v) || undefined,
@@ -15,7 +14,6 @@ const here = useHerePath()
   <DropViewer v-if="drop.data.value" :key="`${drop.data.value.id}@${drop.data.value.version}`" />
   <UDashboardPanel v-else id="drop-missing">
     <template #header>
-      <!-- The viewer's bar while it loads or can't open, so the page keeps its line and doesn't jump. -->
       <UDashboardNavbar :ui="{ root: 'h-12 gap-2 px-2 sm:px-3' }">
         <template #left>
           <SidebarExpand />

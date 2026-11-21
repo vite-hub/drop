@@ -11,13 +11,6 @@ import {
   reviewTiming,
 } from "../../utils/review"
 
-/**
- * A comment from a site under review: `data` (JSON, ReviewCommentSchema), an optional `screenshot` of the viewport,
- * and the `image`s the reviewer added, as multipart. The token decides the site drop. Everything here comes from someone else's page, so it's checked like
- * any upload: the screenshot by its bytes, not its claimed type, and at most 4 MiB. The answer is the comment's number
- * and its thread as the page lists it (ReviewThread), so the script draws the pin without asking again: nothing that
- * would open the review. A resend that finds the earlier submission answers the number only.
- */
 export default reviewApi(async (event) => {
   const timing = reviewTiming(event)
   const { site, claims, who, guest } = await reviewSession(event).catch(async (error) => {

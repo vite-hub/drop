@@ -4,7 +4,6 @@ import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
 import type { SendEndpoint, SendTestResult } from "~/utils/comment-send"
 
-// Started before the layout renders, which waits for your drops first, so the agents load alongside them.
 definePageMeta({ middleware: () => void useAgentList() })
 
 useSeoMeta({ title: "Agents" })
@@ -14,7 +13,6 @@ const server = `${origin}/mcp`
 const MCP_SNIPPETS = mcpSnippets(server)
 const clients: TabsItem[] = MCP_CLIENT_IDS.map((value) => ({ label: MCP_CLIENTS[value], value }))
 
-// Executor's segmented control: the active tab is a raised white chip, not a filled button.
 const tabsUi = {
   list: "w-auto",
   indicator: "bg-default shadow-xs ring ring-default",
@@ -25,8 +23,6 @@ const tabsUi = {
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
 
-// Send: the agent that a Send button in the review pill hands comments to. A member pairs one from any Send button;
-// this row shows it, tests it, and removes it.
 const endpoint = ref<SendEndpoint | null>(null)
 const tested = ref<SendTestResult | null>(null)
 const testing = ref(false)
@@ -86,7 +82,6 @@ onBeforeUnmount(() => unwatchEndpoint?.())
           >{{ MCP_HINTS[client] }} The
           <NuxtLink to="/skills" class="underline underline-offset-4">skills</NuxtLink> come with the server.</span
         >
-        <!-- A bare "Template" said nothing about what it copies. -->
         <UTooltip text="A starter HTML plan your agent can fill in and drop">
           <DropCopyButton label="Copy plan template" size="sm" :value="PLAN_TEMPLATE" />
         </UTooltip>

@@ -1,13 +1,5 @@
 <script setup lang="ts">
-/**
- * "Open in Drop" from a reviewed site, or a doc from its "Related links" menu. The page knows only its review token
- * (`#<token>`) or the doc's handle (`#doc=<handle>`), in the hash so it never reaches a log; Drop opens the review or
- * the doc from it for people who could open it anyway, and says so to everyone else.
- * With `?copy` it copies the review's link instead, here on Drop's origin, so the site never sees the link. The pill
- * opens it as a popup, which closes once the link is copied.
- */
 const route = useRoute("review-open")
-// The router has decoded the hash already.
 const doc = route.hash.startsWith("#doc=") ? route.hash.slice(5) : null
 const thing = doc === null ? "review" : "document"
 useSeoMeta({ title: `Open the ${thing}`, robots: "noindex, nofollow" })
@@ -18,13 +10,16 @@ const error = ref("")
 const copying = doc === null && "copy" in route.query
 const link = ref("")
 const copied = ref(false)
+function closeWindow() {
+  if (import.meta.client) window.close()
+}
+const closeSoon = useTimeoutFn(closeWindow, 1200, { immediate: false })
 
-// Chrome copies as the popup opens; Safari and Firefox want a click here first, so the button stays until it works.
 async function copyLink() {
   try {
     await navigator.clipboard.writeText(link.value)
     copied.value = true
-    setTimeout(() => window.close(), 1200)
+    closeSoon.start()
   } catch {
     copied.value = false
   }

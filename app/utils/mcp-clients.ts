@@ -1,5 +1,3 @@
-// How to add Drop's MCP server to each client. No keys to paste: each client signs in through the browser the
-// first time and keeps the token itself. Used by the Agents page and the docs.
 export const MCP_CLIENT_IDS = ["claude", "claudeai", "chatgpt", "codex", "cursor", "vscode", "any"] as const
 export type McpClient = (typeof MCP_CLIENT_IDS)[number]
 
