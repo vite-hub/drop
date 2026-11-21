@@ -1,0 +1,14 @@
+{
+  "name": "drop",
+  "owner": { "name": "ViteHub", "url": "https://vitehub.dev" },
+  "description": "Drop's plugin for Claude Code: its MCP server and skills.",
+  "plugins": [
+    {
+      "name": "drop",
+      "source": "./",
+      "description": "Drop's MCP server and skills: publish work for review, read the comments, and publish the next version.",
+      "category": "productivity",
+      "homepage": "https://drop.vitehub.dev"
+    }
+  ]
+}

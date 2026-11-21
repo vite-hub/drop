@@ -4,7 +4,7 @@ import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { createTarGzip } from "nanotar"
-import { objects, sql, state, migrate, reset, who, calls, insertDrop, threads } from "../cost/harness.mjs"
+import { objects, sql, state, migrate, reset, who, calls, insertDrop, threads, event } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts")
 const { default: readFile } = await import("../../server/mcp/tools/read_file.ts")
@@ -348,6 +348,24 @@ test("publish accepts partial agent metadata and rejects invalid labels before w
   assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, agent)
 })
 
+test("publish reads a plain agent string as the model", async () => {
+  const doc = (
+    await call(publish, {
+      markdown: "# Model only",
+      note: "String agent",
+      lifetime: "review",
+      agent: "claude-opus-5-5",
+    })
+  ).structuredContent
+  assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, {
+    model: "claude-opus-5-5",
+  })
+  assert.equal(
+    (await call(publish, { markdown: "# Blank", note: "Blank", lifetime: "review", agent: "  " })).isError,
+    true,
+  )
+})
+
 test("app replacement records the current publisher without inheriting earlier metadata", async () => {
   const agent = { model: "gpt-6-astra", harness: "Codex", reasoningLevel: "high" }
   const app = (
@@ -553,7 +571,7 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     commentsPost(route("paper", { kind: "area", selector: "main", ox: 0, oy: 0, pdfPage: 2, body: "x" })),
     { statusText: "A PDF's page takes a spot or an area." },
   )
-  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 0, body: "x" })))
+  await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 0, body: "x" })), { status: 400 })
   await assert.rejects(commentsPost(route("paper", { ...area, pdfPage: 2, at: 4, body: "x" })), {
     statusText: "A comment is on a frame or a page, not both.",
   })
@@ -565,6 +583,69 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     [3, undefined],
   )
   assert.match(read.content[0].text, /\[the area 30%–70% across, 12%–30% down of page 3\]\n {3}Caption this figure\./)
+})
+
+test("a Marker comment keeps its strokes for the page to draw, only on an area", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: init ? "POST" : "GET",
+        ...(init ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init) } : {}),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const { id } = (
+    await call(publish, { markdown: "# Lumpy\n\nRed rows stop being lumpy.", note: "Draft", lifetime: "review" })
+  ).structuredContent
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
+  const ink = {
+    w: 240,
+    h: 90,
+    strokes: [
+      {
+        tool: "pen",
+        color: "#ec4899",
+        width: 8,
+        points: [
+          [4, 4],
+          [120, 80],
+          [236, 10],
+        ],
+      },
+      { tool: "text", color: "#2563eb", width: 16, points: [[10, 45]], text: "this" },
+    ],
+  }
+  const area = { kind: "area", selector: "p", ox: 100, oy: 0, ow: 600, oh: 1000 }
+  const sent = await commentsPost(route(id, { ...area, ink, body: "This one." }))
+  assert.deepEqual(sent.ink, ink)
+  const listed = (await commentsGet(route(id))).find((comment) => comment.n === sent.n)
+  assert.deepEqual(listed.ink, ink)
+  const plain = await commentsPost(route(id, { ...area, body: "A box." }))
+  assert.equal(plain.ink, null)
+  // A long scribble is kept with fewer points, as ViteHub keeps at most 4,000 characters in a field.
+  const scribble = Array.from({ length: 2400 }, (_, i) => [120 + 100 * Math.cos(i / 40), 45 + 40 * Math.sin(i / 40)])
+  const long = await commentsPost(
+    route(id, { ...area, ink: { w: 240, h: 90, strokes: [{ ...ink.strokes[0], points: scribble }] }, body: "Round." }),
+  )
+  assert.ok(long.ink.strokes[0].points.length < 2400 && long.ink.strokes[0].points.length > 20)
+  const kept = (await commentsGet(route(id))).find((comment) => comment.n === long.n)
+  assert.deepEqual(kept.ink, long.ink)
+
+  await assert.rejects(
+    commentsPost(route(id, { kind: "text", selector: "p", ox: 0, oy: 0, quote: "Red rows", ink, body: "x" })),
+    { statusText: "The Marker's strokes go on an area." },
+  )
+  await assert.rejects(
+    commentsPost(route(id, { ...area, ink: { ...ink, strokes: [{ ...ink.strokes[0], color: "red" }] }, body: "x" })),
+    { status: 400 },
+  )
+  const many = { tool: "pen", color: "#ec4899", width: 8, points: Array.from({ length: 3001 }, (_, i) => [i % 240, 1]) }
+  await assert.rejects(commentsPost(route(id, { ...area, ink: { ...ink, strokes: [many, many] }, body: "x" })), {
+    status: 400,
+  })
 })
 
 test("accepting a suggestion, from the page or an agent, publishes its words as the next version and resolves it; undo takes it back", async () => {
@@ -740,7 +821,7 @@ test("a comment on the whole page points at nothing in it, and agents read it as
   assert.equal(added.kind, "page")
   await assert.rejects(
     commentsPost(route(doc.id, { kind: "page", selector: "p", ox: 0, oy: 0, body: "Pointing at a paragraph" })),
-    "a page comment can't carry an anchor",
+    { statusText: "A comment on the whole page points at nothing in it." },
   )
 
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
@@ -1731,6 +1812,180 @@ test("the comments on Drop's own pages are for admins only", async () => {
   assert.deepEqual(admin.structuredContent.threads, [])
   // Nor does `@` suggest the people who comment on drops.
   assert.deepEqual(await comments.people({ query: "", user: null }), [undefined, []])
+})
+
+test("read_drop tells an admin's agent about the toolbar threads on the drop's page, and nobody else's", async () => {
+  const doc = (await call(publish, { markdown: "# Paper", title: "Paper ES", note: "v1", lifetime: "review" }))
+    .structuredContent
+  const author = { id: "owner", name: "Owner" }
+  // What the toolbar keeps: the pathname the comment was left on, any slug, open or resolved.
+  for (const page of [`/d/${doc.id}/paper-es`, `/d/${doc.id}/paper-es`, `/d/${doc.id}/old-slug`])
+    assert.equal((await comments.create({ page, body: "The bar overlaps the title", author }))[0], undefined)
+  const [, done] = await comments.create({ page: `/d/${doc.id}/paper-es`, body: "Fixed already", author })
+  await comments.resolve(done.id, { by: author })
+  // Another drop's page, and a longer id that starts with this one.
+  await comments.create({ page: "/d/other/paper", body: "Elsewhere", author })
+  await comments.create({ page: `/d/${doc.id}x/paper`, body: "Not this drop", author })
+
+  const member = await call(readDrop, { id: doc.id })
+  assert.doesNotMatch(member.content[0].text, /toolbar/i)
+  assert.equal(member.structuredContent.toolbarThreads, undefined)
+
+  state.who = { ...state.who, role: "admin" }
+  const admin = await call(readDrop, { id: doc.id })
+  assert.deepEqual(admin.structuredContent.toolbarThreads, [
+    { page: `/d/${doc.id}/paper-es`, open: 2 },
+    { page: `/d/${doc.id}/old-slug`, open: 1 },
+  ])
+  const text = admin.content[0].text
+  assert.match(text, /## Open comments\nNone\.\n\n## Toolbar comments on this drop's page\n3 open threads/)
+  assert.match(text, /about Drop's interface there, not about the drop's content/)
+  assert.match(text, new RegExp(`- comments_list_threads with page "/d/${doc.id}/paper-es" \\(2 open\\)`))
+  // The call it names returns them.
+  const [list] = siteCommentTools
+  const listed = await call(list, { page: `/d/${doc.id}/paper-es` })
+  assert.equal(listed.structuredContent.threads.length, 2)
+})
+
+test("read_drop leaves a doc's inline figure bytes out of its text and names each figure", async () => {
+  // Shaped like a converted paper: prose with 104 inline PNG and WebP figures, 2.4 MB of figures in all.
+  const sizes = Array.from({ length: 104 }, (_, i) => (i % 3 === 0 ? 4000 : i % 3 === 1 ? 40000 : 30000))
+  const prose = "Las empresas que adoptan IA producen más código revisado. ".repeat(20)
+  const figure = (n, bytes) =>
+    `![Figura ${n} del PDF](data:image/${n % 2 ? "png" : "webp"};base64,${Buffer.alloc(bytes, n).toString("base64")})`
+  const icon = `![dot](data:image/png;base64,${Buffer.alloc(30, 1).toString("base64")})`
+  const markdown = `# Paper\n\n${icon}\n\n${sizes.map((bytes, i) => `${prose}\n\n${figure(i + 1, bytes)}`).join("\n\n")}`
+  insertDrop("paper", { size: markdown.length })
+  objects.set("paper.md", { body: new Blob([markdown]), uploadedAt: new Date() })
+
+  const read = await call(readDrop, { id: "paper" })
+  const text = read.content[0].text
+  assert.ok(markdown.length > 2_500_000)
+  assert.ok(text.length < 200_000, `${text.length} characters`)
+  // Only the prose and a short placeholder per figure are left.
+  assert.ok(text.length < prose.length * 104 + 104 * 80 + 2000, `${text.length} characters`)
+  assert.doesNotMatch(text, /base64,[A-Za-z0-9+/]{1024}/)
+  assert.match(
+    text,
+    /## Content\n104 inline figures \(2\.4 MB\) left out of this text as \[inline figure N: …\]\..*read_file/,
+  )
+  assert.match(text, /!\[Figura 1 del PDF\]\(\[inline figure 1: image\/png, 4 KB, left out\]\)/)
+  assert.match(text, /!\[Figura 2 del PDF\]\(\[inline figure 2: image\/webp, 39 KB, left out\]\)/)
+  // A small icon costs less than its placeholder, so it stays.
+  assert.ok(text.includes(icon))
+  assert.equal(read.structuredContent.content.length, text.slice(text.indexOf("# Paper")).length)
+  assert.deepEqual(read.structuredContent.inlineFigures[1], {
+    n: 2,
+    alt: "Figura 2 del PDF",
+    mediaType: "image/webp",
+    bytes: 40000,
+  })
+  // The original keeps them.
+  const original = await call(readFile, { id: "paper" })
+  assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), markdown)
+})
+
+test("read_drop scans unmatched Markdown image prefixes without blocking on HTML", async () => {
+  const html = "<!doctype html><pre>" + "![".repeat(100000) + "</pre>"
+  insertDrop("prefixes", { kind: "html", blob_key: "prefixes.html", size: html.length })
+  objects.set("prefixes.html", { body: new Blob([html]), uploadedAt: new Date() })
+  const start = performance.now()
+  const read = await call(readDrop, { id: "prefixes" })
+  assert.equal(read.structuredContent.content, html)
+  assert.equal(read.structuredContent.inlineFigures, undefined)
+  assert.ok(performance.now() - start < 2000, "200 KB without data URLs must not block for seconds")
+})
+
+test.each(["data:image/png;BASE64,", "DATA:image/png;base64,", "DaTa:image/png;BaSe64,"])(
+  "read_drop omits mixed-case inline data URLs (%s)",
+  async (prefix) => {
+    const data = Buffer.alloc(40000, 1).toString("base64")
+    const html = `<img src="${prefix}${data}">`
+    insertDrop("mixed-case", { kind: "html", blob_key: "mixed-case.html", size: html.length })
+    objects.set("mixed-case.html", { body: new Blob([html]), uploadedAt: new Date() })
+    const read = await call(readDrop, { id: "mixed-case" })
+    assert.doesNotMatch(read.content[0].text, /[A-Za-z0-9+/]{1024}/)
+    assert.equal(read.structuredContent.content, '<img src="[inline figure 1: image/png, 39 KB, left out]">')
+    assert.deepEqual(read.structuredContent.inlineFigures, [{ n: 1, alt: null, mediaType: "image/png", bytes: 40000 }])
+    const original = await call(readFile, { id: "mixed-case" })
+    assert.equal(Buffer.from(original.content[0].resource.blob, "base64").toString(), html)
+  },
+)
+
+test("a Console call, admitted to Comments without a Drop session, reads Drop's page threads and nothing more", async () => {
+  const { commentsOperations } = await import("vite-hub/comments/server")
+  const { commentsMcpTools } = await import("vite-hub/comments/runtime")
+  // As the Console's operations endpoint runs one after the access check: the input through its schema, then `run`.
+  const operation = async (name, value) => {
+    const op = commentsOperations.find((candidate) => candidate.name === name)
+    const parsed = await op.input["~standard"].validate(value)
+    assert.equal(parsed.issues, undefined)
+    return op.run(parsed.value, { access: { mode: "auth", sections: "all" }, surface: "console", user: null })
+  }
+  const doc = (await call(publish, { markdown: "# Plan", note: "v1", lifetime: "review" })).structuredContent
+  const author = { id: "owner", name: "Owner" }
+  const [, pageThread] = await comments.create({
+    page: `/d/${doc.id}/plan`,
+    body: "The bar overlaps the title",
+    author,
+  })
+  await addThread(await findDrop(doc.id), {
+    fields: {
+      kind: "page",
+      selector: "",
+      ox: 0,
+      oy: 0,
+      ow: 0,
+      oh: 0,
+      quote: null,
+      label: null,
+      page: null,
+      elementX: null,
+      elementY: null,
+    },
+    body: "On the private doc",
+    author,
+  })
+  const dropThread = threads().find((thread) => thread.subject_kind === "drop")
+  state.who = null
+
+  const admitted = await operation("comments.threads", { page: `https://drop.vitehub.dev/d/${doc.id}/plan` })
+  assert.deepEqual(
+    admitted.threads.map((thread) => thread.id),
+    [pageThread.id],
+  )
+  // The doc is private: Console admission doesn't open its comments to a caller Drop doesn't know.
+  assert.deepEqual(
+    (await operation("comments.list", {})).map((thread) => thread.id),
+    [pageThread.id],
+  )
+  assert.equal(
+    await comments.can({ user: null, action: "read", thread: (await comments.get(dropThread.id))[1], console: true }),
+    false,
+  )
+  assert.equal(await comments.can({ user: null, action: "resolve", thread: pageThread, console: true }), true)
+
+  // Without Console admission and without a session, the list itself is refused, before any thread is read or counted.
+  const [list] = commentsMcpTools(comments)
+  const outside = await list.call({}, { user: null, event: event("/mcp", "POST") })
+  assert.equal(outside.isError, true)
+  assert.equal(outside.structured, undefined)
+  assert.doesNotMatch(outside.text, /overlaps/)
+})
+
+test("comments_list_threads takes a drop's full link as page", async () => {
+  state.who = { ...who, role: "admin" }
+  const [, thread] = await comments.create({
+    page: "/d/abc/plan",
+    body: "Too tight",
+    author: { id: "owner", name: "Owner" },
+  })
+  const [list] = siteCommentTools
+  const listed = await call(list, { page: "https://drop.vitehub.dev/d/abc/plan?v=2" })
+  assert.deepEqual(
+    listed.structuredContent.threads.map((item) => item.id),
+    [thread.id],
+  )
 })
 
 // An annotated screenshot whose first annotation starts past the image's right edge. The problem is the screenshot's, on

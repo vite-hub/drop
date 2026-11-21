@@ -24,9 +24,9 @@ Then set these on the deployment:
 ::docs-env
 ::
 
-Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_GITHUB_ORG`, which wins when both are set. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
+Drop reads its settings when it runs, so a change needs a restart, not a rebuild. Only the host and database are fixed at build time. Each setting also answers to a `VITEHUB_` name, such as `VITEHUB_DROP_MODE`, which wins when both are set. `VITEHUB_MEMBERS` is owned by ViteHub Auth and only reads that name; `VITEHUB_DROP_MEMBERS` is unsupported. Booleans take `true`, `false`, `1`, or `0`; an invalid value stops Drop with an error naming the setting.
 
-- **Who signs in.** Anyone with a GitHub account, as a Member. `DROP_MEMBERS` lets in only the people whose emails it lists, plus the admins, for publishing and viewing, shared links and MCP included. Like `DROP_ADMINS`, it compares emails a sign-in method verified, so it keeps working if you swap GitHub for another provider. Take someone off and restart, and they're out. `DROP_GITHUB_ORG` requires active membership of that organization instead; sign-in then asks for `read:org`. With both, a person needs both.
+- **Who signs in.** Anyone with a GitHub account, as a Member. `VITEHUB_MEMBERS` lets in only the people it lists, plus the admins, for publishing and viewing, shared links and MCP included. Each entry is a GitHub account (`github:22072217`), an email a sign-in method verified, an email domain (`@example.com`), or a GitHub organization (`github-org:your-org`), which makes sign-in ask for `read:org`. Matching any entry is enough. Take someone off, and they can't sign in again and lose their session within five minutes. It's [ViteHub Auth's member list](https://vitehub.dev/docs/auth/configure#choose-who-can-sign-in).
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
 - **Roles come only from that list.** Admins open **Console** in the sidebar, which opens this Drop in the [ViteHub Console](https://console.vitehub.dev), to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. Link the Drop there once and set the `VITEHUB_CONSOLE_KEY_<NAME>` variable it shows; the Console then lets in only people whose email is in `DROP_ADMINS`. On Node/VPS, build with `DROP_PUBLIC_URL=https://drop.example.com`; signed calls require this trusted origin at build time. For Docker, build your deployment image with `docker build --build-arg DROP_PUBLIC_URL=https://drop.example.com -t my-drop .` instead of using the generic prebuilt image for Console access. Rebuild when the public origin changes. The ingress must pass `POST /_vitehub/rpc` and its subpaths unchanged. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
@@ -36,7 +36,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 ## Team mode {#team-mode}
 
-A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `DROP_MEMBERS`, `DROP_GITHUB_ORG`, or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
+A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, and people share them by public link. `DROP_MODE=team` makes it a Drop one team runs for itself, usually behind `VITEHUB_MEMBERS` or [oauth2-proxy](/docs/self-host/vps#auth-proxy). Everyone signed in is then a teammate:
 
 - New drops start shared with the Team.
 - The sidebar leads with the **Team** tab: the team's folders, then teammates' drops shared with the team.
@@ -47,7 +47,7 @@ A Drop is **personal** by default, like drop.vitehub.dev: drops start Only me, a
 ```sh
 DROP_MODE=team
 DROP_ADMINS=you@example.com
-DROP_GITHUB_ORG=your-org
+VITEHUB_MEMBERS=github-org:your-org
 DROP_PUBLIC_LINK_DAYS=7
 ```
 
@@ -119,37 +119,19 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | --- | --- |
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
-| `identity.denied` | Why Drop refused a sign-in or session: `banned`, `not-member`, or `not-listed`. |
+| `identity.denied`, `identity.session` | Why Drop refused a session (`banned` or `not-member`), or that a session lookup failed. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `roomAccess.refused` | Which of Drop's access rules refused a realtime connection. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
 | `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
-| `roomAccess.refused` | Why a live room turned someone away: `not-found`, `no-access`, `old-version`, `not-editable`, or `write`. |
-| `browserError` | An error in someone's browser. See below. |
-
-**ViteHub's fields.** ViteHub adds its own fields to the same event. `auth` says what a sign-in endpoint answered, `rateLimit` names the limit that refused a request, and `realtime` names the room that refused a connection. Drop's `identity.denied` and `roomAccess.refused` give Drop's reason behind an `auth` or `realtime` refusal.
 
 **Kept events.** Every event is kept today. Failures, requests slower than a second, and audits are kept even if you lower the sampling rate.
 
 **Left out.** The health check and static files write no event. Upload URLs and password reset links lose their token, and IP addresses are masked.
 
-**The hourly cleanup** writes two events a run. ViteHub's, `schedule`, has the run's outcome, how long it took, and its error. Drop's, `action: "cleanup"` with the same `runId`, has what each step did, how long it took, and the steps that failed.
+**The hourly cleanup** writes an `action: "cleanup"` event with its `runId` when ViteHub supplies one, the scheduled time, what each step did, how long it took, and any failures.
 
-### Browser errors {#browser-errors}
-
-**A browser error** is a failure in someone's browser that the server never saw. The page sends it to `POST /api/_vitehub/browser-errors`, and it lands on that request's event at the error level, as `browserError`.
-
-The page sends uncaught errors, chunks that fail to load, and the failures Drop catches and shows, such as a toast. A caught failure carries what Drop was doing in `browserError.action`, and in `browserError.fields` the answer's `status` and `requestId`, the `drop`, the toast's `title`, or the `source` of a frame's script.
-
-Drop leaves out the caught failures in the first three rows. The last applies to every error.
-
-| Not sent | Why |
-| --- | --- |
-| A refusal (any 4xx) | The server gave that answer on purpose. |
-| A 5xx with Drop's error body | The server already logged it. Any other 5xx, such as a gateway's HTML page, is sent, since Drop may never have seen the request. |
-| An aborted request, an offline browser, a page that's closing | None of these is a failure. |
-| The same message twice, or past ten a page | The page sends each once, and at most ten a page load. |
-
-The page sends its path without the query. On a members-only Drop, only signed-in members' browsers can send them.
+**Browser errors.** ViteHub reports uncaught errors on `browserError`. Failures Drop catches go through its own reporter with the response status, request ID, and drop when known. It skips refusals, aborts, offline browsers, pages that are closing, and 5xx responses that carry Drop's own error body.
 
 ## Database and migrations {#database}
 

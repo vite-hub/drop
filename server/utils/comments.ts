@@ -1,4 +1,4 @@
-import { and, eq, type SQL, sql } from "drizzle-orm"
+import { and, count, desc, eq, like, or, type SQL, sql } from "drizzle-orm"
 import { HTTPError } from "h3"
 import * as v from "valibot"
 import type {
@@ -10,6 +10,7 @@ import type {
   CommentUser,
 } from "vite-hub/comments"
 import { knownAgent } from "#shared/agents"
+import { decodeInk } from "#shared/ink"
 import { commentsSchema } from "vite-hub/comments/database"
 import { db } from "vite-hub/database"
 import type { CommentAgent, CommentAttachment, CommentReply, DropComment } from "#shared/types"
@@ -77,7 +78,8 @@ async function commentList(row: Commented): Promise<CommentList> {
  * What a thread keeps in `metadata`: the drop it was written on, and its anchor as Drop's viewers draw it. `kind`:
  * `text` quotes a selection, `image` pins a spot or area on an image, `area` marks a rectangle of a page, `page` is the
  * whole page. `ox`/`oy`/`ow`/`oh` are thousandths of the anchor's box. `suggestion` holds a suggested edit's words.
- * `at` is the second of a video's frame an `image` comment is on, and `pdfPage` the number of a PDF's page.
+ * `at` is the second of a video's frame an `image` comment is on, and `pdfPage` the number of a PDF's page. `ink`
+ * holds the Marker's strokes on an `area` as encodeInk writes them: Comments keeps only flat values.
  * `elementX`/`elementY` place a site review pin on the element `label` names, in thousandths of its box.
  */
 const CommentMeta = v.object({
@@ -92,6 +94,7 @@ const CommentMeta = v.object({
   suggestion: v.optional(v.nullable(v.string()), null),
   at: v.optional(v.nullable(v.number()), null),
   pdfPage: v.optional(v.nullable(v.number()), null),
+  ink: v.optional(v.nullable(v.string()), null),
   label: v.nullable(v.string()),
   page: v.nullable(v.string()),
   elementX: v.nullable(v.number()),
@@ -225,6 +228,7 @@ export function toComment(
     suggestion: meta.suggestion,
     at: meta.at,
     pdfPage: meta.pdfPage,
+    ink: decodeInk(meta.ink),
     label: meta.label,
     page: meta.page,
     body: first?.body ?? "",
@@ -262,23 +266,73 @@ async function threadsOf(list: CommentList, version?: number) {
   return threads.flatMap((thread) => dropThread(thread) ?? [])
 }
 
+/**
+ * Every open thread of a list, page by page past Comments' 500 at once: what an agent still owes an answer must not
+ * stop at the most active threads, which on a pattern site can all be other previews' resolved ones. Past 20 pages it
+ * says it can't tell, rather than report the rest as done.
+ */
+async function openThreadsOf(list: CommentList, version?: number) {
+  const all: CommentThread[] = []
+  let before: { updatedAt: number; id: string } | undefined
+  for (let page = 0; ; page++) {
+    // The 21st read asks only whether one more is left: exactly 10,000 is still all of them.
+    const [error, threads] = await comments.list({
+      subject: list.subject,
+      status: "open",
+      limit: page < 20 ? 500 : 1,
+      ...(version === undefined ? {} : { revision: { lte: version } }),
+      ...(before ? { before } : {}),
+    })
+    if (error) throw commentsFailure(error)
+    if (page === 20 && threads.length) break
+    all.push(...threads)
+    const last = threads.at(-1)
+    if (threads.length < 500 || !last) return all.flatMap((thread) => dropThread(thread) ?? [])
+    before = { updatedAt: last.updatedAt, id: last.id }
+  }
+  throw new HTTPError({ status: 503, statusText: "More than 10,000 comments are open; not all could be read" })
+}
+
 /** The images of a list's comments and replies, by id. Read beside the threads, not after them. */
 async function imagesOf(list: CommentList): Promise<Attachments> {
   return new Map((await attachmentsUnder(list.parents)).map((file) => [file.id, toAttachment(file)]))
 }
 
 /**
- * The threads and images of a list. A site lists all of them, with its screenshots'; a screenshot only its own. A
+ * The threads and images of a list. A site lists all of them, with its screenshots'; a screenshot only its own. `open`
+ * reads every open one instead of the 500 most active. A
  * version lists its own and those of every version before it: a comment stays with the doc until someone resolves it.
  */
-export async function threadsFor(row: Commented) {
+export async function threadsFor(row: Commented, { open = false } = {}) {
   const list = await commentList(row)
+  const version = list.subject.kind === "drop" ? row.version : undefined
   const [threads, attachments] = await Promise.all([
-    threadsOf(list, list.subject.kind === "drop" ? row.version : undefined),
+    open ? openThreadsOf(list, version) : threadsOf(list, version),
     imagesOf(list),
   ])
   return { threads: list.shot ? threads.filter((thread) => thread.meta.dropId === row.id) : threads, attachments }
 }
+
+/**
+ * The numbers of the open comments on a drop, by page without its query, for an agent that just answered one: what it
+ * still owes an answer. `within` keeps a pattern site's to one preview's origin. Comments only, no images.
+ */
+export async function openByPage(row: Commented, within?: string) {
+  const list = await commentList(row)
+  const threads = await openThreadsOf(list, list.subject.kind === "drop" ? row.version : undefined)
+  const pages = new Map<string, { n: number; answered: boolean }[]>()
+  for (const thread of threads.sort((a, b) => a.n - b.n)) {
+    if (list.shot && thread.meta.dropId !== row.id) continue
+    if (within && !thread.meta.page?.startsWith(within)) continue
+    const page = (thread.meta.page ?? "").replace(/[?#].*$/, "")
+    pages.set(page, [...(pages.get(page) ?? []), { n: thread.n, answered: answeredByAgent(thread) }])
+  }
+  return pages
+}
+
+/** Whether an agent has the last word on a thread: it answered, and the thread waits on the person who wrote it. */
+const answeredByAgent = (thread: { messages: { actor?: CommentActor }[] }) =>
+  thread.messages.length > 1 && Boolean(thread.messages.at(-1)?.actor)
 
 /**
  * A version's comments and those of every version before it, by number. The viewer decides which of the older ones
@@ -288,6 +342,33 @@ export async function listComments(row: Commented, who: Identity | null) {
   const { threads, attachments } = await threadsFor(row)
   const named = await mentionedIn(threads)
   return threads.sort((a, b) => a.n - b.n).map((thread) => toComment(thread, who, attachments, named))
+}
+
+/**
+ * The open threads people left with the ViteHub Comments toolbar on a drop's own pages in Drop, per page, most first.
+ * The toolbar keys a thread by its pathname (`page` subject): `/d/<id>`, `/d/<id>/<slug>` with any slug or app path
+ * under it, and `/drops/<id>`. One count on the exported schema's subject index: `comments.list` would read every
+ * page thread and its messages.
+ */
+export async function toolbarThreadsOn(dropId: string): Promise<{ page: string; open: number }[]> {
+  const threads = commentsSchema.vitehubCommentThreads
+  const open = count()
+  return db
+    .select({ page: threads.subjectId, open })
+    .from(threads)
+    .where(
+      and(
+        eq(threads.subjectKind, "page"),
+        or(
+          eq(threads.subjectId, `/d/${dropId}`),
+          like(threads.subjectId, `/d/${dropId}/%`),
+          eq(threads.subjectId, `/drops/${dropId}`),
+        ),
+        eq(threads.status, "open"),
+      ),
+    )
+    .groupBy(threads.subjectId)
+    .orderBy(desc(open), threads.subjectId)
 }
 
 /** Starts a thread on `row`'s list, on its version. `attachments` are the ids of images already stored for it. */
@@ -303,7 +384,7 @@ export async function addThread(
   },
   list?: CommentList,
 ): Promise<DropThread> {
-  const meta: CommentMeta = { suggestion: null, at: null, pdfPage: null, dropId: row.id, ...input.fields }
+  const meta: CommentMeta = { suggestion: null, at: null, pdfPage: null, ink: null, dropId: row.id, ...input.fields }
   const [error, thread] = await comments.create({
     subject: (list ?? (await commentList(row))).subject,
     anchor: anchorOf(meta),

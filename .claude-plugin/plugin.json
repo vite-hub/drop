@@ -1,0 +1,12 @@
+{
+  "name": "drop",
+  "description": "Publish plans, docs, pages and small apps to Drop as a link people review and comment on, read their comments, and publish the next version. Adds Drop's MCP server and its skills.",
+  "author": { "name": "ViteHub", "url": "https://vitehub.dev" },
+  "homepage": "https://drop.vitehub.dev",
+  "repository": "https://github.com/vite-hub/drop",
+  "icon": "./public/icon.png",
+  "keywords": ["review", "comments", "mcp", "skills", "prototype", "dashboard"],
+  "mcpServers": {
+    "drop": { "type": "http", "url": "https://drop.vitehub.dev/mcp" }
+  }
+}

@@ -153,6 +153,7 @@ export async function createFolder(
       parentId: parent?.id ?? null,
       siteUrl: null,
       publishToken: null,
+      draftImage: false,
       resources: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(parent ? [touchFolder(parent.id, now)] : [])])

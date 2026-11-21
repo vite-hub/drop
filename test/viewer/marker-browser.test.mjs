@@ -452,3 +452,85 @@ test("the Marker's Text tip types labels in the frame, keeps Drop's keys out of 
     await browser.close()
   }
 }, 30_000)
+
+test("a sent Marker comment keeps its strokes on the page, over its area, where they were drawn", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(
+      browser,
+      `<!doctype html><style>body { margin: 0 } #card { position: absolute; left: 60px; top: 60px; width: 600px; height: 320px }</style><main id="card"></main>`,
+    )
+    await page.evaluate(() => tell({ type: "tool", tool: "mark", pen: { tool: "pen", color: "#ec4899", width: 8 } }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw.mark"))
+    await page.mouse.move(200, 150)
+    await page.mouse.down()
+    await page.mouse.move(320, 260, { steps: 8 })
+    await page.mouse.move(420, 180, { steps: 8 })
+    await page.mouse.up()
+    const drawn = await frame.evaluate(() => {
+      const r = document.querySelector("drop-comments").shadowRoot.querySelector(".ink path").getBoundingClientRect()
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    })
+    await page.evaluate(() => tell({ type: "mark", do: "done" }))
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "area"))
+    const [area] = await posted(page, "area")
+    assert.equal(area.ink.strokes.length, 1)
+    assert.deepEqual(
+      { tool: area.ink.strokes[0].tool, color: area.ink.strokes[0].color, width: area.ink.strokes[0].width },
+      { tool: "pen", color: "#ec4899", width: 8 },
+    )
+
+    // Drop sends the comment back as a marker once it's saved, and clears the draft.
+    await page.evaluate(() => tell({ type: "tool", tool: "browse" }))
+    await page.evaluate(() => tell({ type: "clear-area" }))
+    const anchor = {
+      selector: area.selector,
+      label: area.label,
+      ox: area.ox,
+      oy: area.oy,
+      ow: area.ow,
+      oh: area.oh,
+      ink: area.ink,
+    }
+    await page.evaluate(
+      (anchor) =>
+        tell({
+          type: "markers",
+          markers: [
+            {
+              id: "c1",
+              n: 1,
+              ...anchor,
+              kind: "area",
+              quote: null,
+              resolved: false,
+              earlier: false,
+              author: "Max",
+              replies: 0,
+            },
+          ],
+        }),
+      anchor,
+    )
+    await frame.waitForFunction(() =>
+      document.querySelector("drop-comments").shadowRoot.querySelector(".marks .inkp path"),
+    )
+    const saved = await frame.evaluate(() => {
+      const root = document.querySelector("drop-comments").shadowRoot
+      const r = root.querySelector(".marks .inkp path").getBoundingClientRect()
+      return {
+        stroke: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+        color: root.querySelector(".marks .inkp path").getAttribute("stroke"),
+        inked: root.querySelector('.marks [data-slot="comment-mark-area"]').hasAttribute("data-ink"),
+        draft: root.querySelectorAll(".draft .inkp").length,
+      }
+    })
+    assert.equal(saved.color, "#ec4899")
+    assert.equal(saved.inked, true)
+    assert.equal(saved.draft, 0)
+    for (const side of ["left", "top", "right", "bottom"])
+      assert.ok(Math.abs(saved.stroke[side] - drawn[side]) < 2, JSON.stringify({ side, drawn, saved: saved.stroke }))
+  } finally {
+    await browser.close()
+  }
+})

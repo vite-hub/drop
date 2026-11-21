@@ -3,18 +3,14 @@ import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event } from "h3"
 import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs"
 
-// Drop's own identity module, with Better Auth's session lookup answering for the test.
+// Drop's own identity module, with Better Auth's session lookup answering for the test (test/stubs.ts `authApi`).
 const session = { current: null }
-vi.mock("vite-hub/auth/server", () => ({
-  useAuth: () => ({
-    api: {
-      getSession: async () => {
-        if (session.current instanceof Error) throw session.current
-        return session.current
-      },
-    },
-  }),
-}))
+state.authApi = {
+  getSession: async () => {
+    if (session.current instanceof Error) throw session.current
+    return { headers: new Headers(), response: session.current }
+  },
+}
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ deployment: { host: "vps" } }) }))
 
 const { evlogOptions } = await import("../../scripts/logging.ts")
@@ -197,6 +193,12 @@ test("a person in the browser is their id on the event, never their name; an age
   const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
   assert.ok(!JSON.stringify(agent.event).includes("Realname"))
+
+  // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
+  state.mcpCaller = null
+  const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.deepEqual(refused.event.token, { rejected: "invalid token" })
+  assert.equal(refused.event.user, undefined)
 })
 
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {
@@ -210,9 +212,24 @@ test("a refused or failed session says why on the event, and the request is stil
   assert.equal(failed.event.level, "error")
   assert.equal(failed.event.error.message, "D1 is unavailable")
   assert.equal(failed.event.identity.session, "failed")
+
+  // A GitHub membership outage still answers 503, not signed out.
+  session.current = Object.assign(new Error("GitHub is down"), { body: { code: "AUTH_GITHUB_UNAVAILABLE" } })
+  const outage = await request("/api/me", identify)
+  assert.equal(outage.failure.status, 503)
 })
 
-test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed without repeating its error", async () => {
+test("an agent accepted by ViteHub after its ban expires is not denied by Drop", async () => {
+  state.mcpCaller = {
+    user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true, banExpires: new Date(0) },
+    clientName: "Claude Code",
+  }
+  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.equal(agent.event.user?.id, "owner")
+  assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
+})
+
+test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed", async () => {
   const now = Date.UTC(2026, 10, 17, 12)
   vi.useFakeTimers({ toFake: ["Date"], now })
   insertDrop("old", { trashed_at: now - 16 * 86_400_000, trash_reason: "deleted" })
@@ -220,15 +237,13 @@ test("the hourly cleanup emits one event a run, with each step's count, and name
     .prepare("INSERT INTO code_images (blob_key, owner_id, size, expires_at) VALUES (?, ?, ?, ?)")
     .run("code-images/expired.png", "owner", 10, now - 1)
   state.failDelete = true
-  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now), runId: "srun_static_cleanup" }))
+  const runId = `run_cleanup_${new Date(now).toISOString()}`
+  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now), id: runId }))
   const runs = background.filter((event) => event.action === "cleanup")
   assert.equal(runs.length, 1)
   const [run] = runs
-  // The error itself is on ViteHub's run event, which logs what the handler throws.
-  assert.equal(run.level, "warn")
-  assert.equal(run.error, undefined)
-  assert.equal(run.runId, "srun_static_cleanup")
-  assert.equal(run.schedule, undefined)
+  assert.equal(run.level, "error")
+  assert.equal(run.runId, runId)
   assert.equal(run.version, "1.2.3")
   assert.deepEqual(run.deployment, { host: "vps" })
   assert.deepEqual(run.failed, ["codeImages"])
@@ -385,7 +400,7 @@ test("a webhook that cancels and updates a subscription lists both, and audits t
 
 test("a realtime room says why it refused someone", async () => {
   const { default: latest } = await import("../../server/realtime/latest.ts")
-  const { event } = await request("/api/_vitehub/realtime/latest/gone", (event) =>
+  const { event } = await request("/_vitehub/realtime/latest/gone", (event) =>
     latest.authorize({ event, documentId: "gone", mode: "read" }),
   )
   assert.deepEqual(event.roomAccess, { refused: "not-found" })

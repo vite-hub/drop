@@ -68,11 +68,11 @@ async function rendersAllowed(event: H3Event) {
     return true
   } catch (error) {
     // Over the limit, or a limiter that can't answer: both get the generic card, and only the second is a failure.
-    // ViteHub's `rateLimit` field already says the limit refused it.
     if (!(error instanceof Error && "status" in error && error.status === 429))
       useLogger(event).warn("OG card rate limit unavailable", {
         ogImage: { rateLimit: error instanceof Error ? error.message : String(error) },
       })
+    else useLogger(event).set({ ogImage: { rateLimited: true } })
     return false
   }
 }

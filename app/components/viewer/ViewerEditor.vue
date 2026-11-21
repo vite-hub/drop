@@ -1,12 +1,18 @@
 <script setup lang="ts">
 // The live editor's page: the same column and typeset as the reader (shared/documents.ts), so editing a doc looks
-// like reading it. Nuxt UI's bubble toolbar, "/" block menu, ":" emoji menu, "@" people menu, and drag handle sit on top;
-// app.config.ts restyles them. Emoji and names go in as plain text, so the Markdown stays plain.
-import type { EditorEmojiMenuItem, EditorSuggestionMenuItem, EditorToolbarItem } from "@nuxt/ui"
-import { type Editor, EditorContent } from "@tiptap/vue-3"
+// like reading it. ViteHub's MarkdownEditor brings the bubble toolbar, the "/" block menu, the drag handle, and image
+// uploads on the Realtime room's editor; Drop adds the ":" emoji menu, the "@" people menu, and the code languages.
+// Emoji and names go in as plain text, so the Markdown stays plain.
+import type { EditorEmojiMenuItem } from "@nuxt/ui"
+import type { Editor } from "@tiptap/vue-3"
+import { MarkdownEditor } from "@vite-hub/ui/markdown-editor"
+import { chooseFiles, uploadKey, uploadPlugin, type UploadOptions } from "comark-ui/editor"
+import * as v from "valibot"
 import { DOC_WIDTHS, type DocWidth } from "#shared/documents"
+import { EDITOR_IMAGE_PICK, editorImageExtension } from "#shared/editor-images"
 
-const props = defineProps<{ editor?: Editor; synced: boolean; width: DocWidth }>()
+const props = defineProps<{ editor?: Editor; synced: boolean; publishing: boolean; dropId: string; width: DocWidth }>()
+const notify = useNotify()
 const prompt = usePrompt()
 
 // The people who may read this drop, for "@", from the same list as the comment boxes.
@@ -24,61 +30,73 @@ onMounted(async () => {
   emojis.value = (await import("@tiptap/extension-emoji")).gitHubEmojis.filter((emoji) => emoji.emoji)
 })
 
-async function editLink() {
+// MarkdownEditor keeps the editor it mounted with, and the room makes a new one for a new draft or connection.
+const editorIds = new WeakMap<Editor, number>()
+let lastEditorId = 0
+const editorKey = computed(() => {
   const editor = props.editor
-  if (!editor) return
-  const previous: string | undefined = editor.getAttributes("link").href
-  const href = await prompt({
-    title: previous ? "Edit link" : "Insert link",
-    label: "URL",
-    initial: previous ?? "",
-    confirmLabel: previous ? "Save" : "Insert",
-  })
-  if (href === null) return
-  const chain = editor.chain().focus().extendMarkRange("link")
-  void (href.trim() ? chain.setMark("link", { href: href.trim() }) : chain.unsetMark("link")).run()
-}
+  if (!editor) return 0
+  let id = editorIds.get(editor)
+  if (id === undefined) editorIds.set(editor, (id = ++lastEditorId))
+  return id
+})
 
-const toolbar = computed<EditorToolbarItem[][]>(() => [
-  [
-    { kind: "mark", mark: "bold", icon: "i-mingcute-bold-line", "aria-label": "Bold" },
-    { kind: "mark", mark: "italic", icon: "i-mingcute-italic-line", "aria-label": "Italic" },
-    { kind: "mark", mark: "strike", icon: "i-mingcute-strikethrough-line", "aria-label": "Strikethrough" },
-    { kind: "mark", mark: "code", icon: "i-mingcute-code-line", "aria-label": "Code" },
-    {
-      icon: "i-mingcute-link-line",
-      "aria-label": "Link",
-      active: props.editor?.isActive("link"),
-      onClick: () => void editLink(),
-    },
-  ],
-  [
-    { kind: "heading", level: 1, icon: "i-mingcute-heading-1-line", "aria-label": "Heading 1" },
-    { kind: "heading", level: 2, icon: "i-mingcute-heading-2-line", "aria-label": "Heading 2" },
-    { kind: "heading", level: 3, icon: "i-mingcute-heading-3-line", "aria-label": "Heading 3" },
-  ],
-  [
-    { kind: "bulletList", icon: "i-mingcute-list-check-line", "aria-label": "Bulleted list" },
-    { kind: "orderedList", icon: "i-mingcute-list-ordered-line", "aria-label": "Numbered list" },
-    { kind: "blockquote", icon: "i-mingcute-blockquote-line", "aria-label": "Quote" },
-  ],
-])
+const canUpload = (editor: Editor) =>
+  props.editor === editor && !editor.isDestroyed && editor.isEditable && props.synced && !props.publishing
 
-// Only blocks the Realtime schema has (StarterKit, image, table): a block it lacks would vanish on the next checkpoint.
-const blocks: EditorSuggestionMenuItem[][] = [
-  [
-    { type: "label", label: "Blocks" },
-    { kind: "paragraph", label: "Text", icon: "i-mingcute-text-line" },
-    { kind: "heading", level: 1, label: "Heading 1", icon: "i-mingcute-heading-1-line" },
-    { kind: "heading", level: 2, label: "Heading 2", icon: "i-mingcute-heading-2-line" },
-    { kind: "heading", level: 3, label: "Heading 3", icon: "i-mingcute-heading-3-line" },
-    { kind: "bulletList", label: "Bulleted list", icon: "i-mingcute-list-check-line" },
-    { kind: "orderedList", label: "Numbered list", icon: "i-mingcute-list-ordered-line" },
-    { kind: "blockquote", label: "Quote", icon: "i-mingcute-blockquote-line" },
-    { kind: "codeBlock", label: "Code block", icon: "i-mingcute-terminal-box-line" },
-    { kind: "horizontalRule", label: "Divider", icon: "i-mingcute-minimize-line" },
-  ],
-]
+const imageUpload = (editor: Editor): UploadOptions => ({
+  pick: EDITOR_IMAGE_PICK,
+  accept: (file) => {
+    if (!canUpload(editor)) return false
+    if (editorImageExtension(file.type)) return true
+    notify.alert(`Couldn't upload ${file.name}`, "Choose a PNG, JPEG, GIF, WebP, or BMP image.")
+    return false
+  },
+  async upload(file, progress) {
+    const form = new FormData()
+    form.append("file", file)
+    form.append("document", props.dropId)
+    const { url } = await sendFile("/api/files", form, v.object({ url: v.string() }), { onProgress: progress })
+    return url
+  },
+  onError: (error, file) => notify.fail(`Couldn't upload ${file.name}`, error),
+})
+
+watch(
+  () => props.editor,
+  (editor, _, onCleanup) => {
+    if (!editor) return
+    const plugin = uploadPlugin(imageUpload(editor))
+    const { handlePaste, handleDrop } = plugin.props
+    plugin.props.handlePaste = (view, event, slice) =>
+      handlePaste?.call(plugin, view, event, slice) || Boolean(event.clipboardData?.files.length)
+    plugin.props.handleDrop = (view, event, slice, moved) =>
+      handleDrop?.call(plugin, view, event, slice, moved) || (!moved && Boolean(event.dataTransfer?.files.length))
+    editor.registerPlugin(plugin)
+    onCleanup(() => {
+      if (!editor.isDestroyed) editor.unregisterPlugin(uploadKey)
+    })
+  },
+  { immediate: true },
+)
+
+provide(viewerEditorControls, {
+  canUpload,
+  chooseImage: (editor) => canUpload(editor) && chooseFiles(editor.view, imageUpload(editor)),
+  async editLink(editor) {
+    const previous: string | undefined = editor.getAttributes("link").href
+    const href = await prompt({
+      title: previous ? "Edit link" : "Insert link",
+      label: "URL",
+      initial: previous ?? "",
+      confirmLabel: previous ? "Save" : "Insert",
+      schema: previous ? v.pipe(v.string(), v.trim()) : undefined,
+    })
+    if (href === null || editor.isDestroyed || !editor.isEditable) return
+    const chain = editor.chain().focus().extendMarkRange("link")
+    void (href.trim() ? chain.setLink({ href: href.trim() }) : chain.unsetLink()).run()
+  },
+})
 </script>
 
 <template>
@@ -92,15 +110,12 @@ const blocks: EditorSuggestionMenuItem[][] = [
         <USkeleton class="h-4 w-11/12" />
         <USkeleton class="h-4 w-4/5" />
       </div>
-      <EditorContent v-show="editor && synced" class="typeset comark-typeset" :editor="editor" />
+      <MarkdownEditor v-if="editor" v-show="synced" :key="editorKey" class="typeset comark-typeset" :editor="editor" />
       <ViewerCodeLanguages v-if="editor && synced" :editor="editor" />
     </main>
     <template v-if="editor">
-      <UEditorToolbar :editor="editor" :items="toolbar" layout="bubble" />
-      <UEditorSuggestionMenu :editor="editor" :items="blocks" />
       <UEditorEmojiMenu :editor="editor" :items="emojis" :limit="24" />
       <ViewerMentionMenu :editor="editor" :people="people" />
-      <UEditorDragHandle :editor="editor" icon="i-mingcute-dots-line" />
     </template>
   </div>
 </template>

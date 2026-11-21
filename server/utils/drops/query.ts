@@ -67,6 +67,7 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
     {
       ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
       ownerBanned: !row.owner || Boolean(row.owner.banned),
+      ...(row.owner ? { ownerProfile: { name: row.owner.name, image: row.owner.image } } : {}),
     },
     row.owner,
     event,
@@ -241,7 +242,7 @@ export async function listTree(who: Identity, event?: H3Event, open?: string): P
 export async function listFolder(
   folder: DropRow,
   event?: H3Event,
-  options: { query?: string; kinds?: DropKind[]; who?: Identity | null } = {},
+  options: { query?: string; kinds?: DropKind[]; who?: Identity | null; limit?: number } = {},
 ): Promise<DropSummary[]> {
   const { days } = expiryPolicy(event)
   const words = searchWords(options.query)
@@ -251,7 +252,7 @@ export async function listFolder(
   const found = await dropsMatching(
     and(owned, inside, ofKinds(options.kinds), isNull(drops.trashedAt)),
     words,
-    deep ? 200 : 500,
+    Math.min(options.limit ?? 500, deep ? 200 : 500),
   )
   // Its direct drops take the folder's own ancestors; matches deeper down look theirs up.
   const above = [folder.raw ?? folder, ...(folder.ancestors ?? [])]
@@ -525,7 +526,7 @@ export function liveEditable(row: DropRow, who: Identity | null) {
 }
 
 /** A drop's versions, newest first: the latest, then the ones `drop_versions` keeps, at most 100 in all. */
-export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
+export async function versionsOf(row: DropRow, who: Identity | null = null): Promise<DropVersion[]> {
   const head = row.head ?? row.raw ?? row
   const older = await db
     .select()
@@ -539,9 +540,15 @@ export async function versionsOf(row: DropRow): Promise<DropVersion[]> {
     createdAt: item.createdAt,
     note: item.note,
     actorName: item.actorName,
-    agent: item.agent,
+    agent: versionAgent(item.agent, who?.userId === row.ownerId),
     current: item.version === row.version,
   }))
+}
+
+function versionAgent(agent: DropVersion["agent"], isOwner: boolean): DropVersion["agent"] {
+  if (isOwner || !agent?.session) return agent
+  const { session: _session, ...attribution } = agent
+  return attribution
 }
 
 /**
@@ -552,6 +559,11 @@ type AppText = "all" | "none" | "agent"
 // read_drop's share of a built app: enough to see what it is without pasting a bundle into an agent's context.
 const AGENT_FILE_BYTES = 64 * 1024
 const AGENT_FILES = 40
+
+async function ownerProfileOf(id: string) {
+  const [row] = await db.select({ name: user.name, image: user.image }).from(user).where(eq(user.id, id)).limit(1)
+  return row ?? null
+}
 
 export async function dropDetail(
   row: DropRow,
@@ -564,13 +576,15 @@ export async function dropDetail(
   if (!can.view) throw new HTTPError({ status: 404, statusText: "Not found" })
   const { days } = expiryPolicy(event)
   // No part waits for another, so their queries reach the database together instead of one round trip each.
-  const [versions, body, attachments, views, quiz, gallery] = await Promise.all([
-    versionsOf(row),
+  const [versions, body, attachments, views, quiz, gallery, owner] = await Promise.all([
+    versionsOf(row, who),
     bodyOf(row, who, origin, event, appText),
     TEXT_KINDS.has(row.kind) ? attachmentsOf(row, origin) : undefined,
     can.manage && !isAttachment(row) ? viewsOf(row) : undefined,
     who && answerable(row, who) ? quizOf(row, who.userId, event) : undefined,
     galleryOf(row, who, days),
+    // Whose it is, for signed-in readers only: a public link doesn't name the person who shared it.
+    who ? (row.ownerProfile ?? ownerProfileOf(row.ownerId)) : null,
   ])
   // Everyone who can open it sees what it links to.
   const resources = isAttachment(row) ? [] : resourcesOf(row)
@@ -595,6 +609,8 @@ export async function dropDetail(
   if (resources.length) detail.resources = resources
   if (quiz) detail.quiz = quiz
   if (gallery) detail.gallery = gallery
+  // Who dropped it, for a doc's header: the person, beside the agent that published the version.
+  if (owner) detail.owner = owner
   return detail
 }
 
@@ -677,7 +693,7 @@ async function attachmentsOf(row: DropRow, origin: string): Promise<DropAttachme
   const rows = await db
     .select()
     .from(drops)
-    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), notCommentImage))
+    .where(and(eq(drops.parentId, row.id), isNotNull(drops.blobKey), eq(drops.draftImage, false), notCommentImage))
     .limit(100)
   return rows.map((item) => ({
     id: item.id,

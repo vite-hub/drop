@@ -5,6 +5,7 @@
 // and × to stop. On a phone the segment takes its own row above the pill's. With `pins`, the eye that hides the
 // comments on the page sits against Comments, the thing it hides. With `style` (a Markdown doc), the segment opens with
 // two icons that pick how comments on the text show, Cards or Pins (useCommentStyle).
+// The `tools` slot adds buttons that act on the same comments, such as Send or Copy prompt, to the track Comments sits in.
 import type { CommentStyle } from "~/composables/usePreferences"
 
 const on = defineModel<boolean>("on", { required: true })
@@ -28,42 +29,50 @@ const item =
 </script>
 
 <template>
-  <UTooltip
-    :text="on ? 'Stop commenting' : canUseMode ? 'Comment on the page' : 'Show comments'"
-    :kbds="['C']"
-    :content="{ side: 'top', sideOffset: 8 }"
+  <!-- Comments, the eye, and Send or Copy prompt act on the same comments, so they share one track inside the pill. -->
+  <div
+    class="comment-track @max-3xl/review-dock:contents flex shrink-0 items-center gap-0.5 rounded-lg"
+    role="group"
+    aria-label="Comments"
   >
-    <button
-      :aria-controls="canUseMode ? 'drop-comment-actions' : 'drop-comments'"
-      aria-keyshortcuts="C"
-      :aria-label="on ? 'Comments: click anywhere on the page' : count ? `Comments, ${count} open` : 'Comments'"
-      :aria-pressed="canUseMode ? on : undefined"
-      :aria-expanded="canUseMode ? undefined : listOpen"
-      class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
-      :class="on && 'bg-inverted text-inverted hover:bg-inverted hover:text-inverted'"
-      data-review-trigger
-      type="button"
-      @click="emit('toggle')"
+    <UTooltip
+      :text="on ? 'Stop commenting' : canUseMode ? 'Comment on the page' : 'Show comments'"
+      :kbds="['C']"
+      :content="{ side: 'top', sideOffset: 8 }"
     >
-      <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
-      {{ on ? "Click anywhere" : "Comments" }}
-      <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
-        count
-      }}</span>
-    </button>
-  </UTooltip>
-  <!-- Pressed means hidden: pressed is the state that changes the page. -->
-  <UTooltip v-if="pins" text="Hide comments" :content="{ side: 'top', sideOffset: 8 }">
-    <button
-      aria-label="Hide comments"
-      :aria-pressed="!pinsShown"
-      class="-ml-1 grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100 pointer-coarse:ml-0"
-      type="button"
-      @click="emit('pins')"
-    >
-      <UIcon :name="pinsShown ? 'i-mingcute-eye-line' : 'i-mingcute-eye-close-line'" class="size-3.5" />
-    </button>
-  </UTooltip>
+      <button
+        :aria-controls="canUseMode ? 'drop-comment-actions' : 'drop-comments'"
+        aria-keyshortcuts="C"
+        :aria-label="on ? 'Comments: click anywhere on the page' : count ? `Comments, ${count} open` : 'Comments'"
+        :aria-pressed="canUseMode ? on : undefined"
+        :aria-expanded="canUseMode ? undefined : listOpen"
+        class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
+        :class="on && 'bg-inverted text-inverted hover:bg-inverted hover:text-inverted'"
+        data-review-trigger
+        type="button"
+        @click="emit('toggle')"
+      >
+        <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
+        {{ on ? "Click anywhere" : "Comments" }}
+        <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
+          count
+        }}</span>
+      </button>
+    </UTooltip>
+    <!-- Pressed means hidden: pressed is the state that changes the page. -->
+    <UTooltip v-if="pins" text="Hide comments" :content="{ side: 'top', sideOffset: 8 }">
+      <button
+        aria-label="Hide comments"
+        :aria-pressed="!pinsShown"
+        class="-ml-1 grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100 pointer-coarse:ml-0"
+        type="button"
+        @click="emit('pins')"
+      >
+        <UIcon :name="pinsShown ? 'i-mingcute-eye-line' : 'i-mingcute-eye-close-line'" class="size-3.5" />
+      </button>
+    </UTooltip>
+    <slot name="tools" />
+  </div>
   <div
     id="drop-comment-actions"
     class="grid min-w-0 transition-[grid-template-columns] duration-250 ease-[cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none max-sm:order-first max-sm:basis-full"
@@ -120,3 +129,10 @@ const item =
     </div>
   </div>
 </template>
+
+<style scoped>
+/* A faint track behind the buttons. A hovered button adds the pill's 8% on top, so it still shows. */
+.comment-track {
+  background: rgb(255 255 255 / 7%);
+}
+</style>
