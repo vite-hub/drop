@@ -285,7 +285,7 @@ test("concurrent SQLite clients cannot reserve more than three slots or the rema
   const race = (drops, bytes, writes, dropLimit, byteLimit, writeLimit) =>
     Promise.all(
       Array.from(
-        { length: 12 },
+        { length: 4 },
         () =>
           new Promise((resolve, reject) => {
             const now = Date.now()

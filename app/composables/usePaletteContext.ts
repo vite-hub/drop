@@ -2,10 +2,12 @@ import type { CommandPaletteItem } from "@nuxt/ui"
 import type { DropSummary } from "#shared/types"
 import type { InjectionKey, ShallowRef } from "vue"
 
-/** The drop open on the page, offered to the ⌘K palette (SearchPalette): its title and what you can do with it. */
+/**
+ * The drop open on the page, offered to the ⌘K palette (SearchPalette): what you can do with it, in groups, the first
+ * one under the drop's title. Groups, because Nuxt UI's palette shows at most 12 items in each.
+ */
 interface PaletteDrop {
-  title: string
-  items: CommandPaletteItem[]
+  groups: { id: string; label: string; items: CommandPaletteItem[] }[]
 }
 /** The folder open on the page, which ⌘K's new drops go into. `folders`: whether you may add folders to it too. */
 interface PaletteFolder extends Pick<DropSummary, "id" | "title"> {

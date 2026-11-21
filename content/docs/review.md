@@ -120,6 +120,8 @@ Docs and apps show a toolbar under the page. **Comments** and the Marker sit in 
 
 :kbd[Esc] unpicks the measured element, closes an open comment box, then returns to Browse.
 
+**Zen** under the **+**, or :kbd[Z], is for reading: a Markdown doc loses its outline, and the toolbar folds to a small handle with Drop's mark, a count of open comments, and a dot for each person here. Press the handle to show the toolbar while you need it. Comments, editing, the Marker, and Share bring it back on their own. Press **Zen** or :kbd[Z] again, or :kbd[Esc] once nothing else is open, to leave. Drop remembers it in this browser, for every drop.
+
 ### Marker {#marker}
 
 The Marker draws on a snapshot of the page and sends it as one comment. Press :kbd[B] while you point at what you want to mark: the page freezes as it is, an open tooltip or menu included, and the toolbar turns into the Marker's tools.
