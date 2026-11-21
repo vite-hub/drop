@@ -180,6 +180,7 @@ test("Highlight draws on the page and sends the screenshot with the strokes, anc
     // The marker's pink, multiplied onto the white page, under the stroke; the rest stays white.
     assert.ok(sent.under[1] < 215 && sent.under[0] > 230, `pink under the marker, got ${sent.under}`)
     assert.deepEqual(sent.away.slice(0, 3), [255, 255, 255])
+    await ui.locator(".pop").waitFor({ state: "hidden" })
     assert.equal(await ui.locator(".ink path").count(), 0, "sending clears the strokes")
     assert.equal(await ui.getByRole("button", { name: "Highlight" }).isVisible(), true)
   } finally {

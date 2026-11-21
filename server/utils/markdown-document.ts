@@ -45,6 +45,7 @@ const preset = comarkUi({
     maxSource: 200_000,
   },
   time: false,
+  motion: false,
   typeset: false,
   zoom: { images: false },
 })
@@ -115,6 +116,21 @@ function tableChipCount(node: MarkdownNode): number {
   if (!Array.isArray(node) || node[0] === null) return 0
   const [tag, , ...children] = node
   return tag === "chip" ? 1 : children.reduce((count, child) => count + tableChipCount(child), 0)
+}
+
+function capProseImageWidths(nodes: MarkdownNode[]): void {
+  for (const node of nodes) {
+    if (!Array.isArray(node) || node[0] === null) continue
+    const [tag, attrs, ...children] = node
+    if (tag === "img") {
+      const width = attrs.width
+      const pixels = typeof width === "string" && /^[0-9]+$/.test(width) ? Number(width) : width
+      if (typeof pixels === "number" && Number.isSafeInteger(pixels) && pixels >= 0) {
+        attrs.style = `${typeof attrs.style === "string" ? `${attrs.style};` : ""}--drop-image-width:${pixels}px`
+      }
+    }
+    capProseImageWidths(children)
+  }
 }
 
 function markScrollableTables(nodes: MarkdownNode[]): void {
@@ -287,6 +303,7 @@ async function renderMarkdownBody(
 ): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseForReaders(renameLegacyProps(markdown))
+    capProseImageWidths(document.nodes)
     markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes
