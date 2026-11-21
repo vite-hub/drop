@@ -89,6 +89,7 @@ export default defineConfig({
     include: ["test/**/*.test.mjs"],
     // Each file runs in its own process, with its own in-memory database.
     pool: "forks",
+    globalSetup: ["test/global-setup.mjs"],
     setupFiles: ["test/setup.ts"],
     restoreMocks: true,
   },
