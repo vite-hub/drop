@@ -3,11 +3,10 @@ import { pathToFileURL } from "node:url"
 import { migrateD1 } from "./migrate-d1.mjs"
 
 // Workers Builds' default deploy command, `npx wrangler deploy`, ships a Worker without applying D1 migrations,
-// so a merged migration took production down five times. The build runs on every host, so it migrates only for a
-// Workers Builds build of the production branch, before the deploy step uploads code that needs the new schema.
-// Preview branches skip it: they would migrate the production database for a branch nobody merged.
+// so the build applies migrations before deploy only when the Production build settings explicitly opt in.
 export async function migrateWorkersBuild(env = process.env, configPath = ".output/server/wrangler.json") {
-  if (env.WORKERS_CI !== "1" || env.WORKERS_CI_BRANCH !== (env.DROP_PRODUCTION_BRANCH || "main")) return
+  const productionBranch = env.DROP_PRODUCTION_BRANCH
+  if (env.WORKERS_CI !== "1" || !productionBranch || env.WORKERS_CI_BRANCH !== productionBranch) return
 
   const config = JSON.parse(await readFile(configPath, "utf8"))
   const databaseId = config.d1_databases?.find(({ binding }) => binding === "DB")?.database_id?.trim()

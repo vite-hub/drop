@@ -9,6 +9,7 @@ import { migrations } from "../../scripts/migrations.mjs"
 const production = {
   WORKERS_CI: "1",
   WORKERS_CI_BRANCH: "main",
+  DROP_PRODUCTION_BRANCH: "main",
   CLOUDFLARE_ACCOUNT_ID: "test-account",
   CLOUDFLARE_API_TOKEN: "deploy-token",
 }
@@ -28,6 +29,23 @@ test("previews and other hosts do not read the deploy config or migrate", async 
   await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: "feat/pins" }, "/unused/wrangler.json")
   await migrateWorkersBuild({ ...production, WORKERS_CI: undefined }, "/unused/wrangler.json")
   await migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: "prod" }, "/unused/wrangler.json")
+  await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: undefined }, "/unused/wrangler.json")
+  await migrateWorkersBuild(
+    { ...production, WORKERS_CI_BRANCH: "", DROP_PRODUCTION_BRANCH: "" },
+    "/unused/wrangler.json",
+  )
+})
+
+test("a main Preview without the production opt-in never queries its generated DB", async () => {
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () => assert.fail("Preview attempted to query D1")
+    await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
+      migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: undefined }, configPath),
+    )
+  } finally {
+    globalThis.fetch = previousFetch
+  }
 })
 
 test.each([

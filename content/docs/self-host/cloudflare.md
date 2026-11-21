@@ -62,12 +62,12 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
 
 ## Deploy on every push with Workers Builds {#workers-builds}
 
-Set the build command to `pnpm build`. On `main`, the build applies migrations to the `DB` binding in `.output/server/wrangler.json` before the deploy command runs. The database ID can come from `CLOUDFLARE_D1_DATABASE_ID` or from the provisioned `wrangler.jsonc` used by the Deploy button. Preview builds skip migrations. If your production branch isn't `main`, set `DROP_PRODUCTION_BRANCH` to match the production branch in Workers Builds.
+Set the build command to `pnpm build`. Build-time migrations are opt-in: in the Worker's **Settings → Build**, set `DROP_PRODUCTION_BRANCH` only in the **Production** build settings to the exact configured production branch, even if it is `main`. Leave it unset in **Preview** so that preview builds never migrate, even when building `main`.
 
-In the Worker's **Settings → Build**, set `CLOUDFLARE_ACCOUNT_ID` as a build variable if it isn't already available. The migration needs **D1 Write** on the account that owns `DB`. The default Workers Builds deploy token does not grant that permission. Use one of these setups:
+On an opted-in branch, the build applies migrations to the `DB` binding in `.output/server/wrangler.json` before the deploy command runs. The database ID can come from `CLOUDFLARE_D1_DATABASE_ID` or from the provisioned `wrangler.jsonc` used by the Deploy button. The migration needs **D1 Write** on the account that owns `DB`. The default Workers Builds deploy token does not grant that permission. Use one of these setups:
 
-- With the default deploy command (`npx wrangler deploy`), add an account-scoped D1 Write token as the `DROP_D1_MIGRATION_TOKEN` **build secret**. The build uses it for migrations without replacing the deploy token.
-- If you keep `pnpm run deploy` as the deploy command, select a Workers Builds API token with both deploy permissions and D1 Write. The build can use that same token, and the deploy command's migration check finds the ledger up to date. A separate migration secret alone won't grant the deploy command D1 access.
+- With the default production deploy command (`npx wrangler deploy`), opt in as described above and set `CLOUDFLARE_ACCOUNT_ID` in the Production build settings if it isn't already available. Add an account-scoped D1 Write token as the `DROP_D1_MIGRATION_TOKEN` **build secret**, or use a Workers Builds API token that already has D1 Write. The separate secret does not replace the deploy token.
+- If you use `pnpm run deploy` as the production deploy command, leave `DROP_PRODUCTION_BRANCH` unset: the deploy command applies migrations itself. Select a Workers Builds API token with both deploy permissions and D1 Write. A separate migration secret alone won't grant the deploy command D1 access.
 
 Verify the build and deploy on a separate Worker backed by a test D1 database before enabling this setup on production. A missing binding or a migration failure stops the build before deployment. Use migrations that are compatible with the currently deployed Worker: the schema changes before the new Worker is published.
 
@@ -77,7 +77,7 @@ Verify the build and deploy on a separate Worker backed by a test D1 database be
 ---
 extra:
   - ["CLOUDFLARE_D1_DATABASE_ID", "The id wrangler d1 create printed. Read at build time."]
-  - ["DROP_PRODUCTION_BRANCH", "The branch whose Workers Builds builds apply D1 migrations. Defaults to main. Read at build time."]
+  - ["DROP_PRODUCTION_BRANCH", "Optional build-time opt-in for D1 migrations. Set only in Workers Builds Production settings to the exact production branch; no default."]
   - ["CLOUDFLARE_D1_DATABASE_NAME", "The D1 database name, vitehub-drop by default."]
   - ["DROP_CONTENT_ORIGIN", "Optional. Where apps and HTML docs run, one subdomain per drop on the same Worker, such as https://*-drop.example.com. Needs VITEHUB_SECRET."]
 ---
