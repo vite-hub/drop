@@ -148,7 +148,7 @@ watch(
         </section>
       </Transition>
       <!-- The pill and, under zen, its handle share one place at the bottom: the pill folds into the handle there. -->
-      <div class="grid max-w-full shrink-0 justify-items-center" :style="foldTo">
+      <div class="review-place grid max-w-full shrink-0 justify-items-center" :style="foldTo">
         <div
           ref="toolbar"
           role="group"
@@ -270,7 +270,8 @@ watch(
   }
 }
 
-:root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-toolbar {
+/* Clear of ViteHub's pill on the bottom edge. On the place, not the pill: there 100% is the dock, not the pill itself. */
+:root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-place {
   max-width: calc(100% - 6rem);
 }
 
