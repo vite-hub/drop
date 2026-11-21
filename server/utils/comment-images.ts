@@ -157,6 +157,7 @@ export function imageDrop(
     actorKind: "browser",
     actorName,
     agent: null,
+    sessionPublisherId: null,
     createdAt: now,
     updatedAt: now,
     lastAccessedAt: now,

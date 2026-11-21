@@ -65,6 +65,7 @@
     "@vite-hub/realtime": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@c3cfab681ec677a47348f620634d9efdafed8f90",
     "@vite-hub/schedule": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@c3cfab681ec677a47348f620634d9efdafed8f90",
     "@vite-hub/ui": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@c3cfab681ec677a47348f620634d9efdafed8f90",
+    "@vite-hub/webhooks": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/webhooks@c3cfab681ec677a47348f620634d9efdafed8f90",
     "@vueuse/core": "^14.4.0",
     "@vueuse/nuxt": "^14.4.0",
     "beautiful-mermaid": "1.1.3",
