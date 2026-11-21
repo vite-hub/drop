@@ -1,30 +1,15 @@
-import { useStorage } from "nitro/storage"
+import { eq } from "drizzle-orm"
+import { db } from "vite-hub/database"
+import { dropRuntimeErrors, type DropRuntimeError } from "../databases/default/drops"
 
-interface RuntimeError {
-  kind: "error" | "rejection" | "console" | "load"
-  message: string
-  source?: string
-  page?: string
-  count: number
-  lastAt: number
-}
-
-interface Entry {
-  version: number
-  errors: RuntimeError[]
-}
-
-const PREFIX = "runtime-errors:"
 const MAX_ERRORS = 20
-const TTL = 60 * 60 * 24 * 14
 
 export async function recordRuntimeErrors(
   dropId: string,
   version: number,
-  reports: Omit<RuntimeError, "count" | "lastAt">[],
+  reports: Omit<DropRuntimeError, "count" | "lastAt">[],
 ) {
-  const storage = useStorage("cache")
-  const entry = await storage.getItem<Entry>(PREFIX + dropId)
+  const [entry] = await db.select().from(dropRuntimeErrors).where(eq(dropRuntimeErrors.dropId, dropId)).limit(1)
   if (entry && entry.version > version) return
   const errors = entry?.version === version ? entry.errors : []
   const now = Date.now()
@@ -42,10 +27,14 @@ export async function recordRuntimeErrors(
     } else errors.push({ ...report, count: 1, lastAt: now })
   }
   errors.sort((a, b) => b.lastAt - a.lastAt)
-  await storage.setItem(PREFIX + dropId, { version, errors: errors.slice(0, MAX_ERRORS) }, { ttl: TTL })
+  const row = { version, errors: errors.slice(0, MAX_ERRORS), updatedAt: now }
+  await db
+    .insert(dropRuntimeErrors)
+    .values({ dropId, ...row })
+    .onConflictDoUpdate({ target: dropRuntimeErrors.dropId, set: row })
 }
 
-export async function runtimeErrors(dropId: string, version: number): Promise<RuntimeError[]> {
-  const entry = await useStorage("cache").getItem<Entry>(PREFIX + dropId)
+export async function runtimeErrors(dropId: string, version: number): Promise<DropRuntimeError[]> {
+  const [entry] = await db.select().from(dropRuntimeErrors).where(eq(dropRuntimeErrors.dropId, dropId)).limit(1)
   return entry?.version === version ? entry.errors : []
 }
