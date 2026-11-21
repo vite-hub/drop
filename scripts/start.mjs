@@ -18,12 +18,18 @@ export function databasePath(url = "file:.data/database/drop.db") {
   return resolve(decodeURIComponent(url.slice("file:".length).split("?")[0]))
 }
 
-/** Migrations newer than the newest one the database recorded, the rule ViteHub applies them by. */
-export function pendingMigrations(database, entries) {
-  const ledger = database
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'")
-    .get()
-  if (!ledger) return entries
+/** Use folder names for Drizzle 1.0 ledgers, retaining the timestamp fallback for legacy ledgers. */
+function pendingMigrations(database, entries, columns) {
+  if (!columns.length) return entries
+  if (columns.some(({ name }) => name === "name")) {
+    const applied = new Set(
+      database
+        .prepare('SELECT name FROM "__drizzle_migrations"')
+        .all()
+        .map(({ name }) => name),
+    )
+    return entries.filter(({ tag }) => !applied.has(tag))
+  }
   const { last } = database.prepare('SELECT max(created_at) AS last FROM "__drizzle_migrations"').get()
   return last === null ? entries : entries.filter((entry) => entry.when > Number(last))
 }
@@ -36,11 +42,11 @@ export function backupBeforeMigrate({ file, entries, backups, now = new Date(), 
   if (!existsSync(file)) return
   const database = new DatabaseSync(file)
   try {
-    const pending = pendingMigrations(database, entries)
-    const legacy = database.prepare("PRAGMA table_info('__drizzle_migrations')").all()
+    const columns = database.prepare("PRAGMA table_info('__drizzle_migrations')").all()
+    const pending = pendingMigrations(database, entries, columns)
     const adoption =
-      legacy.length &&
-      !legacy.some((column) => column.name === "name") &&
+      columns.length &&
+      !columns.some((column) => column.name === "name") &&
       database
         .prepare("SELECT 1 FROM __drizzle_migrations WHERE hash = ? AND created_at = ?")
         .get("3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083", 1793445000000)

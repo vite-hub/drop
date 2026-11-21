@@ -2,7 +2,6 @@ import type { AgentMetadata } from "../../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../../shared/types.ts"
-import { user } from "./index"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
@@ -139,24 +138,6 @@ export const dropVisits = sqliteTable(
     at: integer("at").notNull(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_visits_drop_idx").on(table.dropId)],
-)
-
-/**
- * The drops someone pinned, for the Drops page's Pinned view and ⌘K: theirs or anyone's they can open. Pins are
- * personal; a pin to a drop they can no longer open stays and lists again if it opens to them again.
- */
-export const dropPins = sqliteTable(
-  "drop_pins",
-  {
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    dropId: text("drop_id")
-      .notNull()
-      .references(() => drops.id, { onDelete: "cascade" }),
-    at: integer("at").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_pins_drop_idx").on(table.dropId)],
 )
 
 /**

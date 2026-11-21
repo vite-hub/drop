@@ -2,7 +2,7 @@
 // and billing (./teams.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core"
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core"
 import { quotaReservations } from "./quotas"
 import { abuseReports } from "./trust"
 import { skillSettings } from "./skills"
@@ -14,7 +14,6 @@ import {
   commentAttachments,
   commentCleanup,
   dropFiles,
-  dropPins,
   drops,
   dropTexts,
   dropViewers,
@@ -56,6 +55,24 @@ export const user = sqliteTable("user", {
     .$onUpdate(() => new Date())
     .notNull(),
 })
+
+/**
+ * The drops someone pinned, for the Drops page's Pinned view and ⌘K: theirs or anyone's they can open. Pins are
+ * personal; a pin to a drop they can no longer open stays and lists again if it opens to them again.
+ */
+export const dropPins = sqliteTable(
+  "drop_pins",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    dropId: text("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    at: integer("at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.dropId] }), index("drop_pins_drop_idx").on(table.dropId)],
+)
 
 export const session = sqliteTable(
   "session",
@@ -147,7 +164,6 @@ export {
   commentAttachments,
   commentCleanup,
   dropFiles,
-  dropPins,
   drops,
   dropTexts,
   dropViewers,
