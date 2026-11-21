@@ -13,7 +13,6 @@ import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 import { legacyViteHubRoutes } from "./scripts/legacy-vitehub-routes.ts"
 import { evlogOptions } from "./scripts/logging.ts"
-import { reviewPresence } from "./scripts/review-presence.ts"
 
 declare module "nuxt/schema" {
   interface RouteRuleConfigExtensions {
@@ -358,9 +357,5 @@ export default defineNuxtConfig({
     "nitro:config": function (config) {
       config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
-  },
-
-  vite: {
-    plugins: [reviewPresence()],
   },
 })
