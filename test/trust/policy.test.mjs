@@ -52,6 +52,7 @@ test("report paths cannot navigate to another origin or use traversal", () => {
   assert.equal(reportTarget("/f/code-images/image.svg"), "/f/code-images/image.svg")
   assert.equal(reportTarget("/f/%41.svg"), reportTarget("/f/A.svg"))
   assert.equal(reportTarget("/f/code-images%2Fimage.svg"), reportTarget("/f/code-images/image.svg"))
+  assert.equal(reportTarget("/f//%2Fcode-images/image.svg"), reportTarget("/f/code-images/image.svg"))
   for (const target of ["//evil.test", "https://evil.test/d/id", "/f/../api/me", "/d/id?test=1"])
     assert.equal(reportTarget(target), null)
 })

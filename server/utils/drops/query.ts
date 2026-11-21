@@ -484,7 +484,7 @@ export async function recordSharedVisit(drop: DropRow, who: Identity | null, eve
   }
 }
 
-export function storageFailure(error: Error) {
+export function storageFailure(error: unknown) {
   return new HTTPError({ status: 503, statusText: "File storage is temporarily unavailable.", cause: error })
 }
 

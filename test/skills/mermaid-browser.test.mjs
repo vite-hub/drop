@@ -5,7 +5,7 @@ import { createServer } from "node:http"
 import { toResponse } from "h3"
 import { chromium } from "playwright"
 import { beforeEach, test } from "vite-plus/test"
-import { event, migrate, objects, reset } from "../cost/harness.mjs"
+import { event, insertDrop, migrate, objects, reset } from "../cost/harness.mjs"
 
 const { default: markdownDocument } = await import("../../server/middleware/1.markdown-documents.ts")
 
@@ -17,9 +17,9 @@ test("direct Markdown runs comark-ui's Mermaid copy and zoom under its CSP, and 
   const path = `/f/${key}`
   const source = 'graph LR\n A["A & B"] --> B["Copied diagram"]\n'
   const markdown = ("```mermaid\n" + source + "```\n\n").repeat(2)
+  insertDrop("doc", { blob_key: key })
   objects.set(key, { body: new Blob([markdown]) })
   const request = event(path)
-  request.context.dropAccessChecked = true
   const response = await toResponse(await markdownDocument(request), request)
   assert.equal(response.status, 200)
   const policy = response.headers.get("content-security-policy")

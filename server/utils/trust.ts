@@ -3,7 +3,8 @@ import type { H3Event } from "h3"
 import { db } from "vite-hub/database"
 import { useServerEnv } from "vite-hub/env"
 import { abuseReports, user } from "../databases/default/index"
-import { needsShareReview, reportTarget } from "#shared/trust"
+import { isFileReport, normalizedFileTarget } from "../databases/default/trust"
+import { fileReportTarget, needsShareReview } from "#shared/trust"
 
 export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwner?: typeof user.$inferSelect | null) {
   if (!useServerEnv(event).drop.shareApproval) return null
@@ -12,14 +13,15 @@ export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwn
   return needsShareReview(true, owner ?? undefined) ? ("pending" as const) : null
 }
 
-export function rawFileQuarantine(target: string) {
+export function rawFileQuarantine(key: string) {
   return exists(
     db
       .select({ id: abuseReports.id })
       .from(abuseReports)
       .where(
         and(
-          eq(abuseReports.target, reportTarget(target) ?? target),
+          isFileReport(abuseReports.target),
+          eq(normalizedFileTarget(abuseReports.target), fileReportTarget(key)),
           inArray(abuseReports.status, ["quarantined", "banned"]),
         ),
       ),

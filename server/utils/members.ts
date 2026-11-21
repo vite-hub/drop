@@ -23,8 +23,12 @@ const WrappedMembershipOutage = v.object({
   cause: MembershipOutage,
 })
 
+export function isMembershipOutage(error: unknown) {
+  return v.is(MembershipOutage, error) || v.is(WrappedMembershipOutage, error)
+}
+
 export function rethrowMembershipOutage(error: unknown) {
-  if (!v.is(MembershipOutage, error) && !v.is(WrappedMembershipOutage, error)) return
+  if (!isMembershipOutage(error)) return
   throw new HTTPError({
     status: 503,
     statusText: "GitHub membership verification is unavailable. Try again shortly.",

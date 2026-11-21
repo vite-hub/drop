@@ -18,10 +18,8 @@ export default defineHandler(async (event) => {
   if (!key || !extension) return
   const isHtml = /html?$/i.test(extension)
 
-  if (!event.context.dropAccessChecked) {
-    const { requireBlobAccess } = await import("../utils/content-access")
-    await requireBlobAccess(event, key)
-  }
+  const { requireBlobAccess } = await import("../utils/content-access")
+  await requireBlobAccess(event, key)
   const readSource = async () => {
     const [error, source] = await blob.get(key)
     if (error?.code === "BLOB_NOT_FOUND") throw new HTTPError({ status: 404, statusText: "Not found" })
