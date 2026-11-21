@@ -116,21 +116,7 @@ export function authorOf(who: Identity | null, name: string, guest: string | nul
   return { id: who.userId, name: shown, ...(who.image && who.image.length <= 2048 ? { image: who.image } : {}) }
 }
 
-export async function withRetryAfter(limit: Promise<void>) {
-  try {
-    await limit
-  } catch (error) {
-    if (!(error instanceof Error) || Reflect.get(error, "status") !== 429) throw error
-    const headers: unknown = Reflect.get(error, "headers")
-    const after = headers instanceof Headers ? headers.get("retry-after") : null
-    throw new HTTPError({
-      status: 429,
-      statusText: "Too many comments in a minute. Wait a moment and send again.",
-      headers: { "Retry-After": after ?? "60" },
-      cause: error,
-    })
-  }
-}
+export const TOO_MANY_COMMENTS = "Too many comments in a minute. Wait a moment and send again."
 
 export function actorOf(who: Identity | null): CommentActor | undefined {
   if (who?.actorKind !== "agent") return undefined

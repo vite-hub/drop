@@ -1,10 +1,10 @@
 {
-  "version": "7",
   "dialect": "sqlite",
   "id": "f061b40c-c2eb-4438-b805-c1a532e16f53",
   "prevIds": [
-    "1dc3716d-6d56-49c0-b48c-65d37078263c"
+    "3e2162ab-fcef-43e5-ab16-24ec6f3a8ae1"
   ],
+  "version": "7",
   "ddl": [
     {
       "name": "abuse_reports",
@@ -31,15 +31,7 @@
       "entityType": "tables"
     },
     {
-      "name": "vitehub_comment_sends",
-      "entityType": "tables"
-    },
-    {
       "name": "drop_files",
-      "entityType": "tables"
-    },
-    {
-      "name": "drop_pins",
       "entityType": "tables"
     },
     {
@@ -56,6 +48,10 @@
     },
     {
       "name": "drop_views",
+      "entityType": "tables"
+    },
+    {
+      "name": "drop_pins",
       "entityType": "tables"
     },
     {
@@ -160,18 +156,6 @@
     },
     {
       "name": "vitehub_comment_threads",
-      "entityType": "tables"
-    },
-    {
-      "name": "vitehub_webhook_deliveries",
-      "entityType": "tables"
-    },
-    {
-      "name": "vitehub_webhook_endpoints",
-      "entityType": "tables"
-    },
-    {
-      "name": "vitehub_webhook_pairings",
       "entityType": "tables"
     },
     {
@@ -565,176 +549,6 @@
       "entityType": "columns"
     },
     {
-      "table": "vitehub_comment_sends",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "member",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "subject_kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "subject_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "page",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "threads",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "delivery",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "endpoint",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "thread",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "error",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "sender",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "token_hash",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "token_expires_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_comment_sends",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "drop_files",
       "name": "drop_id",
       "type": "text",
@@ -767,36 +581,6 @@
     {
       "table": "drop_files",
       "name": "size",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "drop_pins",
-      "name": "user_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "drop_pins",
-      "name": "drop_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "drop_pins",
-      "name": "at",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -1035,6 +819,36 @@
       "entityType": "columns"
     },
     {
+      "table": "drop_pins",
+      "name": "user_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_pins",
+      "name": "drop_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_pins",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "drop_visits",
       "name": "user_id",
       "type": "text",
@@ -1237,16 +1051,6 @@
     {
       "table": "drops",
       "name": "agent",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "drops",
-      "name": "session_publisher_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -3845,6 +3649,1765 @@
       "entityType": "columns"
     },
     {
+      "table": "abuse_reports",
+      "name": "abuse_reports_status_idx",
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "abuse_reports",
+      "name": "abuse_reports_target_idx",
+      "columns": [
+        {
+          "value": "target",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "account",
+      "name": "account_userId_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "blob_cleanup",
+      "name": "blob_cleanup_blob_key_unique",
+      "columns": [
+        {
+          "value": "blob_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "code_images",
+      "name": "code_images_owner_idx",
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "code_images",
+      "name": "code_images_expires_idx",
+      "columns": [
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "comment_attachments",
+      "name": "comment_attachments_comment_idx",
+      "columns": [
+        {
+          "value": "comment_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drop_files",
+      "name": "drop_files_path_idx",
+      "columns": [
+        {
+          "value": "drop_id",
+          "isExpression": false
+        },
+        {
+          "value": "path",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drop_versions",
+      "name": "drop_versions_blob_key_idx",
+      "columns": [
+        {
+          "value": "blob_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drop_viewers",
+      "name": "drop_viewers_day_idx",
+      "columns": [
+        {
+          "value": "day",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drop_pins",
+      "name": "drop_pins_drop_idx",
+      "columns": [
+        {
+          "value": "drop_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drop_visits",
+      "name": "drop_visits_drop_idx",
+      "columns": [
+        {
+          "value": "drop_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_owner_idx",
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false
+        },
+        {
+          "value": "updated_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_blob_key_idx",
+      "columns": [
+        {
+          "value": "blob_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_expiry_idx",
+      "columns": [
+        {
+          "value": "lifetime",
+          "isExpression": false
+        },
+        {
+          "value": "last_accessed_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_trash_idx",
+      "columns": [
+        {
+          "value": "trashed_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_parent_idx",
+      "columns": [
+        {
+          "value": "parent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "drops",
+      "name": "drops_share_idx",
+      "columns": [
+        {
+          "value": "share",
+          "isExpression": false
+        },
+        {
+          "value": "updated_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invitation",
+      "name": "invitation_organization_idx",
+      "columns": [
+        {
+          "value": "organization_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "invitation",
+      "name": "invitation_email_idx",
+      "columns": [
+        {
+          "value": "email",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "member",
+      "name": "member_organization_idx",
+      "columns": [
+        {
+          "value": "organization_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "member",
+      "name": "member_user_organization_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        },
+        {
+          "value": "organization_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_token_unique",
+      "columns": [
+        {
+          "value": "token",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_client_id_idx",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_session_id_idx",
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_user_id_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_authorization_code_id_idx",
+      "columns": [
+        {
+          "value": "authorization_code_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_refresh_id_idx",
+      "columns": [
+        {
+          "value": "refresh_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_client",
+      "name": "oauth_client_client_id_unique",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_client",
+      "name": "oauth_client_user_id_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_client_resource",
+      "name": "oauth_client_resource_client_id_idx",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_client_resource",
+      "name": "oauth_client_resource_resource_id_idx",
+      "columns": [
+        {
+          "value": "resource_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_consent",
+      "name": "oauth_consent_client_id_idx",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_consent",
+      "name": "oauth_consent_user_id_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_token_unique",
+      "columns": [
+        {
+          "value": "token",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_client_id_idx",
+      "columns": [
+        {
+          "value": "client_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_session_id_idx",
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_user_id_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_authorization_code_id_idx",
+      "columns": [
+        {
+          "value": "authorization_code_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "oauth_resource",
+      "name": "oauth_resource_identifier_unique",
+      "columns": [
+        {
+          "value": "identifier",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "organization",
+      "name": "organization_slug_idx",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "quota_reservations",
+      "name": "quota_owner_pending_idx",
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false
+        },
+        {
+          "value": "committed",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "quota_reservations",
+      "name": "quota_owner_month_idx",
+      "columns": [
+        {
+          "value": "owner_id",
+          "isExpression": false
+        },
+        {
+          "value": "month",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "quota_reservations",
+      "name": "quota_pending_target_idx",
+      "columns": [
+        {
+          "value": "target_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"quota_reservations\".\"committed\" = 0",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "rate_limit",
+      "name": "rate_limit_key_unique",
+      "columns": [
+        {
+          "value": "key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "review_submissions",
+      "name": "review_submissions_thread_idx",
+      "columns": [
+        {
+          "value": "thread_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "session",
+      "name": "session_token_unique",
+      "columns": [
+        {
+          "value": "token",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "session",
+      "name": "session_userId_idx",
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "subscription",
+      "name": "subscription_reference_idx",
+      "columns": [
+        {
+          "value": "reference_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "suggestion_acceptances",
+      "name": "suggestion_acceptances_drop",
+      "columns": [
+        {
+          "value": "drop_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "user",
+      "name": "user_email_unique",
+      "columns": [
+        {
+          "value": "email",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "verification",
+      "name": "verification_identifier_idx",
+      "columns": [
+        {
+          "value": "identifier",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_forge",
+      "name": "vitehub_comment_forge_thread",
+      "columns": [
+        {
+          "value": "thread_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_forge",
+      "name": "vitehub_comment_forge_pull_request",
+      "columns": [
+        {
+          "value": "repository",
+          "isExpression": false
+        },
+        {
+          "value": "pull_request",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_messages",
+      "name": "vitehub_comment_messages_thread",
+      "columns": [
+        {
+          "value": "thread_id",
+          "isExpression": false
+        },
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_threads",
+      "name": "vitehub_comment_threads_scope_n",
+      "columns": [
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "n",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_threads",
+      "name": "vitehub_comment_threads_scope_request",
+      "columns": [
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_threads",
+      "name": "vitehub_comment_threads_subject",
+      "columns": [
+        {
+          "value": "subject_kind",
+          "isExpression": false
+        },
+        {
+          "value": "subject_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "vitehub_comment_threads",
+      "name": "vitehub_comment_threads_status",
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "updated_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "account",
+      "name": "account_user_id_user_id_fk",
+      "columns": [
+        "user_id"
+      ],
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "comment_attachments",
+      "name": "comment_attachments_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_files",
+      "name": "drop_files_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_texts",
+      "name": "drop_texts_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_versions",
+      "name": "drop_versions_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_viewers",
+      "name": "drop_viewers_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_views",
+      "name": "drop_views_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_pins",
+      "name": "fk_drop_pins_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_pins",
+      "name": "fk_drop_pins_user_id_user_id_fk",
+      "columns": [
+        "user_id"
+      ],
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_visits",
+      "name": "drop_visits_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "invitation",
+      "name": "invitation_organization_id_organization_id_fk",
+      "columns": [
+        "organization_id"
+      ],
+      "tableTo": "organization",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "member",
+      "name": "member_organization_id_organization_id_fk",
+      "columns": [
+        "organization_id"
+      ],
+      "tableTo": "organization",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "member",
+      "name": "member_user_id_user_id_fk",
+      "columns": [
+        "user_id"
+      ],
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "review_submissions",
+      "name": "review_submissions_thread_id_vitehub_comment_threads_id_fk",
+      "columns": [
+        "thread_id"
+      ],
+      "tableTo": "vitehub_comment_threads",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "session",
+      "name": "session_user_id_user_id_fk",
+      "columns": [
+        "user_id"
+      ],
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "suggestion_acceptances",
+      "name": "suggestion_acceptances_drop_id_drops_id_fk",
+      "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "abuse_reports",
+      "name": "abuse_reports_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "account",
+      "name": "account_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "blob_cleanup",
+      "name": "blob_cleanup_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "code_images",
+      "name": "code_images_pk",
+      "columns": [
+        "blob_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "comment_attachments",
+      "name": "comment_attachments_pk",
+      "columns": [
+        "drop_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "comment_cleanup",
+      "name": "comment_cleanup_pk",
+      "columns": [
+        "drop_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_texts",
+      "name": "drop_texts_pk",
+      "columns": [
+        "drop_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_versions",
+      "name": "drop_versions_drop_id_version_pk",
+      "columns": [
+        "drop_id",
+        "version"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_viewers",
+      "name": "drop_viewers_drop_id_day_id_pk",
+      "columns": [
+        "drop_id",
+        "day",
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_views",
+      "name": "drop_views_drop_id_day_viewer_pk",
+      "columns": [
+        "drop_id",
+        "day",
+        "viewer"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_pins",
+      "name": "drop_pins_pk",
+      "columns": [
+        "user_id",
+        "drop_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drop_visits",
+      "name": "drop_visits_user_id_drop_id_pk",
+      "columns": [
+        "user_id",
+        "drop_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "drops",
+      "name": "drops_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "invitation",
+      "name": "invitation_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "jwks",
+      "name": "jwks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "member",
+      "name": "member_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_access_token",
+      "name": "oauth_access_token_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_client",
+      "name": "oauth_client_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_client_assertion",
+      "name": "oauth_client_assertion_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_client_resource",
+      "name": "oauth_client_resource_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_consent",
+      "name": "oauth_consent_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_refresh_token",
+      "name": "oauth_refresh_token_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "oauth_resource",
+      "name": "oauth_resource_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "organization",
+      "name": "organization_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "quota_reservations",
+      "name": "quota_reservations_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "rate_limit",
+      "name": "rate_limit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "review_submissions",
+      "name": "review_submissions_scope_request_id_pk",
+      "columns": [
+        "scope",
+        "request_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "session",
+      "name": "session_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "skill_settings",
+      "name": "skill_settings_pk",
+      "columns": [
+        "name"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "subscription",
+      "name": "subscription_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "suggestion_acceptances",
+      "name": "suggestion_acceptances_pk",
+      "columns": [
+        "thread_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "user",
+      "name": "user_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "verification",
+      "name": "verification_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_comment_counters",
+      "name": "vitehub_comment_counters_pk",
+      "columns": [
+        "scope"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_comment_forge",
+      "name": "vitehub_comment_forge_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_comment_messages",
+      "name": "vitehub_comment_messages_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "vitehub_comment_threads",
+      "name": "vitehub_comment_threads_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "code_images",
+      "name": "code_images_size",
+      "value": "\"code_images\".\"size\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "drops",
+      "name": "session_publisher_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "name": "vitehub_webhook_pairings",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_comment_sends",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_webhook_deliveries",
+      "entityType": "tables"
+    },
+    {
+      "name": "vitehub_webhook_endpoints",
+      "entityType": "tables"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "owner",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "agent",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "host",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "address",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "sealed",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_webhook_pairings",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "member",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "subject_kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "subject_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "page",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "threads",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "delivery",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "endpoint",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "thread",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "sender",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "token_expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "vitehub_comment_sends",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "vitehub_webhook_deliveries",
       "name": "id",
       "type": "text",
@@ -4136,178 +5699,10 @@
     },
     {
       "table": "vitehub_webhook_pairings",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "owner",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "agent",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "host",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "address",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "sealed",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "expires_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "vitehub_webhook_pairings",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "abuse_reports",
-      "name": "abuse_reports_status_idx",
+      "name": "vitehub_webhook_pairings_owner",
       "columns": [
         {
-          "value": "status",
-          "isExpression": false
-        },
-        {
-          "value": "created_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "abuse_reports",
-      "name": "abuse_reports_target_idx",
-      "columns": [
-        {
-          "value": "target",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "account",
-      "name": "account_userId_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "code_images",
-      "name": "code_images_owner_idx",
-      "columns": [
-        {
-          "value": "owner_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "code_images",
-      "name": "code_images_expires_idx",
-      "columns": [
-        {
-          "value": "expires_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "comment_attachments",
-      "name": "comment_attachments_comment_idx",
-      "columns": [
-        {
-          "value": "comment_id",
-          "isExpression": false
-        },
-        {
-          "value": "created_at",
+          "value": "owner",
           "isExpression": false
         }
       ],
@@ -4348,688 +5743,6 @@
         },
         {
           "value": "created_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drop_files",
-      "name": "drop_files_path_idx",
-      "columns": [
-        {
-          "value": "drop_id",
-          "isExpression": false
-        },
-        {
-          "value": "path",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drop_pins",
-      "name": "drop_pins_drop_idx",
-      "columns": [
-        {
-          "value": "drop_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drop_versions",
-      "name": "drop_versions_blob_key_idx",
-      "columns": [
-        {
-          "value": "blob_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drop_viewers",
-      "name": "drop_viewers_day_idx",
-      "columns": [
-        {
-          "value": "day",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drop_visits",
-      "name": "drop_visits_drop_idx",
-      "columns": [
-        {
-          "value": "drop_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_owner_idx",
-      "columns": [
-        {
-          "value": "owner_id",
-          "isExpression": false
-        },
-        {
-          "value": "updated_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_blob_key_idx",
-      "columns": [
-        {
-          "value": "blob_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_expiry_idx",
-      "columns": [
-        {
-          "value": "lifetime",
-          "isExpression": false
-        },
-        {
-          "value": "last_accessed_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_trash_idx",
-      "columns": [
-        {
-          "value": "trashed_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_parent_idx",
-      "columns": [
-        {
-          "value": "parent_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "drops",
-      "name": "drops_share_idx",
-      "columns": [
-        {
-          "value": "share",
-          "isExpression": false
-        },
-        {
-          "value": "updated_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "invitation",
-      "name": "invitation_organization_idx",
-      "columns": [
-        {
-          "value": "organization_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "invitation",
-      "name": "invitation_email_idx",
-      "columns": [
-        {
-          "value": "email",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "member",
-      "name": "member_organization_idx",
-      "columns": [
-        {
-          "value": "organization_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "member",
-      "name": "member_user_organization_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        },
-        {
-          "value": "organization_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_client_id_idx",
-      "columns": [
-        {
-          "value": "client_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_session_id_idx",
-      "columns": [
-        {
-          "value": "session_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_user_id_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_authorization_code_id_idx",
-      "columns": [
-        {
-          "value": "authorization_code_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_refresh_id_idx",
-      "columns": [
-        {
-          "value": "refresh_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_client",
-      "name": "oauth_client_user_id_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_client_resource",
-      "name": "oauth_client_resource_client_id_idx",
-      "columns": [
-        {
-          "value": "client_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_client_resource",
-      "name": "oauth_client_resource_resource_id_idx",
-      "columns": [
-        {
-          "value": "resource_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_consent",
-      "name": "oauth_consent_client_id_idx",
-      "columns": [
-        {
-          "value": "client_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_consent",
-      "name": "oauth_consent_user_id_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_client_id_idx",
-      "columns": [
-        {
-          "value": "client_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_session_id_idx",
-      "columns": [
-        {
-          "value": "session_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_user_id_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_authorization_code_id_idx",
-      "columns": [
-        {
-          "value": "authorization_code_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "organization",
-      "name": "organization_slug_idx",
-      "columns": [
-        {
-          "value": "slug",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "quota_reservations",
-      "name": "quota_owner_pending_idx",
-      "columns": [
-        {
-          "value": "owner_id",
-          "isExpression": false
-        },
-        {
-          "value": "committed",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "quota_reservations",
-      "name": "quota_owner_month_idx",
-      "columns": [
-        {
-          "value": "owner_id",
-          "isExpression": false
-        },
-        {
-          "value": "month",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "quota_reservations",
-      "name": "quota_pending_target_idx",
-      "columns": [
-        {
-          "value": "target_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "\"quota_reservations\".\"committed\" = 0",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "review_submissions",
-      "name": "review_submissions_thread_idx",
-      "columns": [
-        {
-          "value": "thread_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "session",
-      "name": "session_userId_idx",
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "subscription",
-      "name": "subscription_reference_idx",
-      "columns": [
-        {
-          "value": "reference_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "suggestion_acceptances",
-      "name": "suggestion_acceptances_drop",
-      "columns": [
-        {
-          "value": "drop_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "verification",
-      "name": "verification_identifier_idx",
-      "columns": [
-        {
-          "value": "identifier",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_forge",
-      "name": "vitehub_comment_forge_thread",
-      "columns": [
-        {
-          "value": "thread_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_forge",
-      "name": "vitehub_comment_forge_pull_request",
-      "columns": [
-        {
-          "value": "repository",
-          "isExpression": false
-        },
-        {
-          "value": "pull_request",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_messages",
-      "name": "vitehub_comment_messages_thread",
-      "columns": [
-        {
-          "value": "thread_id",
-          "isExpression": false
-        },
-        {
-          "value": "created_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_threads",
-      "name": "vitehub_comment_threads_scope_n",
-      "columns": [
-        {
-          "value": "scope",
-          "isExpression": false
-        },
-        {
-          "value": "n",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_threads",
-      "name": "vitehub_comment_threads_scope_request",
-      "columns": [
-        {
-          "value": "scope",
-          "isExpression": false
-        },
-        {
-          "value": "request_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_threads",
-      "name": "vitehub_comment_threads_subject",
-      "columns": [
-        {
-          "value": "subject_kind",
-          "isExpression": false
-        },
-        {
-          "value": "subject_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "vitehub_comment_threads",
-      "name": "vitehub_comment_threads_status",
-      "columns": [
-        {
-          "value": "status",
-          "isExpression": false
-        },
-        {
-          "value": "updated_at",
           "isExpression": false
         }
       ],
@@ -5112,370 +5825,9 @@
     },
     {
       "table": "vitehub_webhook_pairings",
-      "name": "vitehub_webhook_pairings_owner",
-      "columns": [
-        {
-          "value": "owner",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "account",
-      "name": "account_user_id_user_id_fk",
-      "columns": [
-        "user_id"
-      ],
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "comment_attachments",
-      "name": "comment_attachments_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_files",
-      "name": "drop_files_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_pins",
-      "name": "fk_drop_pins_user_id_user_id_fk",
-      "columns": [
-        "user_id"
-      ],
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_pins",
-      "name": "fk_drop_pins_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_texts",
-      "name": "drop_texts_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_versions",
-      "name": "drop_versions_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_viewers",
-      "name": "drop_viewers_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_views",
-      "name": "drop_views_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_visits",
-      "name": "drop_visits_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "invitation",
-      "name": "invitation_organization_id_organization_id_fk",
-      "columns": [
-        "organization_id"
-      ],
-      "tableTo": "organization",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "member",
-      "name": "member_organization_id_organization_id_fk",
-      "columns": [
-        "organization_id"
-      ],
-      "tableTo": "organization",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "member",
-      "name": "member_user_id_user_id_fk",
-      "columns": [
-        "user_id"
-      ],
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "review_submissions",
-      "name": "review_submissions_thread_id_vitehub_comment_threads_id_fk",
-      "columns": [
-        "thread_id"
-      ],
-      "tableTo": "vitehub_comment_threads",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "session",
-      "name": "session_user_id_user_id_fk",
-      "columns": [
-        "user_id"
-      ],
-      "tableTo": "user",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "suggestion_acceptances",
-      "name": "suggestion_acceptances_drop_id_drops_id_fk",
-      "columns": [
-        "drop_id"
-      ],
-      "tableTo": "drops",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "drop_pins",
-      "name": "drop_pins_pk",
-      "columns": [
-        "user_id",
-        "drop_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drop_versions",
-      "name": "drop_versions_drop_id_version_pk",
-      "columns": [
-        "drop_id",
-        "version"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drop_viewers",
-      "name": "drop_viewers_drop_id_day_id_pk",
-      "columns": [
-        "drop_id",
-        "day",
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drop_views",
-      "name": "drop_views_drop_id_day_viewer_pk",
-      "columns": [
-        "drop_id",
-        "day",
-        "viewer"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drop_visits",
-      "name": "drop_visits_user_id_drop_id_pk",
-      "columns": [
-        "user_id",
-        "drop_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "review_submissions",
-      "name": "review_submissions_scope_request_id_pk",
-      "columns": [
-        "scope",
-        "request_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "abuse_reports",
-      "name": "abuse_reports_pk",
+      "name": "vitehub_webhook_pairings_pk",
       "columns": [
         "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "account",
-      "name": "account_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "blob_cleanup",
-      "name": "blob_cleanup_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "code_images",
-      "name": "code_images_pk",
-      "columns": [
-        "blob_key"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "comment_attachments",
-      "name": "comment_attachments_pk",
-      "columns": [
-        "drop_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "comment_cleanup",
-      "name": "comment_cleanup_pk",
-      "columns": [
-        "drop_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -5483,231 +5835,6 @@
     {
       "table": "vitehub_comment_sends",
       "name": "vitehub_comment_sends_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drop_texts",
-      "name": "drop_texts_pk",
-      "columns": [
-        "drop_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "drops",
-      "name": "drops_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "invitation",
-      "name": "invitation_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "jwks",
-      "name": "jwks_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "member",
-      "name": "member_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_client",
-      "name": "oauth_client_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_client_assertion",
-      "name": "oauth_client_assertion_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_client_resource",
-      "name": "oauth_client_resource_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_consent",
-      "name": "oauth_consent_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "oauth_resource",
-      "name": "oauth_resource_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "organization",
-      "name": "organization_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "quota_reservations",
-      "name": "quota_reservations_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "rate_limit",
-      "name": "rate_limit_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "session",
-      "name": "session_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "skill_settings",
-      "name": "skill_settings_pk",
-      "columns": [
-        "name"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "subscription",
-      "name": "subscription_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "suggestion_acceptances",
-      "name": "suggestion_acceptances_pk",
-      "columns": [
-        "thread_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "user",
-      "name": "user_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "verification",
-      "name": "verification_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "vitehub_comment_counters",
-      "name": "vitehub_comment_counters_pk",
-      "columns": [
-        "scope"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "vitehub_comment_forge",
-      "name": "vitehub_comment_forge_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "vitehub_comment_messages",
-      "name": "vitehub_comment_messages_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "vitehub_comment_threads",
-      "name": "vitehub_comment_threads_pk",
       "columns": [
         "id"
       ],
@@ -5733,91 +5860,72 @@
       "entityType": "pks"
     },
     {
-      "table": "vitehub_webhook_pairings",
-      "name": "vitehub_webhook_pairings_pk",
+      "name": "drop_runtime_errors",
+      "entityType": "tables"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "drop_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "version",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "errors",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "fk_drop_runtime_errors_drop_id_drops_id_fk",
       "columns": [
+        "drop_id"
+      ],
+      "tableTo": "drops",
+      "columnsTo": [
         "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "drop_runtime_errors",
+      "name": "drop_runtime_errors_pk",
+      "columns": [
+        "drop_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
-    },
-    {
-      "table": "blob_cleanup",
-      "name": "blob_cleanup_blob_key_unique",
-      "columns": [
-        "blob_key"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "oauth_access_token",
-      "name": "oauth_access_token_token_unique",
-      "columns": [
-        "token"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "oauth_client",
-      "name": "oauth_client_client_id_unique",
-      "columns": [
-        "client_id"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "oauth_refresh_token",
-      "name": "oauth_refresh_token_token_unique",
-      "columns": [
-        "token"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "oauth_resource",
-      "name": "oauth_resource_identifier_unique",
-      "columns": [
-        "identifier"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "rate_limit",
-      "name": "rate_limit_key_unique",
-      "columns": [
-        "key"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "session",
-      "name": "session_token_unique",
-      "columns": [
-        "token"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "user",
-      "name": "user_email_unique",
-      "columns": [
-        "email"
-      ],
-      "nameExplicit": false,
-      "entityType": "uniques"
-    },
-    {
-      "table": "code_images",
-      "name": "code_images_size",
-      "value": "\"size\" >= 0",
-      "entityType": "checks"
     }
   ],
   "renames": []

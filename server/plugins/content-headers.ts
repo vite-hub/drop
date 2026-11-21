@@ -1,4 +1,4 @@
-import { getEventContext, type H3EventContext } from "h3"
+import { getEventContext, HTTPError, type H3EventContext } from "h3"
 import { definePlugin } from "nitro"
 import { useRuntimeConfig } from "nitro/runtime-config"
 import { HUB_SKILLS_PATH } from "#shared/links"
@@ -6,6 +6,12 @@ import { isIndexedPath } from "#shared/utils/docs"
 
 export default definePlugin((app) => {
   app.hooks!.hook("response", (response, event) => {
+    if (response.status >= 400) {
+      const errors = event.req.context?.nitro?.errors?.map(({ error }) => error) ?? []
+      const thrown = errors.filter((error) => HTTPError.isError(error)).findLast((error) => error.headers)
+      for (const [name, value] of thrown?.headers ?? [])
+        if (!response.headers.has(name)) response.headers.set(name, value)
+    }
     if (!response.headers.has("X-Content-Type-Options")) response.headers.set("X-Content-Type-Options", "nosniff")
     if (!response.headers.has("Referrer-Policy"))
       response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")

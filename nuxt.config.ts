@@ -65,6 +65,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
         cloudflareTemplate.d1_databases[0]!.database_id ||
         "00000000-0000-4000-8000-000000000000",
       readReplication: true,
+      migrateOnDeploy: true,
     },
     kv: true,
     cache: { driver: "kv" },
@@ -83,7 +84,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     host: "netlify",
     blob: files,
     database: d1("vitehub-drop-netlify"),
-    schedule: { providerOutput: "standalone" },
+    schedule: true,
     realtime: false,
   },
   deno: {

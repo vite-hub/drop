@@ -5,6 +5,7 @@ import { createRequire } from "node:module"
 import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { test } from "vite-plus/test"
+import { migrateD1 } from "../../scripts/migrate-d1.mjs"
 import { migrations } from "../../scripts/migrations.mjs"
 
 const require = createRequire(import.meta.resolve("vite-hub"))
@@ -46,7 +47,7 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
       assert.equal(url, "https://api.cloudflare.com/client/v4/accounts/test-account/d1/database/test-database/query")
       const { sql, params } = JSON.parse(options.body)
       let results = []
-      if (sql.startsWith("SELECT")) results = database.prepare(sql).all(...params)
+      if (sql.startsWith("SELECT")) results = database.prepare(sql).all(...(params ?? []))
       else database.exec(`BEGIN; ${sql}; COMMIT;`)
       return Response.json({ success: true, result: [{ success: true, results }] })
     }
@@ -55,9 +56,12 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
     assert.equal(await migrate.run([], context), 0, stderr)
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
 
+    const deno = JSON.parse(readFileSync(new URL("../../deno.jsonc", import.meta.url), "utf8")).deploy
+    assert.equal(deno.build, "DROP_HOST=deno pnpm build")
     const commands = [
       readFileSync(new URL("../../netlify.toml", import.meta.url), "utf8").match(/^command = "([^"]+)"/m)[1],
       JSON.parse(readFileSync(new URL("../../vercel.json", import.meta.url), "utf8")).buildCommand,
+      deno.predeploy,
     ]
     for (const command of commands) {
       database.close()
@@ -75,6 +79,13 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
       assert.equal(database.prepare("SELECT name FROM sqlite_master WHERE name = 'comments'").get(), undefined)
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
     }
+
+    // Deno and Docker on D1 used Drop's D1 script, which writes the same Wrangler ledger: nothing is pending after it.
+    database.close()
+    database = new DatabaseSync(":memory:")
+    await migrateD1({ ...context.env, CLOUDFLARE_D1_DATABASE_ID: "test-database" })
+    assert.equal(await migrate.run([], context), 0, stderr)
+    assert.equal(database.prepare("SELECT count(*) AS n FROM d1_migrations").get().n, migrations().length)
   } finally {
     globalThis.fetch = previousFetch
     database.close()

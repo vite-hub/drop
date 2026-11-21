@@ -156,6 +156,10 @@ test("concurrent toggles from separate served settings instances preserve both s
   const { default: other } = await import("../../server/skills.ts")
   assert.notEqual(settings, other)
   assert.ok(isSkillSettings(other))
+  const previouslyOff = rows()
+    .filter(({ enabled }) => !enabled)
+    .map(({ name }) => name)
+  const expectedOff = [...new Set([...previouslyOff, "prototype", "slidev"])].toSorted()
   const start = queries.length
   try {
     await roundTrips(async () => {
@@ -171,9 +175,9 @@ test("concurrent toggles from separate served settings instances preserve both s
       rows()
         .filter(({ enabled }) => !enabled)
         .map(({ name }) => name),
-      ["prototype", "slidev"],
+      expectedOff,
     )
-    assert.deepEqual(await offNames(), ["prototype", "slidev"])
+    assert.deepEqual(await offNames(), expectedOff)
   } finally {
     await settings.set("prototype", true)
     await other.set("slidev", true)

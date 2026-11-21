@@ -10,7 +10,9 @@ const changed = git("diff", "--name-status", "--no-renames", base, "--", directo
   .split("\n")
   .filter(Boolean)
   .map((line) => line.split("\t"))
-  .filter(([status, path]) => status !== "A" && path !== manifest)
+  .filter(
+    ([status, path]) => status !== "A" && path !== manifest && !(status === "M" && path.endsWith("/snapshot.json")),
+  )
 
 const changedMappings = []
 if (git("ls-tree", "--name-only", base, "--", manifest)) {
