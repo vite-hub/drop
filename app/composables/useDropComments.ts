@@ -123,8 +123,8 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     const shown = drop()
     if (!shown) return false
     if (action === "reply") return shown.canComment
-    if (action === "resolve") return shown.isOwner || mine(thread.author)
-    if (!message) return false
+    if (action === "resolve") return !thread.delivery && (shown.isOwner || mine(thread.author))
+    if (!message || message.delivery) return false
     if (action === "edit") return mine(message.author)
     return shown.isOwner || mine(message.author)
   }

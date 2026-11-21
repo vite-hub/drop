@@ -1,7 +1,8 @@
 import { useLogger } from "evlog/nitro/v3"
-import type { H3Event, HTTPError } from "h3"
+import { getCookie, type H3Event, type HTTPError } from "h3"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { contentUnavailable, contentUnavailableIcon, missingInDrop } from "../../shared/content-unavailable.ts"
+import { RETURNING_COOKIE, TRIED_COOKIE, signInPath, signInRightAway } from "../../shared/sign-in.ts"
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
@@ -68,6 +69,24 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
     fellBack(event, "identity", failure)
   }
   const drop = status === 404 ? await openableDrop(event, path, identity) : null
+  // A browser that was signed in before goes back through sign-in instead of reading why it can't open this.
+  if (
+    !identity &&
+    !drop &&
+    event.req.method === "GET" &&
+    signInRightAway(status, {
+      returning: Boolean(getCookie(event, RETURNING_COOKIE)),
+      tried: Boolean(getCookie(event, TRIED_COOKIE)),
+    })
+  )
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: signInPath(`${path}${event.url.search}`, { proxy: authProxy().enabled }),
+        "Set-Cookie": `${TRIED_COOKIE}=1; Path=/; Max-Age=60; SameSite=Lax${event.url.protocol === "https:" ? "; Secure" : ""}`,
+        "Cache-Control": "private, no-store",
+      },
+    })
   const message = drop
     ? missingInDrop(drop, identity?.email)
     : contentUnavailable(

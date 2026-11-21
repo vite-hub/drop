@@ -240,7 +240,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
     >
       <template #actions>
         <UTooltip
-          v-if="canAccept && comment.suggestion !== null && !comment.resolved"
+          v-if="canAccept && !comment.delivery && comment.suggestion !== null && !comment.resolved"
           text="Publish a new version with this change"
         >
           <UButton
@@ -254,7 +254,7 @@ const edit = (messageId: string, text: string, ids: string[]) =>
           />
         </UTooltip>
         <!-- Deleting the thread is the first message's Delete, which asks first. -->
-        <UTooltip text="Copy link">
+        <UTooltip v-if="!comment.delivery" text="Copy link">
           <UButton
             aria-label="Copy link"
             color="neutral"

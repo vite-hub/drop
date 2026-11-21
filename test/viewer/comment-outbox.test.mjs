@@ -5,6 +5,7 @@ import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/clien
 import { createEventHook, createInjectionState, useEventListener } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
+import { RETURNING_COOKIE } from "../../shared/sign-in.ts"
 
 // useDrop's sends go through the app's outbox (useCommentsOutbox, on ViteHub's): they return at once, show as waiting,
 // and reach Drop's routes once, from whatever page the reader is on by then.
@@ -16,6 +17,7 @@ const saved = new Map()
 let answer
 const ada = { id: "ada", name: "Ada", image: null }
 const me = ref(ada)
+const returning = ref("1")
 let app
 const confirm = vi.fn()
 const signOut = vi.fn(async () => {})
@@ -48,6 +50,10 @@ for (const [name, value] of Object.entries({
   useCommentsOutbox: () => app,
   useNuxtApp: () => ({ $auth: {} }),
   useUserSession: () => ({ signOut }),
+  useCookie: (name) => {
+    assert.equal(name, RETURNING_COOKIE)
+    return returning
+  },
   useConfirm: () => confirm,
   navigateTo: async () => {},
   clearNuxtData: () => {},
@@ -81,6 +87,7 @@ const scoped = (run) => {
 // Each test gets the app's outbox afresh, as a new page load with an empty browser.
 beforeEach(() => {
   me.value = ada
+  returning.value = "1"
   app = scoped(() => createCommentsOutbox({ store: createMemoryOutboxStore() })).value
 })
 afterEach(() => {
@@ -293,18 +300,22 @@ test("signing out with an unsent comment asks, stays on no, and discards it on y
   await leave()
   assert.equal(confirm.mock.calls.length, 0, "nothing waits, so it doesn't ask")
   assert.equal(signOut.mock.calls.length, 1)
+  assert.equal(returning.value, null)
 
   await state.addComment(place, "The chart is cut off")
+  returning.value = "1"
   confirm.mockResolvedValueOnce(false)
   await leave()
   assert.match(confirm.mock.calls[0][0].title, /^1 comment isn't sent\. Sign out and discard it\?$/)
   assert.equal(signOut.mock.calls.length, 1, "no: still signed in")
   assert.equal(app.entries.value.length, 1, "no: the comment stays")
+  assert.equal(returning.value, "1", "no: the sign-in preference stays")
 
   confirm.mockResolvedValueOnce(true)
   await leave()
   assert.equal(app.entries.value.length, 0, "yes: discarded")
   assert.equal(signOut.mock.calls.length, 2)
+  assert.equal(returning.value, null, "yes: the next drop link won't sign in automatically")
   assert.equal(state.list.value.length, 0)
 })
 
