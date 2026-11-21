@@ -148,6 +148,7 @@ const theme = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() =>
           items: (["system", "light", "dark"] as const).map((mode) => ({
             id: `theme-${mode}`,
             label: mode.charAt(0).toUpperCase() + mode.slice(1),
+            suffix: "Theme",
             icon: appConfig.ui.icons[mode],
             active: colorMode.preference === mode,
             onSelect: () => (colorMode.preference = mode),
