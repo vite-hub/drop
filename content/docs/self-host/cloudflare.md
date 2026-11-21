@@ -12,7 +12,7 @@ The button clones Drop into your GitHub account, creates D1, R2, and KV, and ask
 
 1. Choose a Worker name and note its `https://<worker>.<subdomain>.workers.dev` address.
 2. [Create a GitHub OAuth app](/docs/self-host#github) with that address and callback `<origin>/api/auth/callback/github`. Supply its client id and secret, `BETTER_AUTH_SECRET` from `openssl rand -base64 32`, and `DROP_ADMINS` with the admins' emails.
-3. Accept `pnpm build` as the build command and `pnpm run deploy` as the deploy command. If you add a custom domain later, update the OAuth app's homepage and callback.
+3. Accept `pnpm build` as the build command and `pnpm run deploy` as the deploy command. This setup needs a build API token with D1 Write as well as deploy permissions; see [Workers Builds](#workers-builds). If you add a custom domain later, update the OAuth app's homepage and callback.
 
 The root `wrangler.jsonc` describes resources for the button. Cloudflare writes their new ids there. ViteHub generates `.output/server/wrangler.json` during the build; Drop carries the template's resource names and ids into that file. `CLOUDFLARE_D1_DATABASE_ID` still takes priority, so existing Workers Builds keep their current database.
 
@@ -60,7 +60,16 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    DROP_URL=https://<your-domain> pnpm test:e2e:deployed
    ```
 
-To deploy on every push instead, connect the repository in Workers Builds with `CLOUDFLARE_D1_DATABASE_ID` as a build variable, `pnpm build` as the build command, and `pnpm run deploy` as the deploy command, as the button sets up. Its default, `npx wrangler deploy`, publishes without applying new migrations.
+## Deploy on every push with Workers Builds {#workers-builds}
+
+Set the build command to `pnpm build`. Build-time migrations are opt-in: in the Worker's **Settings → Build**, set `DROP_PRODUCTION_BRANCH` only in the **Production** build settings to the exact configured production branch, even if it is `main`. Leave it unset in **Preview** so that preview builds never migrate, even when building `main`.
+
+On an opted-in branch, the build applies migrations to the `DB` binding in `.output/server/wrangler.json` before the deploy command runs. The database ID can come from `CLOUDFLARE_D1_DATABASE_ID` or from the provisioned `wrangler.jsonc` used by the Deploy button. The migration needs **D1 Write** on the account that owns `DB`. The default Workers Builds deploy token does not grant that permission. Use one of these setups:
+
+- With the default production deploy command (`npx wrangler deploy`), opt in as described above and set `CLOUDFLARE_ACCOUNT_ID` in the Production build settings if it isn't already available. Add an account-scoped D1 Write token as the `DROP_D1_MIGRATION_TOKEN` **build secret**, or use a Workers Builds API token that already has D1 Write. The separate secret does not replace the deploy token.
+- If you use `pnpm run deploy` as the production deploy command, leave `DROP_PRODUCTION_BRANCH` unset: the deploy command applies migrations itself. Select a Workers Builds API token with both deploy permissions and D1 Write. A separate migration secret alone won't grant the deploy command D1 access.
+
+Verify the build and deploy on a separate Worker backed by a test D1 database before enabling this setup on production. A missing binding or a migration failure stops the build before deployment. Use migrations that are compatible with the currently deployed Worker: the schema changes before the new Worker is published.
 
 ## Settings {#env}
 
@@ -68,6 +77,7 @@ To deploy on every push instead, connect the repository in Workers Builds with `
 ---
 extra:
   - ["CLOUDFLARE_D1_DATABASE_ID", "The id wrangler d1 create printed. Read at build time."]
+  - ["DROP_PRODUCTION_BRANCH", "Optional build-time opt-in for D1 migrations. Set only in Workers Builds Production settings to the exact production branch; no default."]
   - ["CLOUDFLARE_D1_DATABASE_NAME", "The D1 database name, vitehub-drop by default."]
   - ["DROP_CONTENT_ORIGIN", "Optional. Where apps and HTML docs run, one subdomain per drop on the same Worker, such as https://*-drop.example.com. Needs VITEHUB_SECRET."]
 ---
