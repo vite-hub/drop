@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { setImmediate } from "node:timers/promises"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { computed, effectScope, onScopeDispose, readonly, ref, shallowRef, toValue, watch } from "vue"
 import { createMemoryOutboxStore, replyMessageId } from "vite-hub/comments/client"
@@ -503,6 +504,46 @@ test("a startup identity failure retries on reconnect before replaying a saved c
   assert.equal(fetches[1].body.as, "ada")
   assert.equal(fetches[1].body.requestId, fetches[0].body.requestId)
 })
+
+test(
+  "a confirmed same-account lookup resumes a 401 hold but not the following quota hold",
+  { timeout: 10_000 },
+  async () => {
+    const refusal = (status) => Promise.reject(Object.assign(new Error("Not sent"), { status }))
+    answer = () => refusal(401)
+    resolveIdentity.mockImplementationOnce(() => {
+      identityStatus.value = "pending"
+      me.value = null
+      identityStatus.value = "error"
+    })
+    const { state } = open()
+    await state.addComment(place, "Saved before signing back in")
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.error?.status, 401), { timeout: 4_000 })
+    assert.equal(identityStatus.value, "error")
+
+    answer = () => refusal(402)
+    resolveIdentity.mockImplementationOnce(() => {
+      identityStatus.value = "pending"
+      me.value = ada
+      identityStatus.value = "success"
+    })
+    window.dispatchEvent(new Event("online"))
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.error?.status, 402), { timeout: 4_000 })
+    const [first, second] = fetches
+    assert.equal(second.body.as, ada.id)
+    assert.equal(second.body.requestId, first.body.requestId)
+
+    identityStatus.value = "error"
+    identityStatus.value = "success"
+    await setImmediate()
+    assert.equal(app.entries.value[0]?.error?.status, 402)
+    assert.equal(fetches.length, 2)
+    answer = (_url, body) => comment("c1", body.body, body.requestId)
+    await app.retry(app.entries.value[0].id)
+    await vi.waitFor(() => assert.equal(state.list.value[0]?.id, "c1"))
+    assert.equal(fetches.length, 3, "the quota hold needs an explicit retry")
+  },
+)
 
 test("a guest's waiting comment goes out as the person who signs in, without asking", { timeout: 10_000 }, async () => {
   me.value = null

@@ -4,6 +4,10 @@ const route = useRoute()
 const count = computed(() => entries.value.length + heldIds.value.length)
 const open = ref(false)
 const urls = fileUrls()
+watch(
+  () => route.fullPath,
+  () => (open.value = false),
+)
 watch(entries, (saved) => urls.keep(fileKeys(saved)))
 onScopeDispose(urls.clear)
 const items = computed(() =>

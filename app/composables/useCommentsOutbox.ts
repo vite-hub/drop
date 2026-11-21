@@ -168,6 +168,14 @@ export function createCommentsOutbox(
         : { ...entry, input: { ...entry.input, ...words } }
     })
 
+  async function resumeAuthorizationHolds(who: Holder, client: Client) {
+    for (const entry of await store.list(who.account)) {
+      if (active.value !== client || status.value !== "success" || (me.value?.id ?? GUEST_ACCOUNT) !== who.account)
+        return
+      if (entry.held && entry.error?.status === 401) await client.outbox.retry(entry.id)
+    }
+  }
+
   // Who's signed in is known once /api/me first answers; until then nothing goes out as a guest by mistake.
   const retryIdentity = () => {
     if (status.value === "error") void refreshNuxtData(keys.me)
@@ -183,10 +191,20 @@ export function createCommentsOutbox(
     { immediate: true },
   )
   let resolving = 0
+  let identityFailed = false
   watch(
     [() => me.value?.id, status],
     async ([id, state]) => {
-      if (state !== "success" || holder.value?.account === (id ?? GUEST_ACCOUNT)) return
+      if (state === "error") identityFailed = true
+      if (state !== "success") return
+      const recovered = identityFailed
+      identityFailed = false
+      const who = holder.value
+      const client = active.value
+      if (who?.account === (id ?? GUEST_ACCOUNT)) {
+        if (recovered && client) await resumeAuthorizationHolds(who, client)
+        return
+      }
       const turn = ++resolving
       const person = me.value
       heldHolder.value = undefined
@@ -270,9 +288,7 @@ export function createCommentsOutbox(
           else if (emptied && readOutboxAuthor() === who.account) writeOutboxAuthor()
         })
         const stop = next.start()
-        // What a 401 held for this person goes out now that they're signed in again. Signed out, it stays held, unless
-        // the last of it went out or was discarded while this outbox started.
-        if (!who.held) void next.outbox.retry()
+        if (!who.held) void resumeAuthorizationHolds(who, next)
         onCleanup(() => {
           stopChange()
           stop()
