@@ -5,7 +5,7 @@ import { MAX_ARCHIVE_BYTES } from "../../utils/app-archive"
 import { MAX_FILE_BYTES } from "../../utils/drops"
 import { logActor } from "../../utils/logs"
 import { publishInput } from "../../utils/publish"
-import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
+import { publishUploadOnce, readUpload } from "../../utils/uploads"
 
 export default defineHandler(async (event) => {
   const upload = await readUpload(event, getRouterParam(event, "ticket")!)
@@ -31,19 +31,17 @@ export default defineHandler(async (event) => {
       status: 400,
       statusText: `The upload is empty. Send the ${what} as the body, as curl -T does.`,
     })
-  if (!(await claimUpload(upload.id, upload.expiresAt)))
+  const published = await publishUploadOnce(upload.id, upload.expiresAt, () =>
+    publishInput(upload.who, upload.input, event, bytes),
+  )
+  if (!published)
     throw new HTTPError({
       status: 409,
       statusText: "This upload URL was already used. Call publish again to upload another file.",
     })
-  try {
-    const { result } = await publishInput(upload.who, upload.input, event, bytes)
-    logActor(event, upload.who)
-    useLogger(event).set({ drop: { id: "id" in result ? result.id : undefined, size: bytes.byteLength } })
-    event.res.headers.set("Cache-Control", "no-store")
-    return result
-  } catch (error) {
-    await releaseUpload(upload.id)
-    throw error
-  }
+  const { result } = published.value
+  logActor(event, upload.who)
+  useLogger(event).set({ drop: { id: "id" in result ? result.id : undefined, size: bytes.byteLength } })
+  event.res.headers.set("Cache-Control", "no-store")
+  return result
 })

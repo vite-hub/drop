@@ -1,8 +1,7 @@
 import { eq } from "drizzle-orm"
 import type { H3Event } from "h3"
-import { useStorage } from "nitro/storage"
 import * as v from "valibot"
-import { db } from "vite-hub/database"
+import { db, withIdempotency } from "vite-hub/database"
 import { isRole } from "#shared/roles"
 import { ACTOR_KINDS } from "#shared/types"
 import { user as users } from "../databases/default/index"
@@ -56,12 +55,21 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   return { who, input: ticket.i, id: ticket.j, expiresAt: ticket.e }
 }
 
-export async function claimUpload(id: string, expiresAt: number, now = Date.now()) {
-  const storage = useStorage("cache")
-  const key = `uploads:${id}`
-  if (await storage.getItem(key)) return false
-  await storage.setItem(key, 1, { ttl: Math.max(60, Math.ceil((expiresAt - now) / 1000)) })
-  return true
+export async function publishUploadOnce<T>(
+  id: string,
+  expiresAt: number,
+  publish: () => Promise<T>,
+  now = Date.now(),
+): Promise<{ value: T } | null> {
+  let published: { value: T } | undefined
+  const [error] = await withIdempotency(
+    `uploads:${id}`,
+    async () => {
+      published = { value: await publish() }
+      return true
+    },
+    { ttl: Math.max(60, Math.ceil((expiresAt - now) / 1000)) },
+  )
+  if (error && error.code !== "DATABASE_IDEMPOTENCY_IN_PROGRESS") throw error
+  return published ?? null
 }
-
-export const releaseUpload = (id: string) => useStorage("cache").removeItem(`uploads:${id}`)
