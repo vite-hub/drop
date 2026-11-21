@@ -13,7 +13,7 @@
     "db:migrate": "vitehub database migrate",
     "deploy": "node scripts/deploy-cloudflare.mjs",
     "dev": "nuxt dev",
-    "postinstall": "nuxt prepare && vitehub types prepare",
+    "postinstall": "nuxt prepare",
     "preview": "wrangler d1 migrations apply DB --local --config .output/server/wrangler.json && wrangler dev --config .output/server/wrangler.json --enable-containers=false --port 8788",
     "doctor": "vite-doctor . --config doctor.config.ts --no-cache --severity warn --max-warnings 0",
     "test": "vp test",
