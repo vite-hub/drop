@@ -24,6 +24,9 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+// VPS and Deno answer /api/health with Drop's database-only check (server/handlers/database-health.ts), not ViteHub's
+// route, which also probes Blob: the fs driver can read a broken root as a missing file, and S3 can deny a missing key
+// while existing files stay readable, so a healthy store would fail (drop#245).
 const databaseOnlyHealth = host === "vps" || host === "deno"
 const healthRoute = "/api/health"
 
@@ -113,8 +116,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     realtime: false,
   },
   // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). The hourly
-  // cleanup stays off here until Deno.cron is tested: expired drops and code images stop being served but stay stored,
-  // the Trash is never purged, and unused OAuth clients stay registered.
+  // cleanup is off here: ViteHub runs a Deno Schedule from Deno.cron outside Nitro, without its plugins, and nobody has
+  // run Drop's cleanup that way yet. Until then expired drops and code images stop being served but stay stored, the
+  // Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     host: "deno",
     blob: {
@@ -296,8 +300,9 @@ export default defineNuxtConfig({
     public: { realtime: liveEditing },
   },
 
-  // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
-  // check, and body limits, so the module's request middlewares stay off.
+  // nuxt-security (patched for Nuxt 5) writes the security headers, and its request middlewares stay off: ViteHub's
+  // `requireRateLimit` and `sameOriginWrites` cover rate limits and cross-site writes, and the routes that take
+  // files check their own body sizes.
   security: {
     rateLimiter: false,
     requestSizeLimiter: false,
