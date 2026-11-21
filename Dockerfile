@@ -16,7 +16,7 @@ ENV DROP_PUBLIC_URL=$DROP_PUBLIC_URL
 # The commit /api/health reports. The build context has no .git.
 ARG VITEHUB_BUILD_COMMIT
 ENV VITEHUB_BUILD_COMMIT=$VITEHUB_BUILD_COMMIT
-ENV DROP_HOST=vps
+ENV VITEHUB_HOST=node
 # The image has no git, so `prepare` (vp config) skips the git hooks.
 ENV VP_GIT_HOOKS=0
 ENV CLOUDFLARE_D1_DATABASE_ID=$CLOUDFLARE_D1_DATABASE_ID
@@ -39,7 +39,6 @@ COPY server/databases/default/migrations ./server/databases/default/migrations
 RUN mkdir .data && chown node:node .data
 USER node
 ENV HOST=0.0.0.0 PORT=3000
-ENV DROP_HOST=vps
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
+import { readForgeBuild } from "@vite-hub/forge/build/node"
 import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
@@ -13,7 +14,6 @@ import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
 import { legacyViteHubRoutes } from "./scripts/legacy-vitehub-routes.ts"
 import { evlogOptions } from "./scripts/logging.ts"
-import { reviewPresence } from "./scripts/review-presence.ts"
 
 declare module "nuxt/schema" {
   interface RouteRuleConfigExtensions {
@@ -24,17 +24,13 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+if (!process.env.VITEHUB_HOST && process.env.DROP_HOST) process.env.VITEHUB_HOST = host === "vps" ? "node" : host
 const databaseOnlyHealth = host === "vps" || host === "deno"
 const healthRoute = "/api/health"
 
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
-  commit:
-    process.env.VITEHUB_BUILD_COMMIT ||
-    process.env.WORKERS_CI_COMMIT_SHA ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.COMMIT_REF ||
-    "",
+  commit: (await readForgeBuild(fileURLToPath(new URL(".", import.meta.url)))).commit ?? "",
 }
 const liveEditing = host === "cloudflare" || host === "vps"
 
@@ -337,7 +333,6 @@ export default defineNuxtConfig({
         },
       ],
     }),
-    devServer: { runner: "node-worker" },
     devStorage: { cache: { driver: "memory" } },
     modules: [evlog(evlogOptions(release)), legacyViteHubRoutes],
     cloudflare: {
@@ -358,9 +353,5 @@ export default defineNuxtConfig({
     "nitro:config": function (config) {
       config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
-  },
-
-  vite: {
-    plugins: [reviewPresence()],
   },
 })

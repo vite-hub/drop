@@ -181,11 +181,13 @@ Cloudflare has everything Drop uses in one account. A VPS can keep all data on l
 
 ## Choose the host at build time {#build}
 
-`DROP_HOST` picks the host when you build. Without it, Drop checks `NITRO_PRESET` or `SERVER_PRESET`, then Vercel, Netlify, or Deno markers, then a local `DROP_DATABASE_URL`, which selects VPS. With no signal, it builds for Cloudflare. Docker always builds for VPS.
+Drop builds for the host that ViteHub detects. ViteHub reads `VITEHUB_HOST`, then `NITRO_PRESET` or `SERVER_PRESET`, then the Cloudflare Workers Builds, Netlify, Vercel, or Deno markers. With none of them, a local `DROP_DATABASE_URL` selects VPS, and no signal builds for Cloudflare. Docker always builds for VPS.
 
 ```sh
-DROP_HOST=vercel pnpm build   # explicit override: cloudflare, vercel, netlify, deno, or vps
+VITEHUB_HOST=vercel pnpm build   # explicit override: cloudflare, vercel, netlify, deno, or node for VPS
 ```
+
+When upgrading, replace `DROP_HOST` with `VITEHUB_HOST` in your build environment. Use `VITEHUB_HOST=node` in place of `DROP_HOST=vps`; other host names stay the same. Existing `DROP_HOST` settings still work during migration, but `VITEHUB_HOST` takes precedence when both are set.
 
 `DROP_DATABASE=sqlite` or `DROP_DATABASE=d1` picks the database at build time. SQLite needs the VPS preset and persistent disk, and an existing D1 database id keeps a VPS build on D1. To change drivers, rebuild and migrate the data yourself.
 

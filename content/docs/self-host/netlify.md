@@ -24,7 +24,6 @@ The button clones Drop, creates a site, and prompts for the variables described 
 extra:
   - ["CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN", "Cloudflare account id and an account API token with D1 edit access."]
   - ["CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_D1_DATABASE_NAME", "Your D1 database id and name."]
-  - ["DROP_HOST", "netlify. Set in netlify.toml."]
 ---
 ::
 

@@ -11,11 +11,14 @@ test("host detection and explicit hosts select compatible storage", () => {
     [{ NITRO_PRESET: "node-server" }, "vps", "sqlite"],
     [{ SERVER_PRESET: "cloudflare-module" }, "cloudflare", "d1"],
     [{ VITEHUB_HOST: "netlify" }, "netlify", "d1"],
+    [{ VITEHUB_HOST: "node", VERCEL: "1" }, "vps", "sqlite"],
+    [{ DROP_HOST: "vps" }, "vps", "sqlite"],
     [{ DROP_HOST: "vps", VERCEL: "1" }, "vps", "sqlite"],
+    [{ DROP_HOST: "vps", VITEHUB_HOST: "deno" }, "deno", "d1"],
     [{ DROP_DATABASE_URL: "file:.data/custom.db" }, "vps", "sqlite"],
-    [{ DROP_HOST: "vps", CLOUDFLARE_D1_DATABASE_ID: "existing" }, "vps", "d1"],
-    [{ DROP_HOST: "vps", DROP_DATABASE: "d1" }, "vps", "d1"],
-    [{ DROP_HOST: "vps", DROP_DATABASE: "sqlite", CLOUDFLARE_D1_DATABASE_ID: "existing" }, "vps", "sqlite"],
+    [{ VITEHUB_HOST: "node", CLOUDFLARE_D1_DATABASE_ID: "existing" }, "vps", "d1"],
+    [{ VITEHUB_HOST: "node", DROP_DATABASE: "d1" }, "vps", "d1"],
+    [{ VITEHUB_HOST: "node", DROP_DATABASE: "sqlite", CLOUDFLARE_D1_DATABASE_ID: "existing" }, "vps", "sqlite"],
   ])
     assert.deepEqual(deployment(env), { host, database }, JSON.stringify(env))
 })
@@ -24,13 +27,29 @@ test("host detection and explicit hosts select compatible storage", () => {
 test("invalid configuration fails instead of changing providers", () => {
   for (const env of [
     { DROP_HOST: "unknown" },
-    { DROP_HOST: "vps", DROP_DATABASE: "postgres" },
-    { DROP_HOST: "vercel", DROP_DATABASE: "sqlite" },
-    { DROP_HOST: "cloudflare", DROP_DATABASE_URL: "file:test.db" },
-    { DROP_HOST: "vps", DROP_DATABASE: "d1", DROP_DATABASE_URL: "file:test.db" },
-    { DROP_HOST: "vps", DROP_DATABASE_URL: "libsql://remote" },
+    { VITEHUB_HOST: "node", DROP_DATABASE: "postgres" },
+    { VITEHUB_HOST: "vercel", DROP_DATABASE: "sqlite" },
+    { VITEHUB_HOST: "cloudflare", DROP_DATABASE_URL: "file:test.db" },
+    { VITEHUB_HOST: "node", DROP_DATABASE: "d1", DROP_DATABASE_URL: "file:test.db" },
+    { VITEHUB_HOST: "node", DROP_DATABASE_URL: "libsql://remote" },
   ])
     assert.throws(() => deployment(env), Error, JSON.stringify(env))
+})
+
+test("Nuxt shares the legacy host override with ViteHub's build validator", async () => {
+  vi.resetModules()
+  vi.stubGlobal("defineNuxtConfig", (config) => config)
+  vi.stubEnv("VITEHUB_HOST", undefined)
+  vi.stubEnv("DROP_HOST", "vps")
+  vi.stubEnv("VERCEL", "1")
+  try {
+    const { default: config } = await import("../../nuxt.config.ts")
+    assert.equal(config.vitehub.host, "node")
+    assert.equal(process.env.VITEHUB_HOST, "node")
+  } finally {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  }
 })
 
 test.each([
@@ -42,12 +61,14 @@ test.each([
 ])("%s registers only its intended health handler", async (host, databaseOnly) => {
   vi.resetModules()
   vi.stubGlobal("defineNuxtConfig", (config) => config)
-  vi.stubEnv("DROP_HOST", host)
+  vi.stubEnv("VITEHUB_HOST", host === "vps" ? "node" : host)
+  vi.stubEnv("DROP_HOST", host === "vps" ? "deno" : "vps")
   vi.stubEnv("DROP_DATABASE", undefined)
   vi.stubEnv("DROP_DATABASE_URL", undefined)
   vi.stubEnv("VITEHUB_BUILD_COMMIT", "health-test-commit")
   try {
     const { default: config } = await import("../../nuxt.config.ts")
+    assert.equal(process.env.VITEHUB_HOST, host === "vps" ? "node" : host)
     const handlers = config.nitro.handlers?.filter(({ route }) => route === "/api/health") ?? []
     if (databaseOnly) {
       assert.equal(config.vitehub.health, undefined)
