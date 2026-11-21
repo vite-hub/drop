@@ -4,10 +4,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin } from "better-auth/plugins"
 import { H3Event } from "h3"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
-import { migrate, reset, sql, state } from "../cost/harness.mjs"
+import { migrate, queries, reset, roundTrips, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/default/index.ts")
 const { proxyAuth } = await import("../../server/utils/proxy-auth.ts")
+const { identify } = await import("../../server/utils/identity.ts")
 const { isProxyMember, readAuthProxyConfig } = await import("../../server/utils/proxy-auth-config.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
 
@@ -23,6 +24,7 @@ afterEach(() => {
   state.members = ""
   state.authProxyCookie = ""
   delete state.auth
+  delete state.authApi
 })
 
 test("proxy sign-in requires a GitHub organization when VITEHUB_MEMBERS is unset", () => {
@@ -45,6 +47,13 @@ function github(
       throw new Error(`Unexpected GitHub request: ${url}`)
     }),
   )
+}
+
+function withCookies(event) {
+  const headers = new Headers(event.req.headers)
+  const pairs = (event.context.dropSessionCookies ?? []).map((cookie) => cookie.split(";")[0])
+  if (pairs.length) headers.set("cookie", pairs.join("; "))
+  return headers
 }
 
 function connect(token) {
@@ -89,13 +98,18 @@ for (const [label, upstream, status, message] of [
       assert.match(error.message, message)
       return true
     })
-    const response = await auth().api.proxySignIn({
-      headers: new Headers({ "x-auth-request-access-token": `test-api-${label}` }),
-      asResponse: true,
-    })
+    const response = await signIn(auth(), `test-api-${label}`)
     assert.equal(response.status, status)
     assert.match((await response.json()).message, message)
   })
+}
+
+function signIn(instance, token) {
+  return instance.handler(
+    new Request("https://drop.example/api/auth/get-session", {
+      headers: { "x-auth-request-access-token": token },
+    }),
+  )
 }
 
 function auth(databaseHooks = {}) {
@@ -130,10 +144,7 @@ for (const [label, profile, status, message] of [
     github(membership, profile)
     const instance = auth()
     state.auth = instance
-    const response = await instance.api.proxySignIn({
-      headers: new Headers({ "x-auth-request-access-token": token }),
-      asResponse: true,
-    })
+    const response = await signIn(instance, token)
     assert.equal(response.status, status)
     assert.match((await response.json()).message, message)
     await assert.rejects(connect(token), (error) => error.status === status)
@@ -178,10 +189,7 @@ for (const [label, publicEmail, emails, email, emailVerified] of [
         }),
       emails,
     )
-    const response = await auth().api.proxySignIn({
-      headers: new Headers({ "x-auth-request-access-token": `test-profile-${label}` }),
-      asResponse: true,
-    })
+    const response = await signIn(auth(), `test-profile-${label}`)
     assert.equal(response.status, 200, await response.text())
     const user = sql.prepare("SELECT name, email, email_verified, image FROM user WHERE id <> 'owner'").get()
     assert.equal(user.name, "maxi")
@@ -218,10 +226,7 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
       },
     },
   })
-  const response = await instance.api.proxySignIn({
-    headers: new Headers({ "x-auth-request-access-token": "test-hooks" }),
-    asResponse: true,
-  })
+  const response = await signIn(instance, "test-hooks")
   assert.equal(response.status, 200, await response.text())
   assert.equal(created.length, 2, "Both lifecycle hooks run")
   assert.equal(created[0][1], created[1][1])
@@ -242,7 +247,7 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
     }),
   )
   await proxySession(event)
-  const refreshed = await instance.api.getSession({ headers: event.req.headers })
+  const refreshed = await instance.api.getSession({ headers: withCookies(event) })
   assert.equal(refreshed.user.id, session.user.id, "A refreshed proxy token retains the existing GitHub identity")
   assert.equal(
     sql.prepare("SELECT access_token FROM account WHERE account_id='42'").get().access_token,
@@ -256,11 +261,12 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
     "An unchanged proxy token reuses its session",
   )
   sql.prepare("UPDATE user SET banned=1 WHERE id=?").run(session.user.id)
-  const banned = await instance.api.proxySignIn({
-    headers: new Headers({ "x-auth-request-access-token": "test-banned" }),
-    asResponse: true,
-  })
-  assert.equal(banned.status, 403, "The Better Auth admin plugin refuses a banned user")
+  sql.prepare("DELETE FROM session WHERE user_id=?").run(session.user.id)
+  await assert.rejects(
+    connect("test-banned"),
+    (error) => error.status === 403,
+    "The Better Auth admin plugin refuses a banned user",
+  )
   for (const membership of [() => Response.json({}, { status: 404 }), () => Response.json({ state: "pending" })]) {
     github(membership)
     await assert.rejects(
@@ -284,26 +290,63 @@ test("proxy sign-in works when the request's headers are immutable, as on Deno",
       throw new TypeError("immutable")
     }
   }
-  const request = new Request("https://drop.example/review/connect")
+  const request = new Request("https://drop.example/api/auth/get-session")
   Object.defineProperty(request, "headers", {
     value: new ImmutableHeaders({ "x-auth-request-access-token": "test-immutable" }),
     configurable: true,
   })
   const event = new H3Event(request)
   await proxySession(event)
-  assert.ok(event.res.headers.getSetCookie().length > 0, "The browser gets the session cookie")
-  const session = await state.auth.api.getSession({ headers: event.req.headers })
+  const response = await auth().handler(event.req)
+  const session = await response.json()
   assert.equal(session?.user.email, "maxi@example.com", "The same request sees the new session")
+  const cookies = [...event.context.dropSessionCookies, ...response.headers.getSetCookie()]
+  assert.equal(cookies.filter((cookie) => cookie.includes("session_token=")).length, 1)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 1, "Later lookups reuse the session")
+  const signOut = await auth().handler(
+    new Request("https://drop.example/api/auth/sign-out", {
+      method: "POST",
+      headers: { origin: "https://drop.example", cookie: withCookies(event).get("cookie") },
+    }),
+  )
+  assert.equal(signOut.status, 200)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
+})
+
+test("request session reads write the GitHub account only when its token rotates", async () => {
+  github()
+  state.members += ",maxi@example.com"
+  const first = await signIn(auth(), "test-unchanged-token")
+  assert.equal(first.status, 200)
+  const cookie = first.headers
+    .getSetCookie()
+    .map((value) => value.split(";")[0])
+    .join("; ")
+  for (const [token, expectedWrites] of [
+    ["test-unchanged-token", 0],
+    ["test-rotated-token", 1],
+    ["test-rotated-token", 0],
+  ]) {
+    const start = queries.length
+    state.auth = auth()
+    state.authApi = auth().api
+    const event = new H3Event(
+      new Request("https://drop.example/api/me", {
+        headers: { cookie, "x-auth-request-access-token": token },
+      }),
+    )
+    await proxySession(event)
+    assert.equal((await identify(event))?.email, "maxi@example.com")
+    assert.equal(queries.slice(start).filter(({ query }) => /^update "account"/i.test(query)).length, expectedWrites)
+    assert.equal(sql.prepare("SELECT access_token FROM account WHERE account_id='42'").get().access_token, token)
+  }
 })
 
 test("a Better Auth user policy rejection leaves no proxy user or account", async () => {
   github()
   const instance = auth({ user: { create: { before: async () => false } } })
-  const response = await instance.api.proxySignIn({
-    headers: new Headers({ "x-auth-request-access-token": "test-rejected" }),
-    asResponse: true,
-  })
-  assert.equal(response.status, 403)
+  state.auth = instance
+  await assert.rejects(connect("test-rejected"), (error) => error.status === 403)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE email='maxi@example.com'").get().n, 0)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM account WHERE account_id='42'").get().n, 0)
 })
@@ -320,19 +363,51 @@ test("parallel first proxy sign-ins provision one account through Better Auth ho
       },
     },
   })
-  const responses = await Promise.all(
-    Array.from({ length: 2 }, () =>
-      instance.api.proxySignIn({
-        headers: new Headers({ "x-auth-request-access-token": "test-parallel" }),
-        asResponse: true,
-      }),
-    ),
-  )
+  const responses = await Promise.all(Array.from({ length: 2 }, () => signIn(instance, "test-parallel")))
   assert.deepEqual(
     responses.map((response) => response.status),
     [200, 200],
   )
   assert.equal(created.length, 1)
+})
+
+test("browsers that sign in separately as one GitHub user keep separate sessions", async () => {
+  github()
+  const cookieOf = (response) =>
+    response.headers
+      .getSetCookie()
+      .map((cookie) => cookie.split(";")[0])
+      .join("; ")
+  const first = cookieOf(await signIn(auth(), "test-browser-a"))
+  const second = cookieOf(await signIn(auth(), "test-browser-b"))
+  assert.notEqual(first, second)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 1)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 2)
+  const signOut = await auth().handler(
+    new Request("https://drop.example/api/auth/sign-out", {
+      method: "POST",
+      headers: { origin: "https://drop.example", cookie: first },
+    }),
+  )
+  assert.equal(signOut.status, 200)
+  const kept = await auth().api.getSession({ headers: new Headers({ cookie: second }) })
+  assert.equal(kept?.user.email, "maxi@example.com", "Signing out one browser keeps the other's session")
+})
+
+test("overlapping first proxy requests through separate auth instances provision one user", async () => {
+  github()
+  Object.defineProperty(state, "auth", { get: () => auth(), configurable: true })
+  const events = Array.from(
+    { length: 2 },
+    () =>
+      new H3Event(
+        new Request("https://drop.example/api/me", { headers: { "x-auth-request-access-token": "test-overlap" } }),
+      ),
+  )
+  await roundTrips(() => Promise.all(events.map((event) => proxySession(event))))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 1)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM account WHERE account_id = '42'").get().n, 1)
+  for (const event of events) assert.match(event.req.headers.get("cookie") ?? "", /session_token=/)
 })
 
 test("an expired proxy token can still sign out through Better Auth", async () => {
@@ -360,4 +435,24 @@ test("an expired proxy token can still sign out through Better Auth", async () =
       ),
     )
   assert.equal(fetch.mock.calls.length, 0, "Recovery routes do not depend on the rejected GitHub token")
+})
+
+test("without proxy mode, the forwarded header signs nobody in", async () => {
+  github()
+  state.authProxy = false
+  const instance = auth()
+  state.auth = instance
+  const event = new H3Event(
+    new Request("https://drop.example/review/connect", {
+      headers: { "x-auth-request-access-token": "test-proxy-off" },
+    }),
+  )
+  await proxySession(event)
+  assert.equal(event.context.dropSessionCookies, undefined)
+  const response = await signIn(instance, "test-proxy-off")
+  assert.equal(await response.json(), null)
+  assert.equal(response.headers.getSetCookie().length, 0)
+  assert.equal(fetch.mock.calls.length, 0, "Drop never asks GitHub about an untrusted header")
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
 })
