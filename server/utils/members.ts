@@ -4,7 +4,7 @@ import { useServerEnv } from "vite-hub/env"
 import * as v from "valibot"
 
 /** Whether `VITEHUB_MEMBERS` limits who may use this Drop. */
-export const membersOnly = () => Boolean(useServerEnv().drop.members.unseal().trim())
+export const membersOnly = () => Boolean(useServerEnv().drop.members?.unseal().trim())
 
 /**
  * Whether someone may still use this Drop, by ViteHub Auth's `VITEHUB_MEMBERS` rules: a listed account, a verified

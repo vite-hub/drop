@@ -1,4 +1,4 @@
-import { connectRealtimeRoom } from "@vite-hub/realtime/client"
+import { connectRealtimeRoom } from "vite-hub/realtime/client"
 
 /**
  * The room of a doc's link (server/realtime/latest.ts): its digest is the version number of the doc's head. It brings

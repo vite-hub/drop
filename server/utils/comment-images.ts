@@ -12,6 +12,7 @@ import { textValue } from "#shared/utils/text"
 import { commentAttachments, drops } from "../databases/default/index"
 import { type DropRow, deleteDrop, findDrop, permissions, storageFailure } from "./drops"
 import type { Identity } from "./identity"
+import { background } from "./logs"
 import { withDropQuota } from "./quotas"
 
 /**
@@ -231,7 +232,11 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
         ),
       ])
     } catch (error) {
-      if (stored.length) await blob.delete(stored)
+      if (stored.length) {
+        const [cleanupError] = await blob.delete(stored)
+        if (cleanupError)
+          background.error({ action: "comment-image-cleanup", error: cleanupError.message, keys: stored.length })
+      }
       throw error
     }
     return rows

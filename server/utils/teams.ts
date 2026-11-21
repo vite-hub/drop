@@ -39,8 +39,8 @@ export function teamsEnabled(event?: H3Event) {
 /** Stripe settings, when billing is on: teams enabled, and the key, the webhook secret, and the price all set. */
 export function billingConfig(event?: H3Event) {
   const { billing } = useServerEnv(event).drop
-  const secretKey = billing.stripeSecretKey.unseal()
-  const webhookSecret = billing.stripeWebhookSecret.unseal()
+  const secretKey = billing.stripeSecretKey?.unseal() ?? ""
+  const webhookSecret = billing.stripeWebhookSecret?.unseal() ?? ""
   const enabled = teamsEnabled(event) && Boolean(secretKey && webhookSecret && billing.priceId)
   return {
     enabled,

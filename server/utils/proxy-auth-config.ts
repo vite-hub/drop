@@ -5,7 +5,7 @@ import { useServerEnv } from "vite-hub/env"
 /** The GitHub organization that oauth2-proxy signs people in for: the first `github-org:` entry of `VITEHUB_MEMBERS`. */
 const proxyOrganization = () =>
   useServerEnv()
-    .drop.members.unseal()
+    .drop.members?.unseal()
     .split(",")
     .map((entry) => entry.trim())
     .find((entry) => entry.startsWith("github-org:"))

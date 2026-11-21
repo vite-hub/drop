@@ -5,7 +5,7 @@ import { useIdle } from "@vueuse/core"
 import { usePresence } from "../../app/composables/usePresence.ts"
 
 const { connect } = vi.hoisted(() => ({ connect: vi.fn() }))
-vi.mock("@vite-hub/realtime/client", () => ({ connectRealtimeRoom: connect }))
+vi.mock("vite-hub/realtime/client", () => ({ connectRealtimeRoom: connect }))
 afterEach(() => vi.unstubAllGlobals())
 
 test("frame input wakes a reviewer and restarts the idle deadline, while a hidden tab stays away", async () => {

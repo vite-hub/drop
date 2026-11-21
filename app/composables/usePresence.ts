@@ -1,5 +1,5 @@
 import type { DropDetail } from "#shared/types"
-import type { RealtimeRoom } from "@vite-hub/realtime/client"
+import type { RealtimeRoom } from "vite-hub/realtime/client"
 import * as v from "valibot"
 
 /** Someone else looking at the drop right now: who, in their presence color, and where they are. */
@@ -79,7 +79,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
         return null
       })
       if (!found || current !== generation) return
-      const { connectRealtimeRoom } = await import("@vite-hub/realtime/client")
+      const { connectRealtimeRoom } = await import("vite-hub/realtime/client")
       if (current !== generation) return
       const joined = connectRealtimeRoom("presence", found.room, {
         params: { drop: id },

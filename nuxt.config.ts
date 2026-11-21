@@ -204,8 +204,8 @@ export default defineNuxtConfig({
         auth: {
           github: {
             // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
-            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
-            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
+            clientId: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_ID") }),
+            clientSecret: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_SECRET") }),
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },
@@ -223,7 +223,7 @@ export default defineNuxtConfig({
           // `github:22072217,ada@example.com,@acme.com,github-org:acme`. Admins always may. Empty lets anyone in. Drop
           // reads it only to know whether it is members-only, and for oauth2-proxy's organization.
           // This Auth-owned setting only accepts VITEHUB_MEMBERS, without a VITEHUB_DROP_MEMBERS alias.
-          members: env({ secret: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }), default: "" }),
+          members: env({ secret: true, optional: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }) }),
           // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
@@ -252,8 +252,8 @@ export default defineNuxtConfig({
           teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
           // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
           billing: {
-            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
-            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            stripeSecretKey: env({ secret: true, optional: true, source: env.source("STRIPE_SECRET_KEY") }),
+            stripeWebhookSecret: env({ secret: true, optional: true, source: env.source("STRIPE_WEBHOOK_SECRET") }),
             // A recurring price per member (quantity = members), and optionally its yearly one.
             priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
             annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),

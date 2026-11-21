@@ -1,9 +1,19 @@
 import comark from "comark-linter/doctor"
 import { defineDoctorConfig } from "vite-doctor/config"
+import vitehub from "vite-hub/doctor"
 
 export default defineDoctorConfig({
-  extends: ["nuxt/strict", "typescript/strict", "vue/strict", "vite/strict", "nitro/strict", "comark/recommended"],
+  extends: [
+    "nuxt/strict",
+    "typescript/strict",
+    "vue/strict",
+    "vite/strict",
+    "nitro/strict",
+    "comark/recommended",
+    "vitehub/recommended",
+  ],
   extensions: [
+    vitehub,
     // The skills are the Markdown agents read and copy into drops, so they get the checks Drop runs when one publishes
     // (server/utils/markdown-document.ts lintMarkdown). content/docs is the docs site, made of Vue components a drop
     // can't use. Drop's skills endpoint adds pr-evidence's references/annotations.md and references/comark-ui/ from

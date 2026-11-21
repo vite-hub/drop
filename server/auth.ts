@@ -127,7 +127,10 @@ export default defineAuth(({ env, requestOrigin }) => {
     socialProviders: proxied
       ? {}
       : {
-          github: { clientId: env.auth.github.clientId.unseal(), clientSecret: env.auth.github.clientSecret.unseal() },
+          github: {
+            clientId: env.auth.github.clientId?.unseal() ?? "",
+            clientSecret: env.auth.github.clientSecret?.unseal() ?? "",
+          },
         },
     emailAndPassword: { enabled: password },
     account: { accountLinking: { enabled: true, trustedProviders: ["github"] } },
