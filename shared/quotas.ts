@@ -133,13 +133,17 @@ export function quotaFailure(unit: QuotaUnit, used: number, limit: number, retry
   }
 }
 
+/** Whether one quota is close to its limit: two thirds of the drops, or 80% of the storage or monthly writes. */
+export function quotaNearLimit(
+  kind: "drops" | "bytes" | "writes",
+  quota: { used: number; limit: number | null },
+): boolean {
+  if (quota.limit === null) return false
+  return quota.used >= (kind === "drops" ? Math.ceil((quota.limit * 2) / 3) : quota.limit * 0.8)
+}
+
 export function usageNearLimit(usage: Usage): boolean {
-  return (
-    usage.enabled &&
-    ((usage.drops.limit !== null && usage.drops.used >= Math.ceil((usage.drops.limit * 2) / 3)) ||
-      (usage.bytes.limit !== null && usage.bytes.used >= usage.bytes.limit * 0.8) ||
-      (usage.writes.limit !== null && usage.writes.used >= usage.writes.limit * 0.8))
-  )
+  return usage.enabled && (["drops", "bytes", "writes"] as const).some((kind) => quotaNearLimit(kind, usage[kind]))
 }
 
 export function quotaToolFailure(body: QuotaFailure) {
