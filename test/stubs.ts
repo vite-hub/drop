@@ -40,7 +40,7 @@ export const checkRateLimit = async (_event, bucket, options) => {
 export const requireRateLimit = async (...args) => {
   const [, decision] = await checkRateLimit(...args)
   if (decision.allowed) return
-  throw new HTTPError({ status: 429, message: "burst limit", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
+  throw new HTTPError({ status: 429, statusText: "Too Many Requests", message: args[2].message ?? "Rate limit exceeded.", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
 }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.

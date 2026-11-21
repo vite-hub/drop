@@ -235,11 +235,12 @@ test("past the limit, a comment's 429 says when to send again", async () => {
   const counted = await send()
   assert.equal(counted.status, 429)
   assert.equal(counted.headers.get("retry-after"), "42")
-  // Cloudflare's binding doesn't: the whole window.
+  // Cloudflare's binding doesn't, so the 429 doesn't say and the client backs off on its own.
   state.burstRetryAfter = undefined
   const cloudflare = await send()
   assert.equal(cloudflare.status, 429)
-  assert.equal(cloudflare.headers.get("retry-after"), "60")
+  assert.equal(cloudflare.headers.get("retry-after"), null)
+  assert.match((await cloudflare.json()).message, /Too many comments in a minute/)
   assert.equal(threads().length, 0)
 })
 
