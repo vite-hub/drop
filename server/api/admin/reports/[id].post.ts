@@ -1,11 +1,11 @@
 import { eq } from "drizzle-orm"
-import { useLogger } from "evlog/nitro/v3"
 import { defineValidatedHandler, HTTPError } from "h3"
 import { db } from "vite-hub/database"
 import { ReportActionSchema } from "#shared/schemas"
 import { abuseReports, drops } from "../../../databases/default/index"
 import { findDrop } from "../../../utils/drops"
 import { authFor, requireAdmin } from "../../../utils/identity"
+import { logAudit } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 export default defineValidatedHandler({
   validate: { body: ReportActionSchema },
@@ -28,9 +28,19 @@ export default defineValidatedHandler({
       const drop = await findDrop(report.dropId, event)
       if (drop) await db.update(drops).set({ quarantinedAt: Date.now() }).where(eq(drops.id, drop.id))
     }
+    const audit = () =>
+      logAudit(event, who, `report.${action}`, {
+        type: "report",
+        id,
+        drop: report.dropId,
+        owner: report.ownerId,
+      })
     // Dismissing a report must never undo a quarantine.
     if (report.status === "quarantined" || report.status === "banned") {
-      if (action === "dismiss") return { ok: true }
+      if (action === "dismiss") {
+        audit()
+        return { ok: true }
+      }
     }
     await db
       .update(abuseReports)
@@ -40,11 +50,7 @@ export default defineValidatedHandler({
         resolvedBy: who.userId,
       })
       .where(eq(abuseReports.id, id))
-    useLogger(event).error("Abuse report action", {
-      severity: "high",
-      action: `abuse-${action}`,
-      report: { id, dropId: report.dropId },
-    })
+    audit()
     return { ok: true }
   },
 })

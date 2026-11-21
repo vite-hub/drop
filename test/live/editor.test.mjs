@@ -1,4 +1,7 @@
 import assert from "node:assert/strict"
+import { getSchema } from "@tiptap/core"
+import { EditorState } from "@tiptap/pm/state"
+import { startUploads, uploadKey, uploadPlugin } from "comark-ui/editor"
 import { test } from "vite-plus/test"
 
 const { liveEditor } = await import("../../server/utils/live-editor.ts")
@@ -58,4 +61,29 @@ test("a bare URL stays the same link and a bracketed span stays a span", async (
 test("a doc a save would change opens read-only", async () => {
   const body = "Each pair shares one roll:\n\n$$\n\\frac{n(n-1)}{2}\n$$\n"
   assert.equal((await liveEditor.verify(body)).writable, false)
+})
+
+test("the upload placeholder stays pending until the image is inserted or the upload fails", async () => {
+  const upload = Promise.withResolvers()
+  const failure = Promise.withResolvers()
+  const image = new File(["image"], "chart.png", { type: "image/png" })
+  const broken = new File(["image"], "broken.png", { type: "image/png" })
+  const options = { accept: () => true, upload: (file) => (file === image ? upload.promise : failure.promise) }
+  const view = {
+    state: EditorState.create({ schema: getSchema(liveEditor.extensions()), plugins: [uploadPlugin(options)] }),
+    dispatch(transaction) {
+      this.state = this.state.apply(transaction)
+    },
+  }
+  const pending = () => uploadKey.getState(view.state).find().length
+  const [imageDone, failedDone] = startUploads(view, [image, broken], 1, options)
+  assert.equal(pending(), 2)
+  upload.resolve("/f/chart.png")
+  await imageDone
+  assert.equal(pending(), 1)
+  assert.equal(view.state.doc.firstChild.firstChild.attrs.src, "/f/chart.png")
+  failure.reject(new Error("Upload failed"))
+  await failedDone
+  assert.equal(pending(), 0)
+  assert.equal(view.state.doc.firstChild.childCount, 1)
 })

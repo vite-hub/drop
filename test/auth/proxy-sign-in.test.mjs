@@ -8,19 +8,19 @@ import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/default/index.ts")
 const { proxyAuth } = await import("../../server/utils/proxy-auth.ts")
-const { isGitHubMember } = await import("../../server/utils/github-membership.ts")
+const { isProxyMember } = await import("../../server/utils/proxy-auth-config.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
 
 migrate()
 beforeEach(() => {
   reset()
   state.authProxy = true
-  state.githubOrg = "quiverdk"
+  state.members = "github-org:quiverdk"
 })
 afterEach(() => {
   vi.unstubAllGlobals()
   state.authProxy = false
-  state.githubOrg = ""
+  state.members = ""
   state.authProxyCookie = ""
   delete state.auth
 })
@@ -120,7 +120,7 @@ for (const [label, profile, status, message] of [
   test(`proxy sign-in reports ${label} during identity lookup after caching membership`, async () => {
     const token = `test-cached-profile-${label}`
     github()
-    assert.equal(await isGitHubMember(token), true)
+    assert.equal(await isProxyMember(token), true)
     const membership = vi.fn(() => assert.fail("The successful membership check should be cached"))
     github(membership, profile)
     const instance = auth()
@@ -188,10 +188,10 @@ for (const [label, publicEmail, emails, email, emailVerified] of [
 
 test("a cached grant for one GitHub organization does not grant access to another", async () => {
   github()
-  assert.equal(await isGitHubMember("test-org-cache"), true)
-  state.githubOrg = "another-org"
+  assert.equal(await isProxyMember("test-org-cache"), true)
+  state.members = "github-org:another-org"
   github(() => Response.json({}, { status: 404 }))
-  assert.equal(await isGitHubMember("test-org-cache"), false)
+  assert.equal(await isProxyMember("test-org-cache"), false)
 })
 
 test("proxy sign-in runs Better Auth user and account creation hooks", async () => {

@@ -31,6 +31,7 @@ async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
     await sendReport(event.data)
     sent.value = true
   } catch (cause) {
+    reportClientError("report", cause)
     error.value = errorText(cause, "Could not send the report. Try again shortly.")
   } finally {
     sending.value = false

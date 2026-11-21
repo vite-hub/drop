@@ -1,6 +1,5 @@
 import { and, count, eq, inArray, isNull, lt, lte, sql, type SQL } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
-import { log } from "evlog"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { db } from "vite-hub/database"
@@ -279,8 +278,13 @@ export async function cleanupQuotaReservations(now: Date) {
       ),
     )
     .returning()
-  for (const reservation of released)
-    log.warn({ action: "quota-reservation-release", reservation, ageMs: now.getTime() - reservation.createdAt })
+  // Each one is a publish that crashed before it committed.
+  return {
+    released: released.length,
+    ...(released.length
+      ? { reservations: released.map((row) => ({ ...row, ageMs: now.getTime() - row.createdAt })) }
+      : {}),
+  }
 }
 
 /**
@@ -288,16 +292,18 @@ export async function cleanupQuotaReservations(now: Date) {
  * keeps counting toward storage until it's gone. 80 keys a batch stays under D1's bind limit.
  */
 export async function cleanupCodeImages(now: Date) {
+  let deleted = 0
   for (;;) {
     const rows = await db
       .select({ key: codeImages.blobKey })
       .from(codeImages)
       .where(lte(codeImages.expiresAt, now.getTime()))
       .limit(80)
-    if (!rows.length) return
+    if (!rows.length) return { deleted }
     const keys = rows.map((row) => row.key)
     const [error] = await blob.delete(keys)
     if (error) throw error
     await db.delete(codeImages).where(inArray(codeImages.blobKey, keys))
+    deleted += keys.length
   }
 }

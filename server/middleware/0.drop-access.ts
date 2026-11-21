@@ -25,7 +25,11 @@ export default defineHandler(async (event) => {
   }
   // `/d/<link>`, the address the page settles on, `/d/<link>/<slug>`, and a page of an app under it,
   // `/d/<link>/<slug>/guide/setup`.
-  const page = event.url.pathname.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
+  // The Markdown copy of a share link, `/d/<link>.md` or `/d/<link>/<slug>.md`, passes the same gate, then its route
+  // answers (server/routes/d).
+  const markdown = /^\/d\/[^/]+(?:\/[^/]+)?\.md$/.test(event.url.pathname)
+  const path = markdown ? event.url.pathname.slice(0, -".md".length) : event.url.pathname
+  const page = path.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
   if (!page) return
   const [{ expiredLink, findDrop, permissions, waitingForReview }, { identify }] = await Promise.all([
     import("../utils/drops"),
@@ -60,6 +64,7 @@ export default defineHandler(async (event) => {
     throw notFound()
   }
   event.res.headers.set("Cache-Control", "private, no-store")
+  if (markdown) return
   const { dropPath, slugify } = await import("../../shared/links")
   const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
   // A path under the link is a page of the app: the link opens it as `?path=`, where the viewer keeps an app's address
@@ -77,6 +82,12 @@ export default defineHandler(async (event) => {
   }
   // A pinned `?v=` renders: the page checks that the version exists.
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
+  // Let Content answer negotiable documents before the viewer's redirect and HTML HEAD shortcuts.
+  if (drop.kind === "markdown" || drop.kind === "html") {
+    const { acceptsMarkdown } = await import("vite-hub/content/markdown")
+    const { headers } = event.req
+    if (acceptsMarkdown(headers.get("accept")) || AI_FETCHER.test(headers.get("user-agent") ?? "")) return
+  }
   // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue). Redirecting here saves rendering a page only
   // to send that redirect, as `/d/<link>` without its slug did.
   if (event.url.pathname !== to) return redirect(to + event.url.search)

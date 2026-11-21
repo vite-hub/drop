@@ -42,7 +42,7 @@ useHead({
 })
 
 const route = useRoute("index")
-const { signedIn, signInWithGitHub } = useGitHubSignIn()
+const { signedIn, signInHref } = useGitHubSignIn()
 
 // `nuxt dev` has no GitHub app: /?signin=1 shows a small email form instead.
 const devSignIn = computed(() => import.meta.dev && route.query.signin === "1")
@@ -167,7 +167,8 @@ const FAQ = [
                 class="h-10 px-4"
                 icon="i-simple-icons-github"
                 label="Sign in with GitHub"
-                @click="signInWithGitHub"
+                :to="signInHref"
+                external
               />
               <UButton color="neutral" variant="outline" size="lg" class="h-10 px-4" label="How it works" to="#how" />
             </div>
@@ -337,7 +338,8 @@ const FAQ = [
               color="neutral"
               icon="i-simple-icons-github"
               label="Sign in with GitHub"
-              @click="signInWithGitHub"
+              :to="signInHref"
+              external
             />
           </div>
         </div>

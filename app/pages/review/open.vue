@@ -41,6 +41,7 @@ onMounted(async () => {
     link.value = found.link
     await copyLink()
   } catch (cause) {
+    reportClientError("review-open", cause)
     error.value = errorText(cause, copying ? "Couldn't copy this review's link." : `Couldn't open this ${thing}.`)
   }
 })

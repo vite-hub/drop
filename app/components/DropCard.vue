@@ -2,6 +2,7 @@
 // A drop on the Drops page's grid: its preview (DropPreview, from usePeek) above its name, who dropped it and when,
 // and a globe or a team when it's shared. Hovering, or focus inside, brings up Copy link and the ⋯ menu over the
 // preview's corner. The page decides what a click does (`pick`): one click previews, a double-click or Enter opens.
+import { RelativeTime } from "vite-hub/ui"
 import { SHARE_ICONS } from "#shared/share"
 import { linkSource } from "#shared/resources"
 import type { DropSummary } from "#shared/types"
@@ -17,7 +18,7 @@ const {
 }>()
 const emit = defineEmits<{ pick: [event: MouseEvent]; delete: [] }>()
 const peek = usePeek(() => drop)
-const { shared, status, copyLink, copied, linkChoices, menu } = useDropItem(() => drop, {
+const { shared, status, link, linkChoices, menu } = useDropItem(() => drop, {
   inTeam: () => inTeam,
   trash: () => emit("delete"),
 })
@@ -71,7 +72,7 @@ const address = computed(() =>
         <span class="truncate">
           <template v-if="where">in {{ where }} · </template>
           <template v-if="drop.version > 1">v{{ drop.version }} · </template>{{ drop.owner?.name ?? drop.actorName }} ·
-          <TimeAgo :at="drop.updatedAt" />
+          <RelativeTime format="short" :at="drop.updatedAt" />
         </span>
         <UIcon
           v-if="shared"
@@ -88,16 +89,7 @@ const address = computed(() =>
       <DeferredMenu v-if="linkChoices" :items="linkChoices" :content="{ align: 'end' }">
         <UButton aria-label="Copy link" color="neutral" icon="i-mingcute-link-line" size="xs" variant="ghost" />
       </DeferredMenu>
-      <UButton
-        v-else
-        aria-label="Copy link"
-        color="neutral"
-        :icon="copied() ? 'i-mingcute-check-line' : 'i-mingcute-link-line'"
-        size="xs"
-        :ui="{ leadingIcon: copied() ? 'animate-icon-in' : undefined }"
-        variant="ghost"
-        @click="copyLink()"
-      />
+      <DropCopyButton v-else aria-label="Copy link" icon="i-mingcute-link-line" size="xs" :value="link" />
       <DeferredMenu :items="menu" :content="{ align: 'end' }">
         <UButton
           :aria-label="`Actions for ${drop.title}`"

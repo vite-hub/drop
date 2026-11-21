@@ -55,8 +55,9 @@ async function signInWithGitHub() {
   error.value = ""
   try {
     const { error: failure } = await signIn.social({ provider: "github", callbackURL: "/drops" })
-    if (failure) throw new Error(failure.message || "Couldn't start GitHub sign-in.")
+    if (failure) throw answerError(failure.message || "Couldn't start GitHub sign-in.", failure.status)
   } catch (cause) {
+    reportClientError("oauth-signin", cause)
     error.value = errorText(cause)
     pending.value = null
   }
@@ -68,11 +69,13 @@ async function answer(accept: boolean) {
   try {
     const { data, error: failure } = await $auth.oauth2.consent({ accept })
     if (failure)
-      throw new Error(
+      throw answerError(
         failure.message || "This authorization link is invalid or has expired. Start again from your agent.",
+        failure.status,
       )
     if (!data?.url) throw new Error("The agent didn't get an answer. Start again from your agent.")
   } catch (cause) {
+    reportClientError("oauth-consent", cause)
     error.value = errorText(cause)
     pending.value = null
   }

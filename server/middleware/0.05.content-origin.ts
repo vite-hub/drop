@@ -9,14 +9,18 @@ export default defineHandler(async (event) => {
   const { FRAME_HOST_HTML, contentHost } = await import("../utils/content-origin")
   const host = contentHost(event)
   if (!host) return
-  if (host === "stray" || /^\/(?:_vitehub|api\/_vitehub\/console)(?:\/|$)/.test(event.url.pathname))
+  if (host === "stray" || /^\/(?:api\/)?_vitehub(?:\/|$)/.test(event.url.pathname))
     return new Response("Not found", {
       status: 404,
       headers: { "Content-Type": "text/plain; charset=utf-8", "X-Robots-Tag": "noindex, nofollow" },
     })
   const destination = event.req.headers.get("sec-fetch-dest")
   const read = ["GET", "HEAD"].includes(event.req.method)
-  const page = read && (!destination || destination === "iframe" || destination === "document")
+  // The frame host reading a page's HTML for the viewer says so, for a browser that sends no Sec-Fetch-Dest.
+  const page =
+    read &&
+    !event.req.headers.has("x-drop-read") &&
+    (!destination || destination === "iframe" || destination === "document")
   // Anything else an app loads (scripts, styles, fonts, fetch) is one of its files, for a frame that holds its grant.
   if (read && !page && host === "content") {
     const { serveAppFile } = await import("../utils/app-files")

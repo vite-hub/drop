@@ -2,6 +2,7 @@ import { HTTPError } from "h3"
 import * as v from "valibot"
 import { CommentPatchSchema } from "#shared/schemas"
 import { findCommentByNumber, setResolved, wroteThread } from "../../../utils/comments"
+import { logDrop } from "../../../utils/logs"
 import { routeNumber } from "../../../utils/review-params"
 import { mayResolveSite, reviewApi, reviewSession } from "../../../utils/review"
 
@@ -15,5 +16,6 @@ export default reviewApi(async (event) => {
   const parsed = v.safeParse(CommentPatchSchema, await event.req.json().catch(() => null))
   if (!parsed.success) throw new HTTPError({ status: 400, statusText: parsed.issues[0].message })
   await setResolved(thread, parsed.output.resolved, who)
+  logDrop(event, site, { change: parsed.output.resolved ? "resolve" : "reopen" })
   return { ok: true }
 })

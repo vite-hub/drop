@@ -54,7 +54,7 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
   const [row] = await db.select().from(users).where(eq(users.id, ticket.u)).limit(1)
   if (!row || row.banned) return null
   // A members-only Drop only acts for current members, as for any other request.
-  if (!(await isMember(row.id))) return null
+  if (!(await isMember(row.id, event))) return null
   const role = row.role ?? ""
   const who: Identity = {
     userId: row.id,

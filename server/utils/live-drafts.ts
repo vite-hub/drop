@@ -1,8 +1,8 @@
-import { log } from "evlog"
 import { HTTPError } from "h3"
 import { blob } from "vite-hub/blob"
 import { isRealtimeAvailable, refreshRealtimeDocument } from "vite-hub/realtime/server"
 import { draftPath } from "#shared/draft-paths"
+import { background } from "./logs"
 
 /**
  * Live drafts: the text people edit together, one Blob file per drop version (`drafts/<id>/v<n>.md`) holding the body
@@ -41,7 +41,7 @@ export async function deleteDrafts(drops: Version[]) {
   if (!drops.length) return
   const paths = drops.map((drop) => draftPath(drop.id, drop.version))
   const [error] = await blob.delete(paths)
-  if (error) log.warn({ action: "draft-cleanup", drafts: paths.join(","), error: String(error) })
+  if (error) background.warn({ action: "draft-cleanup", drafts: paths.join(","), error: String(error) })
 }
 
 /** Tells the people reading a drop's link that it has a new latest version (server/realtime/latest.ts). Never throws. */

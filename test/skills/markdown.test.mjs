@@ -9,6 +9,21 @@ const { COMPONENT_TAGS, lintMarkdown, parseMarkdown, renderMarkdownCached } =
 migrate()
 beforeEach(reset)
 
+test("wide tables of IDs scroll on phones, but tables with prose can still become cards", async () => {
+  const markdown = `| Task ID | Trace ID | Started | Finished | Status |
+| --- | --- | --- | --- | --- |
+| 01ARBZ3NDEKTSV4RRFFQ69G5F1 | 01ARBZ3NDEKTSV4RRFFQ69G5F2 | 2026-11-18T19:00:00Z | 2026-11-18T19:01:00Z | Done |
+`
+  const dense = await renderMarkdownCached("dense-table.md", async () => markdown)
+  assert.match(dense.html, /<table role="table" data-drop-scroll-table="">/)
+
+  const prose = await renderMarkdownCached("prose-table.md", async () =>
+    markdown.replace("Done", "The deployment has finished and the metrics are ready to review."),
+  )
+  assert.match(prose.html, /<table role="table">/)
+  assert.doesNotMatch(prose.html, /<table[^>]*data-drop-scroll-table/)
+})
+
 // The examples draw icons from the Iconify API and a diagram on Kroki; answer both here, so the test needs no network.
 const network = globalThis.fetch
 beforeAll(() => {
@@ -42,25 +57,21 @@ test("every component Drop renders is in the Markdown reference agents read", ()
   assert.deepEqual(missing, [])
 })
 
+const DOC_PAGES = { "comark-mathml": "math" }
+
 test("every comark-ui package Drop renders has a section in the Markdown references", () => {
   const preset = createRequire(import.meta.url)("comark-ui/package.json")
-  // include reads files, which Drop turns off, reading-time only measures, pele draws the ```mermaid fences markdown.md documents, and
-  // the security plugin drops mathml's MathML, so markdown.md lists math under what Drop doesn't render. magic-move's
-  // animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow) leaves it out. Drop turns
-  // time off, since a cached render would keep "2 days ago" for weeks, so markdown.md lists it under what Drop doesn't render.
+  // include reads files, which Drop turns off, reading-time only measures, and pele draws the ```mermaid fences markdown.md
+  // documents. magic-move's animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow)
+  // leaves it out. Drop turns time off, since a cached render would keep "2 days ago" for weeks, so markdown.md lists it under what Drop doesn't render.
   const packages = Object.keys(preset.dependencies).filter(
     (name) =>
-      ![
-        "comark-include",
-        "comark-magic-move",
-        "comark-mathml",
-        "comark-pele",
-        "comark-reading-time",
-        "comark-time",
-      ].includes(name),
+      !["comark-include", "comark-magic-move", "comark-pele", "comark-reading-time", "comark-time"].includes(name),
   )
   const missing = packages.filter(
-    (name) => !(reference + blocks).includes(`https://comark-ui.onmax.me/${name.replace(/^comark-/, "")}/`),
+    // comark-mathml is published under that name, since npm refused comark-math, and documented at /math/.
+    (name) =>
+      !(reference + blocks).includes(`https://comark-ui.onmax.me/${DOC_PAGES[name] ?? name.replace(/^comark-/, "")}/`),
   )
   assert.deepEqual(missing, [])
 })
@@ -231,4 +242,14 @@ test("local HTTP Drop addresses use ::drop as the documented fallback for HTTPS-
   assert.match(html, /data-drop-embed="k7f2q9m4x8wd" data-title="Demo" style="--drop-embed-height: 420px"/)
   assert.match(html, /<a class="drop-embed-link" href="\/d\/k7f2q9m4x8wd">Demo<\/a>/)
   assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
+})
+
+test("documented Graphviz fences render a diagram rather than falling back to source", async () => {
+  const { html } = await renderMarkdownCached(
+    "diagram-upgrade.md",
+    async () => "```dot\ndigraph { agent -> drop }\n```",
+  )
+  assert.match(html, /class="cdg/)
+  assert.match(html, /<svg/)
+  assert.doesNotMatch(html, /render-error|data-error/)
 })

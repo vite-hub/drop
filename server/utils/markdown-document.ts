@@ -1,7 +1,6 @@
 import { type H3Event, HTTPError } from "h3"
 import type { NodeHandler } from "@comark/html/render"
 import { renderHtmlFromDocument } from "@comark/html"
-import { log } from "evlog"
 import { createMarkdownParser } from "@comark/html/parse"
 import attributes from "@comark/html/plugins/attributes"
 import components from "@comark/html/plugins/components"
@@ -16,9 +15,13 @@ import * as v from "valibot"
 import { TYPESET_CSS } from "#shared/typeset"
 import { textValue } from "#shared/utils/text"
 import { loadHighlighter } from "#shared/highlighter"
+import { logError } from "./logs"
 import { cachedMarkdown } from "./markdown-cache"
 import { FAVICON_PATH, faviconUrl, linkText } from "#shared/resources"
 import { chipNode } from "comark-chips"
+import outline, { scripts as outlineScripts } from "comark-outline/html"
+import { scripts as propertiesScripts } from "comark-properties/html"
+import { describeTime } from "comark-time"
 import type { DropResource } from "#shared/types"
 
 /** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
@@ -39,12 +42,14 @@ const dropPlayer = (url: URL) => {
  * off and cast, table, and tests read no files (the preset's defaults), chips take each site's icon from Drop's own
  * endpoint (server/utils/favicons.ts; the address is made absolute per read, absoluteFavicons) and leave avatars for the
  * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments,
- * Mermaid draws at most 4 diagrams and 8,000 characters of source a doc, Shiki colors code in the languages Drop
- * loads (GitHub light, and GitHub dark for the viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't
- * eat the Worker's CPU, and Drop supplies the document's typography.
+ * PlantUML, Graphviz, D2, and the other Kroki fences draw through kroki.io, Mermaid draws at most 4 diagrams and 8,000
+ * characters of source a doc, Shiki colors code in the languages Drop loads (GitHub light, and GitHub dark for the
+ * viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't eat the Worker's CPU, and Drop supplies the
+ * document's typography. Math is typeset as MathML while parsing, so a doc without it loads nothing for it.
  */
 const preset = comarkUi({
   chips: { download: false, favicon: (host) => `${FAVICON_PATH}${host}` },
+  diagrams: true,
   embed: { player: dropPlayer },
   mermaid: { maxDiagrams: 4, maxSource: 8_000 },
   shiki: {
@@ -68,25 +73,17 @@ const preset = comarkUi({
  */
 export const RENDERER_SCRIPTS = [
   mermaidScript,
-  (await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })).match(
-    /<script>([\s\S]*)<\/script>/,
-  )![1]!,
-  // comark-properties rewrites a frontmatter date in the reader's locale.
-  (
-    await renderHtmlFromDocument(
-      {
-        nodes: [
-          [
-            "properties",
-            {},
-            ["div", {}, ["dt", {}, "Date"], ["dd", {}, ["time", { datetime: "2026-10-23" }, "Oct 23, 2026"]]],
-          ],
-        ],
-      },
-      { components: preset.components },
-    )
-  ).match(/<script>([\s\S]*)<\/script>/)![1]!,
+  ...scriptsOf(await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })),
+  // comark-properties writes a box's dates relative to the reader's clock, and comark-time lets Escape close their
+  // tooltips.
+  ...propertiesScripts,
+  // comark-outline's side outline marks the section being read and makes way for wide blocks.
+  ...outlineScripts,
 ]
+
+function scriptsOf(html: string): string[] {
+  return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, script]) => script!)
+}
 
 /**
  * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
@@ -140,12 +137,59 @@ const renameLegacyProps = (markdown: string) =>
 /** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. */
 export const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
 
+/**
+ * The parse a reader's render uses: the same, plus comark-outline's side outline ("On this page") at the end of a doc
+ * with two headings or more. Only here, since the linter and the live editor read the doc's own blocks, and the
+ * outline isn't one.
+ */
+const parseForReaders = createMarkdownParser({
+  plugins: renderPlugins.map((plugin) => (plugin.name === "comark-outline" ? outline({ rail: true }) : plugin)),
+  registerDefaultPlugins: false,
+})
+
 type MarkdownNode = Awaited<ReturnType<typeof parseMarkdown>>["nodes"][number]
 
 function textContent(node: MarkdownNode): string {
   if (!Array.isArray(node)) return node
   const [tag, , ...children] = node
   return tag === null ? "" : children.map((child) => textContent(child)).join("")
+}
+
+function tableChipCount(node: MarkdownNode): number {
+  if (!Array.isArray(node) || node[0] === null) return 0
+  const [tag, , ...children] = node
+  return tag === "chip" ? 1 : children.reduce((count, child) => count + tableChipCount(child), 0)
+}
+
+/** Temporary compatibility for the table preview: match its 32-character prose measure, excluding headers. */
+function markScrollableTables(nodes: MarkdownNode[]): void {
+  for (const node of nodes) {
+    if (!Array.isArray(node) || node[0] === null) continue
+    const [tag, attrs, ...children] = node
+    if (tag === "comments" || tag === "comments-render") markScrollableTables(children)
+    if (tag !== "div" || !("data-cols" in attrs) || !("data-wide" in attrs) || "data-fold" in attrs) continue
+    const [table] = children
+    if (!Array.isArray(table) || table[0] !== "table" || table[1].role !== "table") continue
+
+    const totals: { length: number; count: number }[] = []
+    const [, , ...parts] = table
+    for (const part of parts) {
+      if (!Array.isArray(part) || part[0] !== "tbody") continue
+      const [, , ...rows] = part
+      for (const row of rows) {
+        if (!Array.isArray(row) || row[0] !== "tr") continue
+        const [, , ...cells] = row
+        cells.forEach((cell, index) => {
+          const total = (totals[index] ??= { length: 0, count: 0 })
+          total.length += textContent(cell).trim().length + 3 * tableChipCount(cell)
+          total.count++
+        })
+      }
+    }
+    if (totals.length && !totals.some((total) => total.length >= 32 * total.count)) {
+      table[1]["data-drop-scroll-table"] = ""
+    }
+  }
 }
 
 function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): string {
@@ -280,13 +324,13 @@ const LINT_COMPONENTS = [...ALLOWED_TAGS, ...preset.blocks]
  * external URLs aren't checked: a published doc has no folder around it. The checks read the source, so they can say
  * an annotation's box is outside its image, not that it points at the button it means.
  */
-export async function lintMarkdown(markdown: string): Promise<MarkdownProblem[]> {
+export async function lintMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
   const found = await lint(renameLegacyProps(markdown), { plugins: renderPlugins, components: LINT_COMPONENTS })
   return found.flatMap(({ rule, severity, line, column, message, fix, cause }) => {
     // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
     // is the doc's.
     if (cause !== undefined && !(rule === "comark/invalid-frontmatter" || message.startsWith("Comark could not"))) {
-      log.error({ action: "markdown_lint", rule, error: message })
+      logError(event, cause, { action: "markdown_lint", rule, message })
       return []
     }
     const error = cause !== undefined || severity === "error" || DROP_ERROR_RULE.test(rule)
@@ -302,8 +346,8 @@ export const problemLine = ({ line, column, rule, message, fix }: MarkdownProble
  * Lints a Markdown doc before it's stored: one with an error is refused with all its problems, as `message`, and as
  * `data.problems` for clients. Returns the warnings it publishes with.
  */
-export async function requirePublishableMarkdown(markdown: string): Promise<MarkdownProblem[]> {
-  const problems = await lintMarkdown(markdown)
+export async function requirePublishableMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
+  const problems = await lintMarkdown(markdown, event)
   const errors = problems.filter((problem) => problem.severity === "error")
   if (!errors.length) return problems
   const [first] = errors
@@ -322,9 +366,14 @@ export async function requirePublishableMarkdown(markdown: string): Promise<Mark
  * The one Markdown renderer: Comark with front matter, task lists, every comark-ui package, and a tag allowlist. The
  * /f/ document pages and the viewer (via /api/drops/:id) both show its output.
  */
-async function renderMarkdownBody(markdown: string): Promise<{ title: string; html: string; retry?: true }> {
+async function renderMarkdownBody(
+  markdown: string,
+  blobKey: string,
+  event?: H3Event,
+): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
-    const document = await parseMarkdown(markdown)
+    const document = await parseForReaders(renameLegacyProps(markdown))
+    markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes
       ? `<p class="revision-note">Revision of <a href="${escapeHtml(supersedes)}">a previous document</a>.</p>`
@@ -352,10 +401,12 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
       ...(retry && { retry: true as const }),
     }
   } catch (error) {
-    log.error({ action: "markdown_render", error: error instanceof Error ? error.message : "Unknown error" })
+    logError(event, error, { action: "markdown_render", blobKey })
+    // Kept for minutes, not the month a render is: reads don't each fail again.
     return {
       title: "Untitled document",
       html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`,
+      failed: true,
     }
   }
 }
@@ -365,7 +416,7 @@ async function renderMarkdownBody(markdown: string): Promise<{ title: string; ht
  * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
  */
 export const renderMarkdownCached = (key: string, markdown: () => Promise<string>, event?: H3Event) =>
-  cachedMarkdown(key, markdown, renderMarkdownBody, event)
+  cachedMarkdown(key, markdown, (text) => renderMarkdownBody(text, key, event), event)
 
 export async function renderMarkdownDocument(
   markdown: () => Promise<string>,
@@ -403,10 +454,34 @@ export async function renderMarkdownDocument(
 
 type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
 
+/**
+ * A moment in comark-time's markup, as comark-properties writes a front matter date: the server writes the date in UTC,
+ * which reads right in any cached copy, and the box's script turns it into "2 days ago", with the full date and time in
+ * its tooltip, in the reader's browser.
+ */
+function timeNode(at: number): PropertyNode {
+  const time = describeTime(new Date(at).toISOString(), { timeZone: "UTC", threshold: "none" })!
+  const label = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(at)
+  // One per page, and the same on every read, so a render stays the same while the version does.
+  const id = `cfm-updated-${at}`
+  return [
+    "time",
+    { class: "ctm", datetime: time.datetime, "data-mode": "absolute", tabindex: "0", "aria-describedby": id },
+    label,
+    ["span", { class: "ctm-tip", role: "tooltip", id }, ["span", { class: "ctm-pill" }, time.tip]],
+  ]
+}
+
 // comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
 // data-comark-frame.
 const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
 const CHIP_STYLES = /<style data-comark-chips[^>]*>[\s\S]*?<\/style>/
+const PROPERTIES_STYLES = /<style data-comark-properties[^>]*>[\s\S]*?<\/style>/
 
 /**
  * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
@@ -425,13 +500,6 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   const chips = links.map(
     (resource) => chipNode(resource.url, linkText(resource), faviconUrl(resource.url)) as PropertyNode,
   )
-  const updated = new Date(doc.updatedAt)
-  const shown = updated.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  })
   const rows: PropertyNode[] = [
     ...(links.length
       ? [
@@ -443,12 +511,7 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
           ] satisfies PropertyNode,
         ]
       : []),
-    [
-      "div",
-      { "data-key": "updated", "data-kind": "date" },
-      ["dt", {}, "Updated"],
-      ["dd", {}, ["time", { datetime: updated.toISOString().slice(0, 10) }, shown]],
-    ],
+    ["div", { "data-key": "updated", "data-kind": "date" }, ["dt", {}, "Updated"], ["dd", {}, timeNode(doc.updatedAt)]],
   ]
   const rendered = await renderHtmlFromDocument(
     // SAFETY: the rows are Drop's own nodes, with hrefs resources.ts already checked (https, or http on localhost).
@@ -459,9 +522,22 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
   // its box or text has a chip. The page keeps one: the doc's, or the rows' when the doc has none.
   const own = CHIP_STYLES.test(html)
   if (open === -1) return (own ? rendered.replace(CHIP_STYLES, "") : rendered) + html
-  // The page already has the box's styles and date script: only its rows go in, after the front matter's.
+  // The page already has the box's styles: only its rows go in, after the front matter's. A box without a date of its
+  // own has no date script yet, so the Updated row brings comark-time's runtime before the box and the script after it.
   const opening = PROPERTIES_BOX.exec(rendered)!
   const start = opening.index + opening[0].length
-  const added = rendered.slice(start, rendered.lastIndexOf("</dl>"))
-  return html.slice(0, close) + (own ? added.replace(CHIP_STYLES, "") : added) + html.slice(close)
+  const end = rendered.lastIndexOf("</dl>")
+  const added = rendered.slice(start, end)
+  const dated = box.includes("<time")
+  const runtime = dated ? "" : rendered.slice(0, opening.index).replace(PROPERTIES_STYLES, "")
+  const after = dated ? "" : rendered.slice(end + "</dl>".length)
+  return (
+    html.slice(0, open) +
+    runtime +
+    html.slice(open, close) +
+    (own ? added.replace(CHIP_STYLES, "") : added) +
+    "</dl>" +
+    after +
+    html.slice(close + "</dl>".length)
+  )
 }

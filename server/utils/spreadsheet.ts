@@ -3,10 +3,10 @@ import { formatValue, type Cell, type CellValue, type Sheet } from "hucre"
 import { parseCsv } from "hucre/csv"
 import { readOds } from "hucre/ods"
 import { readXls, readXlsx } from "hucre/xlsx"
-import { log } from "evlog"
 import { escapeUTF8 as escapeHtml } from "entities"
 import { defineCachedFunction } from "nitro/cache"
-import { MARKDOWN_CACHE_TTL } from "./markdown-cache"
+import { logError } from "./logs"
+import { FAILED_RENDER_TTL, MARKDOWN_CACHE_TTL } from "./markdown-cache"
 
 /** The spreadsheets Drop previews, read-only. Anything else stays a plain file with a download. */
 export const SPREADSHEET_EXTENSIONS = new Set([".csv", ".tsv", ".xlsx", ".xlsm", ".xls", ".ods"])
@@ -128,36 +128,60 @@ function sheetTable(sheet: Sheet): string {
 
 /** The spreadsheet as HTML for the viewer: a tab per visible sheet, each a read-only grid of what its cells show. */
 export async function renderSpreadsheet(bytes: Uint8Array, extension: string): Promise<string> {
+  return (await renderSheets(bytes, extension)).html
+}
+
+/** The render, and the error when the workbook couldn't be read and the HTML says so instead. */
+async function renderSheets(bytes: Uint8Array, extension: string): Promise<{ html: string; failed?: unknown }> {
   try {
     const sheets = await readSheets(bytes, extension)
-    if (!sheets.length) return `<p class="sheet-empty">This workbook has no sheets to show.</p>`
+    if (!sheets.length) return { html: `<p class="sheet-empty">This workbook has no sheets to show.</p>` }
     const tabs =
       sheets.length > 1
         ? `<nav class="sheet-tabs" role="tablist">${sheets.map((sheet, i) => `<button type="button" role="tab" aria-selected="${i === 0}" data-sheet="${i}">${escapeHtml(sheet.name || `Sheet ${i + 1}`)}</button>`).join("")}</nav>`
         : ""
-    return (
-      tabs +
-      sheets
-        .map(
-          (sheet, i) => `<section class="sheet" data-sheet="${i}"${i ? " hidden" : ""}>${sheetTable(sheet)}</section>`,
-        )
-        .join("")
-    )
+    return {
+      html:
+        tabs +
+        sheets
+          .map(
+            (sheet, i) =>
+              `<section class="sheet" data-sheet="${i}"${i ? " hidden" : ""}>${sheetTable(sheet)}</section>`,
+          )
+          .join(""),
+    }
   } catch (error) {
-    log.error({ action: "spreadsheet_render", error: error instanceof Error ? error.message : "Unknown error" })
-    return `<p class="sheet-empty">Drop could not read this spreadsheet. Download it to open it.</p>`
+    return {
+      html: `<p class="sheet-empty">Drop could not read this spreadsheet. Download it to open it.</p>`,
+      failed: error,
+    }
   }
+}
+
+/** A render that failed is kept for FAILED_RENDER_TTL, not the month a render is. */
+interface SheetRender {
+  html: string
+  failed?: true
 }
 
 /** Keyed by blob key like Markdown renders (blobs never change); deleteMarkdownCache clears both. */
 const cached = defineCachedFunction(
-  async (_event: H3Event | undefined, _key: string, extension: string, bytes: () => Promise<Uint8Array>) => ({
-    html: await renderSpreadsheet(await bytes(), extension),
-  }),
+  async (
+    event: H3Event | undefined,
+    key: string,
+    extension: string,
+    bytes: () => Promise<Uint8Array>,
+  ): Promise<SheetRender> => {
+    const { html, failed } = await renderSheets(await bytes(), extension)
+    if (failed === undefined) return { html }
+    logError(event, failed, { action: "spreadsheet_render", blobKey: key })
+    return { html, failed: true }
+  },
   {
     name: "spreadsheet",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
+    getMaxAge: (entry: { value?: SheetRender }) => (entry.value?.failed ? FAILED_RENDER_TTL : MARKDOWN_CACHE_TTL),
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )

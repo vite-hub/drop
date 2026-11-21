@@ -9,7 +9,7 @@ const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve(
 // Drop modules swapped by their file name, wherever they're imported from.
 const modules: Record<string, string> = {
   identity:
-    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
+    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const sessionOf = event => authFor().api.getSession({ headers: event.req.headers }); export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
   "code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "live-drafts":
@@ -35,10 +35,37 @@ export const requireRateLimit = async (...args) => { if (!(await checkRateLimit(
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
   "vite-hub/auth/mcp":
     "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
+  // ViteHub Auth's VITEHUB_MEMBERS check, on the test's emails: `state.members` lists them, empty lets everyone in.
+  "vite-hub/auth/server": `import { sql } from "drizzle-orm"
+export const checkAuthMember = async (userId) => {
+  const listed = (globalThis.dropTest.members ?? "").split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+  if (!listed.length) return [undefined, undefined]
+  if (globalThis.dropTest.memberCheckError) return [{ code: globalThis.dropTest.memberCheckError }, undefined]
+  const [row] = await globalThis.dropTest.db.all(sql\`SELECT email FROM user WHERE id = \${userId}\`)
+  return row && listed.includes(row.email.toLowerCase()) ? [undefined, undefined] : [{ code: "AUTH_NOT_MEMBER" }, undefined]
+}
+// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, else the session of \`dropTest.authApi\`.
+export const requireCaller = async (event) => {
+  const headers = event.req.headers
+  if (/^Bearer\\s+\\S+$/i.test(headers.get("authorization") ?? "")) {
+    const caller = globalThis.dropTest.mcpCaller
+    if (!caller) return [{ code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
+    return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
+  }
+  const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })
+  for (const cookie of responseHeaders.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
+  return session?.user ? [undefined, { kind: "browser", user: session.user, session: session.session ?? {} }] : [{ code: "AUTH_SIGNED_OUT" }, undefined]
+}
+// A test that needs Better Auth's API sets \`dropTest.authApi\`; the rest build Better Auth themselves.
+export const useAuth = () => {
+  if (!globalThis.dropTest.authApi) throw new Error("Tests build Better Auth themselves")
+  return { api: globalThis.dropTest.authApi }
+}
+export default () => new Response(null, { status: 404 })`,
   "vite-hub/realtime/server":
-    "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true",
+    "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true; export const blobDocument = () => ({ kind: 'blob' })",
   "vite-hub/env":
-    "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', githubOrg: t.githubOrg ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
+    "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([
@@ -68,7 +95,7 @@ export function dropTestStubs(): Plugin {
       // ViteHub's comment marks.
       const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
       if (css) return PREFIX + css[0]
-      if (id in stubs) return PREFIX + id
+      if (id in stubs && importer !== `${root}nuxt.config.ts`) return PREFIX + id
       const module = Object.keys(modules).find(
         (name) => id.endsWith(`/utils/${name}`) || id === `./${name}` || id === `../${name}`,
       )

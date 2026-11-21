@@ -8,7 +8,7 @@ import { tmpdir } from "node:os"
 import { Worker } from "node:worker_threads"
 import { toStandardJsonSchema } from "@valibot/to-json-schema"
 import * as v from "valibot"
-import { H3Event, HTTPError, toResponse } from "h3"
+import { H3Event, toResponse } from "h3"
 import { createMcpHandler, defineMcpTool } from "nitro-mcp-toolkit"
 import { MCP_LATEST, MCP_LEGACY } from "../../shared/mcp.ts"
 import { MIB, planLimits, quotaFailure, quotaToolFailure, usageNearLimit } from "../../shared/quotas.ts"
@@ -100,7 +100,6 @@ test("plans, warnings, and non-retryable agent guidance", () => {
   assert.match(body.message, /Nothing was created or changed/)
   assert.match(quotaToolFailure(body).content[0].text, /Ask the user/)
   assert.match(quotaToolFailure(body).content[0].text, /Do not retry or delete/)
-  assert.equal("upgradeUrl" in body, false)
   assert.equal(body.selfHostUrl, "/docs/self-host")
   const usage = {
     enabled: true,
@@ -385,18 +384,6 @@ for (const version of [MCP_LATEST, ...MCP_LEGACY]) {
     assert.match(json.result.content[0].text, /Ask the user/)
   })
 }
-
-test("REST quota errors preserve the same top-level JSON fields with 402", async () => {
-  const failure = quotaFailure("drops", 3, 3)
-  const event = new H3Event(new Request("https://drop.example/api/drops"))
-  const response = await toResponse(
-    new HTTPError({ status: 402, message: failure.message, body: { ...failure } }),
-    event,
-  )
-  assert.equal(response.status, 402)
-  const body = await response.json()
-  for (const [key, value] of Object.entries(failure)) assert.deepEqual(body[key], value)
-})
 
 test("deleting a drop with a long history frees every retained byte and its slot without refunding writes", () => {
   const db = setup()

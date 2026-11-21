@@ -46,7 +46,7 @@ async function answer(handler, made) {
 
 /** One connection to a presence room: identify, the origin check, and authorize, each on its own request as ViteHub runs them. */
 async function connect(room, query, origin = DROP) {
-  const url = `${DROP}/api/_vitehub/realtime/presence/${room}?${new URLSearchParams(query)}`
+  const url = `${DROP}/_vitehub/realtime/presence/${room}?${new URLSearchParams(query)}`
   const fresh = () => event(url, { headers: { origin, upgrade: "websocket" } })
   const first = fresh()
   return {
@@ -195,8 +195,26 @@ test("a members-only Drop lets presence through its gate: the room and the ticke
   state.members = "ada@example.com"
   state.who = null
   assert.equal(await membersOnly(event("/api/review/presence")), undefined)
-  assert.equal(await membersOnly(event("/api/_vitehub/realtime/presence/0123abcd")), undefined)
-  await assert.rejects(Promise.resolve(membersOnly(event("/api/_vitehub/realtime/drops/x"))))
+  assert.equal(await membersOnly(event("/_vitehub/realtime/presence/0123abcd")), undefined)
+  await assert.rejects(Promise.resolve(membersOnly(event("/_vitehub/realtime/drops/x"))))
   await assert.rejects(Promise.resolve(membersOnly(event("/api/drops/x/presence"))))
   state.members = undefined
+})
+
+// ViteHub asks authorize() for signed-out callers too since vite-hub/vitehub#4913, with `user: null`.
+test("presence and live-editing rooms turn away a caller nobody identified", async () => {
+  site()
+  const room = await presenceRoom(event("/"), { id: "site" })
+  const { default: presence } = await import("../../server/realtime/presence.ts")
+  const { default: drafts } = await import("../../server/realtime/drafts.ts")
+  const made = event(`/_vitehub/realtime/presence/${room}`)
+  assert.equal(
+    await presence.authorize({ event: made, request: made.req, documentId: room, mode: "read", user: null }),
+    false,
+  )
+  for (const documentId of [null, "drafts/site/v1.md"])
+    assert.equal(
+      await drafts.authorize({ event: made, request: made.req, documentId, mode: "read", user: null }),
+      false,
+    )
 })

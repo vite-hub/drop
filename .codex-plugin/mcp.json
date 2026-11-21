@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "drop": { "type": "http", "url": "https://drop.vitehub.dev/mcp" }
+  }
+}

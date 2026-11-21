@@ -81,6 +81,43 @@ const MentionsSchema = v.optional(v.pipe(v.array(v.pipe(v.string(), v.maxLength(
 
 const thousandths = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000))
 
+/** Most strokes, and most points across them, that a Marker comment keeps for the page to draw. */
+export const MAX_INK_STROKES = 60
+export const MAX_INK_POINTS = 6000
+const inkCoordinate = v.pipe(v.number(), v.minValue(-100_000), v.maxValue(100_000))
+
+/**
+ * The Marker's strokes on an area comment, for the page to draw over the area as the reader drew them. `w`/`h` are the
+ * area's size in CSS pixels when it was drawn; a stroke's points are pixels from the area's top-left corner, so they
+ * scale with the area when the anchor reflows. `width` is the tip's size (a label's font size); a text stroke is a
+ * label whose one point is the middle of its left edge.
+ */
+export const InkSchema = v.pipe(
+  v.object({
+    w: v.pipe(v.number(), v.minValue(1), v.maxValue(100_000)),
+    h: v.pipe(v.number(), v.minValue(1), v.maxValue(100_000)),
+    strokes: v.pipe(
+      v.array(
+        v.object({
+          tool: v.picklist(["marker", "pen", "arrow", "text"]),
+          color: v.pipe(v.string(), v.regex(/^#[0-9a-f]{6}$/i)),
+          width: v.pipe(v.number(), v.minValue(1), v.maxValue(64)),
+          points: v.pipe(v.array(v.tuple([inkCoordinate, inkCoordinate])), v.minLength(1), v.maxLength(MAX_INK_POINTS)),
+          straight: v.optional(v.boolean()),
+          text: v.optional(v.pipe(v.string(), v.maxLength(200))),
+        }),
+      ),
+      v.minLength(1),
+      v.maxLength(MAX_INK_STROKES),
+    ),
+  }),
+  v.check(
+    (ink) => ink.strokes.reduce((sum, stroke) => sum + stroke.points.length, 0) <= MAX_INK_POINTS,
+    `The Marker's strokes hold at most ${MAX_INK_POINTS} points.`,
+  ),
+)
+export type Ink = v.InferOutput<typeof InkSchema>
+
 /**
  * Positions are thousandths of the anchor's box; `ow`/`oh` size an area and default to 0, a point. A `page` comment is
  * about the page as a whole: no anchor, an empty selector, and zero positions.
@@ -102,6 +139,8 @@ export const CommentSchema = v.pipe(
     at: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(86_400))),
     /** A comment on a PDF's page: its number, from 1. The spot or area is on that page. */
     pdfPage: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100_000))),
+    /** From the Marker: its strokes, which the page draws over the area. */
+    ink: v.optional(InkSchema),
     // Empty only with images, such as the Marker's snapshot: the endpoint checks once it has read them.
     body: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(4000)), ""),
     mentions: MentionsSchema,
@@ -123,6 +162,10 @@ export const CommentSchema = v.pipe(
   v.check(
     (input) => input.suggestion === undefined || (input.kind === "text" && Boolean(input.quote)),
     "A suggestion replaces selected text.",
+  ),
+  v.check(
+    (input) => input.ink === undefined || (input.kind === "area" && input.ow > 0),
+    "The Marker's strokes go on an area.",
   ),
   v.check((input) => input.at === undefined || input.kind === "image", "A video's frame takes a spot or an area."),
   v.check((input) => input.pdfPage === undefined || input.kind === "image", "A PDF's page takes a spot or an area."),
@@ -249,6 +292,8 @@ export const DropsQuerySchema = v.object({
   trash: v.optional(v.string()),
   shared: v.optional(v.string()),
   folders: v.optional(v.string()),
+  /** With `folder`: at most this many of its newest drops. */
+  limit: v.optional(v.pipe(v.string(), v.regex(/^[1-9]\d{0,2}$/))),
 })
 
 export const DropTreeQuerySchema = v.object({ open: v.optional(v.pipe(v.string(), v.maxLength(100))) })
@@ -272,4 +317,10 @@ export const ClientErrorSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.maxLength(120))),
   message: v.pipe(v.string(), v.maxLength(1000)),
   stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
+  // A failed request's answer, which finds it in the server's logs, and where in Drop it happened.
+  status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
+  requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
+  drop: v.optional(v.pipe(v.string(), v.maxLength(40))),
+  title: v.optional(v.pipe(v.string(), v.maxLength(200))),
+  source: v.optional(v.pipe(v.string(), v.maxLength(300))),
 })

@@ -14,6 +14,7 @@
 // straight away reads without it, until the next page (useOpenedOnLink).
 // ? opens the keyboard shortcuts (ShortcutsModal).
 import { promiseTimeout } from "@vueuse/core"
+import { RETURNING_COOKIE } from "#shared/sign-in"
 
 const route = useRoute()
 const consoleAuth = consoleUrl("/auth")
@@ -36,6 +37,10 @@ const onShared = computed(() => route.path === "/drops" && route.query.tab === "
 // A team Drop leads with the team's folders, and its Team page takes the place of Shared with me.
 const teamOpen = ref(true)
 const { data: me } = useMe()
+// Someone signed in on this browser: a drop it can't open later may only need signing in again
+// (server/handlers/content-error.ts).
+const returning = useCookie(RETURNING_COOKIE, { maxAge: 60 * 60 * 24 * 365, sameSite: "lax" })
+if (me.value && !returning.value) returning.value = "1"
 const team = computed(() => me.value?.mode === "team")
 // A personal Drop with teams lists each team you're on, its folders below it.
 const teams = computed(() => me.value?.teams ?? null)

@@ -4,12 +4,13 @@ import { db } from "vite-hub/database"
 import { ReviewSchema } from "#shared/schemas"
 import { drops, user } from "../../../databases/default/index"
 import { requireAdmin } from "../../../utils/identity"
+import { logAudit } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 export default defineValidatedHandler({
   validate: { body: ReviewSchema },
   async handler(event) {
-    await requireAdmin(event)
+    const who = await requireAdmin(event)
     const id = await routeId(event)
     const [owner] = await db.select().from(user).where(eq(user.id, id)).limit(1)
     if (!owner || owner.banned) throw new HTTPError({ status: 400, statusText: "This member is missing or banned." })
@@ -27,6 +28,7 @@ export default defineValidatedHandler({
         .update(drops)
         .set({ shareReview: "rejected" })
         .where(and(eq(drops.ownerId, id), eq(drops.shareReview, "pending")))
+    logAudit(event, who, `share-review.${action}`, { type: "user", id })
     return { ok: true }
   },
 })

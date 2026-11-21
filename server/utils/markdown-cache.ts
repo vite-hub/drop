@@ -5,6 +5,8 @@ import { resolveCacheKeys } from "ocache"
 import { version as comarkUiVersion } from "comark-ui/package.json"
 
 export const MARKDOWN_CACHE_TTL = 60 * 60 * 24 * 30
+/** A render that failed is kept this long: the blob won't change, but a fix to the renderer may come. */
+export const FAILED_RENDER_TTL = 5 * 60
 
 interface MarkdownRender {
   title: string
@@ -12,8 +14,10 @@ interface MarkdownRender {
   source: string
   /** A network failure left something out, such as an icon, so the render isn't kept and the next read tries again. */
   retry?: true
+  /** The render failed and shows the source instead; kept for FAILED_RENDER_TTL. */
+  failed?: true
 }
-type Render = (text: string) => Promise<{ title: string; html: string; retry?: true }>
+type Render = (text: string) => Promise<{ title: string; html: string; retry?: true; failed?: true }>
 
 /**
  * Renders keyed by blob key, in Nitro's `cache` storage (KV on Cloudflare, memory elsewhere). Blobs never change
@@ -35,10 +39,11 @@ const cached = defineCachedFunction(
     name: "markdown",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
-    // A comark-ui upgrade changes it by itself. Bump the Drop revision after it when Drop's own render changes, so
-    // existing documents pick up the current preset on their next read.
-    integrity: `${comarkUiVersion}+drop.22`,
+    // Preview builds can share a comark-ui version. Bump the Drop revision for preview upgrades and Drop's own
+    // render changes so existing documents pick up the current preset on their next read.
+    integrity: `${comarkUiVersion}+drop.29`,
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
+    getMaxAge: (entry: { value?: MarkdownRender }) => (entry.value?.failed ? FAILED_RENDER_TTL : MARKDOWN_CACHE_TTL),
     getKey: (_event: H3Event | undefined, key: string) => key,
   },
 )
