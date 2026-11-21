@@ -1555,6 +1555,14 @@ test("the page shows its threads where they were left: element, spot, replies, i
   assert.equal(part.status, 206)
   assert.equal((await part.arrayBuffer()).byteLength, 4)
   assert.equal((await image(thread.images[0].id, "00:forged", { "if-none-match": etag })).status, 401)
+  state.failServe = true
+  const unavailable = await image(thread.images[0].id)
+  state.failServe = false
+  assert.equal(unavailable.status, 503)
+  assert.equal(unavailable.headers.get("access-control-allow-origin"), SITE)
+  assert.equal(unavailable.headers.get("vary"), "Origin")
+  assert.equal(unavailable.headers.get("cache-control"), "no-store")
+  assert.deepEqual(await json(unavailable), { message: "File storage is temporarily unavailable." })
   assert.equal((await image(thread.screenshot)).status, 200)
   insertDrop("elsewhere", { kind: "image", blob_key: "elsewhere.png" })
   assert.equal((await image("elsewhere")).status, 404)
@@ -1598,6 +1606,13 @@ test("the page shows its threads where they were left: element, spot, replies, i
   assert.equal((await resolve(ole)).status, 403)
   assert.equal((await resolve(ada_)).status, 200)
   assert.equal((await json(await count(ole, "/pricing?plan=pro"))).open, 0)
+
+  const storedImage = sql.prepare("SELECT blob_key FROM drops WHERE id = ?").get(thread.images[0].id)
+  assert.equal(objects.delete(storedImage.blob_key), true)
+  const missing = await image(thread.images[0].id)
+  assert.equal(missing.status, 404)
+  assert.equal(missing.headers.get("access-control-allow-origin"), SITE)
+  assert.deepEqual(await json(missing), { message: "The image is missing." })
 })
 
 test("comments and replies in Drop take images, which belong to the drop and go with the comment", async () => {

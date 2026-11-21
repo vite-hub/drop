@@ -212,14 +212,17 @@ test("quarantine and missing owners block warm renders, raw content, apps and pa
 test("reports quarantine code images while image access stays one query", async () => {
   const imageKey = `code-images/${Date.now() + 300000}/image.svg`
   sql.prepare("INSERT INTO code_images VALUES (?, ?, ?, ?)").run(imageKey, "owner", 1, Date.now() + 300000)
-  sql
-    .prepare(
-      "INSERT INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)",
-    )
-    .run(imageKey, `/f/${imageKey}`)
-  queries.length = 0
-  await missing(() => requireBlobAccess(event(`/f/${imageKey}`), imageKey))
-  assert.equal(queries.length, 1)
+  const report = sql.prepare(
+    "INSERT OR REPLACE INTO abuse_reports (id, target, reason, details, status, created_at) VALUES (?, ?, 'spam', '', 'quarantined', 1)",
+  )
+  for (const target of [`/f/${imageKey}`, `/f///${imageKey}`]) {
+    report.run(imageKey, target)
+    for (const pathname of [imageKey, `/${imageKey}`, encodeURIComponent(`/${imageKey}`)]) {
+      queries.length = 0
+      await missing(() => serveFile(pathname))
+      assert.equal(queries.length, 1)
+    }
+  }
   assert.equal(calls.head, 0)
 })
 
