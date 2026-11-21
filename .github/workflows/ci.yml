@@ -23,6 +23,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          # The migration check needs the base branch's history to find the merge base.
+          fetch-depth: 0
+      - if: github.event_name == 'pull_request'
+        run: node scripts/check-migrations.mjs "origin/$GITHUB_BASE_REF"
       - uses: pnpm/action-setup@v4
         with:
           version: 11.18.0

@@ -79,6 +79,8 @@ To [give apps their own domain](/docs/self-host#content-origin), add a proxied w
 
 D1. `pnpm run deploy` applies new migrations before it publishes; `pnpm db:migrate:remote` applies them on their own.
 
+After deploying a database change, confirm the new migration appears in the remote `d1_migrations` ledger, then exercise a lookup that uses the changed schema on the deployed Worker. The pull request migration check cannot verify either step.
+
 To update, [pull Drop's changes into your repository](/docs/self-host#update) and push.
 
 ## On Cloudflare {#different}
