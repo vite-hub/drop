@@ -9,6 +9,19 @@ import { migrate } from "../cost/harness.mjs"
 
 migrate()
 
+test("Markdown image width caps are rendered without typed CSS attributes", async () => {
+  const image = "https://portrait.test/portrait.svg"
+  const markdown = `**![Sized](${image}){width="400" height="1000"}**
+
+![Width only](${image}){width="80"}
+
+![Plain](${image})`
+  const document = await renderMarkdownDocument(async () => markdown, "/f/image-widths.md", "image-widths.md")
+  assert.match(document, /<img(?=[^>]+alt="Sized")(?=[^>]+style="--drop-image-width:400px")/)
+  assert.match(document, /<img(?=[^>]+alt="Width only")(?=[^>]+style="--drop-image-width:80px")/)
+  assert.doesNotMatch(document, /<img(?=[^>]+alt="Plain")(?=[^>]+--drop-image-width)/)
+})
+
 test("a direct Markdown page fits portrait images without stretching the zoom or resizing screenshots", async () => {
   const origin = "https://portrait.test"
   const path = "/f/portrait.md"
