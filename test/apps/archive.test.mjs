@@ -66,3 +66,27 @@ test("a bundle's minified code doesn't read as bare imports; a real one still wa
     'assets/index.js imports "preact", a bare module name that browsers can\'t load. Import it from a CDN URL (https://esm.sh/preact) or add an import map.',
   ])
 })
+
+test("a script of a data type, such as a lesson in Markdown, isn't checked for links", async () => {
+  const { appLinkIssues } = await import("../../shared/project-bundle.ts")
+  const files = {
+    "index.html": [
+      '<script id="lesson" TYPE \n = "text/markdown">',
+      '```html [index.html]\n<script type="module" src="./src/main.js"><\\/script>\n```',
+      'import { format } from "./messages.js"',
+      "</script>",
+      '<script type="module">import "./missing.js"</script>',
+      '<script data-type="text/markdown" src="attribute.js"></script>',
+      '<script title="type=application/json" type="text/jscript" src = legacy.js></script>',
+      '<script type="text&#47;javascript1.5" src="entity.js"></script>',
+      '<script type="" src="empty.js"></script>',
+    ].join("\n"),
+  }
+  assert.deepEqual(appLinkIssues(files, Object.keys(files)), [
+    'index.html loads a module "./missing.js", but missing.js isn\'t in the app.',
+    'index.html loads script "attribute.js", but attribute.js isn\'t in the app.',
+    'index.html loads script "legacy.js", but legacy.js isn\'t in the app.',
+    'index.html loads script "entity.js", but entity.js isn\'t in the app.',
+    'index.html loads script "empty.js", but empty.js isn\'t in the app.',
+  ])
+})

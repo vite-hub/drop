@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Code along</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+    />
+    <!-- The editor and the Markdown parser, at fixed versions. Each package loads once, with its dependencies taken
+         from this map ("*" on esm.sh), so every part of CodeMirror shares one @codemirror/state. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "marked": "https://cdn.jsdelivr.net/npm/marked@16.4.2/lib/marked.esm.js",
+          "es-module-lexer/js": "https://cdn.jsdelivr.net/npm/es-module-lexer@2.3.2/dist/lexer.asm.js",
+          "codemirror": "https://esm.sh/*codemirror@6.0.2",
+          "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.20.2",
+          "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.10.3",
+          "@codemirror/language": "https://esm.sh/*@codemirror/language@6.12.3",
+          "@codemirror/lint": "https://esm.sh/*@codemirror/lint@6.9.6",
+          "@codemirror/search": "https://esm.sh/*@codemirror/search@6.7.0",
+          "@codemirror/state": "https://esm.sh/*@codemirror/state@6.6.0",
+          "@codemirror/view": "https://esm.sh/*@codemirror/view@6.43.0",
+          "@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.2.5",
+          "@codemirror/lang-html": "https://esm.sh/*@codemirror/lang-html@6.4.11",
+          "@codemirror/lang-css": "https://esm.sh/*@codemirror/lang-css@6.3.1",
+          "@codemirror/lang-json": "https://esm.sh/*@codemirror/lang-json@6.0.2",
+          "@codemirror/lang-markdown": "https://esm.sh/*@codemirror/lang-markdown@6.5.0",
+          "@codemirror/lang-python": "https://esm.sh/*@codemirror/lang-python@6.2.1",
+          "@lezer/common": "https://esm.sh/*@lezer/common@1.5.2",
+          "@lezer/highlight": "https://esm.sh/*@lezer/highlight@1.2.3",
+          "@lezer/lr": "https://esm.sh/*@lezer/lr@1.4.10",
+          "@lezer/javascript": "https://esm.sh/*@lezer/javascript@1.5.4",
+          "@lezer/html": "https://esm.sh/*@lezer/html@1.3.13",
+          "@lezer/css": "https://esm.sh/*@lezer/css@1.3.3",
+          "@lezer/json": "https://esm.sh/*@lezer/json@1.0.3",
+          "@lezer/markdown": "https://esm.sh/*@lezer/markdown@1.6.4",
+          "@lezer/python": "https://esm.sh/*@lezer/python@1.1.19",
+          "style-mod": "https://esm.sh/*style-mod@4.1.3",
+          "crelt": "https://esm.sh/*crelt@1.0.6",
+          "w3c-keyname": "https://esm.sh/*w3c-keyname@2.2.8",
+          "@marijn/find-cluster-break": "https://esm.sh/*@marijn/find-cluster-break@1.0.2"
+        }
+      }
+    </script>
+    <style id="ca-style">
+      /* Paste assets/style.css here. */
+    </style>
+  </head>
+  <body>
+    <div id="lesson-root"></div>
+    <!-- Fill the slots with JSON string literals, with literal less-than signs encoded as \u003c. -->
+    <script id="lesson" type="application/json"></script>
+    <script id="ca-lesson" type="application/json"></script>
+    <script id="ca-app" type="application/json"></script>
+    <script>
+      // Runs the template pasted into this page. The editor and the Markdown parser come from a CDN when the page
+      // opens; without them the page still shows the steps and a plain text editor.
+      (() => {
+        const root = document.getElementById("lesson-root");
+        const part = (id) => {
+          const text = document.getElementById(id).textContent;
+          if (id === "ca-style") return text;
+          try {
+            const source = JSON.parse(text);
+            return typeof source === "string" ? source : "";
+          } catch { return ""; }
+        };
+        const missing = [
+          [/\.ca-shell/, "ca-style", "assets/style.css"],
+          [/\bfunction parseLesson\b/, "ca-lesson", "assets/lesson.js"],
+          [/\bfunction mount\b/, "ca-app", "assets/app.js"],
+          [/\S/, "lesson", "lesson.md"],
+        ].find(([test, id]) => !test.test(part(id)));
+        if (missing) {
+          root.textContent = `This page couldn't load: ${missing[2]} isn't in the page. Rebuild it with the code-along skill's build script.`;
+          return;
+        }
+        document.body.append(
+          Object.assign(document.createElement("script"), {
+            type: "module",
+            textContent: `${part("ca-lesson")}\n${part("ca-app")}`,
+          }),
+        );
+      })();
+    </script>
+  </body>
+</html>

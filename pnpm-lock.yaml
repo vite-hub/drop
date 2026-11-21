@@ -342,6 +342,9 @@ importers:
       drizzle-kit:
         specifier: 1.0.0-rc.5
         version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@5.20261023.1)(@libsql/client@0.18.0)(bun-types@1.4.4)(postgres@3.4.9)(sql.js@1.15.1)(valibot@1.5.0(typescript@6.0.3))(zod@4.6.7))
+      es-module-lexer:
+        specifier: 2.3.2
+        version: 2.3.2
       knip:
         specifier: 6.41.0
         version: 6.41.0

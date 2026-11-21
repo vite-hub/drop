@@ -2044,10 +2044,32 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const keyScroll = keyScroller(() => tool === "mark");
   ${PALETTE_KEY}
 
+  let pendingFocus;
+  let focusTimer;
+  const focusMarker = (m) => {
+    const marker = markers.find((entry) => entry.id === m.id);
+    const range = marker?.kind === "text" && marker.quote ? findRange(marker.selector, marker.quote) : null;
+    const node = marker?.kind === "text" ? range?.startContainer : query(marker?.selector);
+    const anchor = node?.nodeType === 1 ? node : node?.parentElement;
+    if (anchor) anchor.dispatchEvent(new Event("drop:reveal-anchor", { bubbles: true }));
+    active = m.id; render();
+    const pinOf = () => (typeof m.id === "string" && (marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
+    const dot = pinOf();
+    pendingFocus = anchor || dot ? null : m;
+    if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
+    if (dot && m.open) setTimeout(() => {
+      const pin = pinOf();
+      if (pin && active === m.id) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top, focused: true }); }
+    }, 500);
+    clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => { active = null; render(); }, 2200);
+  };
+  document.addEventListener("drop:anchors-ready", () => { if (pendingFocus) focusMarker(pendingFocus); });
+
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
-    if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } render(); }
+    if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } if (pendingFocus) focusMarker(pendingFocus); else render(); }
     if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("vh-comment-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
@@ -2078,7 +2100,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // A root class hides the outline in Zen and tells comark-outline to recalculate its placement.
     if (m.type === "zen") { document.documentElement.classList.toggle("drop-zen", m.on === true); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
+    if (m.type === "active") {
+      opened = typeof m.id === "string" ? m.id : null;
+      if (pendingFocus && pendingFocus.id !== opened) pendingFocus = null;
+      covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft();
+    }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
     // The drop's own link: each heading's # points at it with the section's #id (see the click handler).
     if (m.type === "page-link" && typeof m.href === "string" && /^https?:\/\//.test(m.href)) {
@@ -2094,20 +2120,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "heading" && typeof m.id === "string") { const to = document.getElementById(m.id); if (to) to.scrollIntoView({ block: "start" }); }
     if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (m.type === "scroll-key") keyScroll(m.key, m.shift === true);
-    if (m.type === "focus") {
-      active = m.id; render();
-      // A pin, or a margin comment's bubble.
-      const pinOf = () => (typeof m.id === "string" && (marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
-      const dot = pinOf();
-      if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
-      // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it. Marked
-      // focused, so Drop can drop the report if Escape or another comment came first.
-      if (dot && m.open) setTimeout(() => {
-        const pin = pinOf();
-        if (pin) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top, focused: true }); }
-      }, 500);
-      setTimeout(() => { active = null; render(); }, 2200);
-    }
+    if (m.type === "focus") focusMarker(m);
   });
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.

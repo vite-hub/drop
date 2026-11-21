@@ -17,6 +17,10 @@ Drop bundles Comark UI's upstream skills during its build: `comark-ui` for block
 
 For a dataset someone wants to explore, such as an export or numbers you pulled from an analytics tool, follow the `data-explorer` skill: it builds one self-contained HTML page with tabs, charts and filters, which you publish as `html`.
 
+## Code to work through
+
+To walk someone through code, to hand them a prototype to try, or to code something with them, follow the `code-along` skill: it builds one HTML page with a guide in steps beside an editor and a live preview, which you publish as `html`.
+
 ## Publish
 
 Before publishing something new, call `list_folders` and pick its folder (see [Folders](#folders)).

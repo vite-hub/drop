@@ -17,8 +17,13 @@ export default defineDoctorConfig({
     // The skills are the Markdown agents read and copy into drops, so they get the checks Drop runs when one publishes
     // (server/utils/markdown-document.ts lintMarkdown). content/docs is the docs site, made of Vue components a drop
     // can't use. Drop's skills endpoint adds pr-evidence's references/annotations.md and references/comark-ui/ from
-    // comark-ui's own skill (server/utils/skills.ts), so links to them resolve only once served.
-    comark({ include: "skills/**/*.md", links: { skip: [/^references\/(?:annotations\.md|comark-ui\/)/] } }),
+    // comark-ui's own skill (server/utils/skills.ts), so links to them resolve only once served. code-along's example is
+    // a lesson whose links point at the files inside it, which the lesson's page opens.
+    comark({
+      include: "skills/**/*.md",
+      exclude: ["**/node_modules/**", "skills/code-along/references/example.md"],
+      links: { skip: [/^references\/(?:annotations\.md|comark-ui\/)/] },
+    }),
   ],
   rules: {
     "typescript/strict/no-comments": ["error", { apiDocs: "none" }],
