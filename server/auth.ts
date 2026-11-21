@@ -123,7 +123,7 @@ export default defineAuth(({ env, requestOrigin }) => {
       "/admin/stop-impersonating",
       ...(proxied ? ["/sign-in/social", "/callback/github", "/link-social"] : []),
     ],
-    access: { signIn: { callbackURL: "/drops", errorCallbackURL: "/?auth_error=1", provider: "github" } },
+    access: { signIn: { errorCallbackURL: "/?auth_error=1", provider: "github" }, afterSignIn: "/drops" },
     socialProviders: proxied
       ? {}
       : {

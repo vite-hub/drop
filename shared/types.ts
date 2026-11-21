@@ -1,4 +1,5 @@
 // The contract between Drop's API and its pages. Server routes return these shapes; pages render them.
+import type { CommentDelivery } from "vite-hub/comments/client"
 import type { AgentMetadata } from "./agent"
 import type { Lifetime } from "./expiry"
 import type { Role } from "./roles"
@@ -284,6 +285,13 @@ export interface DropComment {
   attachments: CommentAttachment[]
   /** The people its and its replies' `@`s name, so their names show to readers who can't list people. */
   people: { id: string; name: string; image: string | null }[]
+  /** The retry key the viewer sent it with, so its waiting copy and the server's show once. */
+  requestId?: string
+  /**
+   * Only in the viewer: it waits in the outbox (useDrop) and isn't on the server yet. Its `id` is local, `n` is 0, and
+   * its images are `delivery.files`.
+   */
+  delivery?: CommentDelivery
 }
 
 /** A reply in a comment's thread: words and images; the comment keeps the anchor and the resolved state. */
@@ -299,6 +307,10 @@ export interface CommentReply {
   editedAt: number | null
   mine: boolean
   attachments: CommentAttachment[]
+  /** As on a comment: the retry key it was sent with. */
+  requestId?: string
+  /** As on a comment: it waits in the outbox, with a local `id`. */
+  delivery?: CommentDelivery
 }
 
 /** An agent that wrote a comment or a reply for its author. `image` is its logo, when Drop knows the agent. */

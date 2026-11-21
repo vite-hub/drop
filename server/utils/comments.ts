@@ -146,13 +146,34 @@ async function done(pending: Promise<[error: (Error & { code: string }) | undefi
 }
 
 /**
- * Who writes a comment or reply. A guest (a "Can comment" link, or a review token without a person) gets an id of its
- * own, so no comment of theirs ever counts as anyone's. The picture is a copy, like the name.
+ * Who writes a comment or reply. A guest writes as `guest`, the id of their browser or review token (./guests.ts);
+ * without one they get an id of their own, so the comment counts as nobody's. The picture is a copy, like the name.
  */
-export function authorOf(who: Identity | null, name: string): CommentUser {
+export function authorOf(who: Identity | null, name: string, guest: string | null = null): CommentUser {
   const shown = name.trim() || "Guest"
-  if (!who) return { id: `guest:${crypto.randomUUID()}`, name: shown, guest: true }
+  if (!who) return { id: guest ?? `guest:${crypto.randomUUID()}`, name: shown, guest: true }
   return { id: who.userId, name: shown, ...(who.image && who.image.length <= 2048 ? { image: who.image } : {}) }
+}
+
+/**
+ * A comment route's rate limit of so many a minute (`requireRateLimit`, which ViteHub finds by its literal arguments),
+ * with a 429 that always says in `Retry-After` when to send again, so a client that queued comments offline waits
+ * instead of failing them. Cloudflare's binding doesn't say when its window ends; there it's the whole minute.
+ */
+export async function withRetryAfter(limit: Promise<void>) {
+  try {
+    await limit
+  } catch (error) {
+    if (!(error instanceof Error) || Reflect.get(error, "status") !== 429) throw error
+    const headers: unknown = Reflect.get(error, "headers")
+    const after = headers instanceof Headers ? headers.get("retry-after") : null
+    throw new HTTPError({
+      status: 429,
+      statusText: "Too many comments in a minute. Wait a moment and send again.",
+      headers: { "Retry-After": after ?? "60" },
+      cause: error,
+    })
+  }
 }
 
 /**
@@ -173,17 +194,27 @@ function agentOf(actor: CommentActor | undefined): CommentAgent | null {
   return { name, image: knownAgent(actor.id)?.logo ?? knownAgent(name)?.logo ?? null }
 }
 
-const isMine = (author: CommentUser, who: Identity | null) => Boolean(who && author.id === who.userId)
-/** Whether `who` wrote the thread's first message, which lets them resolve or delete it. */
-export const wroteThread = (thread: CommentThread, who: Identity | null) => isMine(thread.author, who)
-export const wroteMessage = (message: CommentMessage, who: Identity | null) => isMine(message.author, who)
+/**
+ * Whom a comment's `mine` means: the person's id, else the guest id of their browser (./guests.ts), else nobody. It is
+ * the `author.id` that `authorOf` gives them.
+ */
+export type Reader = string | null
+export const readerOf = (who: Identity | null, guest: string | null = null): Reader => who?.userId ?? guest
+
+const isMine = (author: CommentUser, reader: Reader) => reader !== null && author.id === reader
+/**
+ * Whether `reader` wrote the thread's first message. Resolving and deleting pass `readerOf(who)`, without the guest id:
+ * a guest's comments are theirs to see and resend, but only someone signed in resolves or deletes.
+ */
+export const wroteThread = (thread: CommentThread, reader: Reader) => isMine(thread.author, reader)
+export const wroteMessage = (message: CommentMessage, reader: Reader) => isMine(message.author, reader)
 
 /** Comment images by their drop id, which messages list in `attachments`. */
 type Attachments = Map<string, CommentAttachment>
 const filesOf = (message: CommentMessage | undefined, attachments: Attachments) =>
   (message?.attachments ?? []).flatMap((id) => attachments.get(id) ?? [])
 
-export const toReply = (message: CommentMessage, who: Identity | null, attachments: Attachments): CommentReply => ({
+export const toReply = (message: CommentMessage, reader: Reader, attachments: Attachments): CommentReply => ({
   id: message.id,
   body: message.body,
   authorId: message.author.id,
@@ -193,7 +224,7 @@ export const toReply = (message: CommentMessage, who: Identity | null, attachmen
   createdAt: message.createdAt,
   editedAt: message.editedAt ?? null,
   mentions: message.mentions,
-  mine: isMine(message.author, who),
+  mine: isMine(message.author, reader),
   attachments: filesOf(message, attachments),
 })
 
@@ -206,15 +237,21 @@ export async function mentionedIn(threads: CommentThread[]): Promise<Named> {
   return new Map((await peopleByIds(ids)).map((person) => [person.id, person]))
 }
 
-/** A thread as Drop's API answers it (DropComment), with the version it was written on. */
+/**
+ * A thread as Drop's API answers it (DropComment), with the version it was written on. The reader's own carry the
+ * retry key they were sent with (a site review's is in its metadata), so a viewer that reloads before the answer shows
+ * its waiting copy and the server's as one.
+ */
 export function toComment(
   thread: DropThread,
-  who: Identity | null,
+  reader: Reader,
   attachments: Attachments,
   named: Named = new Map(),
 ): DropComment {
   const [first, ...replies] = thread.messages
   const { meta } = thread
+  const mine = isMine(thread.author, reader)
+  const requestId = mine ? (thread.requestId ?? meta.requestId) : undefined
   return {
     id: thread.id,
     messageId: first?.id ?? thread.id,
@@ -243,8 +280,9 @@ export function toComment(
     createdAt: thread.createdAt,
     editedAt: first?.editedAt ?? null,
     version: thread.version,
-    mine: isMine(thread.author, who),
-    replies: replies.map((reply) => toReply(reply, who, attachments)),
+    mine,
+    ...(requestId ? { requestId } : {}),
+    replies: replies.map((reply) => toReply(reply, reader, attachments)),
     attachments: filesOf(first, attachments),
     people: [...new Set(thread.messages.flatMap((message) => message.mentions))].flatMap((id) => {
       const person = named.get(id)
@@ -339,10 +377,10 @@ const answeredByAgent = (thread: { messages: { actor?: CommentActor }[] }) =>
  * A version's comments and those of every version before it, by number. The viewer decides which of the older ones
  * still fit the page (see `outdated` in DropViewer.vue). A site's list takes in its screenshots'.
  */
-export async function listComments(row: Commented, who: Identity | null) {
+export async function listComments(row: Commented, reader: Reader) {
   const { threads, attachments } = await threadsFor(row)
   const named = await mentionedIn(threads)
-  return threads.sort((a, b) => a.n - b.n).map((thread) => toComment(thread, who, attachments, named))
+  return threads.sort((a, b) => a.n - b.n).map((thread) => toComment(thread, reader, attachments, named))
 }
 
 /**
@@ -372,7 +410,10 @@ export async function toolbarThreadsOn(dropId: string): Promise<{ page: string; 
     .orderBy(desc(open), threads.subjectId)
 }
 
-/** Starts a thread on `row`'s list, on its version. `attachments` are the ids of images already stored for it. */
+/**
+ * Starts a thread on `row`'s list, on its version. `attachments` are the ids of images already stored for it. With
+ * `requestId`, a resend by the same author returns the thread the first one started (see `earlierThread`).
+ */
 export async function addThread(
   row: Commented,
   input: {
@@ -382,6 +423,7 @@ export async function addThread(
     actor?: CommentActor
     mentions?: string[]
     attachments?: string[]
+    requestId?: string
   },
   list?: CommentList,
 ): Promise<DropThread> {
@@ -396,9 +438,55 @@ export async function addThread(
     ...(input.actor ? { actor: input.actor } : {}),
     ...(input.mentions?.length ? { mentions: input.mentions } : {}),
     ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+    ...(input.requestId ? { requestId: input.requestId } : {}),
   })
   if (error) throw commentsFailure(error)
   return { ...thread, meta, version: row.version }
+}
+
+/** A resend under a retry key that someone else's comment or reply already took. */
+const takenKey = () =>
+  new HTTPError({ status: 409, statusText: "Another comment was sent with this request id. Send a new one." })
+
+/**
+ * Whether a resend comes from whoever sent the first: the same author, or this browser's guest (`guest`, its cookie's
+ * id), whose waiting comments go out as the person who signed in there since.
+ */
+const sameSender = (first: CommentUser, author: CommentUser, guest: string | null) =>
+  first.id === author.id || (guest !== null && first.id === guest)
+
+/**
+ * The thread an earlier `addThread` with this retry key started on `row`'s list, or null. A route looks it up before
+ * storing a resend's images, so they aren't stored twice. Another author's thread is refused, unless this browser's
+ * guest wrote it (`guest`).
+ */
+export async function earlierThread(
+  row: Commented,
+  requestId: string,
+  author: CommentUser,
+  guest: string | null = null,
+) {
+  const [error, found] = await comments.findThread({ subject: (await commentList(row)).subject, requestId })
+  if (error) throw commentsFailure(error)
+  const thread = found ? dropThread(found) : null
+  if (thread && !sameSender(thread.author, author, guest)) throw takenKey()
+  return thread
+}
+
+/**
+ * The reply an earlier `replyTo` with this retry key added to the thread, or null. Another author's is refused, unless
+ * this browser's guest wrote it (`guest`).
+ */
+export async function earlierReply(
+  thread: CommentThread,
+  requestId: string,
+  author: CommentUser,
+  guest: string | null = null,
+) {
+  const [error, found] = await comments.findReply(thread.id, requestId)
+  if (error) throw commentsFailure(error)
+  if (found && !sameSender(found.author, author, guest)) throw takenKey()
+  return found
 }
 
 /** A thread of Drop's by its id (DropComment `id`), or null. */
@@ -452,13 +540,13 @@ export async function setResolved(thread: CommentThread, resolved: boolean, who:
 
 /**
  * Adds a reply to a thread; the callers check who may. Drop takes replies on resolved threads too, and the thread
- * stays resolved.
+ * stays resolved. With `requestId`, a resend by the same author returns the first reply (see `earlierReply`).
  */
 export async function replyTo(
   thread: CommentThread,
   author: CommentUser,
   body: string,
-  extra: { actor?: CommentActor; mentions?: string[]; attachments?: string[] } = {},
+  extra: { actor?: CommentActor; mentions?: string[]; attachments?: string[]; requestId?: string } = {},
 ) {
   const [error, message] = await comments.reply(
     thread.id,
@@ -468,6 +556,7 @@ export async function replyTo(
       ...(extra.actor ? { actor: extra.actor } : {}),
       ...(extra.mentions?.length ? { mentions: extra.mentions } : {}),
       ...(extra.attachments?.length ? { attachments: extra.attachments } : {}),
+      ...(extra.requestId ? { requestId: extra.requestId } : {}),
     },
     { allowResolved: true },
   )
@@ -477,7 +566,7 @@ export async function replyTo(
 
 /** A reply with words only, as an agent sends it. */
 export const addReply = async (thread: CommentThread, who: Identity, body: string) =>
-  toReply(await replyTo(thread, authorOf(who, who.name), body, { actor: actorOf(who) }), who, new Map())
+  toReply(await replyTo(thread, authorOf(who, who.name), body, { actor: actorOf(who) }), who.userId, new Map())
 
 /** Changes the words of a message, by its author. Mentions are the ones the new words keep. */
 export async function editMessage(message: CommentMessage, body: string, mentions: string[] = []) {

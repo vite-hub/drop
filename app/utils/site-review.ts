@@ -24,9 +24,5 @@ export type ReviewToken = Awaited<ReturnType<typeof issueReviewToken>>
 export const openReview = (body: { token: string } | { doc: string }) =>
   $fetch("/api/review/open", { method: "POST", body })
 
-/** A comment drawn on a site inside Drop: `form` holds its `data` and the `screenshot` of the box, taken on `origin`. */
-export const sendSiteComment = (dropId: string, origin: string, form: FormData) =>
-  $fetch(`/api/drops/${dropId}/review`, { method: "POST", query: { origin }, body: form })
-
 /** Sends a report to the instance operator. No sign-in needed. */
 export const sendReport = (body: InferInput<typeof ReportSchema>) => $fetch("/api/reports", { method: "POST", body })

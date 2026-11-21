@@ -35,7 +35,9 @@ const { publicView = false } = defineProps<{ publicView?: boolean }>()
 
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
-const comments = computed(() => state.comments.data.value)
+const publishedComments = computed(() => state.comments.data.value)
+// With the ones that wait in the outbox, each marked by its `delivery` (useDrop).
+const comments = computed(() => state.list.value)
 
 // Site reviews attach screenshots to the same comment threads. Fetch the thumbnails once for list and thread.
 const siteReview =
@@ -65,6 +67,9 @@ const owner = computed(() => drop.value.isOwner)
 const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
+// The pill's "N waiting": what's still on its way after its quiet start, so a send on a working network never shows it.
+const second = useNow({ interval: 1000 })
+const deliveryCount = computed(() => waitingCount(comments.value, second.value.getTime()))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -116,7 +121,7 @@ watch(
 )
 const hasComments = computed(() => drop.value.kind !== "folder")
 const commentsOpen = ref(false)
-const reviewDraft = provideReviewDraft()
+const reviewDraft = provideReviewDraft(() => drop.value.id)
 const siteRef = useTemplateRef<{
   canDraw: boolean
   capturing: boolean
@@ -206,8 +211,7 @@ const annotations = useViewerAnnotations({
     const { images } = reviewDraft
     const before = images.picks.value.find((pick) => pick.file === autoShot)
     if (before) images.remove(before)
-    // A send under way clears the draft when it's done, but not one that changed meanwhile: the picture would stay.
-    autoShot = file && !reviewDraft.sending.value ? file : null
+    autoShot = file
     if (autoShot) images.add([autoShot])
   },
   // Pin style: a click on the page puts away the thread beside a pin, or a composer with nothing typed in it.
@@ -1022,10 +1026,10 @@ const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.v
 const readerId = computed(
   () =>
     me.value?.id ??
-    comments.value.flatMap((comment) => [comment, ...comment.replies]).find((item) => item.mine)?.authorId ??
+    publishedComments.value.flatMap((comment) => [comment, ...comment.replies]).find((item) => item.mine)?.authorId ??
     "",
 )
-const waiting = computed(() => waitingForAnswer(comments.value, { me: readerId.value }))
+const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 // Send is for signed-in people who may comment here, as ViteHub checks again before each send.
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
@@ -1104,42 +1108,37 @@ watch(shownVersion, (version) => {
   }
 })
 
-// Keep drafts and image picks until the server accepts them, including after a retry.
+/** How long a send waits for the picture of its area before it goes without it. */
+const SHOT_WAIT = 1500
+
 async function submit(body: string, files: File[] = [], mentions: string[] = []) {
   const open = popover.value
-  if (open?.type !== "new") return
-  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it.
+  if (open?.type !== "new" || reviewDraft.waiting.value) return
+  const draftScope = reviewDraft.scope.value
+  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it, for a moment.
   const before = reviewDraft.images.picks.value.length
   reviewDraft.waiting.value = true
   try {
-    await annotations.waitForShot()
-  } finally {
-    reviewDraft.waiting.value = false
-  }
-  if (popover.value !== open) return
-  const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-  const finish = reviewDraft.beginSend()
-  if (!finish) return
-  const composer = popoverRef.value
-  try {
+    await Promise.race([annotations.waitForShot(), new Promise((done) => setTimeout(done, SHOT_WAIT))])
+    if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
+    const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
     const sent = await state.addComment(
       { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
       body,
       attached,
       mentions,
     )
-    if (!("value" in sent)) {
-      if (popoverRef.value === composer) composer?.fail(sent.error)
-      return
-    }
-    showSent(sent.value.id)
-    const cleared = finish(true)
-    if (popover.value !== open || popoverRef.value !== composer) return
-    if (!cleared) return composer?.fail()
-    popover.value = null
-    send({ type: "clear-selection" })
+    if (reviewDraft.scope.value !== draftScope) return
+    if ("value" in sent) {
+      reviewDraft.clear()
+      if (popover.value === open) {
+        popover.value = null
+        send({ type: "clear-selection" })
+        return showSent(sent.value.id)
+      }
+    } else if (popover.value === open) await popoverRef.value?.fail(sent.error)
   } finally {
-    finish(false)
+    reviewDraft.waiting.value = false
   }
 }
 
@@ -2214,6 +2213,7 @@ watch(
                 :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
+                :waiting="deliveryCount"
                 :list-open="commentsOpen && !popover"
                 :pins="!lightbox && !shownVersion && (framed || pdf) && pinned.length > 0"
                 :pins-shown="overlays.pins"
@@ -2227,7 +2227,7 @@ watch(
                   <ViewerCommentSend
                     v-if="canSend"
                     v-show="!lightbox && !commentMode"
-                    :comments="comments"
+                    :comments="publishedComments"
                     :drop="drop.id"
                     :send="dropSend"
                   />

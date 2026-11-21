@@ -1,7 +1,7 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentEditSchema } from "#shared/schemas"
-import { editMessage, findMessage, toReply, wroteMessage } from "../../utils/comments"
+import { editMessage, findMessage, toReply, withRetryAfter, wroteMessage } from "../../utils/comments"
 import { findDrop, permissions } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { logDrop } from "../../utils/logs"
@@ -17,12 +17,12 @@ export default defineValidatedHandler({
     const found = await findMessage(await routeId(event))
     const drop = found ? await findDrop(found.thread.meta.dropId, event) : null
     const who = await identify(event)
-    if (!found || !drop || !who || !wroteMessage(found.message, who) || !permissions(drop, who).comment)
+    if (!found || !drop || !who || !wroteMessage(found.message, who.userId) || !permissions(drop, who).comment)
       throw new HTTPError({ status: 404, statusText: "You can't edit this comment." })
-    await requireRateLimit(event, "comment", { key: who.userId, limit: 20, window: "1m" })
+    await withRetryAfter(requireRateLimit(event, "comment", { key: who.userId, limit: 20, window: "1m" }))
     const { body, mentions } = await event.req.json()
     const edited = await editMessage(found.message, body, mentions)
     logDrop(event, drop, { change: "comment-edit" })
-    return toReply(edited, who, new Map())
+    return toReply(edited, who.userId, new Map())
   },
 })

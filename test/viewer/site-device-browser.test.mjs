@@ -52,7 +52,7 @@ const entry = `
   window.usePaletteOpener = () => () => window.paletteOpened++
   window.injectDrop = () => undefined
   window.useTabCapture = () => ({ active: Vue.ref(false), exact: Vue.ref(true) })
-  window.injectReviewDraft = () => ({ body: Vue.ref(""), sending: Vue.ref(false), images: { picks: Vue.ref([]) } })
+  window.injectReviewDraft = () => ({ body: Vue.ref(""), clear() {}, images: { picks: Vue.ref([]) }, scope: Vue.ref("site"), waiting: Vue.ref(false) })
   const app = Vue.createApp({
     setup() {
       const dock = Vue.ref(null)

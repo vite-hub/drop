@@ -456,7 +456,8 @@ export function useViewerFrame(options: {
       send({
         type: "markers",
         // `suggestion`: the doc strikes the quote and shows the new words after it. `body` and `replies`: a text
-        // comment's card in the doc's margin shows its words and how many replies it has.
+        // comment's card in the doc's margin shows its words and how many replies it has. `waiting`: "pending" or
+        // "failed" while the comment is in the outbox.
         markers: options.pinned.value.map(
           ({
             id,
@@ -477,6 +478,7 @@ export function useViewerFrame(options: {
             authorImage,
             body,
             replies,
+            delivery,
           }) => ({
             id,
             n,
@@ -496,6 +498,8 @@ export function useViewerFrame(options: {
             image: authorImage,
             body,
             replies: replies.length,
+            // Not on the server yet (the outbox's): the pin shows a clock where a count goes.
+            ...(delivery ? { waiting: delivery.status } : {}),
           }),
         ),
       })
