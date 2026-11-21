@@ -24,6 +24,7 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+if (!process.env.VITEHUB_HOST && process.env.DROP_HOST) process.env.VITEHUB_HOST = host === "vps" ? "node" : host
 const databaseOnlyHealth = host === "vps" || host === "deno"
 const healthRoute = "/api/health"
 
