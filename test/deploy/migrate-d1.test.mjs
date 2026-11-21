@@ -16,13 +16,17 @@ const settings = {
   CLOUDFLARE_D1_DATABASE_ID: "test-database",
 }
 
-test.each(["fresh database", "existing Wrangler ledger"])("D1 migrations on a %s run only once", async (scenario) => {
+test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])("D1 migrations on a %s run only once", async (scenario) => {
   const previousFetch = globalThis.fetch
   const previousEnv = { ...process.env }
   const database = new DatabaseSync(":memory:")
   const entries = dropMigrations()
   const pinsMigration = "0016_drop_pins.sql"
-  const applied = scenario === "fresh database" ? [] : entries.filter(({ name }) => name !== pinsMigration)
+  const cascadeMigration = "0018_drop_pin_user_cascade.sql"
+  const applied =
+    scenario === "fresh database"
+      ? []
+      : entries.filter(({ name }) => name !== cascadeMigration && (scenario === "ledger with pins" || name !== pinsMigration))
   const expected = entries.filter((entry) => !applied.includes(entry))
   const migrations = []
   try {
@@ -34,10 +38,17 @@ test.each(["fresh database", "existing Wrangler ledger"])("D1 migrations on a %s
       }
       database.exec(`
         INSERT INTO user (id, name, email) VALUES ('owner', 'Owner', 'owner@example.com');
+        INSERT INTO user (id, name, email) VALUES ('reader', 'Reader', 'reader@example.com');
         INSERT INTO drops (id, owner_id, kind, title, filename, actor_kind, actor_name, created_at, updated_at)
         VALUES ('doc', 'owner', 'markdown', 'Existing doc', 'doc.md', 'browser', 'Owner', 1, 1);
       `)
-      assert.throws(() => database.prepare("SELECT at FROM drop_pins"), /no such table/)
+      if (scenario === "ledger with pins") {
+        database.exec(`
+          INSERT INTO drop_pins (user_id, drop_id, at) VALUES ('reader', 'doc', 42), ('former-reader', 'doc', 43);
+        `)
+      } else {
+        assert.throws(() => database.prepare("SELECT at FROM drop_pins"), /no such table/)
+      }
     }
     Object.assign(process.env, settings)
     globalThis.fetch = async (url, options) => {
@@ -65,12 +76,18 @@ test.each(["fresh database", "existing Wrangler ledger"])("D1 migrations on a %s
     )
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
     if (applied.length) {
-      database.exec("INSERT INTO drop_pins (user_id, drop_id, at) VALUES ('owner', 'doc', 42)")
+      if (scenario !== "ledger with pins") {
+        database.exec("INSERT INTO drop_pins (user_id, drop_id, at) VALUES ('reader', 'doc', 42)")
+      }
       const lookup = database.prepare(`
         SELECT drops.title, drops.draft_image, drop_pins.at
         FROM drop_pins JOIN drops ON drops.id = drop_pins.drop_id WHERE drop_pins.user_id = ?
       `)
-      assert.deepEqual({ ...lookup.get("owner") }, { title: "Existing doc", draft_image: 0, at: 42 })
+      assert.deepEqual({ ...lookup.get("reader") }, { title: "Existing doc", draft_image: 0, at: 42 })
+      assert.equal(lookup.get("former-reader"), undefined)
+      database.exec("DELETE FROM user WHERE id = 'reader'")
+      assert.equal(lookup.get("reader"), undefined)
+      assert.ok(database.prepare("SELECT 1 FROM drops WHERE id = 'doc'").get())
     }
     await migrateD1()
     assert.equal(migrations.length, expected.length)

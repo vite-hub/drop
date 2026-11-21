@@ -2,6 +2,7 @@ import type { AgentMetadata } from "../../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../../shared/types.ts"
+import { user } from "./index"
 
 /**
  * A drop is one thing an agent (or a person) published for review: a doc (Markdown, HTML, an image, any
@@ -146,7 +147,9 @@ export const dropVisits = sqliteTable(
 export const dropPins = sqliteTable(
   "drop_pins",
   {
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
     dropId: text("drop_id")
       .notNull()
       .references(() => drops.id, { onDelete: "cascade" }),

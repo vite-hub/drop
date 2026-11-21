@@ -25,6 +25,12 @@ export const useDocWidth = () =>
   useCookie<DocWidth>("drop-doc-width", { default: () => "readable", maxAge: year, sameSite: "lax" })
 
 /**
+ * Zen mode, from the review pill's + or Z, for every drop: a Markdown doc reads without its outline, and the pill folds
+ * to a small handle while nothing needs it (DropViewer).
+ */
+export const useZen = () => useCookie<boolean>("drop-zen", { default: () => false, maxAge: year, sameSite: "lax" })
+
+/**
  * How comments on a Markdown doc's text show: "card", the cards in the margin and the composer floating over its place
  * (89c9927), or "pin", an avatar pin in the gutter with a small bubble beside it. Chosen in the Details panel.
  */

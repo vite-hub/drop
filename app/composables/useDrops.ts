@@ -50,21 +50,26 @@ const LISTS = [keys.drops, keys.tree]
 export const useSharedWithMe = () =>
   useApi("/api/drops", { key: keys.sharedWithMe, query: { shared: "1" }, default: () => [] })
 
-const usePinConfirmations = () => useState<Record<string, boolean>>("pin-confirmations", () => ({}))
+type PinConfirmations = Partial<Record<string, { pinned: boolean }>>
+const usePinConfirmations = () => useState<PinConfirmations>("pin-confirmations", () => ({}))
 
 /** The drops you pinned, yours and others', most recently pinned first (listPinned). */
 export function usePinned() {
   const confirmed = usePinConfirmations()
+  const pending = new WeakMap<object, PinConfirmations>()
   return useApi("/api/drops", {
     key: keys.pinned,
     query: { pinned: "1" },
     default: () => [],
-    transform: (list) => {
-      const ids = new Set(list.map((item) => item.id))
-      for (const [id, pinned] of Object.entries(confirmed.value)) {
-        if (ids.has(id) === pinned) delete confirmed.value[id]
+    onRequest: ({ options }) => {
+      pending.set(options, { ...confirmed.value })
+    },
+    onResponse: ({ options, response }) => {
+      const atStart = pending.get(options)
+      if (!atStart || !response.ok || options.signal?.aborted) return
+      for (const [id, confirmation] of Object.entries(atStart)) {
+        if (confirmed.value[id] === confirmation) delete confirmed.value[id]
       }
-      return list
     },
   })
 }
@@ -75,10 +80,7 @@ export function useDropPin(drop: () => DropSummary) {
   const { data: pins } = useNuxtData<DropSummary[]>(keys.pinned)
   return computed(() => {
     const { id, pinned } = drop()
-    const confirmedPin = confirmed.value[id]
-    return typeof confirmedPin === "boolean"
-      ? confirmedPin
-      : (pinned ?? Boolean(pins.value?.some((item) => item.id === id)))
+    return confirmed.value[id]?.pinned ?? (pinned ?? Boolean(pins.value?.some((item) => item.id === id)))
   })
 }
 
@@ -261,7 +263,7 @@ export function useDropActions() {
     } finally {
       pinWrites.value = pinWrites.value.filter((id) => id !== drop.id)
     }
-    confirmedPins.value[drop.id] = pinned
+    confirmedPins.value[drop.id] = { pinned }
     const currentKey = keys.drop(drop.id)
     for (const key of Object.keys(nuxtApp.payload.data)) {
       if (key === currentKey || key.startsWith(`${currentKey}@`)) editDetail(key, (detail) => ({ ...detail, pinned }))

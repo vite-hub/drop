@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { afterEach, test, vi } from "vite-plus/test"
-import { computed, effectScope, ref, toRef } from "vue"
+import { computed, effectScope, reactive, ref, toRef } from "vue"
 import { keys } from "../../app/utils/keys"
 
 vi.stubGlobal("keys", keys)
@@ -32,28 +32,51 @@ function setup(data, fetch) {
 test("card actions reflect confirmed writes through failed or stale list refreshes", async () => {
   const doc = { id: "doc" }
   const other = { id: "other", pinned: true }
-  const data = { [keys.pinned]: [other] }
+  const data = reactive({ [keys.pinned]: [other] })
   const refresh = setup(data, vi.fn())
   vi.stubGlobal("useApi", (_, options) => options)
-  const { transform } = usePinned()
+  const { onRequest, onResponse } = usePinned()
+  const startRead = (signal) => {
+    const options = { signal }
+    onRequest({ options })
+    return (list, ok = true) => {
+      onResponse({ options, response: { ok } })
+      if (ok && !signal?.aborted) data[keys.pinned] = list
+    }
+  }
   const pin = useDropPin(() => doc)
   const otherPin = useDropPin(() => ({ id: "other" }))
   const { setPinned } = useDropActions()
   refresh.mockImplementation(() => Promise.resolve())
 
   assert.equal(pin.value, false)
+  const stalePinRead = startRead()
   await setPinned(doc, true)
   assert.equal(pin.value, true)
   assert.deepEqual(data[keys.pinned], [other])
   assert.equal(otherPin.value, true)
   const pinned = { ...doc, pinned: true }
-  data[keys.pinned] = transform([pinned, other])
+  stalePinRead([other])
+  startRead()([], false)
+  const canceled = new AbortController()
+  const canceledRead = startRead(canceled.signal)
+  canceled.abort()
+  canceledRead([other])
+  assert.equal(pin.value, true)
+  startRead()([other])
+  assert.equal(pin.value, false)
+  startRead()([pinned, other])
+  assert.equal(pin.value, true)
   const pinnedCard = useDropPin(() => pinned)
+  const staleUnpinRead = startRead()
   await setPinned(doc, false)
-  data[keys.pinned] = transform([pinned, other])
+  staleUnpinRead([pinned, other])
   assert.equal(pin.value, false)
   assert.equal(pinnedCard.value, false)
-  data[keys.pinned] = transform([other])
+  startRead()([pinned, other])
+  assert.equal(pin.value, true)
+  assert.equal(pinnedCard.value, true)
+  startRead()([other])
   assert.equal(otherPin.value, true)
   assert.equal(pin.value, false)
 })

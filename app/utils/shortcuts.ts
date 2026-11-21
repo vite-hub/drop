@@ -31,7 +31,8 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
       { keys: ["l"], label: "Copy the link" },
       { keys: ["m"], label: "Copy as Markdown", where: "A Markdown doc" },
       { keys: ["w"], label: "Switch the text width: readable, wide, or widest", where: "A Markdown doc" },
-      { keys: ["escape"], label: "Close a comment, leave area mode, or go back from a version" },
+      { keys: ["z"], label: "Zen mode: hide the outline and fold the review pill to a handle" },
+      { keys: ["escape"], label: "Close a comment, leave area mode, go back from a version, or leave zen mode" },
     ],
   },
   {
