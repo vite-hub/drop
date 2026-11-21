@@ -6,6 +6,7 @@ import {
   effectScope,
   h,
   nextTick,
+  onMounted,
   onScopeDispose,
   reactive,
   ref,
@@ -23,6 +24,7 @@ for (const [name, value] of Object.entries({
   ref,
   shallowRef,
   watch,
+  onMounted,
   onScopeDispose,
   createInjectionState,
   useFileDialog,
@@ -191,6 +193,14 @@ test("text, mentions and attached images survive plain/area composer replacement
   })
   const mode = ref("plain")
   let draft, composer
+  const author = ref({ id: "ada" })
+  const stored = new Map()
+  vi.stubGlobal("useMe", () => ({ data: author, status: ref("success") }))
+  vi.stubGlobal("localStorage", {
+    getItem: (key) => stored.get(key),
+    setItem: (key, value) => stored.set(key, value),
+    removeItem: (key) => stored.delete(key),
+  })
   const Composer = {
     setup() {
       composer = injectReviewDraft()
@@ -199,7 +209,7 @@ test("text, mentions and attached images survive plain/area composer replacement
   }
   const app = renderer.createApp({
     setup() {
-      draft = provideReviewDraft()
+      draft = provideReviewDraft(() => "shared-drop")
       return () => h(Composer, { key: mode.value })
     },
   })
@@ -229,5 +239,24 @@ test("text, mentions and attached images survive plain/area composer replacement
   assert.deepEqual(composer.people.value, [])
   assert.deepEqual(composer.images.files.value, [])
   await assert.rejects(fetch(preview))
+  draft.body.value = "Ada's own draft"
   app.unmount()
+
+  const reload = renderer.createApp({
+    setup() {
+      draft = provideReviewDraft(() => "shared-drop")
+      return () => h("div")
+    },
+  })
+  reload.mount(node())
+  assert.equal(draft.body.value, "Ada's own draft")
+  author.value = null
+  assert.equal(draft.body.value, "")
+  draft.body.value = "Guest draft"
+  author.value = { id: "bea" }
+  assert.equal(draft.body.value, "")
+  draft.body.value = "Bea's own draft"
+  author.value = { id: "ada" }
+  assert.equal(draft.body.value, "Ada's own draft")
+  reload.unmount()
 })

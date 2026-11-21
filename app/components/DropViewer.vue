@@ -1093,37 +1093,35 @@ watch(shownVersion, (version) => {
 /** How long a send waits for the picture of its area before it goes without it. */
 const SHOT_WAIT = 1500
 
-// The comment goes into the outbox and shows at once; the draft clears so the next one can start. Only a browser that
-// can't keep it brings the words back, with why.
 async function submit(body: string, files: File[] = [], mentions: string[] = []) {
   const open = popover.value
-  if (open?.type !== "new") return
+  if (open?.type !== "new" || reviewDraft.waiting.value) return
+  const draftScope = reviewDraft.scope.value
   // A comment sent the moment its area is drawn still takes the picture the frame is taking of it, for a moment.
   const before = reviewDraft.images.picks.value.length
   reviewDraft.waiting.value = true
   try {
     await Promise.race([annotations.waitForShot(), new Promise((done) => setTimeout(done, SHOT_WAIT))])
+    if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
+    const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
+    const sent = await state.addComment(
+      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
+      body,
+      attached,
+      mentions,
+    )
+    if (reviewDraft.scope.value !== draftScope) return
+    if ("value" in sent) {
+      reviewDraft.clear()
+      if (popover.value === open) {
+        popover.value = null
+        send({ type: "clear-selection" })
+        return showSent(sent.value.id)
+      }
+    } else if (popover.value === open) await popoverRef.value?.fail(sent.error)
   } finally {
     reviewDraft.waiting.value = false
   }
-  if (popover.value !== open) return
-  const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-  reviewDraft.clear()
-  popover.value = null
-  send({ type: "clear-selection" })
-  const sent = await state.addComment(
-    { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
-    body,
-    attached,
-    mentions,
-  )
-  if ("value" in sent) return showSent(sent.value.id)
-  // The words come back in a composer at the same place.
-  popover.value = open
-  await nextTick()
-  if (!reviewDraft.body.value) reviewDraft.body.value = body
-  if (!reviewDraft.images.picks.value.length) reviewDraft.images.add(attached)
-  await popoverRef.value?.fail(sent.error)
 }
 
 /**

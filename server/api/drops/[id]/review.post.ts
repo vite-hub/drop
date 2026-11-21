@@ -45,5 +45,5 @@ export default defineHandler(async (event) => {
   useLogger(event).set({
     review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true },
   })
-  return { n: comment.n }
+  return { n: comment.n, id: comment.id }
 })

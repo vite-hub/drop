@@ -849,13 +849,17 @@ function embedded(id, data, { screenshot, origin = SITE } = {}) {
 test("Drop's embedded review stores a box on a screen capture like the script's, for addresses the site covers", async () => {
   site("previews", { site_url: PATTERN })
   state.who = ada
-  const sent = await embedded("previews", {}, { screenshot: PNG })
+  const data = { requestId: crypto.randomUUID() }
+  const sent = await embedded("previews", data, { screenshot: PNG })
   assert.equal(sent.status, 200)
-  assert.deepEqual(await json(sent), { n: 1 })
+  const receipt = await json(sent)
+  assert.deepEqual(await json(await embedded("previews", data, { screenshot: PNG })), receipt)
   const image = sql.prepare("SELECT * FROM drops WHERE kind = 'image'").get()
   assert.equal(image.parent_id, "previews")
   assert.equal(image.title, "Screenshot of pr12-acme.preview.example.com/pricing")
   const [row] = threads()
+  assert.deepEqual(receipt, { n: 1, id: row.id })
+  assert.equal(threads().length, 1)
   assert.deepEqual(
     [row.metadata.dropId, row.metadata.kind, row.metadata.page, row.author.id, row.author.name, row.metadata.label],
     [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],

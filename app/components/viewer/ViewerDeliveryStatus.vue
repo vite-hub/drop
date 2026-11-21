@@ -6,7 +6,12 @@
 import type { CommentDelivery, CommentMessage } from "vite-hub/comments/client"
 
 // compact: the line alone, for a list row, which opens the thread where the actions are.
-const props = defineProps<{ message: CommentMessage; delivery: CommentDelivery; compact?: boolean }>()
+const props = defineProps<{
+  message: Pick<CommentMessage, "id" | "body" | "mentions" | "createdAt">
+  delivery: CommentDelivery
+  compact?: boolean
+  recovery?: boolean
+}>()
 
 const app = useCommentsOutbox()
 const route = useRoute()
@@ -15,7 +20,13 @@ const route = useRoute()
 const now = ref(Date.now())
 const quiet = props.message.createdAt + WAITING_NOTICE_MS - now.value
 if (quiet > 0) useTimeoutFn(() => (now.value = Date.now()), quiet)
-const line = computed(() => deliveryLine(props.delivery, props.message.createdAt, now.value))
+const line = computed(() =>
+  deliveryLine(props.delivery, props.message.createdAt, props.recovery ? Infinity : now.value),
+)
+const actions = computed(() => {
+  if (props.compact || !line.value) return []
+  return props.recovery ? [...new Set([...line.value.actions, "copy", "discard"] as const)] : line.value.actions
+})
 const asks = computed(() => !props.compact && line.value && line.value.state !== "waiting")
 
 const editing = ref(false)
@@ -33,7 +44,7 @@ async function save() {
   if (await app.edit(props.message.id, body, props.message.mentions)) editing.value = false
   else problem.value = "It's on its way to the server. Try again in a moment."
 }
-const retry = () => app.outbox()?.retry(props.message.id)
+const retry = () => app.retry(props.message.id)
 async function discard() {
   if (!(await app.discard(props.message.id))) problem.value = "It's on its way to the server. Try again in a moment."
 }
@@ -71,7 +82,7 @@ const signIn = computed(() => ({ path: "/signin", query: { redirect: route.fullP
         />
         <span v-if="compact || line.state !== 'sign-in'" class="text-pretty">{{ line.text }}</span>
       </span>
-      <template v-for="action in compact ? [] : line.actions" :key="action">
+      <template v-for="action in actions" :key="action">
         <UButton
           v-if="action === 'sign-in'"
           class="p-0"

@@ -655,7 +655,31 @@ await step("5a. Refused with 404 (drop trashed): the words stay, Copy and Discar
   await shot(page, "5a-after-discard")
 })
 
-await step("5b. Refused with 400: Edit, resend, it lands", async (check) => {
+await step("5b. Recover after leaving a drop that becomes unavailable", async (check) => {
+  const revoked = await publish(owner, "Sharing will be revoked")
+  const words = "Recover this from the app-wide outbox"
+  await open(page, revoked)
+  network = "offline"
+  await pageComment(page, words)
+  await until(async () => (await entriesWith(page, words)).length === 1, WAIT, "the durable entry")
+  await page.goto(new URL("/home", origin))
+  await api(owner, `/api/drops/${revoked.id}`, { trashed: true }, "PATCH")
+  network = "online"
+  await page.goto(revoked.page)
+  await until(() => sent.some((entry) => entry.url.includes(revoked.id) && entry.status === 404), WAIT, "the 404")
+  await page.getByRole("button", { name: /^Unsent comments/ }).click()
+  const recovery = page.getByRole("dialog", { name: "Unsent comments" })
+  await recovery.getByText("This drop no longer takes comments").waitFor()
+  check(await recovery.getByText(words).isVisible(), "the draft is available without the drop viewer")
+  await recovery.getByRole("button", { name: "Copy", exact: true }).click()
+  check((await page.evaluate(() => navigator.clipboard.readText())).includes(words), "recovery can copy the draft")
+  await recovery.getByRole("button", { name: "Discard", exact: true }).click()
+  await recovery.getByText("No unsent comments.").waitFor()
+  check((await entriesWith(page, words)).length === 0, "recovery removes the retained entry")
+  await page.keyboard.press("Escape")
+})
+
+await step("5c. Refused with 400: Edit, resend, it lands", async (check) => {
   const BAD = "Bad: refused once"
   const FIXED = "Fixed: edited after the refusal"
   await open(page, drop)

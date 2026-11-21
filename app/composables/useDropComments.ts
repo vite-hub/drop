@@ -122,7 +122,7 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
   const can: CommentCan = (action, { thread, message }) => {
     const shown = drop()
     if (!shown) return false
-    if (action === "reply") return shown.canComment
+    if (action === "reply") return shown.canComment && (!thread.delivery || thread.delivery.error?.status !== 401)
     if (action === "resolve") return !thread.delivery && (shown.isOwner || mine(thread.author))
     if (!message || message.delivery) return false
     if (action === "edit") return mine(message.author)

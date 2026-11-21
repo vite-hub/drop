@@ -62,7 +62,7 @@ for (const [name, value] of Object.entries({
   errorText: (_error, fallback) => fallback,
   $fetch: async (url, options) => {
     const body = options.body instanceof FormData ? JSON.parse(options.body.get("data")) : options.body
-    fetches.push({ url, body })
+    fetches.push({ url, body, query: options.query })
     return answer(url, body)
   },
 }))
@@ -85,10 +85,12 @@ const scoped = (run) => {
   return { scope, value: scope.run(run) }
 }
 // Each test gets the app's outbox afresh, as a new page load with an empty browser.
-beforeEach(() => {
+const durableStore = () => ({ ...createMemoryOutboxStore(), persisted: true })
+beforeEach(async () => {
   me.value = ada
   returning.value = "1"
-  app = scoped(() => createCommentsOutbox({ store: createMemoryOutboxStore() })).value
+  app = scoped(() => createCommentsOutbox({ store: durableStore() })).value
+  await vi.waitFor(() => app.writable())
 })
 afterEach(() => {
   scopes.splice(0).forEach((scope) => scope.stop())
@@ -146,6 +148,55 @@ const toDrop = (id, body) => ({
 const reply = (id, body) => ({ ...toDrop(id, body), replies: undefined })
 // No answer at all, as offline: the outbox waits and tries again.
 const offline = () => Promise.reject(new TypeError("fetch failed"))
+
+test("memory fallback never accepts comments, site captures or replies", async () => {
+  app = scoped(() => createCommentsOutbox({ store: createMemoryOutboxStore() })).value
+  answer = offline
+  const { state } = open()
+  const image = new File(["image"], "note.png", { type: "image/png" })
+  assert.ok("error" in (await state.addComment(place, "Draft", [image])))
+  assert.equal(await state.addSiteComment("https://example.com", { ...place, page: "/" }, "Draft", [image]), false)
+  assert.ok("error" in (await state.addReply("parent", "Draft", [image])))
+  assert.equal(app.entries.value.length, 0)
+  assert.equal(fetches.length, 0)
+})
+
+test.each([
+  ["markdown", { v: 3 }],
+  ["app", {}],
+])("queued comments on the latest %s send to the right revision", async (kind, expected) => {
+  const { state } = open()
+  state.drop.data.value = { kind, version: 3 }
+  answer = offline
+  assert.ok("value" in (await state.addComment(place, "On version three")))
+  await vi.waitFor(() => assert.equal(fetches.length, 1))
+  state.drop.data.value = { kind, version: 4 }
+  answer = (_url, body) => comment("saved", body.body, body.requestId)
+  await app.retry(app.entries.value[0].id)
+  await vi.waitFor(() => assert.equal(app.entries.value.length, 0))
+  assert.deepEqual(
+    fetches.map(({ query }) => query),
+    [expected, expected],
+  )
+})
+
+test("a reply to a queued site screenshot uses its actual thread ID after replay", async () => {
+  const { state } = open("site")
+  const shot = new Blob(["screenshot"], { type: "image/png" })
+  let tries = 0
+  answer = (url, body) => {
+    if (url.endsWith("/review")) return ++tries === 1 ? offline() : { id: "site-thread", n: 1 }
+    assert.equal(url, "/api/comments/site-thread/replies")
+    return reply("site-reply", body.body)
+  }
+  assert.equal(await state.addSiteComment("https://example.com", { ...place, page: "/" }, "Screenshot", [shot]), true)
+  const parent = state.list.value[0]
+  assert.ok("value" in (await state.addReply(parent.id, "Under screenshot")))
+  await vi.waitFor(() => assert.equal(app.entries.value.length, 0), { timeout: 5_000 })
+  assert.equal(fetches.length, 3)
+  assert.equal(fetches[0].body.requestId, fetches[1].body.requestId)
+  assert.equal(fetches[2].url, "/api/comments/site-thread/replies")
+})
 
 test("a comment sent with no network returns at once, shows waiting, and lands once", { timeout: 10_000 }, async () => {
   let tries = 0
@@ -240,7 +291,10 @@ test(
     await vi.waitFor(() => assert.equal(app.entries.value.length, 0), { timeout: 5_000 })
     assert.equal(fetches.length, 2)
     assert.equal(fetches[1].body.requestId, fetches[0].body.requestId)
-    assert.ok(refreshed.includes("comments:doc"), "the drop's list loads again next time it shows")
+    assert.ok(
+      refreshed.some((key) => key.includes("comments:doc")),
+      "the drop's list loads again next time it shows",
+    )
     assert.equal(wrote.mock.calls.length, 0, "the closed page heard nothing")
   },
 )
@@ -336,8 +390,8 @@ test(
     // /api/me says nobody: Ada's comment stays in view as hers, held, says to sign in, and nothing goes out.
     me.value = null
     const sends = fetches.length
-    await vi.waitFor(() => assert.equal(app.author.value?.name, "Ada"))
-    assert.equal(app.account.value, "ada")
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.account, "ada"))
+    assert.equal(app.account.value, "guest")
     assert.deepEqual(
       state.list.value.map((item) => [item.authorName, item.delivery?.status, item.delivery?.error?.status]),
       [["Ada", "pending", 401]],
@@ -359,26 +413,32 @@ test(
 )
 
 test(
-  "signed out with nothing held, the guests' outbox runs, and a discard of the last held one gets there too",
+  "a guest sends independently of a held account and can discard its uncertain entry",
   {
     timeout: 10_000,
   },
   async () => {
     const signedOut = () => Promise.reject(Object.assign(new Error("Sign in again to send it."), { status: 401 }))
-    answer = signedOut
+    let tries = 0
+    answer = (_url, body) =>
+      !body.as ? comment("guest-comment", body.body, body.requestId) : ++tries === 1 ? offline() : signedOut()
     const { state } = open()
     await state.addComment(place, "The chart is cut off")
     await vi.waitFor(() => assert.equal(app.entries.value[0]?.held, true), { timeout: 5_000 })
     assert.ok(saved.size, "whose they are is kept while they wait")
 
-    const signedIn = app.client()
+    assert.equal(app.entries.value[0].uncertain, true)
     me.value = null
-    await vi.waitFor(() => assert.ok(app.client() && app.client() !== signedIn))
-    assert.equal(app.author.value?.name, "Ada")
-    assert.ok(await app.outbox().dismiss(app.entries.value[0].id))
-    await vi.waitFor(() => assert.equal(app.account.value, "guest"))
+    await vi.waitFor(() => app.writable())
+    await vi.waitFor(() => assert.equal(app.entries.value[0]?.account, "ada"))
+    const held = app.entries.value[0].id
+    assert.equal(app.author("ada")?.name, "Ada")
+    await state.addComment(place, "From the guest composer")
+    await vi.waitFor(() => assert.ok(state.findComment("guest-comment")))
+    assert.equal(fetches.at(-1).body.as, undefined)
+    assert.ok(await app.discard(held))
     assert.equal(saved.size, 0, "and forgotten with the last of them")
-    assert.equal(app.author.value, undefined)
+    assert.equal(app.entries.value.length, 0)
   },
 )
 
@@ -412,7 +472,7 @@ test("a guest's waiting comment goes out as the person who signs in, without ask
 
 test("a comment another tab sent loads in this tab's list", { timeout: 10_000 }, async () => {
   // Two tabs of one browser: one store, and messages between them. This tab is offline, the other one sends.
-  const store = createMemoryOutboxStore()
+  const store = durableStore()
   const listeners = new Set()
   const tab = (online) => {
     const own = new Set()
@@ -440,7 +500,7 @@ test("a comment another tab sent loads in this tab's list", { timeout: 10_000 },
     }
   }
   app = scoped(() => createCommentsOutbox({ store, environment: tab(false) })).value
-  await vi.waitFor(() => assert.ok(app.client()))
+  await vi.waitFor(() => app.writable())
   const { state } = open()
   answer = (_url, body) => comment("c1", body.body, body.requestId)
   await state.addComment(place, "The chart is cut off")

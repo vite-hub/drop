@@ -110,7 +110,7 @@ interface DropTransportHost {
    */
   as?: string
   /** The server took a comment: `comment` when the route answered it, else the drop whose list to load again. */
-  created: (requestId: string, drop: string, comment: DropComment | null) => void | Promise<void>
+  created: (requestId: string, drop: string, comment: DropComment | null, threadId: string) => void | Promise<void>
   replied: (requestId: string, drop: string | undefined, threadId: string, reply: CommentReply) => void
   /** A refusal the plan-limit dialog explains, or another the reader should hear of. */
   refused: (error: unknown) => void
@@ -156,17 +156,16 @@ export function dropTransport(host: DropTransportHost): CommentsTransport {
         form.append("data", JSON.stringify({ ...target.place, body: input.body, requestId, ...as }))
         if (screenshot) form.append("screenshot", screenshot, "screenshot")
         for (const file of images) form.append("image", file, file instanceof File && file.name ? file.name : "image")
-        const { n } = await send(() =>
-          host.fetch<{ n: number }>(`/api/drops/${target.drop}/review`, {
+        const { n, id } = await send(() =>
+          host.fetch<{ n: number; id: string }>(`/api/drops/${target.drop}/review`, {
             method: "POST",
             query: { origin: target.origin },
             body: form,
           }),
         )
-        await host.created(requestId, target.drop, null)
-        // The route answers the number only; the list loads the rest.
+        await host.created(requestId, target.drop, null, id)
         return {
-          id: `review:${requestId}`,
+          id,
           scope: "",
           n,
           subject: input.subject,
@@ -190,7 +189,7 @@ export function dropTransport(host: DropTransportHost): CommentsTransport {
         }),
       )
       const landed = { ...comment, requestId }
-      await host.created(requestId, target.drop, landed)
+      await host.created(requestId, target.drop, landed, landed.id)
       // The subject stays the outbox's, which names the drop whose list the comment and its waiting replies are on.
       return { ...toThread(landed, input.subject), requestId }
     },
@@ -253,7 +252,7 @@ function emptyComment(id: string): DropComment {
   }
 }
 
-const delivery = (entry: CommentsOutboxEntry): CommentDelivery => ({
+export const entryDelivery = (entry: CommentsOutboxEntry): CommentDelivery => ({
   status: entry.status === "failed" ? "failed" : "pending",
   requestId: entry.requestId,
   files: entry.files,
@@ -262,8 +261,7 @@ const delivery = (entry: CommentsOutboxEntry): CommentDelivery => ({
 
 interface OutboxView {
   drop: string
-  account: string
-  author: { name: string; image: string | null }
+  author: (account: string) => { name?: string | null; image?: string | null } | undefined
   /** The comments and replies the server took in this tab, by `requestId`, with the thread each is in. */
   accepted: ReadonlyMap<string, string>
   /** The id the server gives each waiting reply (replyMessageId), by replyKey, once the browser has worked it out. */
@@ -396,12 +394,13 @@ export function withOutbox(server: DropComment[], entries: readonly CommentsOutb
 }
 
 function pendingReply(entry: CommentsOutboxEntry, view: OutboxView): CommentReply {
+  const author = view.author(entry.account)
   return {
     id: entry.id,
     body: entry.input.body,
-    authorId: view.account,
-    authorName: view.author.name,
-    authorImage: view.author.image,
+    authorId: entry.account,
+    authorName: author?.name ?? "Guest",
+    authorImage: author?.image ?? null,
     agent: null,
     mentions: entry.input.mentions ?? [],
     createdAt: entry.createdAt,
@@ -409,22 +408,23 @@ function pendingReply(entry: CommentsOutboxEntry, view: OutboxView): CommentRepl
     mine: true,
     attachments: localAttachments(entry, view),
     requestId: entry.requestId,
-    delivery: delivery(entry),
+    delivery: entryDelivery(entry),
   }
 }
 
 function pendingComment(entry: CommentsOutboxEntry, target: Target, view: OutboxView): DropComment {
   const base = { ...emptyComment(entry.id), version: target.version, createdAt: entry.createdAt }
+  const author = view.author(entry.account)
   const words = {
     body: entry.input.body,
-    authorId: view.account,
-    authorName: view.author.name,
-    authorImage: view.author.image,
+    authorId: entry.account,
+    authorName: author?.name ?? "Guest",
+    authorImage: author?.image ?? null,
     mentions: entry.input.mentions ?? [],
     mine: true,
     attachments: localAttachments(entry, view, target.route === "review"),
     requestId: entry.requestId,
-    delivery: delivery(entry),
+    delivery: entryDelivery(entry),
   }
   if (target.route === "review") {
     const { page, ox, oy, ow, oh } = target.place

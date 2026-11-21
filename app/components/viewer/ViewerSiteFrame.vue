@@ -65,7 +65,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const { body: note, images, clear } = injectReviewDraft()!
+const { body: note, images, clear, scope, waiting } = injectReviewDraft()!
 
 // In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
@@ -117,6 +117,7 @@ async function up() {
   if (crop.width < 1 || crop.height < 1) return (box.value = null)
   // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   capturing.value = true
+  const owner = scope.value
   box.value = null
   try {
     if (!capture.supported()) {
@@ -136,6 +137,7 @@ async function up() {
       width: visible.right - visible.left,
       height: visible.bottom - visible.top,
     })
+    if (scope.value !== owner) return
     const url = new URL(open.value)
     pending.value = {
       blob,
@@ -167,29 +169,34 @@ const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
 async function send() {
   const shot = pending.value
-  if (!shot || !note.value.trim() || !state) return
+  if (!shot || !note.value.trim() || !state || waiting.value) return
   const { box: b, size } = shot
   const ox = thousandths(b.left, size.width),
     oy = thousandths(b.top, size.height)
   const body = note.value.trim()
   const attached = [shot.blob, ...files.value]
-  // The draft and the screenshot clear at once, so the next box can be drawn while this one goes out.
-  clear()
-  discard()
-  const kept = await state.addSiteComment(
-    shot.origin,
-    {
-      page: shot.page,
-      ox,
-      oy,
-      ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
-      oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
-      viewport: size,
-    },
-    body,
-    attached,
-  )
-  if (!kept && !note.value) note.value = body
+  waiting.value = true
+  try {
+    const kept = await state.addSiteComment(
+      shot.origin,
+      {
+        page: shot.page,
+        ox,
+        oy,
+        ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
+        oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
+        viewport: size,
+      },
+      body,
+      attached,
+    )
+    if (kept && pending.value === shot) {
+      clear()
+      discard()
+    }
+  } finally {
+    waiting.value = false
+  }
 }
 
 function cancelDrawing() {
@@ -200,6 +207,7 @@ watch(drawing, (active) => {
   if (!active) cancelDrawing()
 })
 onBeforeUnmount(discard)
+watch(scope, discard, { flush: "sync" })
 defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
 </script>
 
@@ -314,6 +322,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             aria-label="Comment"
             autofocus
             class="w-full"
+            :disabled="waiting"
             placeholder="What should change here?"
             :rows="3"
             :ui="{ base: 'field-sizing-content min-h-[calc(3lh+--spacing(3))] max-h-[calc(8lh+--spacing(3))]' }"
@@ -329,6 +338,7 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 aria-label="Add images"
                 class="mr-auto"
                 color="neutral"
+                :disabled="waiting"
                 icon="i-mingcute-pic-line"
                 variant="ghost"
                 @click="pickImages"
@@ -338,11 +348,12 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             <UButton
               class="hidden in-[#drop-comments]:inline-flex"
               color="neutral"
+              :disabled="waiting"
               label="Remove area"
               variant="ghost"
               @click="discard"
             />
-            <UButton color="neutral" :disabled="!note.trim()" label="Send" type="submit" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="waiting" type="submit" />
           </div>
         </form>
       </Teleport>

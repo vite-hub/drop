@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
-import { insertDrop, migrate, objects, reset, sql, state, threads, who } from "../cost/harness.mjs"
+import { insertDrop, insertVersion, migrate, objects, reset, sql, state, threads, who } from "../cost/harness.mjs"
 const { signReviewToken } = await import("../../server/utils/review.ts")
 const { default: dropCommentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: dropComments } = await import("../../server/api/drops/[id]/comments.get.ts")
@@ -54,6 +54,17 @@ const replyIn = (thread, data, headers = {}) =>
 const images = () => sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'doc' AND kind = 'image'").get().n
 /** The browser's guest cookie from what a request set, as the browser sends it back. */
 const cookieOf = (event) => event.context.dropSessionCookies?.[0]?.split(";")[0]
+
+test("a retry pinned to an older displayed revision stays there after publish", async () => {
+  insertDrop("doc", { version: 4 })
+  insertVersion("doc", 3)
+  state.who = who
+  const send = () =>
+    dropCommentsPost(request("/api/drops/doc/comments?v=3", { method: "POST", body: form(page({ requestId: KEY })) }))
+  const first = await send()
+  assert.equal(first.version, 3)
+  assert.equal((await send()).id, first.id)
+})
 
 test("a comment with an image sent twice is one thread and one stored image", async () => {
   insertDrop("doc")

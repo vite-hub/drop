@@ -24,17 +24,16 @@ interface OutboxPage {
 type Client = CommentsClient & { readonly outbox: CommentsOutbox }
 
 export interface AppCommentsOutbox {
-  /** Whose entries the outbox holds: the signed-in person's, the last one's while theirs wait, or GUEST_ACCOUNT. */
+  /** Whose new writes the active queue accepts. */
   account: Readonly<Ref<string>>
-  /** Who the waiting comments show as: the account's person, or none for a guest. */
-  author: Readonly<Ref<CommentUser | undefined>>
-  /** Every saved comment and reply of the account that hasn't gone out, waiting or refused. */
+  author: (account: string) => CommentUser | undefined
+  /** Saved entries of the active queue and any held queue visible while signed out. */
   entries: Readonly<Ref<readonly CommentsOutboxEntry[]>>
   /** The comments and replies the server took in this tab, by `requestId`, with the thread each is in. */
   accepted: ReadonlyMap<string, string>
   /** The client that saves new comments and replies, once the browser started it. */
-  client: () => Client | undefined
-  outbox: () => CommentsOutbox | undefined
+  writable: () => Promise<Client>
+  retry: (id: string) => Promise<void>
   /** Takes a waiting or refused comment or reply out, with the replies that wait on it. `false` while it's going out. */
   discard: (id: string) => Promise<boolean>
   /** Changes a waiting or refused one's words and sends it again. `false` while it's going out. */
@@ -105,30 +104,37 @@ async function adoptGuests(store: CommentsOutboxStore, account: string) {
 export function createCommentsOutbox(
   options: { store?: CommentsOutboxStore; environment?: CommentsOutboxEnvironment } = {},
 ): AppCommentsOutbox {
-  const client = shallowRef<Client>()
+  const active = shallowRef<Client>()
+  const held = shallowRef<Client>()
   const holder = shallowRef<Holder>()
-  const entries = shallowRef<readonly CommentsOutboxEntry[]>([])
+  const heldHolder = shallowRef<Holder>()
+  const activeEntries = shallowRef<readonly CommentsOutboxEntry[]>([])
+  const heldEntries = shallowRef<readonly CommentsOutboxEntry[]>([])
+  const entries = computed(() => [...activeEntries.value, ...heldEntries.value])
+  const queueFor = (id: string) =>
+    activeEntries.value.some((entry) => entry.id === id) ? active.value?.outbox : held.value?.outbox
   const pages = new Set<OutboxPage>()
   const accepted = new Map<string, string>()
-  // What this tab sent, including site reviews, whose route answers no comment.
+  // What this tab sent, including site reviews.
   const sentHere = new Set<string>()
   const outbox: AppCommentsOutbox = {
     account: computed(() => holder.value?.account ?? GUEST_ACCOUNT),
-    author: computed(() => holder.value?.user),
+    author: (account) => [holder.value, heldHolder.value].find((who) => who?.account === account)?.user,
     entries,
     accepted,
-    client: () => client.value,
-    outbox: () => client.value?.outbox,
+    writable: async () => {
+      throw new Error("Comments can't be written before the page has loaded.")
+    },
+    retry: async (id) => {
+      if (activeEntries.value.some((entry) => entry.id === id)) await active.value?.outbox.retry(id)
+    },
     discard: async () => false,
     edit: async () => false,
     attach(page) {
       pages.add(page)
       onScopeDispose(() => pages.delete(page))
     },
-    clear: async () => {
-      await client.value?.outbox.clear()
-      if (import.meta.client) forgetAuthor()
-    },
+    clear: async () => {},
   }
   // The outbox lives in the browser: the server renders the comments it has.
   if (import.meta.server) return outbox
@@ -139,17 +145,36 @@ export function createCommentsOutbox(
   const store = options.store ?? createIndexedDBOutboxStore()
   const pageOf = (drop: string | undefined) => [...pages].find((page) => page.drop() === drop)
 
-  // ViteHub's outbox won't dismiss or edit an entry whose earlier try got no answer, since the server may hold it. Once
-  // the server refuses it, that leaves the reader nothing but sending it again, so a refused one changes in the store
-  // instead. It keeps its retry key: should the server hold the first try after all, the resend answers that comment.
-  const refused = async (id: string, change: (entry: CommentsOutboxEntry) => CommentsOutboxEntry | undefined) => {
-    const lib = client.value?.outbox
-    if (!lib) return false
-    const changed = await store.update(outbox.account.value, (drafts) => {
+  outbox.writable = async () => {
+    const client = active.value
+    const who = holder.value
+    if (client && who) {
+      await store.list(who.account)
+      if (client === active.value && who.account === (me.value?.id ?? GUEST_ACCOUNT)) {
+        if (!store.persisted)
+          throw new Error("Allow browser storage before sending comments. Your draft is still here.")
+        return client
+      }
+    }
+    throw new Error("Comments aren't ready yet. Try again in a moment.")
+  }
+  outbox.clear = async () => {
+    const account = holder.value?.account
+    await active.value?.outbox.clear()
+    if (readAuthor()?.id === account) forgetAuthor()
+  }
+
+  // ViteHub won't change uncertain entries. Local recovery can remove them without deleting a server copy, or edit
+  // a refused entry without changing its retry key. Check in the transaction that no tab is currently sending it.
+  const revise = async (id: string, change?: (entry: CommentsOutboxEntry) => CommentsOutboxEntry) => {
+    const saved = entries.value.find((entry) => entry.id === id)
+    const lib = queueFor(id)
+    if (!saved || !lib || (change && saved.account === heldHolder.value?.account)) return false
+    if (!change && (await lib.dismiss(id))) return true
+    const changed = await store.update(saved.account, (drafts) => {
       const entry = drafts.get(id)
-      if (entry?.status !== "failed") return false
-      const next = change(entry)
-      if (next) drafts.set(id, next)
+      if (!entry || entry.status === "sending" || (change && entry.status !== "failed")) return false
+      if (change) drafts.set(id, change(entry))
       else {
         for (const reply of drafts.values())
           if (reply.kind === "reply" && reply.input.threadId === id) drafts.delete(reply.id)
@@ -161,10 +186,10 @@ export function createCommentsOutbox(
     if (changed) await lib.retry(id)
     return changed
   }
-  outbox.discard = async (id) => (await client.value?.outbox.dismiss(id)) || refused(id, () => undefined)
+  outbox.discard = (id) => revise(id)
   outbox.edit = async (id, body, mentions) =>
-    (await client.value?.outbox.edit(id, body, mentions)) ||
-    refused(id, (entry) => {
+    (activeEntries.value.some((entry) => entry.id === id) && (await active.value?.outbox.edit(id, body, mentions))) ||
+    revise(id, (entry) => {
       const words = { body, ...(mentions ? { mentions } : {}) }
       // Each kind apart, so the entry keeps its own input type.
       return entry.kind === "create"
@@ -177,7 +202,7 @@ export function createCommentsOutbox(
   watch(
     status,
     (value) => {
-      if (value === "success" || value === "error") known.value = true
+      if (value === "success") known.value = true
     },
     { immediate: true },
   )
@@ -188,108 +213,109 @@ export function createCommentsOutbox(
       if (!ready) return
       const turn = ++resolving
       const person = me.value
-      let next: Holder
+      heldHolder.value = undefined
+      holder.value = undefined
       if (id && person) {
-        // The guests' client stops before their entries move, so it can't send one on the way.
-        if (holder.value?.account === GUEST_ACCOUNT) holder.value = undefined
         await adoptGuests(store, id).catch((error: unknown) => reportClientError("comments-adopt", error))
-        next = {
+        if (turn !== resolving) return
+        holder.value = {
           account: id,
           user: { id, name: person.name, ...(person.image ? { image: person.image } : {}) },
           held: false,
         }
       } else {
         const last = readAuthor()
-        const waiting = last ? await store.list(last.id).catch(() => []) : []
-        if (last && waiting.length) next = { account: last.id, user: last, held: true }
-        else {
-          if (last) forgetAuthor()
-          next = { account: GUEST_ACCOUNT, held: false }
-        }
+        holder.value = { account: GUEST_ACCOUNT, held: false }
+        if (last) heldHolder.value = { account: last.id, user: last, held: true }
       }
-      if (turn === resolving) holder.value = next
     },
-    { immediate: true },
+    { immediate: true, flush: "sync" },
   )
 
-  /** A held account with nothing left: whose they were is forgotten, and the guests' outbox takes over. */
-  async function releaseIfEmpty(who: Holder) {
-    const left = await store.list(who.account).catch(() => [])
-    if (left.length || holder.value !== who) return
-    forgetAuthor()
-    holder.value = { account: GUEST_ACCOUNT, held: false }
+  function connect(
+    owner: Ref<Holder | undefined>,
+    client: Ref<Client | undefined>,
+    visible: Ref<readonly CommentsOutboxEntry[]>,
+  ) {
+    watch(
+      owner,
+      (who, _, onCleanup) => {
+        if (!who) return
+        const transport = dropTransport({
+          fetch: $fetch,
+          held: who.held,
+          ...(who.account === GUEST_ACCOUNT ? {} : { as: who.account }),
+          async created(requestId, drop, comment, threadId) {
+            sentHere.add(requestId)
+            accepted.set(requestId, threadId)
+            const page = pageOf(drop)
+            if (page) await page.created(requestId, comment)
+            else await refreshNuxtData([keys.comments(drop), keys.review(drop)])
+          },
+          replied(requestId, drop, threadId, reply) {
+            sentHere.add(requestId)
+            accepted.set(requestId, threadId)
+            const page = pageOf(drop)
+            if (page) page.replied(requestId, threadId, reply)
+            else if (drop) void refreshNuxtData(keys.comments(drop))
+          },
+          refused(error) {
+            // Only the plan-limit dialog speaks now; the comment itself says it waits or was refused.
+            if (quotaFailureOf(error)) notify.problem(error)
+            // The session isn't the person who wrote it: learn who's signed in now. The entry waits until they sign in again.
+            if (statusOf(error) === 401) void refreshNuxtData(keys.me)
+          },
+        })
+        const next = createCommentsClient({
+          transport,
+          ...(who.user ? { user: who.user } : {}),
+          refreshOnFocus: false,
+          outbox: { account: who.account, store, ...(options.environment ? { environment: options.environment } : {}) },
+        })
+        client.value = next
+        visible.value = next.outbox.entries
+        let before = next.outbox.entries
+        const stopChange = next.onChange(() => {
+          const now = next.outbox.entries
+          visible.value = who.held
+            ? now.map((entry) => ({
+                ...entry,
+                status: "pending",
+                held: true,
+                error: { status: 401, why: "Sign in to send" },
+              }))
+            : now
+          // One that left without this tab sending it went out from another tab: the drop's list loads it.
+          const left = before.filter(
+            (entry) => !sentHere.has(entry.requestId) && !now.some((item) => item.id === entry.id),
+          )
+          const emptied = before.length > 0 && !now.length
+          before = now
+          for (const drop of new Set(left.map(dropOf))) {
+            if (!drop) continue
+            const page = pageOf(drop)
+            void (page ? page.refresh() : refreshNuxtData(keys.comments(drop)))
+          }
+          // Whose they are outlives a sign-out while any wait, and goes with the last of them.
+          if (now.length && who.user && !who.held) writeAuthor(who.user)
+          else if (emptied && readAuthor()?.id === who.account) forgetAuthor()
+        })
+        const stop = next.start()
+        // What a 401 held for this person goes out now that they're signed in again. Signed out, it stays held, unless
+        // the last of it went out or was discarded while this outbox started.
+        if (!who.held) void next.outbox.retry()
+        onCleanup(() => {
+          stopChange()
+          stop()
+          client.value = undefined
+          visible.value = []
+        })
+      },
+      { immediate: true, flush: "sync" },
+    )
   }
-
-  watch(
-    holder,
-    (who, _, onCleanup) => {
-      if (!who) return
-      const transport = dropTransport({
-        fetch: $fetch,
-        held: who.held,
-        ...(who.account === GUEST_ACCOUNT ? {} : { as: who.account }),
-        async created(requestId, drop, comment) {
-          sentHere.add(requestId)
-          if (comment) accepted.set(requestId, comment.id)
-          const page = pageOf(drop)
-          if (page) await page.created(requestId, comment)
-          else await refreshNuxtData(keys.comments(drop))
-        },
-        replied(requestId, drop, threadId, reply) {
-          sentHere.add(requestId)
-          accepted.set(requestId, threadId)
-          const page = pageOf(drop)
-          if (page) page.replied(requestId, threadId, reply)
-          else if (drop) void refreshNuxtData(keys.comments(drop))
-        },
-        refused(error) {
-          // Only the plan-limit dialog speaks now; the comment itself says it waits or was refused.
-          if (quotaFailureOf(error)) notify.problem(error)
-          // The session isn't the person who wrote it: learn who's signed in now. The entry waits until they sign in again.
-          if (statusOf(error) === 401) void refreshNuxtData(keys.me)
-        },
-      })
-      const next = createCommentsClient({
-        transport,
-        ...(who.user ? { user: who.user } : {}),
-        refreshOnFocus: false,
-        outbox: { account: who.account, store, ...(options.environment ? { environment: options.environment } : {}) },
-      })
-      client.value = next
-      entries.value = next.outbox.entries
-      let before = next.outbox.entries
-      const stopChange = next.onChange(() => {
-        const now = next.outbox.entries
-        entries.value = now
-        // One that left without this tab sending it went out from another tab: the drop's list loads it.
-        const left = before.filter(
-          (entry) => !sentHere.has(entry.requestId) && !now.some((item) => item.id === entry.id),
-        )
-        const emptied = before.length > 0 && !now.length
-        before = now
-        for (const drop of new Set(left.map(dropOf))) {
-          if (!drop) continue
-          const page = pageOf(drop)
-          void (page ? page.refresh() : refreshNuxtData(keys.comments(drop)))
-        }
-        // Whose they are outlives a sign-out while any wait, and goes with the last of them.
-        if (now.length && who.user && !who.held) writeAuthor(who.user)
-        else if (emptied && who.account !== GUEST_ACCOUNT) forgetAuthor()
-        if (emptied && who.held) holder.value = { account: GUEST_ACCOUNT, held: false }
-      })
-      const stop = next.start()
-      // What a 401 held for this person goes out now that they're signed in again. Signed out, it stays held, unless
-      // the last of it went out or was discarded while this outbox started.
-      if (!who.held) void next.outbox.retry()
-      else void releaseIfEmpty(who)
-      onCleanup(() => {
-        stopChange()
-        stop()
-        if (client.value === next) client.value = undefined
-      })
-    },
-    { immediate: true },
-  )
+  connect(holder, active, activeEntries)
+  connect(heldHolder, held, heldEntries)
 
   // Closing the tab asks first while anything waits or was refused, on any page of the app.
   const guard = (event: Event) => {

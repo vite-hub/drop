@@ -47,17 +47,9 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     // Another tab sent it, and told nobody here: the list has it now. That tab announced it.
     refresh: () => Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))]),
   })
-  const outbox = () => {
-    const client = app.client()
-    if (!client) throw new Error("Comments can't be written before the page has loaded.")
-    return client
-  }
-
   const view = () => ({
     drop: toValue(id),
-    account: app.account.value,
-    // The outbox's person, also while signed out with their comments held.
-    author: { name: app.author.value?.name ?? "Guest", image: app.author.value?.image ?? null },
+    author: app.author,
     accepted: app.accepted,
   })
   // The id the server gives each waiting reply, so a list that already holds its copy (loaded before the reply's own
@@ -105,9 +97,15 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   ): Promise<Sent<DropComment>> {
     const requestId = randomId()
     try {
+      const displayed = drop.data.value
       const at = toValue(version)
-      const thread = await outbox().create({
-        subject: subject(),
+      const revision = at ?? displayed?.version ?? 0
+      const pinned = at ?? (displayed?.kind === "app" ? undefined : displayed?.version)
+      const target = toValue(id)
+      const inputSubject = subject()
+      const client = await app.writable()
+      const thread = await client.create({
+        subject: inputSubject,
         anchor: { kind: "page" },
         body,
         mentions,
@@ -115,9 +113,9 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
         requestId,
         metadata: targetMetadata({
           route: "comment",
-          drop: toValue(id),
-          ...(at ? { v: at } : {}),
-          version: at ?? drop.data.value?.version ?? 0,
+          drop: target,
+          ...(pinned ? { v: pinned } : {}),
+          version: revision,
           place: input,
         }),
       })
@@ -135,16 +133,19 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
    */
   async function addSiteComment(origin: string, place: SiteCommentPlace, body: string, files: Blob[]) {
     try {
-      await outbox().create({
-        subject: subject(),
+      const inputSubject = subject()
+      const revision = drop.data.value?.version ?? 0
+      const client = await app.writable()
+      await client.create({
+        subject: inputSubject,
         anchor: { kind: "page" },
         body,
         files,
         requestId: randomId(),
         metadata: targetMetadata({
           route: "review",
-          drop: toValue(id),
-          version: drop.data.value?.version ?? 0,
+          drop: inputSubject.id,
+          version: revision,
           origin,
           place,
         }),
@@ -214,7 +215,9 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   ): Promise<Sent<CommentReply>> {
     const requestId = randomId()
     try {
-      await outbox().reply({ threadId: commentId, body, mentions, files, requestId, subject: subject() })
+      const inputSubject = subject()
+      const client = await app.writable()
+      await client.reply({ threadId: commentId, body, mentions, files, requestId, subject: inputSubject })
       const reply = list.value.flatMap((comment) => comment.replies).find((item) => item.requestId === requestId)
       if (!reply) throw new Error("The reply didn't stay in this browser. Try again.")
       return { value: reply }
@@ -320,8 +323,6 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     list,
     /** The saved comments and replies that haven't gone out, of every drop, for the dock. */
     outboxEntries: app.entries,
-    /** The outbox's actions (retry, dismiss, edit, clear), once the browser started it. */
-    outbox: app.outbox,
     /** Runs after each comment write of this reader's, for whoever else should hear of it. */
     onWrote: wrote.on,
     findComment,

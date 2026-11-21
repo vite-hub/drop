@@ -1,18 +1,17 @@
 import type { CommentUser } from "vite-hub/comments/client"
 
 /** Where a drop's unsent words wait in this browser, so a crash or a reload keeps them. */
-const draftKey = (drop: string) => `drop-review-draft:${drop}`
-function readDraft(drop: string) {
+function readDraft(key: string) {
   try {
-    return localStorage.getItem(draftKey(drop)) ?? ""
+    return localStorage.getItem(key) ?? ""
   } catch {
     return ""
   }
 }
-function saveDraft(drop: string, text: string) {
+function saveDraft(key: string, text: string) {
   try {
-    if (text) localStorage.setItem(draftKey(drop), text)
-    else localStorage.removeItem(draftKey(drop))
+    if (text) localStorage.setItem(key, text)
+    else localStorage.removeItem(key)
   } catch {
     // Storage is full or blocked: the words still live in the page.
   }
@@ -28,10 +27,14 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState((dro
   const images = useImagePicks()
   const mentions = ref<string[]>([])
   const people = ref<CommentUser[]>([])
+  const session = drop ? useMe() : undefined
+  const scope = computed(() => JSON.stringify([session?.data.value?.id ?? null, drop?.()]))
   async function rememberPeople(found: CommentUser[]) {
+    const owner = scope.value
     // Mention lookup starts in input capture. Wait for the target input handler to save the native text
     // before publishing reactive people (a microtask can still run between those event handlers).
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    if (scope.value !== owner) return []
     people.value = [...new Map([...people.value, ...found].map((person) => [person.id, person])).values()]
     return found
   }
@@ -45,17 +48,34 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState((dro
     },
     { flush: "sync" },
   )
-  if (drop) {
+  if (session) {
     // Only in the browser, after hydration renders the same empty box the server did.
     onMounted(() => {
+      let key: string | undefined
+      let ready = false
       watch(
-        drop,
-        (id) => {
-          if (!body.value) body.value = readDraft(id)
+        [scope, session.status],
+        ([owner, state]) => {
+          ready ||= state === "success"
+          if (!ready) return
+          const next = `drop-review-draft:v2:${owner}`
+          if (key === next) return
+          key = undefined
+          images.clear()
+          mentions.value = []
+          people.value = []
+          body.value = readDraft(next)
+          key = next
         },
-        { immediate: true },
+        { immediate: true, flush: "sync" },
       )
-      watch(body, (text) => saveDraft(drop(), text))
+      watch(
+        body,
+        (text) => {
+          if (key) saveDraft(key, text)
+        },
+        { flush: "sync" },
+      )
     })
   }
   // Waiting for the picture of the area being commented on before it sends (DropViewer's submit).
@@ -67,5 +87,5 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState((dro
     images.clear()
   }
 
-  return { body, images, mentions, people, rememberPeople, waiting, clear }
+  return { body, images, mentions, people, rememberPeople, waiting, clear, scope }
 })
