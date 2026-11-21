@@ -1024,8 +1024,8 @@ const readerId = computed(
     "",
 )
 const waiting = computed(() => waitingForAnswer(comments.value, { me: readerId.value }))
-const sendOn = useRuntimeConfig().public.send
-const canSend = computed(() => sendOn && Boolean(me.value))
+// Send is for signed-in people who may comment here, as ViteHub checks again before each send.
+const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
 const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
 // A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
@@ -2243,7 +2243,6 @@ watch(
                     v-show="!lightbox && !commentMode"
                     :comments="comments"
                     :drop="drop.id"
-                    :me="readerId"
                     :send="dropSend"
                   />
                   <UTooltip

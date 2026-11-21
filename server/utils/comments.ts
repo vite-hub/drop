@@ -18,6 +18,7 @@ import comments, { peopleByIds } from "../comments"
 import { commentCleanup, drops } from "../databases/default/index"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
+import { restoreReopenedHandoffs } from "./handoffs"
 import type { Identity } from "./identity"
 import { background } from "./logs"
 
@@ -443,8 +444,11 @@ export async function resolveComments(row: Commented, numbers: number[], who: Id
 }
 
 /** Resolves or reopens a thread. */
-export const setResolved = (thread: CommentThread, resolved: boolean, who: Identity | null) =>
-  done(resolved ? comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest") }) : comments.reopen(thread.id))
+export async function setResolved(thread: CommentThread, resolved: boolean, who: Identity | null) {
+  if (resolved) return done(comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest") }))
+  await done(comments.reopen(thread.id))
+  await restoreReopenedHandoffs(thread)
+}
 
 /**
  * Adds a reply to a thread; the callers check who may. Drop takes replies on resolved threads too, and the thread

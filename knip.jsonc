@@ -30,6 +30,8 @@
         "test/quotas/*-runtime.mjs",
         // Launched by ssr-fetch.test.mjs in a Node subprocess.
         "test/auth/ssr-fetch-runtime.mjs",
+        // Bundled into the page by comment-send-browser.test.mjs.
+        "test/viewer/stub-send.ts",
         "skills/**/*.js",
         // `pnpm doctor` loads it with --config.
         "doctor.config.ts",
