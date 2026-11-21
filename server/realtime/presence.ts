@@ -18,12 +18,5 @@ export default defineRealtime({
     // SAFETY: on Nitro, ViteHub's host event is the request's H3Event, which the presence checks read.
     return presenceAllows(event as H3Event, request, documentId, mode)
   },
-  document: {
-    kind: "drop-presence",
-    load: async () => ({ body: "", digest: null }),
-    save() {
-      throw new Error("Presence rooms hold no document.")
-    },
-  },
-  persistence: false,
+  document: false,
 })
