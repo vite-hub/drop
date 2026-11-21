@@ -45,6 +45,14 @@
   margin-bottom: 0;
 }
 
+/* Remove with the typeset follow-up from onmax/comark-ui#478. Auto-size both axes so zoom uses a proportional box. */
+.typeset
+  :where(img:not([data-zoom], [data-zoom] *, .not-typeset, .not-typeset *, [data-not-typeset], [data-not-typeset] *)) {
+  width: auto;
+  height: auto;
+  max-height: min(70svh, 40rem);
+}
+
 .typeset img:not(a img):focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 3px;

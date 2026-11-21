@@ -45,6 +45,7 @@ const preset = comarkUi({
     maxSource: 200_000,
   },
   time: false,
+  motion: false,
   typeset: false,
   zoom: { images: false },
 })
