@@ -209,6 +209,8 @@ const pins = computed(() => {
   })
 })
 
+const numberOf = (comment: DropComment) => (comment.delivery ? waitingLabel(comment.delivery) : `#${comment.n}`)
+
 defineExpose({ pageAt })
 </script>
 
@@ -219,16 +221,23 @@ defineExpose({ pageAt })
       <div ref="viewerElement" class="pdfViewer" />
       <template v-for="{ comment, pin, area } in pins" :key="comment.id">
         <div v-if="area" class="pdf-area" :class="{ done: comment.resolved }" :style="area" />
-        <UTooltip :text="`#${comment.n} ${comment.body || 'image'}`">
+        <!-- A comment still in the outbox has no number yet: a clock takes its place. -->
+        <UTooltip :text="`${numberOf(comment)} ${comment.body || 'image'}`">
           <button
             type="button"
             class="pdf-pin"
             :class="{ done: comment.resolved }"
+            :data-delivery="comment.delivery?.status"
             :style="pin"
-            :aria-label="`Comment #${comment.n} on page ${comment.pdfPage}`"
+            :aria-label="
+              comment.delivery
+                ? `Comment on page ${comment.pdfPage}, ${waitingLabel(comment.delivery).toLowerCase()}`
+                : `Comment #${comment.n} on page ${comment.pdfPage}`
+            "
             @click="emit('open', comment)"
           >
-            {{ comment.n }}
+            <UIcon v-if="comment.delivery" name="i-mingcute-time-line" class="size-3 align-[-2px]" />
+            <template v-else>{{ comment.n }}</template>
           </button>
         </UTooltip>
       </template>
@@ -333,6 +342,10 @@ defineExpose({ pageAt })
   cursor: pointer;
   transition: scale 150ms cubic-bezier(0.23, 1, 0.32, 1);
   transform-origin: top left;
+}
+.pdf-pin[data-delivery="failed"] {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
 }
 .pdf-pin:hover {
   scale: 1.1;

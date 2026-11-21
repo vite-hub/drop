@@ -1,6 +1,6 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { CommentPatchSchema } from "#shared/schemas"
-import { findThread, setResolved, wroteThread } from "../../../utils/comments"
+import { findThread, readerOf, setResolved, wroteThread } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { identify } from "../../../utils/identity"
 import { logDrop } from "../../../utils/logs"
@@ -13,7 +13,7 @@ export default defineValidatedHandler({
     const thread = await findThread(await routeId(event))
     const drop = thread ? await findDrop(thread.meta.dropId) : null
     const who = await identify(event)
-    if (!thread || !drop || !(permissions(drop, who).manage || wroteThread(thread, who)))
+    if (!thread || !drop || !(permissions(drop, who).manage || wroteThread(thread, readerOf(who))))
       throw new HTTPError({ status: 404, statusText: "No comment with that id." })
     const { resolved } = await event.req.json()
     await setResolved(thread, resolved, who)

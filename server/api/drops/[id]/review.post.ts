@@ -2,8 +2,11 @@ import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteMatches } from "#shared/review"
+import { refuseSend, requireSender } from "../../../utils/comment-images"
 import { siteCoversDrop } from "../../../utils/content-origin"
+import { withRetryAfter } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
+import { guestOf } from "../../../utils/guests"
 import { identify } from "../../../utils/identity"
 import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
@@ -14,24 +17,25 @@ import { addReviewComment, readReviewComment } from "../../../utils/review"
  * screenshot the browser's screen capture took. Same multipart body as the review script's, and stored the same way;
  * the reviewer is the one signed in here, so no review token. `?origin=` is the address open in the frame, and the
  * site must cover it. Drop can't see inside the frame, so the comment has no element, and its page is the address
- * typed above the frame.
+ * typed above the frame. One sent `as` someone the session isn't answers 401 (requireSender).
  */
 export default defineHandler(async (event) => {
   const site = await findDrop(await routeId(event), event)
   const who = await identify(event)
   if (!site || site.kind !== "site" || !permissions(site, who).view)
-    throw new HTTPError({ status: 404, statusText: "No site with that id." })
+    return refuseSend(event, who, new HTTPError({ status: 404, statusText: "No site with that id." }))
   if (!permissions(site, who).comment)
-    throw new HTTPError({ status: 403, statusText: "You can't comment on this site." })
+    return refuseSend(event, who, new HTTPError({ status: 403, statusText: "You can't comment on this site." }))
   const origin = event.url.searchParams.get("origin") ?? ""
   if (!site.siteUrl || !siteMatches(site.siteUrl, origin) || siteCoversDrop(event, origin))
     throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
-  await requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" })
+  await withRetryAfter(requireRateLimit(event, "review-comment", { key: who?.userId, limit: 20, window: "1m" }))
   const { input, shot, images } = await readReviewComment(event)
+  requireSender(who, input.as)
 
   const { row: comment } = await addReviewComment(
     site,
-    { who, name: who?.name ?? "Guest" },
+    { who, name: who?.name ?? "Guest", guest: who ? null : await guestOf(event, { mint: true }) },
     input,
     shot,
     origin,
@@ -41,5 +45,5 @@ export default defineHandler(async (event) => {
   useLogger(event).set({
     review: { site: site.id, comment: comment.n, screenshot: Boolean(shot), embedded: true },
   })
-  return { n: comment.n }
+  return { n: comment.n, id: comment.id }
 })

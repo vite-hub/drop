@@ -1,0 +1,134 @@
+diff --git a/dist/comment-row-Bbm9WwuF.js b/dist/comment-row-Bbm9WwuF.js
+index 9aaeb3d..3decdea 100644
+--- a/dist/comment-row-Bbm9WwuF.js
++++ b/dist/comment-row-Bbm9WwuF.js
+@@ -15,11 +15,26 @@ function rowSlotScope(thread) {
+ 		text: threadPreview(thread)
+ 	};
+ }
++function deliveryLabel(delivery) {
++	return delivery.status === "failed" ? "Not sent" : "Waiting to send";
++}
++function deliveryClock(delivery) {
++	return h("svg", {
++		width: "1em",
++		height: "1em",
++		viewBox: "0 0 24 24",
++		fill: "none",
++		stroke: "currentColor",
++		"stroke-width": 2,
++		"aria-label": deliveryLabel(delivery),
++		role: "img"
++	}, [h("circle", { cx: 12, cy: 12, r: 9 }), h("path", { d: "M12 7v5l3 2" })]);
++}
+ /** The inside of one row of a thread list: its number, author, start, and facts. `CommentList` and `CommentPanel` use it. */
+ function threadRow(thread, options = {}) {
+ 	const replies = thread.messages.length - 1;
+ 	return [
+-		h("span", { "data-slot": "comment-list-number" }, String(thread.n)),
++		h("span", { "data-slot": "comment-list-number" }, thread.delivery ? [deliveryClock(thread.delivery)] : String(thread.n)),
+ 		h(AvatarStack, {
+ 			"aria-hidden": "true",
+ 			people: [writerPerson(thread)],
+@@ -36,4 +51,4 @@ function threadRow(thread, options = {}) {
+ 	];
+ }
+ //#endregion
+-export { threadRow as n, rowSlotScope as t };
++export { deliveryClock, deliveryLabel, threadRow as n, rowSlotScope as t };
+diff --git a/dist/comment-thread-BQuzrlkq.d.ts b/dist/comment-thread-BQuzrlkq.d.ts
+index 9345d5b..5947430 100644
+--- a/dist/comment-thread-BQuzrlkq.d.ts
++++ b/dist/comment-thread-BQuzrlkq.d.ts
+@@ -1,7 +1,7 @@
+ import { i as CommentComposerSlots, r as CommentComposerSize } from "./comment-composer-CZjkXRXd.js";
+ import { t as CommentCan } from "./comments-Bx2WRsYy.js";
+ import { PropType, SlotsType, VNode } from "vue";
+-import { CommentMessage, CommentThread, CommentUser } from "@vite-hub/comments/client";
++import { CommentDelivery, CommentMessage, CommentThread, CommentUser } from "@vite-hub/comments/client";
+ //#region src/internal/comment-status.d.ts
+ /** The messages written after the thread was resolved. Empty for an open thread. */
+ declare function messagesSinceResolved(thread: Pick<CommentThread, "status" | "resolvedAt" | "messages">): CommentMessage[];
+@@ -34,6 +34,7 @@ type CommentReplySlots = {
+   body?: (scope: CommentReplySlotScope) => VNode[];
+   /** The attachments of the message. Replaces the default thumbnails. */
+   attachments?: (scope: CommentReplySlotScope) => VNode[];
++  status?: (scope: CommentReplySlotScope & { delivery: CommentDelivery }) => VNode[];
+ };
+ /** The scope of the `actions`, `anchor`, and `after` slots of `CommentThread`. */
+ interface CommentThreadSlotScope {
+@@ -365,4 +366,4 @@ declare const CommentThread$1: import("vue").DefineComponent<import("vue").Extra
+   dismissible: boolean;
+ }, SlotsType<CommentThreadSlots>, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
+ //#endregion
+-export { CommentReplySlots as a, CommentThreadSlots as c, CommentReplySlotScope as i, messagesSinceResolved as l, CommentAttachmentUrl as n, CommentThread$1 as o, CommentReply as r, CommentThreadSlotScope as s, CommentAttachmentLink as t, repliedSinceResolved as u };
+\ No newline at end of file
++export { CommentReplySlots as a, CommentThreadSlots as c, CommentReplySlotScope as i, messagesSinceResolved as l, CommentAttachmentUrl as n, CommentThread$1 as o, CommentReply as r, CommentThreadSlotScope as s, CommentAttachmentLink as t, repliedSinceResolved as u };
+diff --git a/dist/parts/components/comment-panel.js b/dist/parts/components/comment-panel.js
+index b8ced25..e869e3a 100644
+--- a/dist/parts/components/comment-panel.js
++++ b/dist/parts/components/comment-panel.js
+@@ -187,6 +187,8 @@ const CommentPanel = defineComponent({
+ 		});
+ 		const row = (thread) => h("li", { key: thread.id }, [h("button", {
+ 			"data-focus-inset": "",
++			"data-failed": thread.delivery?.status === "failed" ? "true" : void 0,
++			"data-pending": thread.delivery?.status === "pending" ? "true" : void 0,
+ 			"data-slot": "comment-panel-item",
+ 			"data-status": thread.status,
+ 			"data-thread-id": thread.id,
+diff --git a/dist/parts/components/comment-thread.js b/dist/parts/components/comment-thread.js
+index 530419f..1970ceb 100644
+--- a/dist/parts/components/comment-thread.js
++++ b/dist/parts/components/comment-thread.js
+@@ -10,6 +10,7 @@ import { n as mentionPlugin, r as mentionTag, t as CommentComposer } from "../..
+ import { o as messagesSinceResolved, s as repliedSinceResolved, t as defaultCommentCan } from "../../comments-CkWc2Khc.js";
+ import { t as RelativeTime } from "../../relative-time-BVmjOsYG.js";
+ import { Marker, MarkerContent } from "./marker.js";
++import { deliveryClock, deliveryLabel } from "../../comment-row-Bbm9WwuF.js";
+ import { computed, defineComponent, h, nextTick, ref } from "vue";
+ //#region src/components/comment-thread.ts
+ const imageExtensions = /* @__PURE__ */ new Set([
+@@ -200,6 +201,8 @@ const CommentReply = defineComponent({
+ 			return h("div", {
+ 				"data-compact": props.compact ? "true" : void 0,
+ 				"data-editing": editing.value ? "true" : void 0,
++				"data-failed": message.delivery?.status === "failed" ? "true" : void 0,
++				"data-pending": message.delivery?.status === "pending" ? "true" : void 0,
+ 				"data-size": props.size,
+ 				"data-slot": "comment-reply"
+ 			}, [h("div", { "data-slot": "comment-reply-content" }, [
+@@ -245,6 +248,7 @@ const CommentReply = defineComponent({
+ 					value: message.body
+ 				}),
+ 				editing.value || props.compact ? null : slots.attachments?.({ message }) ?? attachmentList(message, props.attachmentUrl, UIcon, icons.value.file),
++				!editing.value && !props.compact && message.delivery ? slots.status?.({ message, delivery: message.delivery }) : null,
+ 				confirming.value ? h("div", {
+ 					"aria-label": "Confirm delete",
+ 					"data-slot": "comment-reply-confirm",
+@@ -448,6 +452,7 @@ const CommentThread = defineComponent({
+ 		const replySlots = () => ({
+ 			...slots.body ? { body: slots.body } : {},
+ 			...slots.attachments ? { attachments: slots.attachments } : {},
++			...slots.status ? { status: slots.status } : {},
+ 			...slots["mention-item"] ? { "mention-item": slots["mention-item"] } : {},
+ 			...slots["mention-empty"] ? { "mention-empty": slots["mention-empty"] } : {}
+ 		});
+@@ -481,7 +486,7 @@ const CommentThread = defineComponent({
+ 			const back = props.navigation === "back";
+ 			const anchor = slots.anchor ? slots.anchor({ thread }) : quote ? h("blockquote", { "data-slot": "comment-thread-quote" }, quote) : null;
+ 			return h("section", {
+-				"aria-label": `Comment ${thread.n}`,
++				"aria-label": thread.delivery ? deliveryLabel(thread.delivery) : `Comment ${thread.n}`,
+ 				"data-size": props.size,
+ 				"data-slot": "comment-thread",
+ 				"data-status": thread.status,
+@@ -498,7 +503,7 @@ const CommentThread = defineComponent({
+ 						size: "xs",
+ 						variant: "ghost"
+ 					}) : null,
+-					h("span", { "data-slot": "comment-thread-title" }, `Comment ${thread.n}`),
++					h("span", { "data-slot": "comment-thread-title" }, thread.delivery ? [deliveryClock(thread.delivery)] : `Comment ${thread.n}`),
+ 					h("span", { "data-slot": "comment-thread-spacer" }),
+ 					slots.actions ? h("div", { "data-slot": "comment-thread-actions" }, slots.actions({ thread })) : null,
+ 					!allowed("resolve") ? null : h(UButton, {
