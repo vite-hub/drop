@@ -15,6 +15,8 @@ const { default: listHandoffs } = await import("../../server/mcp/tools/list_hand
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: commentPatch } = await import("../../server/api/comments/[id]/index.patch.ts")
+const { default: acceptSuggestion } = await import("../../server/api/comments/[id]/accept.post.ts")
+const { default: undoSuggestion } = await import("../../server/api/comments/[id]/accept.delete.ts")
 const { default: comments } = await import("../../server/comments.ts")
 const { default: disconnect } = await import("../../server/api/send/endpoint.delete.ts")
 const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
@@ -108,13 +110,13 @@ const transportFor = (id) =>
   })
 
 /** A comment from the browser, as `person`. */
-async function comment(drop, person, body) {
+async function comment(drop, person, body, anchor = {}) {
   state.who = person
   const event = new H3Event(
     new Request(`https://drop.example/api/drops/${drop}/comments`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body }),
+      body: JSON.stringify({ kind: "page", selector: "", ox: 0, oy: 0, body, ...anchor }),
     }),
   )
   event.context.log = { set() {}, error() {} }
@@ -142,10 +144,10 @@ async function reviewed() {
 }
 
 /** `person` (Ana unless named) pairs Claude Code's inbox and sends what waits on the doc. */
-async function pairAndSend(doc, person = ana) {
+async function pairAndSend(doc, person = ana, count = 2) {
   state.who = person
   const page = `?page=${encodeURIComponent(`/d/${doc.id}/plan`)}`
-  assert.equal((await send(`/status${page}`)).body.data.count, 2)
+  assert.equal((await send(`/status${page}`)).body.data.count, count)
   const { code, selection } = (await send(`/start${page}`, { method: "POST" })).body.data
   // The agent posts from its own machine: no Origin, no session.
   state.who = null
@@ -343,6 +345,62 @@ test("reopening an unanswered ask restores its completed handoff without sending
   state.who = agentOf(ana)
   assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
   assert.deepEqual((await call(readDrop, { handoff: id })).structuredContent.handoff.asks, [])
+})
+
+test("suggestion Undo retries a failed handoff restoration without publishing twice", async () => {
+  const published = await call(publish, {
+    markdown: "Ship on Friday.",
+    note: "Draft",
+    lifetime: "review",
+    share: "public_comment",
+  })
+  assert.equal(published.isError, undefined, published.message)
+  const doc = published.structuredContent
+  const suggestion = await comment(doc.id, ana, "Can we ship on Monday?", {
+    kind: "text",
+    selector: "p",
+    quote: "Friday",
+    suggestion: "Monday",
+  })
+  const id = await pairAndSend(doc, ana, 1)
+  const request = (method) => {
+    state.who = ana
+    const event = new H3Event(new Request(`https://drop.example/api/comments/${suggestion.id}/accept`, { method }))
+    event.context.log = { set() {}, error() {}, warn() {} }
+    event.context.params = { id: suggestion.id }
+    return event
+  }
+  assert.equal((await acceptSuggestion(request("POST"))).version, 2)
+  state.who = agentOf(ana)
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
+  assert.equal((await call(readDrop, { handoff: id })).structuredContent.handoff.state, "done")
+
+  sql.exec(`CREATE TRIGGER fail_handoff_restoration BEFORE UPDATE ON vitehub_comment_sends
+    WHEN NEW.state = 'sent' BEGIN SELECT RAISE(ABORT, 'Handoff restoration unavailable'); END`)
+  try {
+    await assert.rejects(
+      undoSuggestion(request("DELETE")),
+      (error) => error.cause?.message === "Handoff restoration unavailable",
+    )
+    assert.equal((await findDrop(doc.id)).version, 3)
+    assert.equal(
+      sql.prepare("SELECT status FROM vitehub_comment_threads WHERE id = ?").get(suggestion.id).status,
+      "open",
+    )
+    assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
+  } finally {
+    sql.exec("DROP TRIGGER fail_handoff_restoration")
+  }
+
+  assert.equal((await undoSuggestion(request("DELETE"))).version, 3)
+  await assert.rejects(undoSuggestion(request("DELETE")), { status: 409 })
+  state.who = agentOf(ana)
+  assert.deepEqual(
+    (await call(listHandoffs, {})).structuredContent.handoffs.map((handoff) => handoff.id),
+    [id],
+  )
+  assert.deepEqual((await call(readDrop, { handoff: id })).structuredContent.handoff.asks, [suggestion.n])
+  assert.equal(delivered.length, 1)
 })
 
 test("a quote-only handoff stays working until the quoted threads are answered", async () => {

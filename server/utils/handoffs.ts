@@ -142,7 +142,7 @@ function hasWaitingFeedback(reopenedId?: string) {
 
 /** Put a reopened, still-unanswered message back in the original inbox without another delivery. */
 export async function restoreReopenedHandoffs({ id, subject }: CommentThread) {
-  await db
+  const restored = await db
     .update(commentSends)
     .set({ state: "sent", updatedAt: Date.now() })
     .where(
@@ -153,6 +153,8 @@ export async function restoreReopenedHandoffs({ id, subject }: CommentThread) {
         hasWaitingFeedback(id),
       ),
     )
+    .returning({ id: commentSends.id })
+  return restored.length > 0
 }
 
 async function finishAnsweredHandoffs(member: string) {
