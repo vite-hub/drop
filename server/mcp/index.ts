@@ -10,6 +10,7 @@ import createCodeImage from "./tools/create_code_image"
 import createFolder from "./tools/create_folder"
 import editBoard from "./tools/edit_board"
 import listDrops from "./tools/list_drops"
+import listHandoffs from "./tools/list_handoffs"
 import listFolders from "./tools/list_folders"
 import publish from "./tools/publish"
 import readDrop from "./tools/read_drop"
@@ -67,6 +68,7 @@ export function mcpFor(origin: string) {
         reply,
         acceptSuggestion,
         listDrops,
+        listHandoffs,
         listFolders,
         updateDrop,
         createFolder,
