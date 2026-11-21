@@ -4,7 +4,7 @@ import { useServerEnv } from "vite-hub/env"
 
 const proxyOrganization = () =>
   useServerEnv()
-    .drop.members.unseal()
+    .drop.members?.unseal()
     .split(",")
     .map((entry) => entry.trim())
     .find((entry) => entry.startsWith("github-org:"))

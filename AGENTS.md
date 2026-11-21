@@ -9,3 +9,11 @@
 - **When the page breaks without it**, keep the JavaScript, or load a polyfill behind a feature check from bundled app code. Never inline one in the frame scripts (`shared/plan-runtime.ts`, `shared/doc-header.ts`, `shared/review-script.ts`) and never load one from a CDN.
 - **Dates** need no library: format with `Intl`. Temporal waits until stable Safari ships it; then load `temporal-polyfill/global` through a dynamic import.
 - **In plain-DOM code**, prefer `popover` with `popovertarget`, `<dialog>` with `showModal()`, `<details>`, and CSS anchor positioning to hand-written Escape, outside-click, focus and placement code. Vue overlays stay on Nuxt UI.
+
+## ViteHub first
+
+Drop runs on ViteHub. Before writing auth, migrations, storage, realtime, skills, logging, rate limits, deploy or env code, look for the ViteHub built-in in [vitehub.dev/docs](https://vitehub.dev/docs) and in the skill ViteHub ships, `node_modules/vite-hub/dist/console/runtime/public/skills/vitehub/SKILL.md`.
+
+- **When ViteHub falls short**, fix it in [vite-hub/vitehub](https://github.com/vite-hub/vitehub) and move Drop onto the fix.
+- **A workaround Drop needs meanwhile** names its issue in a comment, `// Workaround: vite-hub/vitehub#NNNN`, so the next ViteHub bump finds it.
+- **Before pushing**, run `pnpm run doctor`, which includes ViteHub's rules. Plain `pnpm doctor` is pnpm's own install check.

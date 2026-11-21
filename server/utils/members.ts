@@ -3,7 +3,7 @@ import { checkAuthMember } from "vite-hub/auth/server"
 import { useServerEnv } from "vite-hub/env"
 import * as v from "valibot"
 
-export const membersOnly = () => Boolean(useServerEnv().drop.members.unseal().trim())
+export const membersOnly = () => Boolean(useServerEnv().drop.members?.unseal().trim())
 
 export async function isMember(userId: string, event?: H3Event | Request) {
   const [error] = await checkAuthMember(userId, event)
