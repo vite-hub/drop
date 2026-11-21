@@ -84,10 +84,11 @@ const baseline = new Set([
   "server/utils/code-image-store.ts",
 ])
 const PREFIX = "\0drop-stub:"
-// By stub name, which has no `?raw` for Vite to see: the import, and the file under node_modules.
+// By stub name, which has no `?raw` for Vite to see: the import, and the file relative to the workspace root.
 const rawCss: Record<string, [string, string]> = {
-  "comments-css": ["comark-comments/style.css?raw", "comark-comments/dist/style.css"],
-  "comment-marks-css": ["@vite-hub/ui/comment-marks.css?raw", "@vite-hub/ui/dist/comment-marks.css"],
+  "comments-css": ["comark-comments/style.css?raw", "node_modules/comark-comments/dist/style.css"],
+  "comment-marks-css": ["@vite-hub/ui/comment-marks.css?raw", "node_modules/@vite-hub/ui/dist/comment-marks.css"],
+  "copy-icon-css": ["./copy-icon.css?raw", "shared/copy-icon.css"],
 }
 
 /** Swaps the runtime modules server code imports for test doubles. Tests import the real packages directly. */
@@ -99,8 +100,7 @@ export function dropTestStubs(): Plugin {
     apply: () => Boolean(process.env.VITEST),
     resolveId(id, importer) {
       if (!importer || importer.startsWith(`${root}test/`)) return
-      // Vitest empties CSS `?raw` imports; the frame's comment layer needs the real stylesheets of comark-comments and
-      // ViteHub's comment marks.
+      // Vitest empties CSS `?raw` imports; the frame's browser tests need the real stylesheets.
       const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
       if (css) return PREFIX + css[0]
       if (id in stubs && importer !== `${root}nuxt.config.ts`) return PREFIX + id
@@ -114,7 +114,7 @@ export function dropTestStubs(): Plugin {
       if (id.startsWith(PREFIX)) {
         const name = id.slice(PREFIX.length)
         const css = rawCss[name]
-        if (css) return `export default ${JSON.stringify(readFileSync(`${root}node_modules/${css[1]}`, "utf8"))}`
+        if (css) return `export default ${JSON.stringify(readFileSync(`${root}${css[1]}`, "utf8"))}`
         return modules[name] ?? stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE
