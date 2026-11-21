@@ -103,6 +103,7 @@ export async function createLinkDrop(
       parentId: folder?.id ?? null,
       siteUrl: href,
       publishToken: null,
+      draftImage: false,
       teamId: null,
       resources: null,
     }

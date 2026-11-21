@@ -2,8 +2,8 @@
 // vite-hub/ui's CopyButton (value, label, icon, size, variant, preload) on Drop's timing: the check holds for COPY_MS,
 // as every other copy in Drop does. A copy the browser refuses says so in a toast, besides the button's own "Copy
 // failed" for screen readers, and reaches the client-error log.
-// Its icon swaps with vite-hub/ui's SwapIcon, so the button needs no stylesheet of its own.
 import { CopyButton, type CopyValue } from "vite-hub/ui"
+import "#shared/copy-icon.css"
 
 defineOptions({ inheritAttrs: false })
 defineProps<{ value: CopyValue }>()
@@ -16,5 +16,7 @@ function failed() {
 </script>
 
 <template>
-  <CopyButton v-bind="$attrs" :duration="COPY_MS" :value="value" @error="failed" />
+  <CopyButton v-bind="$attrs" :duration="COPY_MS" :value="value" @error="failed">
+    <template v-if="$slots.default" #default><slot /></template>
+  </CopyButton>
 </template>

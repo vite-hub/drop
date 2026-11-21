@@ -123,6 +123,10 @@
   --ui-border-accented: rgb(255 255 255 / 18%);
   --ui-border-inverted: #fafafa;
   --ui-primary: #fafafa;
+  /* Nuxt UI's dark-mode status colors, for Send's Not delivered and Limit reached on the dark pill. */
+  --ui-success: var(--ui-color-success-400);
+  --ui-warning: var(--ui-color-warning-400);
+  --ui-error: var(--ui-color-error-400);
   color: var(--ui-text);
   background-color: var(--review-surface);
   box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
@@ -384,7 +388,8 @@ body {
   & .ProseMirror > :first-child {
     margin-block-start: 0;
   }
-  & .ProseMirror .is-empty::before {
+  /* An upload's card sits in the empty line it goes to, over the hint. */
+  & .ProseMirror .is-empty:not(:has(.cue-upload))::before {
     content: attr(data-placeholder);
     float: left;
     height: 0;
@@ -434,6 +439,13 @@ body {
   background: var(--color-tool);
   border-color: var(--color-tool);
   color: white;
+}
+
+/* The bar over selected text comes from vite-hub/ui (CommentSelectionBar), which leaves the focus ring to the app. On
+   the bar's ink surface, the ring is the page color. */
+[data-slot="comment-selection-bar-action"]:focus-visible {
+  outline: 2px solid var(--ui-text-inverted);
+  outline-offset: 1px;
 }
 
 /* The sidebar's panes (layouts/dashboard.vue), as a native drill-down. Forward: Docs slides in from the right over the

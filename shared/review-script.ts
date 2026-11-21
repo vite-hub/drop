@@ -85,6 +85,7 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .away { color: var(--muted); font-size: 12px; }
 .pins { position: fixed; inset: 0; pointer-events: none; }
 .pin { position: fixed; left: 0; top: 0; display: grid; place-items: center; width: 28px; height: 28px; margin: -28px 0 0 0; padding: 0; overflow: hidden; border: 0; border-radius: 14px 14px 14px 3px; background: var(--primary); color: var(--primary-fg); font: 600 11px/1 ui-sans-serif, system-ui, sans-serif; cursor: pointer; pointer-events: auto; box-shadow: 0 1px 4px rgb(0 0 0 / .3), 0 0 0 2px var(--bg); transition: scale 120ms; transform-origin: bottom left; }
+.pin img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .pin:hover, .pin.open { scale: 1.12; }
 .pin.done { opacity: .6; filter: grayscale(1); }
 .pin.many { background: var(--primary); color: var(--primary-fg); font-size: 12px; }
@@ -419,14 +420,19 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     img.src = person.image;
     return into;
   }
-  // A pin shows its author's initials on a colour of their own: pictures at this size were mostly GitHub's pixel
-  // identicons, which read as noise on top of the page.
+  // A pin shows its author's picture, like the thread does, on their initials in a colour of their own: those show
+  // while it loads, and stay when there's no picture or it fails.
   function face(pin, person) {
     let hash = 0;
     for (const c of person.name) hash = (hash * 31 + c.charCodeAt(0)) | 0;
     pin.textContent = initials(person.name);
     pin.style.background = "oklch(.5 .13 " + (Math.abs(hash) % 360) + ")";
     pin.style.color = "#fff";
+    if (!person.image || !/^https:\/\//.test(person.image)) return;
+    const img = document.createElement("img");
+    img.alt = ""; img.referrerPolicy = "no-referrer";
+    img.onload = () => { if (pin.dataset.face === pin.dataset.who) { pin.textContent = ""; pin.appendChild(img); } };
+    img.src = person.image;
   }
   // "now", "5m ago", "3h ago", "yesterday", "2d ago" for a week, then the date, in English like the rest of Drop.
   const relative = new Intl.RelativeTimeFormat("en", { style: "narrow", numeric: "auto" });
@@ -1373,7 +1379,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     joining = true;
     try {
       const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
-      const client = await import(drop + "/review-presence.js");
+      const client = await import(drop + "/review-presence.js?v=2");
       if (!token || presence) return;
       const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);

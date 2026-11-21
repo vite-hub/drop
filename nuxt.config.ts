@@ -11,6 +11,7 @@ import { ROBOTS_DISALLOW } from "./shared/robots.ts"
 import { DEFAULT_FREE_KEPT, DEFAULT_FREE_TEAM_MEMBERS, DEFAULT_PRO_LIMITS, PLANS } from "./shared/quotas.ts"
 import { cloudflareTemplate } from "./scripts/cloudflare-template.ts"
 import { deployment, type Host } from "./scripts/deployment.ts"
+import { legacyViteHubRoutes } from "./scripts/legacy-vitehub-routes.ts"
 import { evlogOptions } from "./scripts/logging.ts"
 import { reviewPresence } from "./scripts/review-presence.ts"
 
@@ -23,13 +24,14 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
+const databaseOnlyHealth = host === "vps" || host === "deno"
+const healthRoute = "/api/health"
 
-// What /api/health reports: package.json's version and the commit the host built, from Drop's Docker build or the host's
-// own build variable (Workers Builds, Vercel, Netlify).
+// What every wide event and Drop's database-only health handler report: the app version and the commit the host built.
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
   commit:
-    process.env.DROP_COMMIT ||
+    process.env.VITEHUB_BUILD_COMMIT ||
     process.env.WORKERS_CI_COMMIT_SHA ||
     process.env.VERCEL_GIT_COMMIT_SHA ||
     process.env.COMMIT_REF ||
@@ -55,7 +57,8 @@ const d1 = (fallback: string) => ({
 })
 
 /**
- * ViteHub per host. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
+ * ViteHub per host. A Definition folder turns its feature on (server/realtime/, server/schedules/), so hosts without
+ * that feature set it to false. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
  * for Nitro's cache. Elsewhere code images are SVG only, rate limits count per server instance (ViteHub's
  * in-memory limiter), and Nitro's cache stays in memory. The host comes from DROP_HOST or the build env
  * (scripts/deployment.ts).
@@ -99,6 +102,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     database: d1("vitehub-drop-vercel"),
     // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
     schedule: { cron: { cleanup: "0 0 * * *" } },
+    realtime: false,
   },
   // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: {
@@ -106,10 +110,11 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     blob: files,
     database: d1("vitehub-drop-netlify"),
     schedule: { providerOutput: "standalone" },
+    realtime: false,
   },
-  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). ViteHub's
-  // Deno preset has no schedule, so none of the hourly cleanup runs: expired drops and code images stop being served
-  // but stay stored, the Trash is never purged, and unused OAuth clients stay registered.
+  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). The hourly
+  // cleanup stays off here until Deno.cron is tested: expired drops and code images stop being served but stay stored,
+  // the Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     host: "deno",
     blob: {
@@ -120,6 +125,8 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
       region: process.env.S3_REGION || "auto",
     },
     database: d1("vitehub-drop-deno"),
+    schedule: false,
+    realtime: false,
   },
   // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
   // timer inside the process (its run history in KV files).
@@ -175,11 +182,12 @@ export default defineNuxtConfig({
     // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
     // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
     trustProxy: true,
+    ...(!databaseOnlyHealth && { health: { route: healthRoute } }),
     // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
     // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin.
     sameOriginWrites: { exclude: ["/mcp"] },
     // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
-    // POST /api/_vitehub/browser-errors. Failures the app catches still go through reportClientError()
+    // POST /_vitehub/browser-errors. Failures the app catches still go through reportClientError()
     // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
     observability: { browserErrors: true },
     // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
@@ -277,6 +285,8 @@ export default defineNuxtConfig({
 
   // Off: every page answers noindex (server/plugins/content-headers.ts).
   // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
+  // `send`: members get Send in the review pill and on the Agents page (app/utils/comment-send.ts). Off until Send has
+  // its server; NUXT_PUBLIC_SEND=true turns it on.
   // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     release,
@@ -284,7 +294,7 @@ export default defineNuxtConfig({
     deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
-    public: { realtime: liveEditing },
+    public: { realtime: liveEditing, send: false },
   },
 
   // nuxt-security (patched for Nuxt 5) writes the security headers. Drop keeps its own rate limits, same-origin write
@@ -413,13 +423,22 @@ export default defineNuxtConfig({
   },
 
   nitro: {
+    ...(databaseOnlyHealth && {
+      handlers: [
+        {
+          route: healthRoute,
+          method: "GET",
+          handler: fileURLToPath(new URL("./server/handlers/database-health.ts", import.meta.url)),
+        },
+      ],
+    }),
     // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
     // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
     devStorage: { cache: { driver: "memory" } },
     // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
     // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
-    modules: [evlog(evlogOptions(release))],
+    modules: [evlog(evlogOptions(release)), legacyViteHubRoutes],
     cloudflare: {
       wrangler: {
         name: cloudflareTemplate.name,

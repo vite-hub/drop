@@ -5,6 +5,8 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin } from "better-auth/plugins"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
+import { defineAuth } from "vite-hub/auth"
+import { requireCaller } from "vite-hub/auth/server"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 import { currentRoleAdapter } from "../../server/utils/current-role-adapter.ts"
 import { roleFor } from "../../shared/roles.ts"
@@ -35,7 +37,7 @@ function auth(members = [{ kind: "email", email: "listed@example.com" }]) {
     database: currentRoleAdapter(drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }), (person) =>
       roleFor(person, "promoted@example.com", false),
     ),
-    plugins: [...plugins, createAccessPolicyPlugin({ members: gate, policy: { recheck: 0, allow: () => true } })],
+    plugins: [...plugins, createAccessPolicyPlugin({ members: gate, policy: { recheck: "0s", allow: () => true } })],
   })
   return { instance, gate }
 }
@@ -78,7 +80,7 @@ function cookie(token) {
   return `__Secure-better-auth.session_token=${encodeURIComponent(`${token}.${signature}`)}`
 }
 
-test("real session policy GitHub outages translate to a retryable 503", async () => {
+test("GitHub outages wrapped by the real caller translate to a retryable 503", async () => {
   const { instance } = auth([{ kind: "github-org", org: "acme" }])
   sql
     .prepare(`INSERT INTO account (id, user_id, provider_id, account_id, access_token, created_at, updated_at)
@@ -89,11 +91,17 @@ test("real session policy GitHub outages translate to a retryable 503", async ()
     .prepare(`INSERT INTO session (id, token, user_id, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
     .run("outage-session", "outage-token", "removed", now + 86_400_000, now, now)
   vi.stubGlobal("fetch", async () => Response.json({}, { status: 502 }))
+  const request = new Request("https://drop.example/api/me", { headers: { cookie: cookie("outage-token") } })
   await assert.rejects(
-    instance.api.getSession({ headers: new Headers({ cookie: cookie("outage-token") }) }).catch((error) => {
+    requireCaller(
+      request,
+      defineAuth(() => instance.options),
+    ).catch((error) => {
+      assert.equal(error.code, "AUTH_PROVIDER_OPERATION_FAILED")
+      assert.equal(error.cause.body.code, "AUTH_GITHUB_UNAVAILABLE")
       rethrowMembershipOutage(error)
       return null
     }),
-    (error) => error.status === 503,
+    (error) => error.status === 503 && error.data?.code === "AUTH_GITHUB_UNAVAILABLE",
   )
 })

@@ -98,7 +98,7 @@ test("the doc the viewer gets carries them; its source and cached render don't",
   const detail = await dropDetail(await findDrop(row.id), who, "https://drop.example")
   assert.match(
     strip(detail.html),
-    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
+    /<dt>Links<\/dt><dd><a class="cp" href="https:\/\/github\.com\/acme\/portal\/pull\/42" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/github\.com" data-drop-site="github" alt="">PR #42<\/a><a class="cp" href="https:\/\/pr42-demo\.preview\.example\.com\/" data-kind="favicon"><img class="cp-img" src="https:\/\/drop\.example\/api\/favicons\/pr42-demo\.preview\.example\.com" data-drop-site="pr42-demo\.preview\.example\.com" alt="">Preview<\/a>/,
   )
   assert.equal(detail.content, "# Plan\n\nText.\n")
   assert.deepEqual(

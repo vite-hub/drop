@@ -143,6 +143,7 @@ export function imageDrop(
     parentId: parent.id,
     siteUrl: null,
     publishToken: null,
+    draftImage: false,
     teamId: parent.teamId,
     resources: null,
   }

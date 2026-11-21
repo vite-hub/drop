@@ -1,3 +1,5 @@
+import { signInPath } from "./sign-in"
+
 /** Recovery guidance never depends on the hidden content or its owner's identity. */
 export function contentUnavailable(
   status: number,
@@ -6,7 +8,7 @@ export function contentUnavailable(
   waitingForReview = false,
   authProxy = false,
 ) {
-  const signIn = `/signin?redirect=${encodeURIComponent(path)}`
+  const signIn = signInPath(path, { proxy: authProxy, choose: true })
   if (status >= 500 || status === 429)
     return {
       title: status === 429 ? "Too many requests." : "Could not open this content.",
@@ -29,22 +31,25 @@ export function contentUnavailable(
       email: null,
       action: { label: "Home", to: "/" },
     }
+  const thing = path.startsWith("/f/") ? "file" : "drop"
   // Behind an auth proxy, signing in again returns the same GitHub account to the same page: a loop, not a fix.
-  if (email && authProxy)
+  if (email)
     return {
-      title: "This content isn't available to your account.",
-      description: "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it.",
+      title: `You can't open this ${thing}`,
+      description: `It isn't shared with this account, or it was deleted. Ask whoever sent the link to share it with you.`,
       email,
-      action: { label: "My drops", to: "/drops" },
+      action: authProxy
+        ? { label: "My drops", to: "/drops" }
+        : { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
     }
+  // Most people who land here signed out were sent a team link they can open: say only what to do. Whether it's private
+  // or deleted is for the signed-in card above, once there's an account to compare; a private, team or deleted drop all
+  // answer the same 404 here, so these words tell nobody which one this is.
   return {
-    title: email ? "This content isn't available to your account." : "This drop isn't available",
-    // Most people who land here were sent a team link, not someone who connected an agent: say what to do first.
-    description: email
-      ? "It may be private to its owner, or deleted. If someone sent you the link, ask them to share it with you, or sign in with another account."
-      : "This link may be private or deleted. If it was shared with you or your team, sign in to check access.",
-    email: email ?? null,
-    action: { label: email ? "Use another account" : "Sign in with GitHub", to: signIn },
+    title: `Sign in to open this ${thing}`,
+    description: `${thing === "file" ? "Files" : "Drops"} shared with you or your team open right after you sign in.`,
+    email: null,
+    action: { label: "Sign in with GitHub", to: signIn },
   }
 }
 

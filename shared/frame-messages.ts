@@ -1,5 +1,6 @@
 import * as v from "valibot"
 import { MAX_QUIZ_BLOCKS, QuizAnswerInput, QuizId } from "./quiz"
+import { InkSchema } from "./schemas"
 
 // What a drop's frame posts up to the viewer: the comment layer (shared/plan-runtime.ts), an app's page runtime
 // (shared/project-bundle.ts), and the content origin's frame host (server/utils/content-origin.ts). Frames run the
@@ -100,6 +101,8 @@ export const FrameMessage = v.variant("type", [
     shot: v.optional(v.number()),
     // From the Marker: the words under its strokes.
     quote: v.optional(v.pipe(v.string(), v.maxLength(2000))),
+    // From the Marker: its strokes, in pixels of the area. Strokes past the limits leave the comment with its box only.
+    ink: v.optional(v.fallback(v.nullable(InkSchema), null)),
   }),
   // null: the picture couldn't be taken.
   v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),

@@ -65,14 +65,14 @@ test("a 404 under a drop its reader may open says the address is missing, not th
   assert.equal(owner.status, 404)
   assert.match(owner.html, /Nothing is at this address in the drop/)
   assert.match(owner.html, /href="\/d\/app1\/docs-preview">Open the drop/)
-  assert.doesNotMatch(owner.html, /available to your account|Use another account|private to its owner/)
+  assert.doesNotMatch(owner.html, /open this drop|Use another account|shared with this account/)
   // Someone who can't open it learns nothing about the drop.
   const stranger = await errorPage("/d/app1/docs-preview/integrations/components", {
     ...who,
     userId: "stranger",
     email: "stranger@example.com",
   })
-  assert.match(stranger.html, /available to your account/)
+  assert.match(stranger.html, /shared with this account, or it was deleted/)
   assert.doesNotMatch(stranger.html, /Nothing is at this address|docs-preview">Open the drop/)
   const visitor = await errorPage("/d/app1/docs-preview/integrations/components", null)
   assert.match(visitor.html, /Sign in with GitHub/)

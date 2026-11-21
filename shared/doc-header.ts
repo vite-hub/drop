@@ -1,7 +1,9 @@
 // A Markdown doc's header in the viewer: the properties box at the top (withDocProperties in
 // server/utils/markdown-document.ts) takes what the review dock used to hold. Its links are comark-chips' chips with
-// their site's icon (from Drop, server/utils/favicons.ts), the drops related to this one join its Links row as more chips, Copy as Markdown, Download and Export as PDF sit at its top right, and the
-// read-only facts (views, file, who dropped it, folder) fold under its last row behind See more.
+// their site's icon (from Drop, server/utils/favicons.ts), the drops related to this one join its Links row as more chips
+// after them, and a row of more than LINKS_ALL chips shows its first LINKS_SHOWN behind "N more". Copy as Markdown,
+// Download and Export as PDF sit at its top right, and the read-only facts (views, file, who dropped it, folder) fold
+// under its last row behind See more.
 //
 // The frame is on another origin than Drop, so the viewer sends what to show ("doc-header", DocHeader) and the buttons
 // ask the viewer to act ("doc-action", "doc-open" in ./frame-messages). Everything goes after the box's own rows, so
@@ -10,6 +12,8 @@
 // Copy writes the clipboard here, in the click that asked for it: the frame has the click's activation, and the
 // viewer's Markdown arrives ahead of it ("doc-intent" on hover or focus, answered with "doc-markdown"). Before it has
 // arrived, the write takes a promise of it. A frame without the Clipboard API asks the viewer to copy instead.
+import COPY_ICON_CSS from "./copy-icon.css?raw"
+import { siteTile } from "./site-tile"
 
 type DocHeaderAction = { id: "markdown" | "download" | "pdf"; label: string; kbd?: string }
 /** A person with the agent that acted for them: "[avatar] Max · [logo] Claude Code", the rest on hover. */
@@ -37,8 +41,6 @@ export type DocHeader = {
   facts: DocHeaderFact[]
   /** Drops related to this one through the pages they link to (server/utils/related.ts), opened in the viewer. */
   related: { id: string; title: string; href: string; icon: string }[]
-  /** Those drops' links that this doc doesn't list yet. */
-  links: { url: string; label: string; icon: string }[]
 }
 /** A row of the folder list ("doc-folder-items"); `at` is already words, such as "3 days ago", with `tip` the date. */
 type DocHeaderFolderItem = {
@@ -153,25 +155,30 @@ drop-doc-facts > div > div { display: grid; grid-template-columns: minmax(0, 9re
   drop-doc-facts > div > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; }
 }
-@media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop { transition: none; } }
-@media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop { display: none !important; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
-/* Copy's two icons share one cell and cross-fade with a short blur, as vite-hub/ui's swapIcon does. The frame runs no
-   module of ours, so it draws the fade in CSS. */
-[data-slot="copy-button-icon"] { display: grid; place-items: center; }
-[data-slot="copy-button-icon"] > * { display: flex; grid-area: 1 / 1; transition: opacity 150ms ease-out, filter 150ms ease-out; }
-[data-slot="copy-button-icon"] > [data-icon="check"], [data-copied] [data-slot="copy-button-icon"] > [data-icon="copy"] { opacity: 0; filter: blur(3px); }
-[data-copied] [data-slot="copy-button-icon"] > [data-icon="check"] { opacity: 1; filter: none; }
-@media (prefers-reduced-motion: reduce) { [data-slot="copy-button-icon"] > * { filter: none; } }
+.drop-head .cp.drop-folded { display: none; }
+.drop-links-toggle { display: inline-flex; align-items: center; gap: .25rem; height: 1.5rem; padding: 0 .375rem 0 .5rem; border: 0; border-radius: calc(var(--radius) - 4px); background: none; color: var(--muted-foreground); font: 400 .8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; vertical-align: middle; cursor: pointer; user-select: none; transition: background-color .12s, color .12s, transform .12s; }
+.drop-links-toggle::before { content: attr(data-label); }
+.drop-links-toggle:hover { background: var(--accent); color: var(--foreground); }
+.drop-links-toggle:active { transform: scale(.97); }
+.drop-links-toggle:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.drop-links-toggle svg { width: .875rem; height: .875rem; transition: transform .24s cubic-bezier(.23,1,.32,1); }
+.drop-links-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { drop-doc-facts, .drop-more svg, .drop-pop, .drop-links-toggle svg { transition: none; } }
+@media print { drop-doc-actions, drop-doc-more, drop-doc-facts, .drop-pop, .drop-links-toggle { display: none !important; } .drop-head .cp.drop-folded { display: inline-flex; } .drop-head.drop-acts > div:first-of-type > dd { padding-right: 0; } }
+${COPY_ICON_CSS}
 `
 
 /** How long Copy shows its check, as Drop's other copy buttons (COPY_MS in app/composables/usePreferences.ts). */
 const COPIED_MS = 1400
+/** A Links row of up to LINKS_ALL chips shows them all; a longer one shows its first LINKS_SHOWN, so "N more" never hides one or two. */
+const LINKS_ALL = 8
+const LINKS_SHOWN = 6
 
 /** Runs in a Markdown doc's frame (planDocument in ./documents). */
 export const DOC_HEADER_SCRIPT = String.raw`(() => {
   const box = document.querySelector("article > dl.cfm");
   if (!box) return;
-  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS};
+  const SVGS = ${JSON.stringify(SVGS)}, MASKS = ${JSON.stringify(MASKS)}, COPIED_MS = ${COPIED_MS}, LINKS_ALL = ${LINKS_ALL}, LINKS_SHOWN = ${LINKS_SHOWN};
   const style = document.createElement("style");
   style.textContent = ${JSON.stringify(CSS)};
   document.head.appendChild(style);
@@ -187,6 +194,26 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     a.dataset.dropAdded = "";
     return a;
   }
+
+  // A chip's icon that doesn't load (a sign-in proxy in front of Drop's /api/favicons/, a host that's down) takes its
+  // site's letter tile, as the server draws one for a site without an icon, instead of an empty space before the
+  // words. The server supplies the canonical name for favicon chips; other chips fall back to a hostname guess.
+  // An agent's logo that fails goes, leaving its name. Images that
+  // failed before this script ran are caught up at once.
+  const siteTile = ${siteTile.toString()};
+  function siteName(href) {
+    const labels = new URL(href, location.href).hostname.replace(/^www\./, "").split(".");
+    if (labels.length < 2) return labels[0] || "?";
+    const at = labels.length > 2 && /^[a-z]{2}$/.test(labels[labels.length - 1]) && /^(?:co|com|org|net|gov|ac|edu)$/.test(labels[labels.length - 2]) ? 3 : 2;
+    return labels[labels.length - at];
+  }
+  function brokenImage(img) {
+    const chip = img.matches("img.cp-img") && img.closest("a[href]");
+    if (chip && !img.src.startsWith("data:")) img.src = "data:image/svg+xml," + encodeURIComponent(siteTile(img.dataset.dropSite || siteName(chip.href)));
+    else if (img.matches(".drop-who img")) img.remove();
+  }
+  document.addEventListener("error", (e) => { if (e.target instanceof HTMLImageElement) brokenImage(e.target); }, true);
+  document.querySelectorAll("img.cp-img").forEach((img) => { if (img.complete && !img.naturalWidth) brokenImage(img); });
 
   const rows = () => Array.from(box.children).filter((child) => child.localName === "div");
   const actions = el("drop-doc-actions", { hidden: true });
@@ -419,11 +446,48 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     place();
   }
 
+  // A long Links row: its first LINKS_SHOWN chips, the doc's own ahead of related drops, then "N more", which opens the
+  // rest. The row grows to its new height and the chips it reveals fade in; it stays open when the related drops change.
+  let linksOpen = false;
+  const linksMotion = [];
+  const stopLinksMotion = () => { for (const animation of linksMotion.splice(0)) animation.cancel(); };
+  const linksLayout = () => box.dispatchEvent(new Event("drop-links-layout", { bubbles: true }));
+  const ease = "cubic-bezier(.23,1,.32,1)";
+  function foldLinks() {
+    stopLinksMotion();
+    box.querySelectorAll(".drop-links-toggle").forEach((node) => node.remove());
+    const dd = box.querySelector(':scope > div[data-key="links"] > dd');
+    if (!dd) return linksLayout();
+    const chips = Array.from(dd.querySelectorAll("a.cp"));
+    const extra = chips.length > LINKS_ALL ? chips.slice(LINKS_SHOWN) : [];
+    for (const a of chips) a.classList.remove("drop-folded");
+    if (!extra.length) return linksLayout();
+    const toggle = el("button", { type: "button", className: "drop-links-toggle" }, icon("chevron"));
+    const show = () => {
+      for (const a of extra) a.classList.toggle("drop-folded", !linksOpen);
+      toggle.dataset.label = linksOpen ? "Show less" : extra.length + " more";
+      toggle.setAttribute("aria-expanded", String(linksOpen));
+      toggle.setAttribute("aria-label", linksOpen ? "Show fewer links" : "Show " + extra.length + " more links");
+      linksLayout();
+    };
+    toggle.addEventListener("click", () => {
+      const from = dd.offsetHeight;
+      stopLinksMotion();
+      linksOpen = !linksOpen;
+      show();
+      place();
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const to = dd.offsetHeight;
+      if (from !== to) linksMotion.push(dd.animate([{ height: from + "px", overflow: "clip" }, { height: to + "px", overflow: "clip" }], { duration: 240, easing: ease }));
+      if (linksOpen) extra.forEach((chip, i) => linksMotion.push(chip.animate([{ opacity: 0, transform: "translateY(-2px)" }, { opacity: 1, transform: "none" }], { duration: 180, delay: Math.min(i, 8) * 15, easing: ease, fill: "backwards" })));
+    });
+    extra[0].before(toggle);
+    show();
+  }
+
   // Related drops open in the viewer; with a modifier key, in a new tab as any link.
-  function renderRelated(related, links) {
+  function renderRelated(related) {
     box.querySelectorAll("[data-drop-added]").forEach((node) => node.remove());
-    if (!related.length && !links.length) return;
-    const has = new Set(Array.from(box.querySelectorAll("a[href]"), (a) => a.href));
     const tags = [];
     for (const drop of related) {
       const a = chip(drop.href, drop.title, drop.icon);
@@ -434,8 +498,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
       });
       tags.push(a);
     }
-    for (const link of links) if (!has.has(new URL(link.url).href)) tags.push(chip(link.url, link.label, link.icon));
-    if (!tags.length) return;
+    if (!tags.length) return foldLinks();
     let dd = box.querySelector(':scope > div[data-key="links"] > dd');
     // One link the box showed becomes several.
     if (dd && /^\s*Link\s*$/.test(dd.previousElementSibling.textContent)) dd.previousElementSibling.textContent = " Links";
@@ -448,6 +511,7 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
       box.insertBefore(row, actions);
     }
     dd.append(...tags);
+    foldLinks();
     place();
   }
 
@@ -466,10 +530,10 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     }
     if (m.type !== "doc-header") return;
     renderActions(Array.isArray(m.actions) ? m.actions.filter((a) => ACTION_ICONS[a.id]) : []);
-    const related = JSON.stringify([m.related, m.links]);
+    const related = JSON.stringify(m.related);
     if (related !== shownRelated) {
       shownRelated = related;
-      renderRelated(Array.isArray(m.related) ? m.related : [], Array.isArray(m.links) ? m.links : []);
+      renderRelated(Array.isArray(m.related) ? m.related : []);
     }
     const factsKey = JSON.stringify(m.facts);
     if (factsKey !== shownFacts) {
@@ -478,4 +542,5 @@ export const DOC_HEADER_SCRIPT = String.raw`(() => {
     }
   });
   renderFolder();
+  foldLinks();
 })()`

@@ -98,7 +98,7 @@ Every block takes `title` and `note` (a `note` needs a `title`), and every block
 - `line`, `area`: `x` (a year, an ISO date, or a category), `y`, optional `series`; or wide rows with `"y": ["fix", "feat"]` and `names`. Lines are named at their end; `endValues: true` adds the last value. `emphasis` draws one series (a total, "All") in the text color and thicker. `points: true` marks every value. `area` stacks with a series; `"stack": "percent"` on an `area` makes shares.
 - `bar`, `stacked`, `grouped`: `x` the category, `y` the value, optional `series`. `horizontal: true` sorts by value; `limit` keeps the top N; `"stack": "percent"` turns stacked bars (`stacked`, or `bar` with a `series`) into shares.
 - `scatter`: `x`, `y`, optional `size`, `series`, `label` (names the top `labelTop` points, moved apart so they don't overlap). `logX`/`logY` keep points at 0 on the axis. A click on a point filters by its `label`, else its `series`, when that is a `list` filter's field; with neither, and with the report's `search`, it searches for its `label`.
-- `histogram`: `x` only; `bins` (default 30). With `logToggle` on log, values at or below 0 are left out.
+- `histogram`: `x` only; `bins` (default 30). With `logToggle` on log, values at or below 0 are left out. A click on a bin filters every dataset with the `x` field to the bin's range. Only the final bin includes its upper edge. The sidebar shows the range under `xTitle`, and a second click clears it. Shared URLs store the range separately from list filters and search (for example, `#spread?range%3Ahours=10..20`).
 
 A click on a line, area or bar chart filters by its `series`, or else by its `x`, when that is a `list` filter's field; a second click clears it.
 
@@ -116,6 +116,8 @@ Options for any chart: `format` (`number`, `integer`, `compact`, `percent` for 0
 
 - A `color`, `fill` or `stroke` encoding on a `list` filter's field, with no `scale.range` or `scheme`, draws each name in its color across the report: `"color": { "field": "store", "type": "nominal" }`.
 - Wherever the spec sets `color`, `fill` or `stroke` (a mark, an encoding's `value`, a gradient stop) or lists a scale's `range`, a name stands for a page color: `fg`, `muted`, `border`, `grid`, `bg`, `soft` from the theme, the tones `good`, `fair`, `warn`, `bad`, `accent`, or a palette index. `"mark": { "type": "rule", "color": "bad" }`, `"scale": { "range": ["good", "warn", "bad"] }`.
+
+A click on a vega block filters like a chart: a mark or legend entry by its `color`, `fill`, `stroke` or `shape` field, a mark or axis label by its `x` (else `y`) field, when that is a `list` filter's field. A mark on a binned field (`"bin": true`) filters by its bin's range, named by the encoding's `title`. The block retains rows for filters represented by its marks and fades the corresponding marks and guides. Clicks require a direct field encoding; a guide shared by different fields is not clickable.
 
 ## Filters
 

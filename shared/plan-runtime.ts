@@ -5,6 +5,7 @@ import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
+import { MAX_INK_POINTS, MAX_INK_STROKES } from "./schemas"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
 import MARKS_CSS from "@vite-hub/ui/comment-marks.css?raw"
 import { commentLeaveMs } from "vite-hub/ui/headless"
@@ -406,6 +407,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The Marker's strokes: on the snapshot in viewport pixels, then on the page while their comment is written.
     '.draw.mark{cursor:crosshair}.ink{position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.inkp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none}' +
     '.ink path,.inkp path{fill:none;stroke-linecap:round;stroke-linejoin:round}.ink .mk,.inkp .mk{stroke-opacity:.4;stroke-linecap:butt}' +
+    // A Marker comment draws its strokes over its area, and its box only while its thread is open.
+    '[data-slot="comment-mark-area"][data-ink]:not([data-active]){border-color:transparent;background:none;box-shadow:none;outline-color:transparent}.inkp.done{opacity:.4}' +
     // The spot a point comment is being written on.
     '.dp{position:absolute;scale:var(--vh-comment-zoom,1);width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--vh-comment-mark);box-shadow:0 0 0 2px var(--vh-comment-surface),0 1px 4px rgb(0 0 0/.3);pointer-events:none}' +
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
@@ -593,6 +596,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     box.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + width + "px;height:" + height + "px";
     parentEl.appendChild(box);
     return box;
+  }
+  /**
+   * A Marker comment's strokes, over its area at page coordinates. They were saved in pixels of the area as drawn, so
+   * they stretch with it when the anchor reflows, and their tips scale with its narrower side.
+   */
+  function drawInk(parentEl, box, m, left, top, width, height) {
+    const sx = width / m.ink.w, sy = height / m.ink.h, k = Math.min(sx, sy);
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("class", m.resolved ? "inkp done" : "inkp");
+    svg.style.left = left + "px"; svg.style.top = top + "px";
+    for (const s of m.ink.strokes) drawStroke(Object.assign({}, s, { width: s.width * k, points: s.points.map(([x, y]) => [x * sx, y * sy]) }), svg);
+    box.dataset.ink = "";
+    parentEl.appendChild(svg);
   }
 
   // Comark's zoom (comark-zoom) shows a copy of an item, such as an annotated screenshot, with a layer over the copy.
@@ -863,6 +879,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (zoomMarks) zoomMarks.innerHTML = "";
     if (asideMarks) asideMarks.innerHTML = "";
     const unplaced = [], railed = [], standing = new Map();
+    const pinOnStand = (marker, stand) => {
+      resized.observe(stand);
+      const rect = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
+      standing.set(stand, before + 1);
+      placePin(marker, rect.right + scrollX + before * (PIN + 4), rect.top + scrollY, marks, true);
+    };
     clearBubbles();
     // The quote is searched in its block first, then the whole page, so text that moved keeps its comment.
     const ranges = new Map(markers.filter((m) => m.kind === "text" && m.quote).map((m) => [m.id, findRange(m.selector, m.quote)]));
@@ -894,12 +916,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!shows(el)) {
           const stand = !zoom && standIn(el);
           if (!stand) continue;
-          resized.observe(stand);
-          const s = stand.getBoundingClientRect(), before = standing.get(stand) || 0;
           // Side by side when several wait on the same element, so each can be clicked.
-          standing.set(stand, before + 1);
-          x = s.right + scrollX + before * (PIN + 4); y = s.top + scrollY;
-          placePin(m, x, y, into, true);
+          pinOnStand(m, stand);
           continue;
         }
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
@@ -909,7 +927,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
-        if (m.ow || m.oh) areaBox(into, x, y, (m.ow / 1000) * b.width, (m.oh / 1000) * b.height, m);
+        if (m.ow || m.oh) {
+          const w = (m.ow / 1000) * b.width, h = (m.oh / 1000) * b.height, box = areaBox(into, x, y, w, h, m);
+          if (m.ink) drawInk(into, box, m, x, y, w, h);
+        }
       } else {
         const range = ranges.get(m.id);
         if (!range) { unplaced.push(m.id); continue; }
@@ -917,6 +938,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         const railedHere = bubbles.has(m.id);
         textRanges.push({ id: m.id, range, resolved: m.resolved, rail: railedHere, suggest: suggests(m) });
         if (zoom) continue;
+        if (article) {
+          const end = range.endContainer;
+          const element = end.nodeType === 1 ? end : end.parentElement;
+          const folded = element?.closest(".drop-head a.cp.drop-folded");
+          const toggle = folded && folded.parentElement.querySelector(':scope > .drop-links-toggle[aria-expanded="false"]');
+          if (toggle) { pinOnStand(m, toggle); continue; }
+        }
         const rects = range.getClientRects(), last = rects[rects.length - 1];
         if (!last) continue;
         // Outlined like an area, one box per line: a highlight alone can't draw a border, and its tint barely shows on
@@ -1792,6 +1820,19 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (!out || out.size > MAX_BYTES) out = await blob("image/jpeg", 0.8);
     return out && out.size <= MAX_BYTES ? out : null;
   }
+  // The strokes as the comment keeps them, for the page to draw: pixels from the corner of the area as the page will
+  // place it (its thousandths of the anchor, rounded), to a tenth of a pixel. Past the limits, the comment keeps its
+  // box and its picture only.
+  function inkOf(list, left, top, width, height) {
+    const at = (p) => [Math.round((p[0] - left) * 10) / 10, Math.round((p[1] - top) * 10) / 10];
+    const strokes = list.map((s) => {
+      const points = s.tool === "arrow" ? [s.points[0], s.points[s.points.length - 1]] : s.points;
+      return Object.assign({ tool: s.tool, color: s.color, width: s.width, points: points.map(at) }, s.straight ? { straight: true } : {}, s.tool === "text" ? { text: s.text } : {});
+    });
+    const count = strokes.reduce((sum, s) => sum + s.points.length, 0);
+    if (strokes.length > ${MAX_INK_STROKES} || count > ${MAX_INK_POINTS}) return undefined;
+    return { w: Math.max(1, width), h: Math.max(1, height), strokes };
+  }
   async function finishMark() {
     if (tool === "mark") commitLabel();
     if (tool !== "mark" || !strokes.length || finishing) return;
@@ -1829,7 +1870,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (session !== markSession || tool !== "mark") return;
     finishing = false;
     const n = ++shots;
-    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, shot: n });
+    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
     post({ type: "area-shot", shot: n, image: marked });
   }
 
@@ -2137,6 +2178,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The page and every anchor: an area must follow its element even when the page keeps its size.
   const resized = new ResizeObserver(render);
   resized.observe(document.documentElement);
+  if (article) article.addEventListener("drop-links-layout", () => { if (markers.length) render(); });
   // An element that shows or hides without changing size, such as a tooltip that fades, changes a class, a style, or
   // its hidden or open attribute, or ends a transition: pins on elements are placed again then. Drop's own changes
   // (the root's custom properties, its hosts in the page) don't count.

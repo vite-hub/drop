@@ -8,7 +8,7 @@ const session = { current: null }
 state.authApi = {
   getSession: async () => {
     if (session.current instanceof Error) throw session.current
-    return session.current
+    return { headers: new Headers(), response: session.current }
   },
 }
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({ deployment: { host: "vps" } }) }))
@@ -193,6 +193,12 @@ test("a person in the browser is their id on the event, never their name; an age
   const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
   assert.ok(!JSON.stringify(agent.event).includes("Realname"))
+
+  // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
+  state.mcpCaller = null
+  const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.deepEqual(refused.event.token, { rejected: "invalid token" })
+  assert.equal(refused.event.user, undefined)
 })
 
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {
@@ -211,6 +217,16 @@ test("a refused or failed session says why on the event, and the request is stil
   session.current = Object.assign(new Error("GitHub is down"), { body: { code: "AUTH_GITHUB_UNAVAILABLE" } })
   const outage = await request("/api/me", identify)
   assert.equal(outage.failure.status, 503)
+})
+
+test("an agent accepted by ViteHub after its ban expires is not denied by Drop", async () => {
+  state.mcpCaller = {
+    user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true, banExpires: new Date(0) },
+    clientName: "Claude Code",
+  }
+  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  assert.equal(agent.event.user?.id, "owner")
+  assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
 })
 
 test("the hourly cleanup emits one event a run, with each step's count, and names the step that failed", async () => {
@@ -382,7 +398,7 @@ test("a webhook that cancels and updates a subscription lists both, and audits t
 
 test("a realtime room says why it refused someone", async () => {
   const { default: latest } = await import("../../server/realtime/latest.ts")
-  const { event } = await request("/api/_vitehub/realtime/latest/gone", (event) =>
+  const { event } = await request("/_vitehub/realtime/latest/gone", (event) =>
     latest.authorize({ event, documentId: "gone", mode: "read" }),
   )
   assert.deepEqual(event.realtime, { reason: "not-found" })

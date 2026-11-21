@@ -348,6 +348,24 @@ test("publish accepts partial agent metadata and rejects invalid labels before w
   assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, agent)
 })
 
+test("publish reads a plain agent string as the model", async () => {
+  const doc = (
+    await call(publish, {
+      markdown: "# Model only",
+      note: "String agent",
+      lifetime: "review",
+      agent: "claude-opus-5-5",
+    })
+  ).structuredContent
+  assert.deepEqual((await call(readDrop, { id: doc.id })).structuredContent.versions[0].agent, {
+    model: "claude-opus-5-5",
+  })
+  assert.equal(
+    (await call(publish, { markdown: "# Blank", note: "Blank", lifetime: "review", agent: "  " })).isError,
+    true,
+  )
+})
+
 test("app replacement records the current publisher without inheriting earlier metadata", async () => {
   const agent = { model: "gpt-6-astra", harness: "Codex", reasoningLevel: "high" }
   const app = (
@@ -565,6 +583,69 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     [3, undefined],
   )
   assert.match(read.content[0].text, /\[the area 30%–70% across, 12%–30% down of page 3\]\n {3}Caption this figure\./)
+})
+
+test("a Marker comment keeps its strokes for the page to draw, only on an area", async () => {
+  const route = (id, init) => {
+    const event = new H3Event(
+      new Request(`https://drop.example/api/drops/${id}/comments`, {
+        method: init ? "POST" : "GET",
+        ...(init ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init) } : {}),
+      }),
+    )
+    event.context.log = { set() {}, error() {} }
+    event.context.params = { id }
+    return event
+  }
+  const { id } = (
+    await call(publish, { markdown: "# Lumpy\n\nRed rows stop being lumpy.", note: "Draft", lifetime: "review" })
+  ).structuredContent
+  state.who = { ...who, actorKind: "browser", actorName: who.name }
+  const ink = {
+    w: 240,
+    h: 90,
+    strokes: [
+      {
+        tool: "pen",
+        color: "#ec4899",
+        width: 8,
+        points: [
+          [4, 4],
+          [120, 80],
+          [236, 10],
+        ],
+      },
+      { tool: "text", color: "#2563eb", width: 16, points: [[10, 45]], text: "this" },
+    ],
+  }
+  const area = { kind: "area", selector: "p", ox: 100, oy: 0, ow: 600, oh: 1000 }
+  const sent = await commentsPost(route(id, { ...area, ink, body: "This one." }))
+  assert.deepEqual(sent.ink, ink)
+  const listed = (await commentsGet(route(id))).find((comment) => comment.n === sent.n)
+  assert.deepEqual(listed.ink, ink)
+  const plain = await commentsPost(route(id, { ...area, body: "A box." }))
+  assert.equal(plain.ink, null)
+  // A long scribble is kept with fewer points, as ViteHub keeps at most 4,000 characters in a field.
+  const scribble = Array.from({ length: 2400 }, (_, i) => [120 + 100 * Math.cos(i / 40), 45 + 40 * Math.sin(i / 40)])
+  const long = await commentsPost(
+    route(id, { ...area, ink: { w: 240, h: 90, strokes: [{ ...ink.strokes[0], points: scribble }] }, body: "Round." }),
+  )
+  assert.ok(long.ink.strokes[0].points.length < 2400 && long.ink.strokes[0].points.length > 20)
+  const kept = (await commentsGet(route(id))).find((comment) => comment.n === long.n)
+  assert.deepEqual(kept.ink, long.ink)
+
+  await assert.rejects(
+    commentsPost(route(id, { kind: "text", selector: "p", ox: 0, oy: 0, quote: "Red rows", ink, body: "x" })),
+    { statusText: "The Marker's strokes go on an area." },
+  )
+  await assert.rejects(
+    commentsPost(route(id, { ...area, ink: { ...ink, strokes: [{ ...ink.strokes[0], color: "red" }] }, body: "x" })),
+    { status: 400 },
+  )
+  const many = { tool: "pen", color: "#ec4899", width: 8, points: Array.from({ length: 3001 }, (_, i) => [i % 240, 1]) }
+  await assert.rejects(commentsPost(route(id, { ...area, ink: { ...ink, strokes: [many, many] }, body: "x" })), {
+    status: 400,
+  })
 })
 
 test("accepting a suggestion, from the page or an agent, publishes its words as the next version and resolves it; undo takes it back", async () => {

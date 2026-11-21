@@ -22,14 +22,19 @@ export async function isMember(userId: string, event?: H3Event | Request) {
   return !error
 }
 
-const MembershipOutage = v.object({ body: v.object({ code: v.literal("AUTH_GITHUB_UNAVAILABLE") }) })
+const membershipOutageCode = "AUTH_GITHUB_UNAVAILABLE"
+const MembershipOutage = v.object({ body: v.object({ code: v.literal(membershipOutageCode) }) })
+const WrappedMembershipOutage = v.object({
+  code: v.literal("AUTH_PROVIDER_OPERATION_FAILED"),
+  cause: MembershipOutage,
+})
 
 /** Session policy errors cross Better Auth's API boundary before the sessionless check can run. */
 export function rethrowMembershipOutage(error: unknown) {
-  if (!v.is(MembershipOutage, error)) return
+  if (!v.is(MembershipOutage, error) && !v.is(WrappedMembershipOutage, error)) return
   throw new HTTPError({
     status: 503,
     statusText: "GitHub membership verification is unavailable. Try again shortly.",
-    data: { code: error.body.code },
+    data: { code: membershipOutageCode },
   })
 }
