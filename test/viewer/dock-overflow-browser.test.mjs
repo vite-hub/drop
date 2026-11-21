@@ -24,7 +24,13 @@ const candidates = [
 ]
 let styles = readFileSync(require.resolve("tailwindcss/preflight.css"), "utf8")
 styles += readFileSync(root + "node_modules/@vite-hub/ui/dist/styles.css", "utf8")
-for (const name of ["ViewerReviewDock", "ViewerDetailsSegment", "ViewerToolbar"]) {
+for (const name of [
+  "ViewerReviewDock",
+  "ViewerDetailsSegment",
+  "ViewerToolbar",
+  "ViewerVariants",
+  "ViewerCommentsSegment",
+]) {
   const { descriptor } = parse(readFileSync(`${root}app/components/viewer/${name}.vue`, "utf8"))
   const id = `data-v-${name}`
   let code = transpileModule(compileScript(descriptor, { id, inlineTemplate: true }).content, {
@@ -49,14 +55,32 @@ const entry = `
   import Dock from "ViewerReviewDock"
   import Details from "ViewerDetailsSegment"
   import Toolbar from "ViewerToolbar"
+  import Variants from "ViewerVariants"
+  import Comments from "ViewerCommentsSegment"
   Object.assign(window, Vue, VueUse)
   window.useHead = () => {}
   const app = Vue.createApp({
     setup() {
       const open = Vue.ref(false)
+      const fixture = new URLSearchParams(location.search)
+      const hasCanvas = fixture.has("canvas")
+      const hand = Vue.ref(fixture.has("hand"))
+      const spacer = () => Vue.h("span", { "aria-hidden": true, class: "w-1 shrink-0 max-sm:hidden" })
       return () => Vue.h(Dock, { open: false, heading: "none", overlay: true }, {
         toolbar: () => [
-          ...["Marker", "Comments", "Share"].map(label => Vue.h("button", null, label)),
+          ...(hasCanvas ? [
+            Vue.h("a", { href: "/", "aria-label": "Drop", "data-review-home": "", class: "inline-flex items-center justify-center" }, "D"),
+            spacer(),
+            Vue.h(Variants, {
+              state: { canvas: true, zoom: 100, tool: hand.value ? "hand" : "move", current: 0, variants: [{ id: "v-first", label: "First" }] },
+              onCommand: command => { if (command === "move") hand.value = false },
+            }),
+            spacer(),
+            Vue.h(Toolbar, { tool: "browse", sizable: false, tools: ["mark"], views: [] }),
+            Vue.h(Comments, { on: false, count: fixture.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: fixture.has("pins"), pinsShown: false }),
+            spacer(),
+            Vue.h("button", { "aria-label": "Share drop", class: "inline-flex shrink-0 items-center" }, [Vue.h("span", { class: "iconify" }), Vue.h("span", { class: "review-share-label" }, "Share")]),
+          ] : ["Marker", "Comments", "Share"].map(label => Vue.h("button", null, label))),
           Vue.h(Details, {
             open: open.value, "onUpdate:open": value => open.value = value,
             pop: false, chip: "v2 · 42 views", details: true, history: true,
@@ -73,7 +97,8 @@ const entry = `
   const passthrough = { setup: (_, { slots }) => () => slots.default?.() }
   app.component("UTooltip", passthrough)
   app.component("UPopover", passthrough)
-  app.component("UIcon", { render: () => Vue.h("span") })
+  app.component("UDropdownMenu", passthrough)
+  app.component("UIcon", { render: () => Vue.h("span", { class: "iconify" }) })
   app.component("NuxtLink", { setup: (_, { attrs, slots }) => () => Vue.h("a", { ...attrs, href: "#download" }, slots.default?.()) })
   app.component("ViewerDeviceButton", { render: () => Vue.h("button", { "aria-label": "Device mode" }, "Device") })
   app.mount("#app")
@@ -94,6 +119,63 @@ const bundle = await build({
 const script = (Array.isArray(bundle) ? bundle[0] : bundle).output.find(
   (item) => item.type === "chunk" && item.isEntry,
 ).code
+
+test("collapsed prototype tools stay on one row with full phone touch targets", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 320, height: 600 },
+      hasTouch: true,
+      reducedMotion: "reduce",
+    })
+    await page.route("**/*", (route) =>
+      route.fulfill(
+        new URL(route.request().url()).pathname === "/fixture.js"
+          ? { contentType: "text/javascript", body: script }
+          : {
+              contentType: "text/html",
+              body: `<!doctype html><style>${styles}</style><div id="app"></div>
+                <script>document.documentElement.appendChild(document.createElement('vitehub-pill')).setAttribute('edge','bottom')</script>
+                <script type="module" src="/fixture.js"></script>`,
+            },
+      ),
+    )
+    for (const width of [320, 393, 430]) {
+      await page.setViewportSize({ width, height: 600 })
+      for (const hand of [false, true]) {
+        await page.goto(`https://drop.test/?canvas${hand ? "&hand" : ""}`)
+        const dock = page.getByRole("group", { name: "Document tools" })
+        await dock.getByRole("button", { name: "More", exact: true }).waitFor()
+        const bounds = []
+        for (const label of [
+          "Drop",
+          "Zoom, 100%",
+          "Marker",
+          "Comments",
+          "Share drop",
+          "More",
+          ...(hand ? ["Hand"] : []),
+        ]) {
+          const control = dock.getByLabel(label, { exact: true })
+          const rect = await control.boundingBox()
+          assert.ok(rect && rect.width >= 44 && rect.height >= 44, `${width}px: ${label} has a full touch target`)
+          assert.ok(rect.x >= 0 && rect.x + rect.width <= width, `${width}px: ${label} is within the viewport`)
+          bounds.push(rect)
+        }
+        assert.ok(
+          bounds.every((rect) => rect.y === bounds[0].y),
+          `${width}px: all primary controls on the same row`,
+        )
+        if (hand) {
+          await dock.getByRole("button", { name: "Hand", exact: true }).tap()
+          assert.equal(await dock.getByRole("button", { name: "Hand", exact: true }).count(), 0)
+        }
+      }
+    }
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
 
 for (const width of [320, 640, 667, 1440])
   test(`expanded dock actions remain tappable at ${width}px with history and the bottom mark`, async () => {

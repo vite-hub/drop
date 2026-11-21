@@ -63,6 +63,7 @@ export function useViewerFrame(options: {
   threadOverCard?: Ref<boolean>
   /** Whether the viewer's bar shows a prototype's variants, in place of the bar the page draws itself. */
   variantBar?: boolean
+  variants?: Ref<ViewerVariants | null>
   /** ← or → on an image's page, while the page has focus: the viewer moves along the image's folder. */
   arrow?: (key: "ArrowLeft" | "ArrowRight") => void
   /** Who else has the drop open (usePresence): the reader's pointer goes up to them, and their cursors come down. */
@@ -193,7 +194,7 @@ export function useViewerFrame(options: {
     location.value = at
   }
 
-  const variants = shallowRef<ViewerVariants | null>(null)
+  const variants = options.variants ?? shallowRef<ViewerVariants | null>(null)
   const picker = (command: PickerCommand, index?: number) => send({ type: "picker", do: command, index })
 
   /**

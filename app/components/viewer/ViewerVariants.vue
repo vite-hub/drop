@@ -73,7 +73,7 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
     {
       type: "label",
       ui: { label: "font-normal text-muted", itemLabel: "whitespace-normal text-pretty" },
-      label: `${count.value} items. Double-click a name, or press 1–9, to open one`,
+      label: `${count.value} items. Close this menu, then double-click a name or press 1–9 to open one.`,
     },
     { label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbds: ["+"], onSelect: () => emit("command", "zoom-in") },
     { label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbds: ["−"], onSelect: () => emit("command", "zoom-out") },
@@ -93,7 +93,13 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <div ref="group" aria-label="Prototype" class="flex max-w-full min-w-0 items-center gap-0.5" role="group">
+  <div
+    ref="group"
+    aria-label="Prototype"
+    :data-review-canvas="state.canvas || undefined"
+    class="flex max-w-full min-w-0 items-center gap-0.5"
+    role="group"
+  >
     <template v-if="state.canvas">
       <UTooltip
         v-if="tool === 'hand'"
@@ -105,6 +111,7 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
           aria-keyshortcuts="H"
           aria-label="Hand"
           aria-pressed="true"
+          data-review-hand
           class="inline-flex shrink-0 items-center"
           type="button"
           @click="emit('command', 'move')"
@@ -115,6 +122,7 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
       <UDropdownMenu :content="{ side: 'top', sideOffset: 10 }" :items="zoomItems" :ui="{ content: 'w-60' }">
         <button
           :aria-label="`Zoom, ${state.zoom}%`"
+          data-review-zoom
           class="inline-flex shrink-0 items-center gap-0.5 tabular-nums"
           type="button"
         >

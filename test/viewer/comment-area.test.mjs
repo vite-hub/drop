@@ -34,7 +34,7 @@ for (const [name, value] of Object.entries({
 const { provideReviewDraft, injectReviewDraft } = await import("../../app/composables/useReviewDraft.ts")
 const scopes = []
 afterEach(() => scopes.splice(0).forEach((scope) => scope.stop()))
-function viewer(kind = "markdown") {
+function viewer(kind = "markdown", optionsOverride = {}) {
   const scope = effectScope()
   scopes.push(scope)
   const shots = []
@@ -45,9 +45,34 @@ function viewer(kind = "markdown") {
     reviewOpen: ref(false),
     shot: (file) => shots.push(file),
     shots,
+    ...optionsOverride,
   }
   return { ...options, ...scope.run(() => useViewerAnnotations(options)) }
 }
+
+test("entering a prototype canvas clears inspection and blocks toolbar and frame shortcuts", () => {
+  const canvas = ref(false)
+  const state = viewer("html", { canvas })
+  state.setTool("measure")
+  state.toggleOverlay("xray")
+  assert.equal(state.frameTool.value, "measure")
+  assert.equal(state.overlays.xray, true)
+
+  canvas.value = true
+  assert.equal(state.frameTool.value, "browse")
+  assert.equal(state.overlays.xray, false)
+
+  state.setTool("measure")
+  state.toggleOverlay("xray")
+  for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
+  assert.equal(state.frameTool.value, "browse")
+  assert.equal(state.overlays.xray, false)
+
+  canvas.value = false
+  for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
+  assert.equal(state.frameTool.value, "measure")
+  assert.equal(state.overlays.xray, true)
+})
 const frame = { left: 0, top: 0, scale: 1 }
 const area = {
   type: "area",

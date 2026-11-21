@@ -47,6 +47,7 @@ export function useViewerAnnotations(options: {
   drop: Ref<DropDetail>
   editing: Ref<boolean>
   enabled?: Ref<boolean>
+  canvas?: Readonly<Ref<boolean>>
   reviewOpen?: Ref<boolean>
   /**
    * The frame's picture of the tooltip or menu the comment being written is on, for its images; null once that comment
@@ -142,7 +143,7 @@ export function useViewerAnnotations(options: {
   function setTool(next: ViewerTool) {
     if (!(options.enabled?.value ?? true) && next !== "browse") return
     if ((next === "comment" || next === "mark") && !canDrawArea.value) return
-    if (next === "measure" && !["html", "app"].includes(drop.value.kind)) return
+    if (next === "measure" && !inspectsPage.value) return
     if (options.reviewOpen && next !== "comment") options.reviewOpen.value = false
     awaited = null
     focusGeneration++
@@ -153,9 +154,19 @@ export function useViewerAnnotations(options: {
   function toggleOverlay(name: keyof ViewerOverlays) {
     if (!(options.enabled?.value ?? true)) return
     // Rulers measure any page in the frame, an image or a doc too; X-ray outlines an HTML page's or app's elements.
-    if (name === "xray" && !["html", "app"].includes(drop.value.kind)) return
+    if (name === "xray" && !inspectsPage.value) return
     overlays[name] = !overlays[name]
   }
+  const inspectsPage = computed(() => !options.canvas?.value && ["html", "app"].includes(drop.value.kind))
+  watch(
+    inspectsPage,
+    (available) => {
+      if (available) return
+      if (tool.value === "measure") tool.value = "browse"
+      overlays.xray = false
+    },
+    { flush: "sync" },
+  )
   watch(canDrawArea, (value) => !value && ["comment", "mark"].includes(tool.value) && (tool.value = "browse"))
   // A new comment that's sent, put away, or turned into a thread no longer wants the picture of its area.
   watch(

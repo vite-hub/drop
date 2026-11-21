@@ -8,6 +8,7 @@ import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
 import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
+import type { ViewerVariants } from "~/composables/useViewerFrame"
 import { expiryLabel } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import { isPdf, videoType } from "#shared/plans"
@@ -183,12 +184,15 @@ const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
 
 const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
+const variants = shallowRef<ViewerVariants | null>(null)
+const prototypeCanvas = computed(() => Boolean(variants.value?.canvas))
 /** The picture the frame took of the tooltip or menu the new comment is on, among the draft's images. */
 let autoShot: File | null = null
 const annotations = useViewerAnnotations({
   drop,
   editing,
   enabled: annotationsEnabled,
+  canvas: prototypeCanvas,
   // The page takes clicks for comments while the mode is on or the dock's panel is open; putting them away ends both.
   reviewOpen: computed({
     get: () => commentMode.value || commentsOpen.value,
@@ -257,7 +261,7 @@ const framed = computed(
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
 /** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
-const sizable = computed(() => framed.value && ["html", "app"].includes(drop.value.kind))
+const sizable = computed(() => framed.value && !prototypeCanvas.value && ["html", "app"].includes(drop.value.kind))
 /** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
  * clears the dock inside its own stage, so the stage's color runs under the dock, and a PDF's pages scroll under it. Apps and sites run under the dock like
  * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
@@ -550,61 +554,48 @@ const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
-const {
-  srcdoc,
-  contentOrigin,
-  frameSrc,
-  frameKey,
-  frameScheme,
-  ready,
-  send,
-  unplaced,
-  openPath,
-  variants,
-  picker,
-  whenHeld,
-} = useViewerFrame({
-  drop,
-  frame,
-  app,
-  pinned,
-  // The panel sits beside the frame, not over it: the doc has nothing to make room for.
-  inset: ref(0),
-  // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
-  bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
-  width: docWidth,
-  annotations,
-  clickComments: commentMode,
-  threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
-  comments: computed(() => ({
-    style: pinStyle.value ? "pin" : "card",
-    me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
-    only: [...shownWhileHidden.value],
-  })),
-  variantBar: true,
-  arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
-  presence,
-  heading: (id, copySection) => {
-    // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
-    const here = new URL(route.fullPath, link.value)
-    here.hash = id
-    history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
-    if (!copySection) return
-    const shared = new URL(link.value)
-    shared.hash = id
-    void copy(shared.href, { announce: "Link to the section copied" })
-  },
-  docAction: (action) => {
-    if (action === "markdown") void copyMarkdown()
-    else if (action === "download") download()
-    else if (printsPdf.value) exportPdf()
-  },
-  openDrop: (id) => void router.push(`/drops/${id}`),
-})
+const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unplaced, openPath, picker, whenHeld } =
+  useViewerFrame({
+    drop,
+    frame,
+    app,
+    pinned,
+    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
+    inset: ref(0),
+    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
+    bottom: computed(() => (hasComments.value && !trashed.value && !dockClearance.value ? 72 : 0)),
+    width: docWidth,
+    annotations,
+    clickComments: commentMode,
+    threadOverCard: computed(() => Boolean(threadSpot.value?.rail)),
+    comments: computed(() => ({
+      style: pinStyle.value ? "pin" : "card",
+      me: me.value ? { name: me.value.name, image: me.value.image ?? null } : null,
+      only: [...shownWhileHidden.value],
+    })),
+    variantBar: true,
+    variants,
+    arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
+    presence,
+    heading: (id, copySection) => {
+      // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
+      const here = new URL(route.fullPath, link.value)
+      here.hash = id
+      history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
+      if (!copySection) return
+      const shared = new URL(link.value)
+      shared.hash = id
+      void copy(shared.href, { announce: "Link to the section copied" })
+    },
+    docAction: (action) => {
+      if (action === "markdown") void copyMarkdown()
+      else if (action === "download") download()
+      else if (printsPdf.value) exportPdf()
+    },
+    openDrop: (id) => void router.push(`/drops/${id}`),
+  })
 /** A prototype's canvas is in the bar (ViewerVariants), where its Move and Hand tools are. */
-const canvasShown = computed(
-  () => Boolean(variants.value?.canvas) && !editing.value && !lightbox.value && !shownVersion.value,
-)
+const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
 /** The Hand tool pans: picking it puts Drop's comment and inspection tools down, and picking one of those puts it down. */
 function canvasTool(command: "move" | "hand") {
   if (command === "hand") {
@@ -872,7 +863,7 @@ const detailsChip = computed(() => {
   return views === null ? lead : `${lead} · ${views} ${views === 1 ? "view" : "views"}`
 })
 // What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
-// Download, Copy as Markdown and Export as PDF are in its header (docHeader); Open in new window is in ⌘K only.
+// Download, Copy as Markdown and Export as PDF are in its header (docHeader).
 const detailsActions = computed<DetailsAction[]>(() => [
   ...(drop.value.url && drop.value.kind !== "markdown"
     ? [{ id: "download", label: "Download original", icon: "i-mingcute-download-2-line", kbd: "D", press: download }]
@@ -887,6 +878,9 @@ const detailsActions = computed<DetailsAction[]>(() => [
           press: () => void copyMarkdown(),
         },
       ]
+    : []),
+  ...(visitor.value && presents.value && !slidev.value
+    ? [{ id: "window", label: "Open in new window", icon: "i-mingcute-external-link-line", press: openWindow }]
     : []),
   ...(visitor.value
     ? [
@@ -940,7 +934,7 @@ const measurable = computed(() => framed.value && annotationsEnabled.value && !l
 // The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements, so
 // a prototype's canvas, a plane of many items, has neither until one opens in focus. Measure goes off with a second
 // press or V, so there's no Browse button.
-const inspectsPage = computed(() => inspectable.value && !canvasShown.value)
+const inspectsPage = computed(() => inspectable.value && !prototypeCanvas.value)
 const previewTools = computed(() => (inspectsPage.value ? (["measure"] as const) : []))
 const previewViews = computed(() => [
   ...(measurable.value ? (["rulers"] as const) : []),
@@ -1596,11 +1590,18 @@ watch(
             <!-- A plain link, so it opens in this tab and ⌘-click still opens a new one. -->
             <template v-if="!editing">
               <UTooltip :text="visitor ? 'Open Drop' : 'Go to your drops'">
-                <UButton aria-label="Drop" color="neutral" size="xs" :to="visitor ? '/' : '/drops'" variant="ghost">
+                <UButton
+                  aria-label="Drop"
+                  data-review-home
+                  color="neutral"
+                  size="xs"
+                  :to="visitor ? '/' : '/drops'"
+                  variant="ghost"
+                >
                   <DropMark class="h-3.5 w-5" /><span class="hidden sm:inline">Drop</span>
                 </UButton>
               </UTooltip>
-              <span aria-hidden="true" class="w-1 shrink-0" />
+              <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>
             <template v-if="galleryShown">
               <LazyViewerGallery
@@ -1620,7 +1621,7 @@ watch(
                     command === 'move' || command === 'hand' ? canvasTool(command) : picker(command, index)
                 "
               />
-              <span aria-hidden="true" class="w-1 shrink-0" />
+              <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>
             <template v-if="editing">
               <!-- One presence ring instead of the outline's two: its inner ring is page-colored, not the glass behind it,
@@ -1719,7 +1720,12 @@ watch(
                 @pins="toggleOverlay('pins')"
               />
             </template>
-            <span v-if="editing || (hasComments && !trashed)" aria-hidden="true" class="w-1 shrink-0" />
+            <span
+              v-if="editing || (hasComments && !trashed)"
+              aria-hidden="true"
+              class="w-1 shrink-0"
+              :class="prototypeCanvas && 'max-sm:hidden'"
+            />
             <template v-if="!editing && presence.people.value.length">
               <ViewerPresence
                 v-model:show-cursors="presence.showCursors.value"
@@ -1759,7 +1765,7 @@ watch(
                   <ViewerToolbar
                     v-if="!lightbox && !shownVersion && (measurable || sizable || siteRef?.canDraw)"
                     :overlays="overlays"
-                    :sizable="(sizable && !canvasShown) || Boolean(siteRef?.canDraw)"
+                    :sizable="sizable || Boolean(siteRef?.canDraw)"
                     :tool="tool"
                     :tools="previewTools"
                     :views="previewViews"

@@ -51,7 +51,7 @@ watch(
     <div
       v-bind="$attrs"
       ref="root"
-      class="pointer-events-none inset-x-2 bottom-[max(1rem,env(safe-area-inset-bottom))] flex max-h-[calc(100%-2rem)] flex-col items-center gap-2 sm:inset-x-4"
+      class="review-dock pointer-events-none inset-x-2 bottom-[max(1rem,env(safe-area-inset-bottom))] flex max-h-[calc(100%-2rem)] flex-col items-center gap-2 sm:inset-x-4"
       :class="overlay ? 'fixed z-[60]' : 'absolute z-30'"
     >
       <!-- Rises out of the bar it opens from; closing is quicker and quieter, since the reader has moved on. -->
@@ -182,9 +182,49 @@ watch(
 }
 
 @media (pointer: coarse) {
-  .review-toolbar :deep(button) {
+  .review-toolbar :deep(button),
+  .review-toolbar :deep([data-review-home]) {
     min-width: 44px;
     height: 44px;
+  }
+}
+
+@media (width < 40rem) {
+  .review-dock:has(:deep([data-review-canvas])) {
+    inset-inline: 2px;
+  }
+
+  :root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-dock:has(:deep([data-review-canvas])) {
+    bottom: calc(3rem + max(1rem, env(safe-area-inset-bottom)));
+  }
+
+  :root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-toolbar:has(:deep([data-review-canvas])) {
+    max-width: 100%;
+  }
+
+  .review-toolbar:has(:deep([data-review-canvas])) {
+    gap: 0;
+    padding: 2px;
+  }
+
+  .review-toolbar :deep([data-review-canvas]) {
+    gap: 0;
+  }
+
+  .review-toolbar :deep([data-review-zoom]) {
+    justify-content: center;
+    padding-inline: 2px;
+  }
+
+  .review-toolbar:has(:deep([data-review-canvas])) :deep(:is([data-review-label], .review-share-label)),
+  .review-toolbar :deep([data-review-zoom] > .iconify) {
+    display: none;
+  }
+}
+
+@media (width < 23rem) {
+  .review-toolbar:has(:deep([aria-label="Hide comments"])) :deep([data-review-hand]) {
+    display: none;
   }
 }
 </style>

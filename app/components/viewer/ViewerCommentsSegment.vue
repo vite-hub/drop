@@ -46,10 +46,13 @@ const item =
       @click="emit('toggle')"
     >
       <UIcon name="i-mingcute-chat-3-line" class="size-3.5" />
-      {{ on ? "Click anywhere" : "Comments" }}
-      <span v-if="count && !on" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
-        count
-      }}</span>
+      <span data-review-label>{{ on ? "Click anywhere" : "Comments" }}</span>
+      <span
+        v-if="count && !on"
+        data-review-label
+        class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums"
+        >{{ count }}</span
+      >
     </button>
   </UTooltip>
   <!-- Pressed means hidden: pressed is the state that changes the page. -->
