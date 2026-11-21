@@ -15,7 +15,7 @@ import { dropDetail, permissions } from "../../utils/drops"
 import { recordVisit } from "../../utils/expiry"
 import { type Identity, requireIdentity } from "../../utils/identity"
 import { findDropOrSite, originOf, siteItems } from "../../utils/review"
-import { type Handoff, openHandoff } from "../../utils/handoffs"
+import { type Handoff, openHandoff, publishingSession } from "../../utils/handoffs"
 import { countView } from "../../utils/views"
 import { runtimeErrors } from "../../utils/runtime-errors"
 import { writtenBy } from "#shared/agents"
@@ -268,6 +268,7 @@ function handoffSection<T extends { id: string; n: number; resolved: boolean }>(
   comments: T[],
   line: (comment: T) => string,
 ) {
+  const session = publishingSession(handoff.drop, handoff.sender) ? sessionLabel(handoff.drop.agent) : ""
   const byId = new Map(comments.map((comment) => [comment.id, comment]))
   const marked = (role: "ask" | "quote") =>
     handoff.threads.flatMap((thread) => {
@@ -281,6 +282,11 @@ function handoffSection<T extends { id: string; n: number; resolved: boolean }>(
   const text = [
     `## Handoff ${handoff.id} (${handoff.state}, sent ${new Date(handoff.createdAt).toISOString()})`,
     `Comments the user sent you from this drop with Send. Answer each ask in its thread with reply, or publish the next version with previous, base, and resolves; the drop's page shows Working until every ask has an answer.`,
+    ...(session
+      ? [
+          `The drop was published from ${session}. If that isn't your session and you can message it, hand this handoff's id to it; otherwise answer here.`,
+        ]
+      : []),
     `### Asks: the user's own${asks.length ? "" : "\nNone."}`,
     ...(asks.length ? [list(asks)] : []),
     ...(quotes.length

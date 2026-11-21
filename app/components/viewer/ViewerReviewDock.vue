@@ -112,6 +112,30 @@ watch(
   max-width: calc(100% - 6rem);
 }
 
+@container review-dock (width < 40rem) {
+  .review-toolbar :deep([data-slot="comment-send"]:is([data-state="pairing"], [data-state="confirm"])) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .review-toolbar :deep(:is([data-state="pairing"], [data-state="confirm"]) [data-slot="comment-send-content"]) {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .review-toolbar
+    :deep(:is([data-state="pairing"], [data-state="confirm"]) [data-slot="comment-send-status"]:not([data-icon])) {
+    flex: 0 1 100%;
+    min-width: 0;
+    height: auto;
+    padding-block: 4px;
+    line-height: 1.35;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .review-toolbar :deep(button) {
   min-width: 28px;
   height: 28px;

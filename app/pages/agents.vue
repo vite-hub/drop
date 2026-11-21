@@ -120,7 +120,7 @@ onBeforeUnmount(() => unwatchEndpoint?.())
           <AgentIcon :name="endpoint.agent.name" kind="agent" class="size-5" />
         </span>
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium text-highlighted">{{ endpoint.agent.name }}</p>
+          <p class="truncate text-sm font-medium text-highlighted">{{ endpoint.agent.name }} · Default</p>
           <p v-if="tested?.status === 'delivered'" class="flex items-center gap-1 truncate text-xs text-success">
             <UIcon name="i-mingcute-check-circle-line" class="size-3.5 shrink-0" />{{
               tested.code === null ? "In the inbox" : `Delivered · ${tested.code} in ${tested.ms} ms`
@@ -137,13 +137,13 @@ onBeforeUnmount(() => unwatchEndpoint?.())
         <UButton
           color="neutral"
           icon="i-mingcute-send-plane-line"
-          label="Send test"
+          label="Test default"
           :loading="testing"
           size="sm"
           variant="ghost"
           @click="sendTest"
         />
-        <UButton color="neutral" label="Remove" size="sm" variant="ghost" @click="removeEndpoint" />
+        <UButton color="neutral" label="Disconnect all" size="sm" variant="ghost" @click="removeEndpoint" />
       </div>
     </UCard>
 

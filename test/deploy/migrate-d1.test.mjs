@@ -181,9 +181,10 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
         .all(table)
         .map((row) => row.name)
     for (const [table, names] of [
+      ["drops", ["session_publisher_id"]],
       ["vitehub_comment_sends", ["endpoint", "thread"]],
-      ["vitehub_comment_send_codes", ["thread"]],
-      ["vitehub_webhook_endpoints", ["owner_name", "owner_email", "disabled_by"]],
+      ["vitehub_webhook_pairings", ["address"]],
+      ["vitehub_webhook_endpoints", ["owner_name", "owner_email", "disabled_by", "address"]],
     ])
       for (const name of names) assert.ok(columns(table).includes(name), `${table}.${name}`)
 
@@ -211,20 +212,14 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
         .join("\n"),
       /vitehub_comment_sends_member/,
     )
-    // Webhooks keeps each member's agent once, and Send's codes by member.
-    database
-      .prepare(
-        "INSERT INTO vitehub_webhook_endpoints (id, owner, name, kind, created_at, updated_at) VALUES ('e1', 'ana', 'T3 Code thread', 'url', 1, 1)",
-      )
-      .run()
-    assert.throws(() =>
-      database
-        .prepare(
-          "INSERT INTO vitehub_webhook_endpoints (id, owner, name, kind, created_at, updated_at) VALUES ('e2', 'ana', 'Codex inbox', 'inbox', 1, 1)",
-        )
-        .run(),
+    // Webhooks keeps one endpoint per member and address, and the pairing codes beside them.
+    const endpoint = database.prepare(
+      "INSERT INTO vitehub_webhook_endpoints (id, owner, address, name, kind, created_at, updated_at) VALUES (?, 'ana', ?, 'T3 Code thread', 'url', 1, 1)",
     )
-    assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_comment_send_codes'").get())
+    endpoint.run("e1", "")
+    endpoint.run("e2", "t3-thread://v2/env/thread-a")
+    assert.throws(() => endpoint.run("e3", "t3-thread://v2/env/thread-a"))
+    assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_pairings'").get())
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_deliveries'").get())
     await migrateD1()
     assert.equal(applied.length, 1)

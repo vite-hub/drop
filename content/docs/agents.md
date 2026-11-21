@@ -17,7 +17,7 @@ For drop.vitehub.dev, the Drop plugin adds the server and the [skills](#skill) i
 - **Claude Code:** Run `claude plugin marketplace add vite-hub/drop`, then `claude plugin install drop@drop`. In Claude Code, open `/mcp`, select the Drop plugin server, and authenticate in your browser.
 - **Codex:** Run `codex plugin marketplace add vite-hub/drop`, then `codex plugin add drop@drop`. Run `codex mcp login drop` and finish signing in through your browser.
 
-Then `/drop:feedback` in Claude Code, or `$feedback` in Codex, lists the comments you sent with [Send](/docs/review) and answers the one you pick. To have Send reach it, run Send once on a drop, paste the setup prompt it copies, and press **Allow and send** when the pill asks.
+To pair an inbox, press [**Send**](/docs/review) on a drop with waiting comments. In Claude Code, run `/drop:feedback` with the copied setup prompt; in Codex, use `$feedback` with that prompt. Ask the skill to pair an inbox, not a T3 task. When it reports that pairing succeeded, press **Allow and send** in Drop. Then run the skill without the setup prompt to pull your handoffs and answer the one you pick.
 
 ## How sign-in works {#sign-in}
 
@@ -94,7 +94,7 @@ Every call runs as the person who allowed the client, with their role.
 | `list_handoffs` | Your handoffs that no agent finished, newest first: `sent` ones wait, `working` ones an agent opened |
 | `read_drop` with `handoff` | Reads the drop with that handoff's threads first, your own as asks and others' as quotes, and shows you Working on the drop's page |
 
-Publish with `agent.session`, its `thread` set to your thread's id (`T3CODE_THREAD_ID` in T3 Code), and with `base`, the version you read. Each delivery names that session, so the next round of comments reaches the thread that wrote the drop, and a stale `base` fails instead of overwriting a newer version. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.
+Publish with `agent.session` and with `base`, the version you read. In T3 Code, look up `T3CODE_THREAD_ID` with `t3_thread_read` and use its `t3-thread://v2/<environment>/<thread>` link as `agent.session.thread`; a bare ID cannot route across environments. A delivery includes the publishing session only when the sender owns the drop and published its latest version. For teammates and versions with no verified publisher, `session` is `null`. A stale `base` fails instead of overwriting a newer version. New drops start with the Drop's default share: Team on a team Drop, Only me on a personal one. Agents make a drop public only when you ask, or when it's meant for people outside, like pull request assets.
 
 ## Read uploaded files {#read-files}
 
