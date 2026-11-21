@@ -157,8 +157,8 @@ export default defineNuxtConfig({
       server: {
         auth: {
           github: {
-            clientId: env({ secret: true, source: env.source("GITHUB_CLIENT_ID"), default: "" }),
-            clientSecret: env({ secret: true, source: env.source("GITHUB_CLIENT_SECRET"), default: "" }),
+            clientId: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_ID") }),
+            clientSecret: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_SECRET") }),
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },
@@ -166,7 +166,7 @@ export default defineNuxtConfig({
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
           mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
           publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
-          members: env({ secret: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }), default: "" }),
+          members: env({ secret: true, optional: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }) }),
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
           testSignin: env.boolean({ source: env.source("DROP_TEST_SIGNIN"), default: false }),
@@ -185,8 +185,8 @@ export default defineNuxtConfig({
           },
           teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
           billing: {
-            stripeSecretKey: env({ secret: true, source: env.source("STRIPE_SECRET_KEY"), default: "" }),
-            stripeWebhookSecret: env({ secret: true, source: env.source("STRIPE_WEBHOOK_SECRET"), default: "" }),
+            stripeSecretKey: env({ secret: true, optional: true, source: env.source("STRIPE_SECRET_KEY") }),
+            stripeWebhookSecret: env({ secret: true, optional: true, source: env.source("STRIPE_WEBHOOK_SECRET") }),
             priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
             annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
             freeMembers: env.number({

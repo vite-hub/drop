@@ -72,8 +72,13 @@ export const useAuth = () => {
 export default () => new Response(null, { status: 404 })`,
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true; export const blobDocument = () => ({ kind: 'blob' })",
-  "vite-hub/env":
-    "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
+  "vite-hub/env": `const optionalSecret = (value) => value ? { unseal: () => value } : undefined;
+    export const deriveSecret = async (purpose) => \`test-secret:\${purpose}\`;
+    export const useServerEnv = () => {
+      const t = globalThis.dropTest;
+      const billing = t.billing === true ? { stripeSecretKey: 'sk_test', stripeWebhookSecret: 'whsec_test', priceId: 'price_team' } : t.billing || {};
+      return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: optionalSecret(t.members), quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: optionalSecret(billing.stripeSecretKey), stripeWebhookSecret: optionalSecret(billing.stripeWebhookSecret), priceId: billing.priceId ?? '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) };
+    };`,
 }
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([
