@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Who can open a drop is one choice (#shared/share). Every state stays in the list, and one this drop can't take says
-// why, so picking never makes options appear or vanish; the line under the link always takes one line, so the popover
-// keeps its height too.
+// why, so picking never makes options appear or vanish.
 import { daysUntil } from "#shared/expiry"
 import { isPublic, type Share, SHARE_ICONS, SHARE_LABELS } from "#shared/share"
 import type { DropDetail } from "#shared/types"
@@ -19,9 +18,9 @@ const url = useShareUrl(() => props.drop)
 const choices = computed(() => shareItems(me.value, props.drop))
 const now = useRelativeNow()
 
-// What the link does now, in one line.
+// What the link does now, in one line. A link that is off says nothing: the dimmed link already shows it.
 const linkNote = computed(() => {
-  if (props.drop.isOwner && !shared.value) return "Pick who can open it to turn the link on."
+  if (props.drop.isOwner && !shared.value) return ""
   if (!isPublic(props.drop.share)) return "Teammates sign in to open it."
   if (!props.drop.publicUntil) return "It stays open until you change it."
   const left = daysUntil(props.drop.publicUntil, now.value)
@@ -43,6 +42,10 @@ async function pick(next: Share) {
   if (done && renew) notify.done("Public link renewed")
 }
 
+// The panel rises centered over the whole pill, as the related links and comments do, not over the Share button.
+const trigger = useTemplateRef<{ $el: HTMLElement }>("trigger")
+const bar = computed(() => trigger.value?.$el?.closest<HTMLElement>('[aria-label="Document tools"]') ?? undefined)
+
 // Reka focuses the first button, the close X, and rings it. Focus the panel instead: Tab still walks in, Escape still closes.
 function focusPanel(event: Event) {
   event.preventDefault()
@@ -53,13 +56,15 @@ function focusPanel(event: Event) {
 <template>
   <UPopover
     v-model:open="open"
-    :content="{ align: 'end', side: 'top', onOpenAutoFocus: focusPanel }"
+    :content="{ align: 'center', side: 'top', sideOffset: 8, onOpenAutoFocus: focusPanel }"
+    :reference="bar"
     :ui="{
       content:
         'w-[min(23rem,calc(100vw-1rem))] max-h-[min(36rem,calc(100dvh-5rem))] overflow-y-auto overscroll-contain rounded-[12px]',
     }"
   >
     <UButton
+      ref="trigger"
       aria-label="Share drop"
       class="shrink-0"
       color="neutral"
@@ -143,7 +148,7 @@ function focusPanel(event: Event) {
               :value="url"
             />
           </div>
-          <p aria-live="polite" class="mt-1.5 min-h-lh px-1 text-xs text-muted">
+          <p v-if="linkNote" aria-live="polite" class="mt-1.5 px-1 text-xs text-muted">
             {{ linkNote }}
           </p>
         </div>
