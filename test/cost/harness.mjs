@@ -147,8 +147,8 @@ export const state = (globalThis.dropTest = {
       const stream = request.method === "HEAD" ? null : body.slice(start, end + 1).stream()
       return new Response(stream, { status: range ? 206 : 200, headers })
     },
-    put: async (key, body) => {
-      objects.set(key, { body: new Blob([body]), uploadedAt: new Date() })
+    put: async (key, body, options = {}) => {
+      objects.set(key, { body: new Blob([body], { type: options.contentType ?? "" }), uploadedAt: new Date() })
       return [null, { url: `/f/${key}` }]
     },
     delete: async (keys) => {
