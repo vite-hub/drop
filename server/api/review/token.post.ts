@@ -2,6 +2,7 @@ import { defineValidatedHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteMatches } from "#shared/review"
 import { ReviewTokenSchema } from "#shared/schemas"
+import { clientAddress } from "../../utils/client-address"
 import { findDrop, permissions } from "../../utils/drops"
 import { guestOf } from "../../utils/guests"
 import { identify } from "../../utils/identity"
@@ -11,7 +12,7 @@ export default defineValidatedHandler({
   validate: { body: ReviewTokenSchema },
   async handler(event) {
     const who = await identify(event)
-    await requireRateLimit(event, "review-token", { key: who?.userId, limit: 20, window: "1m" })
+    await requireRateLimit(event, "review-token", { key: who?.userId ?? clientAddress(event), limit: 20, window: "1m" })
     const { origin, choice, name } = await event.req.json()
     const id = await openChoice(event, choice, origin, who)
     const site = id ? await findDrop(id, event) : null

@@ -2,6 +2,7 @@ import { defineHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { encodeInk } from "#shared/ink"
 import { CommentSchema } from "#shared/schemas"
+import { clientAddress } from "../../../utils/client-address"
 import {
   attachmentsById,
   imageParent,
@@ -33,7 +34,12 @@ export default defineHandler(async (event) => {
   const who = await identify(event)
   if (!drop || !permissions(drop, who).comment)
     return refuseSend(event, who, new HTTPError({ status: 404, statusText: "You can't comment on this drop." }))
-  await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m", message: TOO_MANY_COMMENTS })
+  await requireRateLimit(event, "comment", {
+    key: who?.userId ?? clientAddress(event),
+    limit: 20,
+    window: "1m",
+    message: TOO_MANY_COMMENTS,
+  })
   const { input, images } = await readCommentBody(event, CommentSchema)
   requireSender(who, input.as)
   if (!input.body && !images.length && input.suggestion === undefined)

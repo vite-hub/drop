@@ -1,6 +1,7 @@
 import { defineHandler } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { faviconUrl, resourceLabel } from "#shared/resources"
+import { clientAddress } from "../../utils/client-address"
 import { siteCoversDrop } from "../../utils/content-origin"
 import { linkedFrom, relatedDrops } from "../../utils/related"
 import { covered, reviewApi, reviewSession, sealDoc } from "../../utils/review"
@@ -13,7 +14,7 @@ export default reviewApi(
       event.res.headers.set("Cache-Control", "no-store")
       if (origin) event.res.headers.set("Access-Control-Allow-Origin", origin)
       if (!(await covered(origin))) return { linked: false }
-      await requireRateLimit(event, "review-related", { limit: 30, window: "1m" })
+      await requireRateLimit(event, "review-related", { key: clientAddress(event), limit: 30, window: "1m" })
       return { linked: await linkedFrom(origin) }
     }
     const { claims, who } = await reviewSession(event)

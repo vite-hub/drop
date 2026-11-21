@@ -2,6 +2,7 @@ import { defineValidatedHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { siteAddressesFor } from "#shared/review"
 import { ReviewSitesSchema } from "#shared/schemas"
+import { clientAddress } from "../../utils/client-address"
 import { identify } from "../../utils/identity"
 import { sealChoice, sitesFor } from "../../utils/review"
 
@@ -9,7 +10,7 @@ export default defineValidatedHandler({
   validate: { body: ReviewSitesSchema },
   async handler(event) {
     const who = await identify(event)
-    await requireRateLimit(event, "review-token", { key: who?.userId, limit: 20, window: "1m" })
+    await requireRateLimit(event, "review-token", { key: who?.userId ?? clientAddress(event), limit: 20, window: "1m" })
     const { origin } = await event.req.json()
     if (!siteAddressesFor(origin).length)
       throw new HTTPError({ status: 400, statusText: "Drop reviews pages on https, or http on localhost." })

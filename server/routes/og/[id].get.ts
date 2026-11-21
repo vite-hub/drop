@@ -3,6 +3,7 @@ import { defineHandler, getValidatedRouterParams, type H3Event, redirect } from 
 import { useStorage } from "nitro/storage"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
+import { clientAddress } from "../../utils/client-address"
 import { renderOgPng } from "../../utils/code-image-png"
 
 const CARD_TTL = 60 * 60 * 24 * 30
@@ -55,7 +56,7 @@ export default defineHandler(async (event) => {
 
 async function rendersAllowed(event: H3Event) {
   try {
-    await requireRateLimit(event, "og-image", { limit: 20, window: "1m" })
+    await requireRateLimit(event, "og-image", { key: clientAddress(event), limit: 20, window: "1m" })
     return true
   } catch (error) {
     if (!(error instanceof Error && "status" in error && error.status === 429))

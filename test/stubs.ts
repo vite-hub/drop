@@ -83,6 +83,10 @@ export default () => new Response(null, { status: 404 })`,
       return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: optionalSecret(t.members), quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: optionalSecret(billing.stripeSecretKey), stripeWebhookSecret: optionalSecret(billing.stripeWebhookSecret), priceId: billing.priceId ?? '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) };
     };`,
 }
+// The client IP header nuxt.config sets for the host, VPS unless a test sets `dropTest.clientIpHeader`. Only for
+// client-address.ts, so tests that vi.mock nitro/runtime-config still get their mock.
+const clientAddressConfig =
+  'export const useRuntimeConfig = () => ({ clientIpHeader: globalThis.dropTest?.clientIpHeader ?? "x-forwarded-for" })'
 // With DROP_TEST_BASELINE=<ref>, these files load as they were at that commit, to compare a change against it.
 const baseline = new Set([
   "server/utils/drops.ts",
@@ -111,6 +115,8 @@ export function dropTestStubs(): Plugin {
       // Vitest empties CSS `?raw` imports; the frame's browser tests need the real stylesheets.
       const css = Object.entries(rawCss).find(([, [specifier]]) => specifier === id)
       if (css) return PREFIX + css[0]
+      if (id === "nitro/runtime-config" && importer === `${root}server/utils/client-address.ts`)
+        return `${PREFIX}client-address-config`
       if (id in stubs && importer !== `${root}nuxt.config.ts`) return PREFIX + id
       const module = Object.keys(modules).find(
         (name) => id.endsWith(`/utils/${name}`) || id === `./${name}` || id === `../${name}`,
@@ -123,6 +129,7 @@ export function dropTestStubs(): Plugin {
         const name = id.slice(PREFIX.length)
         const css = rawCss[name]
         if (css) return `export default ${JSON.stringify(readFileSync(`${root}${css[1]}`, "utf8"))}`
+        if (name === "client-address-config") return clientAddressConfig
         return modules[name] ?? stubs[name]
       }
       const ref = process.env.DROP_TEST_BASELINE

@@ -1,6 +1,7 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import * as v from "valibot"
+import { clientAddress } from "../../../../utils/client-address"
 import { findDrop, permissions } from "../../../../utils/drops"
 import { writeBoard } from "../../../../utils/boards"
 import { identify } from "../../../../utils/identity"
@@ -16,7 +17,7 @@ export default defineValidatedHandler({
     const who = await identify(event)
     if (!drop || drop.expired || !permissions(drop, who).edit)
       throw new HTTPError({ status: 404, statusText: "You can't draw on this board." })
-    await requireRateLimit(event, "board", { key: who?.userId, limit: 120, window: "1m" })
+    await requireRateLimit(event, "board", { key: who?.userId ?? clientAddress(event), limit: 120, window: "1m" })
     const { elements } = await event.req.json()
     const { updatedAt } = await writeBoard(drop, { elements, who })
     logDrop(event, drop, { change: "board" })
