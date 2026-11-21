@@ -49,7 +49,7 @@ After note.
     const position = await page.locator(".cz-dialog").evaluate((dialog) => ({
       copyBottom: dialog.querySelector(".ca-copy").getBoundingClientRect().bottom,
       imageTop: dialog.querySelector(".ca-frame img").getBoundingClientRect().top,
-      beforeClose: Boolean(dialog.querySelector(".ca-zoom-copy + .cz-close")),
+      beforeClose: Boolean(dialog.querySelector(".ca-zoom-tools + .cz-close")),
     }))
     assert.ok(position.beforeClose && position.copyBottom <= position.imageTop)
 

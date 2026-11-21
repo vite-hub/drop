@@ -64,9 +64,10 @@ test("every comark-ui package Drop renders has a section in the Markdown referen
   // include reads files, which Drop turns off, reading-time only measures, and pele draws the ```mermaid fences markdown.md
   // documents. magic-move's animation needs its script, which /f/ pages block, so blocks.md (a stopgap that doesn't grow)
   // leaves it out. Drop turns time off, since a cached render would keep "2 days ago" for weeks, so markdown.md lists it under what Drop doesn't render.
+  // motion has no syntax to write, and Drop turns it off.
   const packages = Object.keys(preset.dependencies).filter(
     (name) =>
-      !["comark-include", "comark-magic-move", "comark-pele", "comark-reading-time", "comark-time"].includes(name),
+      !["comark-include", "comark-magic-move", "comark-motion", "comark-pele", "comark-reading-time", "comark-time"].includes(name),
   )
   const missing = packages.filter(
     // comark-mathml is published under that name, since npm refused comark-math, and documented at /math/.
