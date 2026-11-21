@@ -37,6 +37,10 @@ function pendingMigrations(database, entries, columns) {
 /**
  * Copies the database into a `backups` folder beside it before migrations change it, and keeps the newest three
  * copies. A new database has nothing to keep.
+ *
+ * ViteHub's `migrateOnStart: { backup: true }` makes the same copy, but inside the server, after `adoptSqliteLedger`
+ * below has rewritten the ledger, and only when migrations are pending. Its copy of a legacy database would hold the
+ * adopted hash, and a database that needs only the adoption would get no copy, so Drop keeps its own.
  */
 export function backupBeforeMigrate({ file, entries, backups, now = new Date(), log = console.log }) {
   if (!existsSync(file)) return
@@ -70,6 +74,8 @@ export function backupBeforeMigrate({ file, entries, backups, now = new Date(), 
 
 async function start() {
   if (readFileSync(join(app, ".output/drop-database"), "utf8").trim() === "d1") {
+    // Workaround: ViteHub's migrateOnStart refuses D1 over HTTP, so a VPS on D1 keeps Drop's own migrator until
+    // ViteHub can apply D1 migrations at start. It reads only the folders d1-migrations.json lists.
     const { migrateD1 } = await import("./migrate-d1.mjs")
     await migrateD1()
   } else {

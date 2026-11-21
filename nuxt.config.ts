@@ -142,6 +142,7 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
             connection: {
               url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }),
             },
+            // Without `backup`: scripts/start.mjs copies the file before adoptSqliteLedger changes the ledger.
             migrateOnStart: true,
           }
         : d1("vitehub-drop-vps"),
