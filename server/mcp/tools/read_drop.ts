@@ -267,11 +267,10 @@ function handoffSection<
   T extends { id: string; n: number; resolved: boolean; agent: unknown; replies: { agent: unknown }[] },
 >(handoff: Handoff, comments: T[], line: (comment: T) => string) {
   const session = publishingSession(handoff.drop, handoff.sender) ? sessionLabel(handoff.drop.agent) : ""
-  const byId = new Map(
-    comments
-      .filter((comment) => !comment.resolved && !(comment.replies.at(-1) ?? comment).agent)
-      .map((comment) => [comment.id, comment]),
-  )
+  const byId = new Map<string, T>()
+  for (const comment of comments) {
+    if (!comment.resolved && !(comment.replies.at(-1) ?? comment).agent) byId.set(comment.id, comment)
+  }
   const marked = (role: "ask" | "quote") =>
     handoff.threads.flatMap((thread) => {
       const comment = byId.get(thread.id)

@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import * as v from "valibot"
-import type { CommentSendData, CommentSubject } from "vite-hub/comments"
+import type { CommentSendData, CommentSubject, CommentThread } from "vite-hub/comments"
 import { commentMessages, commentSends, commentThreads } from "vite-hub/comments/database"
 import { db } from "vite-hub/database"
 import { findDrop, permissions } from "./drops"
@@ -122,6 +122,39 @@ export async function openHandoff(id: string, who: Identity): Promise<Handoff | 
 /** At most this many handoffs in a list. */
 const LISTED = 20
 
+function hasWaitingFeedback(reopenedId?: string) {
+  return sql`exists (
+      select 1 from json_each(${commentSends.threads}) as entry
+      join ${commentThreads} on ${commentThreads.id} = json_extract(entry.value, '$.id')
+      where ${commentThreads.status} = 'open'
+        ${reopenedId ? sql`and ${commentThreads.id} = ${reopenedId}` : sql``}
+        and (coalesce(json_extract(entry.value, '$.role'), 'ask') = 'ask' or not exists (
+          select 1 from json_each(${commentSends.threads}) as candidate
+          where coalesce(json_extract(candidate.value, '$.role'), 'ask') = 'ask'
+        ))
+        and (select nullif(${commentMessages.actor}, 'null') is null
+          ${reopenedId ? sql`and ${commentMessages.id} = json_extract(entry.value, '$.message')` : sql``}
+          from ${commentMessages}
+          where ${commentMessages.threadId} = ${commentThreads.id}
+          order by ${commentMessages.createdAt} desc, ${commentMessages.id} desc limit 1)
+    )`
+}
+
+/** Put a reopened, still-unanswered message back in the original inbox without another delivery. */
+export async function restoreReopenedHandoffs({ id, subject }: CommentThread) {
+  await db
+    .update(commentSends)
+    .set({ state: "sent", updatedAt: Date.now() })
+    .where(
+      and(
+        eq(commentSends.subjectKind, subject.kind),
+        eq(commentSends.subjectId, subject.id),
+        eq(commentSends.state, "done"),
+        hasWaitingFeedback(id),
+      ),
+    )
+}
+
 async function finishAnsweredHandoffs(member: string) {
   await db
     .update(commentSends)
@@ -130,18 +163,7 @@ async function finishAnsweredHandoffs(member: string) {
       and(
         eq(commentSends.member, member),
         inArray(commentSends.state, ["sent", "working"]),
-        sql`not exists (
-      select 1 from json_each(${commentSends.threads}) as entry
-      join ${commentThreads} on ${commentThreads.id} = json_extract(entry.value, '$.id')
-      where ${commentThreads.status} = 'open'
-        and (coalesce(json_extract(entry.value, '$.role'), 'ask') = 'ask' or not exists (
-          select 1 from json_each(${commentSends.threads}) as candidate
-          where coalesce(json_extract(candidate.value, '$.role'), 'ask') = 'ask'
-        ))
-        and (select nullif(${commentMessages.actor}, 'null') is null from ${commentMessages}
-          where ${commentMessages.threadId} = ${commentThreads.id}
-          order by ${commentMessages.createdAt} desc, ${commentMessages.id} desc limit 1)
-    )`,
+        sql`not ${hasWaitingFeedback()}`,
       ),
     )
 }

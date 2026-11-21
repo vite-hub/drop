@@ -14,6 +14,7 @@ const { default: readDrop } = await import("../../server/mcp/tools/read_drop.ts"
 const { default: listHandoffs } = await import("../../server/mcp/tools/list_handoffs.ts")
 const { default: reply } = await import("../../server/mcp/tools/reply.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
+const { default: commentPatch } = await import("../../server/api/comments/[id]/index.patch.ts")
 const { default: comments } = await import("../../server/comments.ts")
 const { default: disconnect } = await import("../../server/api/send/endpoint.delete.ts")
 const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
@@ -294,6 +295,54 @@ test("reopening a handoff skips asks resolved or answered in another session", a
   const complete = await call(readDrop, { handoff: id })
   assert.deepEqual(complete.structuredContent.handoff.asks, [])
   assert.deepEqual(complete.structuredContent.handoff.quotes, [], "completed asks don't turn quotes into requests")
+})
+
+test("reopening an unanswered ask restores its completed handoff without sending again", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  const id = await pairAndSend(doc)
+  async function setResolved(thread, resolved) {
+    state.who = ana
+    const event = new H3Event(
+      new Request(`https://drop.example/api/comments/${thread.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ resolved }),
+      }),
+    )
+    event.context.log = { set() {}, error() {}, warn() {} }
+    event.context.params = { id: thread.id }
+    assert.deepEqual(await commentPatch(event), { ok: true })
+  }
+
+  await setResolved(mine, true)
+  await setResolved(theirs, true)
+  state.who = agentOf(ana)
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
+  assert.equal((await call(readDrop, { handoff: id })).structuredContent.handoff.state, "done")
+
+  await setResolved(mine, false)
+  state.who = agentOf(ana)
+  assert.deepEqual(
+    (await call(listHandoffs, {})).structuredContent.handoffs.map((handoff) => handoff.id),
+    [id],
+  )
+  assert.deepEqual((await call(readDrop, { handoff: id })).structuredContent.handoff, {
+    id,
+    state: "working",
+    asks: [mine.n],
+    quotes: [],
+  })
+  assert.equal(delivered.length, 1)
+
+  assert.equal(
+    (await call(reply, { id: doc.id, comment: mine.n, body: "Moved to Monday.", resolve: true })).isError,
+    undefined,
+  )
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
+  await setResolved(mine, false)
+  state.who = agentOf(ana)
+  assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
+  assert.deepEqual((await call(readDrop, { handoff: id })).structuredContent.handoff.asks, [])
 })
 
 test("a quote-only handoff stays working until the quoted threads are answered", async () => {
