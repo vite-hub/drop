@@ -6,8 +6,6 @@ const DOCUMENT_PATH =
   /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html|htm))$/i
 const markdownContentSecurityPolicy = (scriptHashes: string[]) =>
   `default-src 'none'; img-src https: data:; media-src https:; script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(" ")}; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
-const HTML_CONTENT_SECURITY_POLICY =
-  "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https:; style-src 'unsafe-inline' https:; font-src data: https:; img-src https: data: blob:; connect-src https:; frame-src 'self' about:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 export default defineHandler(async (event) => {
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("raw")) return
@@ -36,9 +34,9 @@ export default defineHandler(async (event) => {
   event.res.headers.set("Referrer-Policy", "no-referrer")
   event.res.headers.set("X-Content-Type-Options", "nosniff")
   if (isHtml) {
+    const { htmlLanding, HTML_CONTENT_SECURITY_POLICY } = await import("#shared/html-landing")
     event.res.headers.set("Content-Security-Policy", HTML_CONTENT_SECURITY_POLICY)
     const text = await readSource()
-    const { htmlLanding } = await import("#shared/html-landing")
     return event.req.method === "HEAD" ? "" : htmlLanding(text, event.url.pathname)
   }
   const { renderMarkdownDocument, RENDERER_SCRIPTS } = await import("../utils/markdown-document")

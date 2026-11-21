@@ -801,6 +801,14 @@ button.ca-tree-row.is-active {
   background: var(--ca-warn);
   vertical-align: 1px;
 }
+.ca-storage-notice {
+  padding: 4px 12px;
+  color: var(--ca-muted-fg);
+  font-size: 12px;
+}
+.ca-storage-notice:empty {
+  display: none;
+}
 
 /* Syntax colors, from @lezer/highlight's classHighlighter. */
 .tok-keyword,

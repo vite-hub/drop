@@ -98,6 +98,7 @@ function parseLesson(source) {
       files: Object.fromEntries(paths.map((p) => [p, files[p]])),
       changed,
       active,
+      preferredFile: linked ?? ownFirst ?? null,
     };
   });
   const guideSide = meta.guide === "right" ? "right" : "left";

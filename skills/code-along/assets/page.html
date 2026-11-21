@@ -15,6 +15,7 @@
       {
         "imports": {
           "marked": "https://cdn.jsdelivr.net/npm/marked@16.4.2/lib/marked.esm.js",
+          "es-module-lexer/js": "https://cdn.jsdelivr.net/npm/es-module-lexer@2.3.2/dist/lexer.asm.js",
           "codemirror": "https://esm.sh/*codemirror@6.0.2",
           "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.20.2",
           "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.10.3",
@@ -51,18 +52,23 @@
   </head>
   <body>
     <div id="lesson-root"></div>
-    <!-- Paste lesson.md between these tags, with every </script written as <\/script. -->
-    <script id="lesson" type="text/markdown"></script>
-    <!-- Paste assets/lesson.js between these tags. -->
-    <script id="ca-lesson" type="text/plain"></script>
-    <!-- Paste assets/app.js between these tags. -->
-    <script id="ca-app" type="text/plain"></script>
+    <!-- Fill the slots with JSON string literals, with literal less-than signs encoded as \u003c. -->
+    <script id="lesson" type="application/json"></script>
+    <script id="ca-lesson" type="application/json"></script>
+    <script id="ca-app" type="application/json"></script>
     <script>
       // Runs the template pasted into this page. The editor and the Markdown parser come from a CDN when the page
       // opens; without them the page still shows the steps and a plain text editor.
       (() => {
         const root = document.getElementById("lesson-root");
-        const part = (id) => document.getElementById(id).textContent;
+        const part = (id) => {
+          const text = document.getElementById(id).textContent;
+          if (id === "ca-style") return text;
+          try {
+            const source = JSON.parse(text);
+            return typeof source === "string" ? source : "";
+          } catch { return ""; }
+        };
         const missing = [
           [/\.ca-shell/, "ca-style", "assets/style.css"],
           [/\bfunction parseLesson\b/, "ca-lesson", "assets/lesson.js"],

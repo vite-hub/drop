@@ -6,7 +6,7 @@ license: MIT
 
 # Code along
 
-A code-along is one `lesson.md`: a guide in steps, and the files each step shows. This skill's template turns it into one HTML page with the guide on one side and, on the other, a file tree, an editor and a preview that reruns as the person types. Their edits stay in their browser until they press Reset. You write the lesson; the template owns how it looks.
+A code-along is one `lesson.md`: a guide in steps, and the files each step shows. This skill's template turns it into one HTML page with the guide on one side and, on the other, a file tree, an editor and a preview that reruns as the person types. Edits persist until Reset where the browser provides durable storage. In a sandboxed Drop without a separate content origin, on a direct HTML landing page, or when storage is blocked, edits are temporary and reloading can lose them. You write the lesson; the template owns how it looks.
 
 It fits three asks:
 
@@ -58,7 +58,7 @@ console.log("hi")
 - **A step's files** are the step before's files plus the ones it writes. Writing a path again replaces that file from that step on. The tree marks the files a step changes.
 - **Links** to a path open that file; add `#L3` or `#L3-L5` to select lines. A link whose text is a file name shows as a file chip. Every link must point to a file of its step, or the build stops.
 - **The step opens** on the file its text links to first, else the first file it writes.
-- **The preview** shows `index.html` in a sandboxed frame. It runs `<script type="module">` with relative imports between the files, `fetch` of a file, and bare imports such as `import confetti from "canvas-confetti"` from esm.sh. It has no network beyond https and no server, so a lesson about a server shows its code without a preview.
+- **The preview** shows `index.html` in a sandboxed frame. It runs native `<script type="module">` with literal imports between lesson JavaScript files, `fetch("./file.ext")` of any lesson file, and bare imports such as `import confetti from "canvas-confetti"` from esm.sh (unless the preview supplies its own import map). Use string literals with `import()` in lesson modules. Virtual modules have `data:` URLs, not HTTP paths: use relative string `fetch` for lesson assets instead of resolving them against `import.meta.url`. Local module previews require the CDN module lexer. There is no server, so a lesson about a server shows its code without a preview.
 - **The console** tab shows the preview's `console` calls and errors.
 - **Callouts** are `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` and `[!CAUTION]`. Tables and `<details>` work as in GitHub.
 - **Frontmatter:** `title`, and `guide: right` to put the guide on the right, as for a prototype the person tries first.
@@ -75,7 +75,7 @@ The page is [assets/page.html](assets/page.html) with `lesson.md`, [assets/style
 
    `--shots` saves every step in light and dark and the first step on a phone, and fails when the page, the editor or a preview throws. It needs `playwright` in the folder you run it from; set one up once with `mkdir -p /tmp/ca-build && cd /tmp/ca-build && npm init -y && npm i playwright && npx playwright install chromium`, then run the build from there. Without it, drop `--shots`.
 
-2. **Without Node**, fill [assets/page.html](assets/page.html) yourself: `lesson.md` inside `<script id="lesson">`, `style.css` inside `<style id="ca-style">`, `lesson.js` inside `<script id="ca-lesson">` and `app.js` inside `<script id="ca-app">`, with every `</script` written as `<\/script`. Set the `<title>`. When a file of this skill isn't on disk, read it as `skill://code-along/assets/app.js` from Drop's MCP server, or at `https://drop.vitehub.dev/.well-known/skills/code-along/assets/`. Nothing checks the lesson on this path, so check each link against its step's files yourself.
+2. **Without Node**, fill [assets/page.html](assets/page.html) yourself: copy `style.css` into `<style id="ca-style">`. Encode `lesson.md`, `lesson.js`, and `app.js` each as one JSON string literal, then replace every literal `<` in the encoded string with `\u003c` (in JavaScript, `JSON.stringify(source).replaceAll("<", "\\u003c")`). Paste the resulting strings, including the surrounding quotes, into the `lesson`, `ca-lesson`, and `ca-app` script slots respectively. Set the `<title>`. When a file of this skill isn't on disk, read it as `skill://code-along/assets/app.js` from Drop's MCP server, or at `https://drop.vitehub.dev/.well-known/skills/code-along/assets/`. Nothing checks the lesson on this path, so check each link against its step's files yourself.
 
 The page loads the editor (CodeMirror) and the Markdown parser from esm.sh and jsDelivr when it opens. Without a network, it shows the steps with a plain text editor.
 

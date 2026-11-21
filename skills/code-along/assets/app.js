@@ -94,83 +94,6 @@ async function loadEditorKit() {
   return { ...language, ...commands, ...cm, ...state, ...view, highlight, language: languageFor };
 }
 
-// ---------- the module runner inside the preview
-//
-// Drop serves an HTML drop with a Content-Security-Policy that allows inline and https: scripts but no data: or blob:
-// URLs, so a lesson's files can't import each other as real modules. The preview turns each JS file into an async
-// function instead: `import` becomes an awaited call that returns the other file's exports, and `export` defines a
-// getter. URLs and bare names (from esm.sh) still load as real modules.
-
-function toAsyncModule(code) {
-  const exported = [];
-  let n = 0;
-  const lines = (text) => "\n".repeat((text.match(/\n/g) || []).length);
-  const bindings = (list, from) =>
-    list
-      .split(",")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const [name, alias] = part.split(/\s+as\s+/);
-        return [name.trim(), (alias || name).trim()];
-      });
-  code = code.replace(/\bimport\.meta\b/g, "__meta");
-  code = code.replace(
-    /^([ \t]*)export\s*\{([^}]*)\}\s*from\s*(['"])([^'"\n]+)\3[ \t]*;?/gm,
-    (match, indent, list, _q, spec) => {
-      const m = `__m${n++}`;
-      return `${indent}const ${m} = await __import(${JSON.stringify(spec)});${bindings(list)
-        .map(([name, alias]) => `__export(${JSON.stringify(alias)}, () => ${m}[${JSON.stringify(name)}]);`)
-        .join("")}${lines(match)}`;
-    },
-  );
-  code = code.replace(
-    /^([ \t]*)export\s*\*\s*(?:as\s+([\w$]+)\s*)?from\s*(['"])([^'"\n]+)\3[ \t]*;?/gm,
-    (match, indent, ns, _q, spec) => {
-      const m = `__m${n++}`;
-      return `${indent}const ${m} = await __import(${JSON.stringify(spec)});${
-        ns
-          ? `__export(${JSON.stringify(ns)}, () => ${m});`
-          : `for (const k of Object.keys(${m})) if (k !== "default") __export(k, () => ${m}[k]);`
-      }${lines(match)}`;
-    },
-  );
-  code = code.replace(
-    /^([ \t]*)import\s+(?:([\w$]+)\s*,?\s*)?(\{[^}]*\}|\*\s*as\s+[\w$]+)?\s*from\s*(['"])([^'"\n]+)\4[ \t]*;?/gm,
-    (match, indent, def, rest, _q, spec) => {
-      const m = `__m${n++}`;
-      let out = `${indent}const ${m} = await __import(${JSON.stringify(spec)});`;
-      if (def) out += `const ${def} = ${m}.default;`;
-      if (rest && rest.startsWith("{"))
-        out += `const { ${bindings(rest.slice(1, -1))
-          .map(([name, alias]) => (name === alias ? name : `${name}: ${alias}`))
-          .join(", ")} } = ${m};`;
-      else if (rest) out += `const ${rest.replace(/^\*\s*as\s+/, "")} = ${m};`;
-      return out + lines(match);
-    },
-  );
-  code = code.replace(
-    /^([ \t]*)import\s*(['"])([^'"\n]+)\2[ \t]*;?/gm,
-    (_m, indent, _q, spec) => `${indent}await __import(${JSON.stringify(spec)});`,
-  );
-  code = code.replace(/\bimport\s*\(/g, "__import(");
-  code = code.replace(
-    /^([ \t]*)export\s+default\s+(async\s+function\b\*?|function\b\*?|class\b)\s*([\w$]+)/gm,
-    (_m, indent, kind, name) => (exported.push(["default", name]), `${indent}${kind} ${name}`),
-  );
-  code = code.replace(/^([ \t]*)export\s+default\s+/gm, "$1__exports.default = ");
-  code = code.replace(
-    /^([ \t]*)export\s+(const|let|var|async\s+function\*?|function\*?|class)\s+([\w$]+)/gm,
-    (_m, indent, kind, name) => (exported.push([name, name]), `${indent}${kind} ${name}`),
-  );
-  code = code.replace(/^([ \t]*)export\s*\{([^}]*)\}[ \t]*;?/gm, (match, indent, list) => {
-    for (const [name, alias] of bindings(list)) exported.push([alias, name]);
-    return indent + lines(match);
-  });
-  const head = exported.map(([name, local]) => `__export(${JSON.stringify(name)}, () => ${local});`).join("");
-  return `"use strict";${head}${code}`;
-}
-
 function resolvePath(from, ref) {
   if (!ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return null;
   const clean = ref.split("#")[0].split("?")[0];
@@ -183,23 +106,36 @@ function resolvePath(from, ref) {
   return parts.join("/");
 }
 
-function previewRuntime(files) {
+function scriptJSON(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function previewRuntime(files, run, entries) {
   return `(() => {
-  const files = ${JSON.stringify(files).replace(/</g, "\\u003c")};
+  const files = Object.assign(Object.create(null), JSON.parse(${scriptJSON(JSON.stringify(files))}));
   const resolvePath = ${resolvePath.toString()};
-  const toAsyncModule = ${toAsyncModule.toString()};
-  const post = (message) => parent.postMessage(Object.assign({ __codeAlong: true }, message), "*");
+  const post = (message) => parent.postMessage(Object.assign({ __codeAlong: true, run: ${run} }, message), "*");
   const show = (value) => {
     if (typeof value === "string") return value;
     if (value instanceof Error) return value.stack && value.stack.includes(value.message) ? value.stack : value.name + ": " + value.message;
-    try { const text = JSON.stringify(value, (k, v) => typeof v === "bigint" ? v + "n" : v); return text === undefined ? String(value) : text; } catch { return String(value); }
+    try { const text = JSON.stringify(value, (key, val) => typeof val === "bigint" ? val + "n" : val); return text === undefined ? String(value) : text; } catch { return String(value); }
   };
   for (const level of ["log", "info", "warn", "error", "debug"]) {
     const original = console[level].bind(console);
     console[level] = (...args) => { post({ type: "log", level, text: args.map(show).join(" ") }); original(...args); };
   }
-  addEventListener("error", (event) => post({ type: "log", level: "error", text: event.error ? show(event.error) : event.message }));
-  addEventListener("unhandledrejection", (event) => post({ type: "log", level: "error", text: "Uncaught (in promise) " + show(event.reason) }));
+  const logError = (text) => post({ type: "log", level: "error", text });
+  addEventListener("error", (event) => logError(event.error ? show(event.error) : event.message));
+  addEventListener("unhandledrejection", (event) => logError("Uncaught (in promise) " + show(event.reason)));
+  addEventListener("load", async () => {
+    try {
+      await Promise.all(${scriptJSON(entries)}.map((specifier) => import(specifier)));
+      post({ type: "ready" });
+    } catch (error) {
+      logError(show(error));
+      post({ type: "failed" });
+    }
+  });
   const types = { css: "text/css", js: "text/javascript", json: "application/json", svg: "image/svg+xml", md: "text/markdown", html: "text/html" };
   const native = window.fetch.bind(window);
   window.fetch = (input, init) => {
@@ -209,120 +145,128 @@ function previewRuntime(files) {
       return Promise.resolve(new Response(files[path], { status: 200, headers: { "content-type": types[path.split(".").pop()] || "text/plain" } }));
     return native(input, init);
   };
-  const AsyncFunction = (async () => {}).constructor;
-  const mapped = () => !!document.querySelector('script[type="importmap"]');
-  const modules = new Map();
-  const load = (path) => {
-    if (modules.has(path)) return modules.get(path).ready;
-    const exports = Object.create(null);
-    const record = { exports, ready: null };
-    modules.set(path, record);
-    record.ready = (async () => {
-      let run;
-      try {
-        run = new AsyncFunction("__import", "__export", "__exports", "__meta", toAsyncModule(files[path]) + "\\n//# sourceURL=" + path);
-      } catch (error) {
-        // The engine can't say where a syntax error is in code it compiles from a string; name the file at least.
-        const named = new SyntaxError(path + ": " + error.message);
-        named.stack = named.name + ": " + named.message;
-        throw named;
-      }
-      const imp = (spec) => {
-        if (/^(?:\\.{1,2}\\/|\\/)/.test(spec)) {
-          const target = resolvePath(path, spec);
-          if (target in files) {
-            if (target.endsWith(".json")) return Promise.resolve({ default: JSON.parse(files[target]) });
-            if (target.endsWith(".css")) {
-              document.head.append(Object.assign(document.createElement("style"), { textContent: files[target] }));
-              return Promise.resolve({});
-            }
-            const other = modules.get(target);
-            return other ? Promise.resolve(other.exports) : load(target);
-          }
-          return Promise.reject(new Error(path + " imports " + spec + ", which isn't a file of this step."));
-        }
-        if (/^[a-z][a-z0-9+.-]*:/i.test(spec)) return import(spec);
-        return import(mapped() ? spec : "https://esm.sh/" + spec);
-      };
-      await run(imp, (name, get) => Object.defineProperty(exports, name, { enumerable: true, get }), exports, { url: path });
-      return exports;
-    })();
-    return record.ready;
-  };
-  const queue = [];
-  let started = false;
-  const drain = async () => {
-    started = true;
-    while (queue.length) {
-      const path = queue.shift();
-      try { await load(path); } catch (error) { post({ type: "log", level: "error", text: show(error) }); }
-    }
-  };
-  window.__codeAlong = {
-    entry(path) {
-      queue.push(path);
-      if (document.readyState === "loading") { if (queue.length === 1) addEventListener("DOMContentLoaded", drain, { once: true }); }
-      else if (queue.length === 1) drain();
-    },
-  };
-  addEventListener("load", () => post({ type: "loaded" }));
 })();`;
 }
 
-function previewDocument(files) {
-  const page = "index.html";
-  const scripts = Object.fromEntries(Object.entries(files).filter(([path]) => !path.endsWith(".html")));
-  let inline = 0;
-  const safe = (code) => code.replace(/<\/script/gi, "<\\/script");
-  let html = files[page]
-    .replace(/<link\b[^>]*>/gi, (tag) => {
-      if (!/\brel=["']?stylesheet/i.test(tag)) return tag;
-      const href = /\bhref=["']([^"']+)["']/i.exec(tag)?.[1];
-      const target = href ? resolvePath(page, href) : null;
-      return target && files[target] !== undefined ? `<style data-file="${target}">${files[target]}</style>` : tag;
-    })
-    .replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (tag, attrs, body) => {
-      const src = /\bsrc=["']([^"']+)["']/i.exec(attrs)?.[1];
-      const isModule = /\btype=["']?module/i.test(attrs);
-      if (src) {
-        const target = resolvePath(page, src);
-        if (!target || files[target] === undefined) return tag;
-        return isModule
-          ? `<script>__codeAlong.entry(${JSON.stringify(target)})</script>`
-          : `<script data-file="${target}">${safe(files[target])}\n//# sourceURL=${target}</script>`;
+const moduleLexer = () => withTimeout(import("es-module-lexer/js"), 10000);
+let lexerPromise;
+const dataURL = (type, source) => `data:${type};charset=utf-8,${encodeURIComponent(source.toWellFormed())}`;
+
+function previewModules(files, parse, importMaps) {
+  const imports = Object.create(null);
+  const modules = new Map();
+  const add = (path, inlineSource) => {
+    if (modules.has(path)) return modules.get(path);
+    const name = `@code-along/virtual/${modules.size}`;
+    modules.set(path, name);
+    let source = inlineSource ?? files[path];
+    let type = "text/javascript";
+    if (path.endsWith(".json")) type = "application/json";
+    else if (path.endsWith(".css")) {
+      source = `document.head.append(Object.assign(document.createElement("style"), { textContent: ${JSON.stringify(source)} }));`;
+    } else {
+      let references;
+      try { [references] = parse(source, path); }
+      catch (error) { throw new Error(`${path}: ${error.message}`); }
+      for (const { n: specifier, d: dynamic, s: start, e: end, a: attributes } of references.toReversed()) {
+        if (dynamic === -2) continue;
+        if (specifier === undefined) throw new Error(`${path}: use a string literal in dynamic import().`);
+        let target = specifier;
+        if (/^(?:\.{1,2}\/|\/(?!\/))/.test(specifier)) {
+          const resolved = resolvePath(path.includes("#") ? "index.html" : path, specifier);
+          if (!Object.hasOwn(files, resolved)) throw new Error(`${path} imports ${specifier}, which isn't a file of this step.`);
+          if (!/\.(?:m?js|json|css)$/i.test(resolved)) throw new Error(`${path}: fetch ${specifier} instead of importing it.`);
+          if (resolved.endsWith(".json") && attributes === -1) {
+            target = add(`${resolved}#default`, `export default JSON.parse(${JSON.stringify(files[resolved])});`);
+          } else target = add(resolved);
+        } else if (specifier.startsWith("//")) target = `https:${specifier}`;
+        else if (!/^[a-z][a-z0-9+.-]*:/i.test(specifier) && !importMaps) target = `https://esm.sh/${specifier}`;
+        const from = dynamic < 0 ? start - 1 : start;
+        const to = dynamic < 0 ? end + 1 : end;
+        source = source.slice(0, from) + JSON.stringify(target) + source.slice(to);
       }
-      if (!isModule) return tag;
-      const path = `index.html#module-${++inline}`;
-      scripts[path] = body;
-      return `<script>__codeAlong.entry(${JSON.stringify(path)})</script>`;
-    })
-    .replace(/(<(?:img|source|image|use)\b[^>]*?\s(?:src|href)=)(["'])([^"']+)\2/gi, (match, lead, quote, ref) => {
-      const target = resolvePath(page, ref);
-      return target && files[target] !== undefined && target.endsWith(".svg")
-        ? `${lead}${quote}data:image/svg+xml;charset=utf-8,${encodeURIComponent(files[target])}${quote}`
-        : match;
-    });
-  const runtime = `<script>${safe(previewRuntime(scripts))}</script>`;
-  if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, (tag) => tag + runtime);
-  else if (/<html[^>]*>/i.test(html)) html = html.replace(/<html[^>]*>/i, (tag) => `${tag}<head>${runtime}</head>`);
-  else html = `<!doctype html><head><meta charset="utf-8">${runtime}</head><body>${html}</body>`;
-  return html;
+    }
+    imports[name] = dataURL(type, type === "text/javascript" ? `${source}\n//# sourceURL=code-along/${encodeURI(path)}` : source);
+    return name;
+  };
+  return { add, imports };
+}
+
+async function previewDocument(files, run) {
+  const doc = new DOMParser().parseFromString(files["index.html"], "text/html");
+  const script = (type, source) => Object.assign(doc.createElement("script"), { type, textContent: source });
+  for (const link of doc.querySelectorAll('link[rel~="stylesheet"][href]')) {
+    const target = resolvePath("index.html", link.getAttribute("href"));
+    if (Object.hasOwn(files, target)) {
+      const style = doc.createElement("style");
+      if (link.media) style.media = link.media;
+      style.textContent = files[target];
+      link.replaceWith(style);
+    }
+  }
+  for (const image of doc.querySelectorAll("img[src], source[src], image[href], use[href]")) {
+    const attr = image.hasAttribute("src") ? "src" : "href";
+    const target = resolvePath("index.html", image.getAttribute(attr));
+    if (target?.endsWith(".svg") && Object.hasOwn(files, target)) image.setAttribute(attr, dataURL("image/svg+xml", files[target]));
+  }
+  const modules = [...doc.querySelectorAll("script")].filter((tag) => tag.type.toLowerCase() === "module");
+  const entries = [];
+  const importMaps = [...doc.querySelectorAll('script[type="importmap" i]')];
+  if (modules.length) {
+    const localEntries = modules.some((tag) => !tag.hasAttribute("src") || resolvePath("index.html", tag.getAttribute("src")));
+    let parse;
+    if (localEntries) {
+      try {
+        const lexer = await (lexerPromise ??= moduleLexer().catch((error) => { lexerPromise = null; throw error; }));
+        parse = lexer.parse;
+      } catch { throw new Error("The preview module parser could not load. Connect to the network and try again."); }
+    }
+    const { add, imports } = previewModules(files, parse, importMaps.length);
+    for (const [index, tag] of modules.entries()) {
+      const src = tag.getAttribute("src");
+      const path = src === null ? `index.html#module-${index + 1}` : resolvePath("index.html", src);
+      if (src !== null && path && !Object.hasOwn(files, path)) throw new Error(`index.html loads ${src}, which isn't a file of this step.`);
+      const specifier = path ? add(path, src === null ? tag.textContent : undefined) : new URL(src, document.baseURI).href;
+      entries.push(specifier);
+      tag.removeAttribute("src");
+      tag.textContent = `import ${scriptJSON(specifier)};`;
+    }
+    doc.head.prepend(script("importmap", scriptJSON({ imports })), ...importMaps);
+  }
+  for (const tag of doc.querySelectorAll("script[src]")) {
+    const target = resolvePath("index.html", tag.getAttribute("src"));
+    if (Object.hasOwn(files, target)) tag.src = dataURL("text/javascript", `${files[target]}\n//# sourceURL=code-along/${encodeURI(target)}`);
+  }
+  doc.head.prepend(script("text/javascript", previewRuntime(files, run, entries)));
+  return `<!doctype html>\n${doc.documentElement.outerHTML}`;
 }
 
 // ---------- the page
 
-function mount(root, lesson, kit) {
+function mount(root, lesson, kit, source) {
   const { marked } = kit;
   const cm = kit.editor;
-  const storeKey = `code-along:${fnv(document.getElementById("lesson").textContent)}`;
+  const storeKey = `code-along:${fnv(source)}`;
+  let persistent = self.origin !== "null";
+  const storageNotice = h("div", { class: "ca-storage-notice", role: "status" });
+  const warnTemporary = () => {
+    persistent = false;
+    storageNotice.textContent = "Temporary edits: reloading may lose your changes.";
+  };
   let edits = {};
   try {
-    edits = JSON.parse(localStorage.getItem(storeKey) || "{}") || {};
-  } catch {}
+    if (persistent) edits = JSON.parse(localStorage.getItem(storeKey) || "{}") || {};
+  } catch {
+    persistent = false;
+  }
+  if (!persistent) warnTemporary();
   const saveEdits = () => {
+    if (!persistent) return;
     try {
       localStorage.setItem(storeKey, JSON.stringify(edits));
-    } catch {}
+    } catch {
+      warnTemporary();
+    }
   };
   const state = { step: 0, file: null, tab: "preview", wrap: false, logs: [] };
   const steps = lesson.steps;
@@ -428,6 +372,7 @@ function mount(root, lesson, kit) {
     { class: "ca-editor", "aria-label": "Editor" },
     h("header", { class: "ca-pane-head" }, crumbs, wrapButton),
     editorHost,
+    storageNotice,
     h("footer", { class: "ca-status" }, statusLeft, statusRight),
   );
   const work = h("main", { class: "ca-work" }, output, h("div", { class: "ca-code" }, files, editorPane));
@@ -468,13 +413,12 @@ function mount(root, lesson, kit) {
     );
     if (!fromHash)
       try {
-        history.replaceState(null, "", `#${s.id}`);
+        history.replaceState(null, "", `#${encodeURIComponent(s.id)}`);
       } catch {}
     const hasPreview = Boolean(s.files["index.html"]);
     shell.toggleAttribute("data-no-preview", !hasPreview);
     renderTree();
-    // Keep the open file when the step changes nothing; otherwise open the file the step is about.
-    openFile(s.files[state.file] && !s.changed.length ? state.file : s.active);
+    openFile(s.preferredFile ?? (s.files[state.file] ? state.file : s.active));
     runPreview(true);
   }
 
@@ -589,23 +533,38 @@ function mount(root, lesson, kit) {
   }
 
   let timer = 0;
+  let previewRun = 0;
   function runPreview(now = false) {
     clearTimeout(timer);
+    const id = ++previewRun;
     const s = step();
-    if (!s.files["index.html"]) return;
-    const run = () => {
-      state.logs = [];
-      renderConsole();
-      shell.dataset.preview = "running";
-      frame.srcdoc = previewDocument(filesOf(s));
+    state.logs = [];
+    renderConsole();
+    shell.dataset.preview = s.files["index.html"] ? "running" : "none";
+    if (!s.files["index.html"]) {
+      frame.removeAttribute("srcdoc");
+      return;
+    }
+    const run = async () => {
+      try {
+        const html = await previewDocument(filesOf(s), id);
+        if (id === previewRun) frame.srcdoc = html;
+      } catch (error) {
+        if (id !== previewRun) return;
+        frame.removeAttribute("srcdoc");
+        state.logs.push({ level: "error", text: error.message });
+        renderConsole();
+        shell.dataset.preview = "failed";
+      }
     };
     if (now) run();
     else timer = setTimeout(run, 350);
   }
 
-  frame.addEventListener("load", () => (shell.dataset.preview = "ready"));
   addEventListener("message", (event) => {
-    if (event.source !== frame.contentWindow || !event.data || event.data.__codeAlong !== true) return;
+    if (event.source !== frame.contentWindow || event.data?.__codeAlong !== true || event.data.run !== previewRun) return;
+    if (event.data.type === "failed") shell.dataset.preview = "failed";
+    if (event.data.type === "ready" && shell.dataset.preview === "running") shell.dataset.preview = "ready";
     if (event.data.type === "log") {
       state.logs.push({ level: event.data.level, text: String(event.data.text).slice(0, 4000) });
       if (state.logs.length > 200) state.logs.shift();
@@ -645,9 +604,23 @@ function mount(root, lesson, kit) {
       setWrap(!state.wrap);
     }
   });
+  function hashStep() {
+    try {
+      const id = decodeURIComponent(location.hash.slice(1));
+      return steps.findIndex((s) => s.id === id);
+    } catch {
+      return -1;
+    }
+  }
   addEventListener("hashchange", () => {
-    const index = steps.findIndex((s) => `#${s.id}` === location.hash);
+    const index = hashStep();
     if (index >= 0 && index !== state.step) go(index, true);
+  });
+  root.addEventListener("drop:reveal-anchor", (event) => {
+    const index = articles.indexOf(event.target.closest(".ca-step"));
+    if (index < 0) return;
+    if (index !== state.step) go(index);
+    event.target.scrollIntoView({ block: "nearest" });
   });
 
   // ---------- markdown
@@ -691,7 +664,11 @@ function mount(root, lesson, kit) {
         link.rel = "noopener noreferrer";
       }
     }
-    for (const table of body.querySelectorAll("table")) table.replaceWith(h("div", { class: "ca-table" }, table.cloneNode(true)));
+    for (const table of body.querySelectorAll("table")) {
+      const wrapper = h("div", { class: "ca-table" });
+      table.replaceWith(wrapper);
+      wrapper.append(table);
+    }
     if (cm) for (const code of body.querySelectorAll("pre > code")) highlightBlock(code);
   }
 
@@ -818,10 +795,11 @@ function mount(root, lesson, kit) {
   // ---------- start
 
   setTab("preview");
-  const fromHash = steps.findIndex((s) => `#${s.id}` === location.hash);
+  const fromHash = hashStep();
   go(fromHash >= 0 ? fromHash : 0, fromHash >= 0);
   window.__lesson = { steps: steps.map((s) => s.id), go: (id) => go(steps.findIndex((s) => s.id === id)) };
   document.body.dataset.ready = cm ? "editor" : "plain";
+  root.dispatchEvent(new Event("drop:anchors-ready", { bubbles: true }));
 }
 
 function fnv(text) {
@@ -832,7 +810,7 @@ function fnv(text) {
 
 {
   const root = document.getElementById("lesson-root");
-  const source = document.getElementById("lesson").textContent.replace(/<\\\/script/gi, "</script");
+  const source = JSON.parse(document.getElementById("lesson").textContent);
   const lesson = parseLesson(source);
   const params = new URLSearchParams(location.search);
   if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
@@ -856,6 +834,6 @@ function fnv(text) {
     mount(root, lesson, {
       marked: markedResult.value?.marked ?? null,
       editor: editorResult.value ?? null,
-    });
+    }, source);
   }
 }

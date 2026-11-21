@@ -42,7 +42,7 @@ if (lesson.errors.length) {
 // The same page an agent without Node fills by hand: each part goes in its slot.
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const script = (text) => text.replace(/<\/script/gi, "<\\/script");
+const script = (text) => JSON.stringify(text).replace(/</g, "\\u003c");
 const fill = (id, text) => [new RegExp(`(<(\\w+) id="${id}"[^>]*>)[\\s\\S]*?(</\\2>)`), text];
 const slots = [
   [/(<(title)>)[\s\S]*?(<\/title>)/, esc(lesson.title)],
@@ -119,16 +119,21 @@ if (shots) {
       await page.evaluate((v) => window.__lesson?.go(v), id);
       const step = lesson.steps[index];
       if (step.files["index.html"]) {
-        await page
-          .waitForFunction(() => document.querySelector(".ca-shell")?.dataset.preview === "ready", null, {
+        const status = await page
+          .waitForFunction(() => {
+            const state = document.querySelector(".ca-shell")?.dataset.preview;
+            return state === "ready" || state === "failed" ? state : null;
+          }, null, {
             timeout: 15000,
           })
-          .catch(() => problems.push(`${view.name}: step "${step.title}": the preview didn't load in 15 s`));
-        await page.waitForTimeout(400);
-        if (view.name === "light") {
-          const errors = await page.$$eval(".ca-log.is-error", (rows) => rows.map((r) => r.textContent));
-          for (const e of errors) problems.push(`step "${step.title}": the preview logged an error: ${e}`);
+          .then((result) => result.jsonValue(), () => "timeout");
+        const errors = await page.$$eval(".ca-log.is-error", (rows) => rows.map((r) => r.textContent));
+        for (const e of errors) problems.push(`${view.name}: step "${step.title}": the preview logged an error: ${e}`);
+        if (status !== "ready") {
+          problems.push(`${view.name}: step "${step.title}": ${status === "timeout" ? "the preview didn't finish in 15 s" : "the preview failed"}`);
+          continue;
         }
+        if (errors.length) continue;
       } else await page.waitForTimeout(150);
       await page.screenshot({ path: join(shots, `${String(index + 1).padStart(2, "0")}-${id}-${view.name}.png`) });
     }

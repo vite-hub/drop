@@ -2,7 +2,7 @@
 // assets/page.html, the same page an agent without Node fills by hand. This runs it on the skill's example.
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -24,33 +24,38 @@ const parse = (source) => JSON.parse(JSON.stringify(context.parseLesson(source))
 function build(source) {
   const input = join(dir, "lesson.md")
   const output = join(dir, "lesson.html")
+  const logPath = join(dir, "build.log")
   writeFileSync(input, source)
+  const fd = openSync(logPath, "w")
   try {
-    const log = execFileSync("node", [join(skill, "scripts/build.mjs"), input, output], { cwd: dir, encoding: "utf8" })
-    return { ok: true, log, html: readFileSync(output, "utf8") }
+    execFileSync(process.execPath, [join(skill, "scripts/build.mjs"), input, output], { stdio: ["ignore", fd, fd] })
+    return { ok: true, log: readFileSync(logPath, "utf8"), html: readFileSync(output, "utf8") }
   } catch (error) {
-    return { ok: false, log: String(error.stdout), html: "" }
+    return { ok: false, log: readFileSync(logPath, "utf8") || error.message, html: "" }
+  } finally {
+    closeSync(fd)
   }
 }
+
+const slot = (html, id) => new RegExp(`<script id="${id}" type="application/json">([^<]*)</script>`).exec(html)[1]
 
 test("the build fills every slot of the page with the example", () => {
   const { ok, html, log } = build(example)
   assert.ok(ok, log)
   assert.ok(html.includes("<title>Plurals with Intl.PluralRules</title>"))
-  const lesson = /<script id="lesson" type="text\/markdown">([\s\S]*?)<\/script>/.exec(html)[1]
-  assert.equal(lesson.trim().replace(/<\\\/script/g, "</script"), example.trim())
+  assert.equal(JSON.parse(slot(html, "lesson")), example)
   assert.match(html, /<style id="ca-style">\s*[\s\S]*\.ca-shell/)
-  assert.match(html, /<script id="ca-lesson" type="text\/plain">\s*[\s\S]*function parseLesson\b/)
-  assert.match(html, /<script id="ca-app" type="text\/plain">\s*[\s\S]*function mount\b/)
+  assert.match(JSON.parse(slot(html, "ca-lesson")), /function parseLesson\b/)
+  assert.match(JSON.parse(slot(html, "ca-app")), /function mount\b/)
   // Nothing but the slots changes: text between the tags would show above the page.
   assert.doesNotMatch(html.replace(/<(script|style|title)\b[\s\S]*?<\/\1>/g, ""), />\s*[^<\s][^<]*</)
 })
 
-test("a lesson that writes </script> in a file can't close its slot early", () => {
-  const { ok, html } = build(`## One\n\n\`\`\`html [index.html]\n<script>1</script>\n\`\`\`\n`)
+test("script tokenizer delimiters and original backslashes round-trip in the lesson slot", () => {
+  const source = `## One\n\n\`\`\`js [main.js]\nconsole.log("<!--", "<script>", "</script>", /<\\/script>/)\n\`\`\`\n`
+  const { ok, html } = build(source)
   assert.ok(ok)
-  const lesson = /<script id="lesson" type="text\/markdown">([\s\S]*?)<\/script>/.exec(html)[1]
-  assert.match(lesson, /<script>1<\\\/script>/)
+  assert.equal(JSON.parse(slot(html, "lesson")), source)
 })
 
 test("each step has the step before's files plus its own, and marks the ones it changes", () => {
