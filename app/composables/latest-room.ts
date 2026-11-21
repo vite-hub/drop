@@ -1,4 +1,4 @@
-import { connectRealtimeRoom } from "@vite-hub/realtime/client"
+import { connectRealtimeRoom } from "vite-hub/realtime/client"
 
 export function useLatestRoom(link: () => string, enabled: () => boolean): Readonly<Ref<number>> {
   const digest = shallowRef(0)

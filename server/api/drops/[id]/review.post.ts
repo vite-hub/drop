@@ -5,7 +5,7 @@ import { siteMatches } from "#shared/review"
 import { clientAddress } from "../../../utils/client-address"
 import { refuseSend, requireSender } from "../../../utils/comment-images"
 import { siteCoversDrop } from "../../../utils/content-origin"
-import { withRetryAfter } from "../../../utils/comments"
+import { TOO_MANY_COMMENTS } from "../../../utils/comments"
 import { findDrop, permissions } from "../../../utils/drops"
 import { guestOf } from "../../../utils/guests"
 import { identify } from "../../../utils/identity"
@@ -23,9 +23,12 @@ export default defineHandler(async (event) => {
   const origin = event.url.searchParams.get("origin") ?? ""
   if (!site.siteUrl || !siteMatches(site.siteUrl, origin) || siteCoversDrop(event, origin))
     throw new HTTPError({ status: 400, statusText: "That address isn't part of this site." })
-  await withRetryAfter(
-    requireRateLimit(event, "review-comment", { key: who?.userId ?? clientAddress(event), limit: 20, window: "1m" }),
-  )
+  await requireRateLimit(event, "review-comment", {
+    key: who?.userId ?? clientAddress(event),
+    limit: 20,
+    window: "1m",
+    message: TOO_MANY_COMMENTS,
+  })
   const { input, shot, images } = await readReviewComment(event)
   requireSender(who, input.as)
 

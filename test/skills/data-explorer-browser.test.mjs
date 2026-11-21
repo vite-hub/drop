@@ -24,8 +24,8 @@ const vega = {
   "vega-lite@6": join(dirname(from.resolve("vega-lite")), "vega-lite.min.js"),
 }
 
-const opacities = (locator) =>
-  locator.evaluateAll((nodes) => nodes.map((node) => Number(getComputedStyle(node).opacity)))
+const opacities = (locator, property = "opacity") =>
+  locator.evaluateAll((nodes, property) => nodes.map((node) => Number(getComputedStyle(node)[property])), property)
 
 const months = ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01"]
 const teams = { Alpha: 30, Beta: 18, Gamma: 6 }
@@ -92,35 +92,30 @@ test("a click on a chart, a legend, an axis label or a matrix cell filters the p
       return new URLSearchParams(decodeURIComponent(await page.evaluate(() => location.hash)).split("?")[1])
     }
 
-    const opacity = (locator) => locator.evaluate((el) => Number(getComputedStyle(el).opacity))
-
     let hash = await after(() => chart("By team and type").locator('path[aria-label*="type: Feature"]').first().click())
     assert.equal(hash.get("type"), "Feature")
-    await page.waitForFunction(() => document.querySelectorAll('.rp-chart[data-state="ok"] svg').length === 2)
     const bars = chart("By team and type")
-    assert.equal(await bars.locator('.role-mark path[aria-label*="type: Bug"]').count(), 3)
-    assert.equal(await opacity(bars.locator('.role-mark path[aria-label*="type: Bug"]').first()), 0.2)
-    assert.equal(await opacity(bars.locator('.role-mark path[aria-label*="type: Feature"]').first()), 1)
-    assert.equal(await opacity(bars.locator(".role-legend-label text", { hasText: "Bug" })), 0.2)
+    await expect
+      .poll(() => opacities(bars.locator('.role-mark path[aria-label*="type: Bug"]')))
+      .toEqual([0.2, 0.2, 0.2])
+    await expect.poll(() => opacities(bars.locator('.role-mark path[aria-label*="type: Feature"]'))).toEqual([1, 1, 1])
+    await expect.poll(() => opacities(bars.locator(".role-legend-label text", { hasText: "Bug" }))).toEqual([0.2])
     hash = await after(() => chart("By team and type").locator(".role-legend-label text", { hasText: "Bug" }).click())
     assert.equal(hash.get("type"), "Bug")
     hash = await after(() => chart("By team and type").locator(".role-axis-label text", { hasText: "Gamma" }).click())
     assert.equal(hash.get("team"), "Gamma")
-    await page.waitForFunction(() => document.querySelectorAll('.rp-chart[data-state="ok"] svg').length === 2)
-    const label = (name) =>
-      chart("By team and type")
-        .locator(".role-axis-label text", { hasText: name })
-        .evaluate((el) => Number(getComputedStyle(el).fillOpacity))
-    assert.deepEqual([await label("Alpha"), await label("Gamma")], [0.2, 1])
+    const label = (name) => bars.locator(".role-axis-label text", { hasText: name })
+    await expect.poll(() => opacities(label("Alpha"), "fillOpacity")).toEqual([0.2])
+    await expect.poll(() => opacities(label("Gamma"), "fillOpacity")).toEqual([1])
     hash = await after(() =>
       chart("Per month")
         .locator(".role-mark text", { hasText: /^Beta$/ })
         .click(),
     )
     assert.equal(hash.get("team"), "Beta")
-    await page.waitForFunction(() => document.querySelectorAll('.rp-chart[data-state="ok"] svg').length === 2)
-    assert.equal(await opacity(chart("Per month").locator(".role-mark text", { hasText: /^Alpha$/ })), 0.2)
-    assert.equal(await opacity(chart("Per month").locator(".role-mark text", { hasText: /^Beta$/ })), 1)
+    const line = (name) => chart("Per month").locator(".role-mark text", { hasText: name })
+    await expect.poll(() => opacities(line(/^Alpha$/))).toEqual([0.2])
+    await expect.poll(() => opacities(line(/^Beta$/))).toEqual([1])
     // Away from any point, the hover layer takes the click, and the line nearest the pointer wins.
     hash = await after(async () => {
       const point = await chart("Per month").locator('.role-mark path[aria-label*="team: Alpha"]').nth(1).boundingBox()

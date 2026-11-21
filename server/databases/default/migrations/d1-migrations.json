@@ -18,5 +18,6 @@
   "20261119174943_0016_draft_images": "0016_draft_images.sql",
   "20261120063815_0017_comment_sends": "0017_comment_sends.sql",
   "20261121010000_0017_drop_pins": "0016_drop_pins.sql",
-  "20261121011000_0018_drop_pin_user_cascade": "0018_drop_pin_user_cascade.sql"
+  "20261121011000_0018_drop_pin_user_cascade": "0018_drop_pin_user_cascade.sql",
+  "20261121145524_0019_drop_runtime_errors": "0019_drop_runtime_errors.sql"
 }

@@ -17,7 +17,10 @@ const modules: Record<string, string> = {
 }
 // Server modules Drop reads from Nitro and ViteHub at runtime, backed by test/cost/harness.mjs's `globalThis.dropTest`.
 const stubs: Record<string, string> = {
-  "vite-hub/database": "export const db = globalThis.dropTest.db; export const defineDatabase = v => v",
+  // ViteHub's real helpers, on the test database: a copy with no Databases of its own reads them from this global.
+  "vite-hub/database": `globalThis[Symbol.for("vitehub.database.runtime")] = () => ({ databases: { default: { db: globalThis.dropTest.db } }, configured: new Set(["default"]) })
+export { chunkParameters, withIdempotency } from "@vite-hub/database"
+export const db = globalThis.dropTest?.db; export const defineDatabase = v => v`,
   "vite-hub/blob":
     'export { detectContentType } from "@vite-hub/blob/client"; export const blob = globalThis.dropTest.blob',
   // Nitro's own cache runtime (ocache), on the test storage. unstorage's "cache" mount drops the base and turns "/" into ":".
@@ -37,7 +40,7 @@ export const checkRateLimit = async (_event, bucket, options) => {
 export const requireRateLimit = async (...args) => {
   const [, decision] = await checkRateLimit(...args)
   if (decision.allowed) return
-  throw new HTTPError({ status: 429, message: "burst limit", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
+  throw new HTTPError({ status: 429, statusText: "Too Many Requests", message: args[2].message ?? "Rate limit exceeded.", headers: decision.retryAfter === undefined ? undefined : { "Retry-After": String(decision.retryAfter) } })
 }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
@@ -72,8 +75,13 @@ export const useAuth = () => {
 export default () => new Response(null, { status: 404 })`,
   "vite-hub/realtime/server":
     "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true; export const blobDocument = () => ({ kind: 'blob' })",
-  "vite-hub/env":
-    "export const deriveSecret = async (purpose) => `test-secret:${purpose}`; export const useServerEnv = () => { const t = globalThis.dropTest; return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: { unseal: () => t.members ?? '' }, quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: { unseal: () => t.billing ? 'sk_test' : '' }, stripeWebhookSecret: { unseal: () => t.billing ? 'whsec_test' : '' }, priceId: t.billing ? 'price_team' : '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) } }",
+  "vite-hub/env": `const optionalSecret = (value) => value ? { unseal: () => value } : undefined;
+    export const deriveSecret = async (purpose) => \`test-secret:\${purpose}\`;
+    export const useServerEnv = () => {
+      const t = globalThis.dropTest;
+      const billing = t.billing === true ? { stripeSecretKey: 'sk_test', stripeWebhookSecret: 'whsec_test', priceId: 'price_team' } : t.billing || {};
+      return { drop: { shareApproval: t.shareApproval, contentOrigin: t.contentOrigin ?? '', expiryDays: t.expiryDays, customExpiry: t.customExpiry, mode: t.mode ?? 'personal', publicLinkDays: t.publicLinkDays ?? '', authProxy: t.authProxy ?? false, authProxyCookie: t.authProxyCookie ?? '', testSignin: false, admins: { unseal: () => t.admins ?? '' }, members: optionalSecret(t.members), quotas: { enabled: t.quotasEnabled, plan: 'free', proDrops: undefined, proBytes: 1073741824, proWrites: 10000, freeKept: t.freeKept ?? 10 }, teams: t.teams ?? false, billing: { stripeSecretKey: optionalSecret(billing.stripeSecretKey), stripeWebhookSecret: optionalSecret(billing.stripeWebhookSecret), priceId: billing.priceId ?? '', annualPriceId: '', freeMembers: 3, managedPayments: true } }, ...(t.authSecret ? { auth: { secret: { unseal: () => t.authSecret } } } : {}) };
+    };`,
 }
 // The client IP header nuxt.config sets for the host, VPS unless a test sets `dropTest.clientIpHeader`. Only for
 // client-address.ts, so tests that vi.mock nitro/runtime-config still get their mock.

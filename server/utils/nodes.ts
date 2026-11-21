@@ -1,10 +1,9 @@
 import { and, eq, inArray, isNull, like, ne, or, type SQL, sql } from "drizzle-orm"
-import { db } from "vite-hub/database"
+import { chunkParameters, db } from "vite-hub/database"
 import { MAX_SLUG } from "#shared/links"
 import { MAX_DEPTH } from "#shared/nodes"
 import { type Share, SHARE_RANK } from "#shared/share"
 import { drops } from "../databases/default/index"
-import { d1Chunks } from "./d1"
 import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
 import { shareNow, sharePolicy } from "./share"
@@ -19,7 +18,7 @@ const MAX_WALK = MAX_DEPTH + 2
 export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[]) {
   const parents = [...new Set(rows.flatMap((row) => (row.parentId ? [row.parentId] : [])))]
   const byId = new Map<string, Row>()
-  for (const chunk of d1Chunks(parents)) {
+  for (const chunk of chunkParameters(parents, { reserved: 10 })) {
     const seeds = sql.join(
       chunk.map((id) => sql`${id}`),
       sql`, `,
@@ -182,7 +181,7 @@ export const touchFolder = (id: string, now = Date.now()) =>
 
 export async function itemCounts(ids: string[] | SQL) {
   const counts = new Map<string, number>()
-  for (const chunk of Array.isArray(ids) ? d1Chunks(ids) : [ids]) {
+  for (const chunk of Array.isArray(ids) ? chunkParameters(ids, { reserved: 10 }) : [ids]) {
     const rows = await db
       .select({ parentId: drops.parentId, count: sql<number>`count(*)`.mapWith(Number) })
       .from(drops)

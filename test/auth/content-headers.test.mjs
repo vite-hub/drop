@@ -94,3 +94,14 @@ test.each([
     state.authApi = authApi
   }
 })
+
+test("an API error answered by evlog's handler still says when to retry", () => {
+  // evlog's handler answers with only Content-Type; the error Nitro captured still has its Retry-After.
+  const request = new Request("https://drop.example/api/drops/doc/comments", { method: "POST" })
+  const limited = new HTTPError({ status: 429, message: "Too many", headers: { "Retry-After": "42" } })
+  request.context = { nitro: { errors: [{ error: limited, context: {} }] } }
+  const response = new Response("{}", { status: 429, headers: { "Content-Type": "application/json" } })
+  onResponse(response, new H3Event(request))
+  assert.equal(response.headers.get("retry-after"), "42")
+  assert.equal(response.headers.get("content-type"), "application/json")
+})

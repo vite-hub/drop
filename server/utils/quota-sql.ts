@@ -1,6 +1,6 @@
-import { getTableColumns, sql, type SQL } from "drizzle-orm"
+import { sql, type SQL } from "drizzle-orm"
+import { chunkParameters } from "vite-hub/database"
 import { dropFiles } from "../databases/default/drops.ts"
-import { d1Chunks } from "./d1.ts"
 
 export const QUOTA_RESERVATION_TTL_MS = 15 * 60 * 1000
 
@@ -12,8 +12,7 @@ export function bindQuotaSQL(query: string, values: unknown[]): SQL {
   )
 }
 
-export const appFileChunks = (rows: (typeof dropFiles.$inferInsert)[]) =>
-  d1Chunks(rows, { perItem: Object.keys(getTableColumns(dropFiles)).length, others: 0 })
+export const appFileChunks = (rows: (typeof dropFiles.$inferInsert)[]) => chunkParameters(rows, { per: dropFiles })
 
 const usageCTE = `WITH RECURSIVE scope AS (SELECT ? AS owner, ? AS month, ? AS cutoff), trashed(id) AS (
   SELECT id FROM drops WHERE owner_id = (SELECT owner FROM scope) AND trashed_at IS NOT NULL

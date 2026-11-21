@@ -20,7 +20,7 @@ import {
   mentionedIn,
   readerOf,
   toComment,
-  withRetryAfter,
+  TOO_MANY_COMMENTS,
 } from "../../../utils/comments"
 import { findDropAt, permissions } from "../../../utils/drops"
 import { guestOf } from "../../../utils/guests"
@@ -34,9 +34,12 @@ export default defineHandler(async (event) => {
   const who = await identify(event)
   if (!drop || !permissions(drop, who).comment)
     return refuseSend(event, who, new HTTPError({ status: 404, statusText: "You can't comment on this drop." }))
-  await withRetryAfter(
-    requireRateLimit(event, "comment", { key: who?.userId ?? clientAddress(event), limit: 20, window: "1m" }),
-  )
+  await requireRateLimit(event, "comment", {
+    key: who?.userId ?? clientAddress(event),
+    limit: 20,
+    window: "1m",
+    message: TOO_MANY_COMMENTS,
+  })
   const { input, images } = await readCommentBody(event, CommentSchema)
   requireSender(who, input.as)
   if (!input.body && !images.length && input.suggestion === undefined)

@@ -3,7 +3,7 @@ import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
 import { clientAddress } from "../../../../utils/client-address"
 import { lists, readCommentBody, withImages } from "../../../../utils/comment-images"
-import { authorOf, earlierReply, findCommentByNumber, replyTo, withRetryAfter } from "../../../../utils/comments"
+import { authorOf, earlierReply, findCommentByNumber, replyTo, TOO_MANY_COMMENTS } from "../../../../utils/comments"
 import { logDrop } from "../../../../utils/logs"
 import { routeNumber } from "../../../../utils/review-params"
 import { reviewApi, reviewSession } from "../../../../utils/review"
@@ -13,9 +13,12 @@ export default reviewApi(async (event) => {
     await event.req.body?.cancel().catch(() => {})
     throw error
   })
-  await withRetryAfter(
-    requireRateLimit(event, "review-comment", { key: claims.u ?? clientAddress(event), limit: 20, window: "1m" }),
-  )
+  await requireRateLimit(event, "review-comment", {
+    key: claims.u ?? clientAddress(event),
+    limit: 20,
+    window: "1m",
+    message: TOO_MANY_COMMENTS,
+  })
   const thread = await findCommentByNumber(site, await routeNumber(event))
   if (!thread) throw new HTTPError({ status: 404, statusText: "No comment with that number." })
   const { input, images } = await readCommentBody(event, CommentReplySchema)

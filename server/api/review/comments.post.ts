@@ -1,7 +1,7 @@
 import { useLogger } from "evlog/nitro/v3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { clientAddress } from "../../utils/client-address"
-import { withRetryAfter } from "../../utils/comments"
+import { TOO_MANY_COMMENTS } from "../../utils/comments"
 import { logDrop } from "../../utils/logs"
 import {
   addReviewComment,
@@ -19,9 +19,12 @@ export default reviewApi(async (event) => {
     throw error
   })
   timing.step("session")
-  await withRetryAfter(
-    requireRateLimit(event, "review-comment", { key: claims.u ?? clientAddress(event), limit: 20, window: "1m" }),
-  )
+  await requireRateLimit(event, "review-comment", {
+    key: claims.u ?? clientAddress(event),
+    limit: 20,
+    window: "1m",
+    message: TOO_MANY_COMMENTS,
+  })
   timing.step("limit")
   const { input, shot, images } = await readReviewComment(event)
   timing.step("form")
