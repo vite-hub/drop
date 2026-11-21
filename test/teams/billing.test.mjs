@@ -7,12 +7,24 @@ import { beforeEach, test } from "vite-plus/test"
 import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/default/index.ts")
-const { authorizeBilling, checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
+const { authorizeBilling, billingConfig, checkoutParams, teamPlans } = await import("../../server/utils/teams.ts")
 const { lazyClient } = await import("../../server/utils/lazy-client.ts")
 
 // The Team plan through Stripe's plugin, with a Stripe client that keeps what Checkout was asked to bill.
 migrate()
 beforeEach(() => reset())
+
+test("billing requires both Stripe secrets even with teams and a price configured", () => {
+  state.teams = true
+  state.billing = { priceId: "price_team", stripeSecretKey: "sk_test", stripeWebhookSecret: "whsec_test" }
+  assert.equal(billingConfig().enabled, true)
+  for (const secret of ["stripeSecretKey", "stripeWebhookSecret"]) {
+    const configured = state.billing
+    state.billing = { ...configured, [secret]: undefined }
+    assert.equal(billingConfig().enabled, false, `billing is disabled without ${secret}`)
+    state.billing = configured
+  }
+})
 
 function stripeClient(sessions) {
   const none = async () => ({ data: [] })

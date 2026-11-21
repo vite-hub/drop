@@ -3,7 +3,7 @@ import { afterEach, test, vi } from "vite-plus/test"
 import { effectScope, nextTick, ref, shallowRef, watch } from "vue"
 
 const { connect } = vi.hoisted(() => ({ connect: vi.fn() }))
-vi.mock("@vite-hub/realtime/client", () => ({ connectRealtimeRoom: connect }))
+vi.mock("vite-hub/realtime/client", () => ({ connectRealtimeRoom: connect }))
 afterEach(() => {
   vi.unstubAllGlobals()
   connect.mockReset()

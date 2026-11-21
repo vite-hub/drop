@@ -52,7 +52,7 @@ import {
   storageFailure,
 } from "./drops"
 import { type Identity, roleOf } from "./identity"
-import { logDrop } from "./logs"
+import { background, logDrop } from "./logs"
 import { isMember, membersOnly } from "./members"
 import { DropQuotaError, requireKeepSlot, withDropQuota } from "./quotas"
 import { modeFor, shareFields } from "./share"
@@ -568,7 +568,8 @@ async function insertReviewComment(
       try {
         await quota.commit([db.insert(drops).values(row)])
       } catch (error) {
-        await blob.delete([key])
+        const [cleanupError] = await blob.delete([key])
+        if (cleanupError) background.error({ action: "review-screenshot-cleanup", error: cleanupError.message, key })
         throw error
       }
       return row

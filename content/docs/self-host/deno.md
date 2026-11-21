@@ -21,7 +21,7 @@ The [official Deno button](https://docs.deno.com/deploy/reference/button/) clone
 3. Choose an organization and app name. [Create the GitHub OAuth app](/docs/self-host#github) with callback `https://<app>.<org>.deno.net/api/auth/callback/github`.
 4. Before deploying, open Edit Environment Variables and add all settings below. Make the D1 settings available to build and runtime; `S3_BUCKET`, `S3_ENDPOINT`, and `S3_REGION` must be available to the build. Put GitHub credentials, the auth secret, admin emails, and S3 access keys in the production runtime context.
 
-Use a separate D1 database and bucket in preview contexts, or turn previews off. Deno runs pre-deploy migrations for each timeline.
+Use a separate D1 database and bucket in preview contexts, or turn previews off. Each timeline runs migrations using its own D1 settings in the pre-deploy hook; the shared build does not migrate any database.
 
 ::docs-host-facts{host="deno"}
 ::
@@ -42,7 +42,7 @@ extra:
 
 ## Database {#database}
 
-Cloudflare D1 over HTTPS. `pnpm db:migrate:d1` skips migrations already applied. The GitHub flow runs it as a pre-deploy command. For a local build, run it before publishing.
+Cloudflare D1 over HTTPS. `pnpm db:migrate` (ViteHub's `vitehub database migrate`) skips migrations already applied and refuses one that would delete data. The pre-deploy hook in `deno.jsonc` runs it after the build. For a local build, run it before publishing with the target database's credentials.
 
 To update, [pull Drop's changes into your repository](/docs/self-host#update) and push.
 

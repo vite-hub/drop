@@ -8,7 +8,7 @@ import { migrate, reset, sql, state } from "../cost/harness.mjs"
 
 const { default: schema } = await import("../../server/databases/default/index.ts")
 const { proxyAuth } = await import("../../server/utils/proxy-auth.ts")
-const { isProxyMember } = await import("../../server/utils/proxy-auth-config.ts")
+const { isProxyMember, readAuthProxyConfig } = await import("../../server/utils/proxy-auth-config.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
 
 migrate()
@@ -23,6 +23,11 @@ afterEach(() => {
   state.members = ""
   state.authProxyCookie = ""
   delete state.auth
+})
+
+test("proxy sign-in requires a GitHub organization when VITEHUB_MEMBERS is unset", () => {
+  delete state.members
+  assert.throws(readAuthProxyConfig, /DROP_AUTH_PROXY requires a github-org:<organization> entry in VITEHUB_MEMBERS/)
 })
 
 function github(
