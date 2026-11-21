@@ -9,7 +9,6 @@ import type { DropResource } from "#shared/types"
 import { drops } from "../databases/default/index"
 import type { DropRow } from "./drops"
 
-/** One link of a drop, as `publish` and `update_drop` take it. */
 const ResourceItem = v.object({
   url: v.pipe(
     v.string(),
@@ -25,10 +24,8 @@ const ResourceItem = v.object({
   ),
 })
 
-/** How `publish` and `update_drop` take a drop's links. */
 export const ResourcesInput = v.pipe(v.array(ResourceItem), v.maxLength(MAX_RESOURCES))
 
-/** `resources` in a Markdown doc's front matter: the input's list, where an address alone also stands for a link. */
 const FrontmatterResources = v.pipe(
   v.array(
     v.union([
@@ -43,7 +40,6 @@ const FrontmatterResources = v.pipe(
   v.maxLength(MAX_RESOURCES),
 )
 
-/** The links an agent sent, checked and normalized: one per page, the last title given for it winning. */
 export function resourceList(input: v.InferOutput<typeof ResourcesInput>): DropResource[] {
   const list: DropResource[] = []
   for (const item of input) {
@@ -56,10 +52,6 @@ export function resourceList(input: v.InferOutput<typeof ResourcesInput>): DropR
   return mergeResources([], list)
 }
 
-/**
- * The links a Markdown doc lists under `resources` in its front matter: addresses, or `{ url, title }` as `publish`
- * takes them. A `.md` file sent to an upload URL carries its links this way, since the URL has no room for them.
- */
 export function frontmatterResources(markdown: string): DropResource[] {
   const yaml = splitFrontmatter(markdown).frontmatter.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1]
   if (!yaml) return []
@@ -80,13 +72,8 @@ export function frontmatterResources(markdown: string): DropResource[] {
   return resourceList(parsed.output)
 }
 
-/** A drop's links, the same on every version. */
 export const resourcesOf = (row: Pick<DropRow, "resources">): DropResource[] => row.resources ?? []
 
-/**
- * `list` added to the links `row` has, if any: a link already there keeps its place, so an agent that publishes again
- * never doubles one. Checked before anything is written.
- */
 export function addedResources(row: Pick<DropRow, "resources"> | null, list: DropResource[]) {
   const next = row ? mergeResources(resourcesOf(row), list) : list
   if (next.length > MAX_RESOURCES)
@@ -97,7 +84,6 @@ export function addedResources(row: Pick<DropRow, "resources"> | null, list: Dro
   return next
 }
 
-/** Sets a drop's links to `list`; an empty one removes them. */
 export async function saveResources(row: Pick<DropRow, "id">, list: DropResource[]) {
   await db
     .update(drops)

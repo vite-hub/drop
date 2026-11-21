@@ -1,10 +1,4 @@
 <script setup lang="ts">
-/**
- * The popup a site's review script opens on its first Comment (shared/review-script.ts). It runs on Drop's origin,
- * with Drop's session, so it works where the site can't send Drop's cookies. It looks up the site drops that cover the
- * page that opened it and that this person may comment on, lets them pick one when there are several, and posts a
- * review token to the page's origin only; the server already refused any other origin.
- */
 useSeoMeta({ title: "Comment on a site", robots: "noindex, nofollow" })
 
 const route = useRoute("review-connect")
@@ -19,17 +13,20 @@ const issued = ref<ReviewToken | null>(null)
 const name = ref("")
 const pending = ref<string | null>(null)
 const error = ref("")
+function closeWindow() {
+  if (import.meta.client) window.close()
+}
+const closeSoon = useTimeoutFn(closeWindow, 800, { immediate: false })
 
 function handOver(answer: ReviewToken) {
   issued.value = answer
-  // Without an opener (it was closed, or a sign-in page cut the link) the token has nowhere to go.
   if (!window.opener) return (state.value = "lost")
   window.opener.postMessage(
     { __dropReview: true, token: answer.token, expiresAt: answer.expiresAt, name: answer.name },
     answer.origin,
   )
   state.value = "done"
-  setTimeout(() => window.close(), 800)
+  closeSoon.start()
 }
 
 async function connect(site: ReviewSite) {
@@ -48,7 +45,6 @@ async function connect(site: ReviewSite) {
   }
 }
 
-/** No review covers the page yet, or none is shared with this person: they start their own and connect to it. */
 async function start() {
   pending.value = "start"
   error.value = ""
@@ -81,7 +77,6 @@ onMounted(async () => {
     return
   }
   if (!sites.value.length) state.value = me.value ? "none" : "signin"
-  // Signed out, guests say who they are first.
   else if (!me.value) state.value = "guest"
   else if (sites.value.length === 1) await connect(sites.value[0]!)
   else state.value = "choose"

@@ -15,12 +15,6 @@ const Operator = v.object({
   banned: v.optional(v.nullable(v.boolean())),
 })
 
-/**
- * Drop's admins use the ViteHub Console at console.vitehub.dev, which signs each call with the key of the team that
- * linked this Drop. A Console person whose email is in DROP_ADMINS gets every section; anyone else on that team gets
- * a 403. The page tools pill shows its Console link only to a current, verified admin signed in to Drop. Agents get
- * nothing, and the content origin never serves any of it (middleware/0.05).
- */
 export default defineConsoleAuthorize(async (context) => {
   if (contentHost(new H3Event(context.request))) return new Response(null, { status: 404 })
   switch (context.via) {
@@ -41,7 +35,6 @@ export default defineConsoleAuthorize(async (context) => {
       return isMember(parsed.output.id, context.request)
     }
     default:
-      // An open Console on a development server.
       return true
   }
 })

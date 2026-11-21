@@ -15,7 +15,6 @@ let highlighter: Highlighter | undefined
 const loaded = new Set<CodeLanguage>()
 const loading = new Set<CodeLanguage>()
 
-// A grammar that fails to load stays in `loading`: its blocks stay plain rather than retry on every keystroke.
 async function prepare(lang: CodeLanguage) {
   try {
     highlighter = (await loadHighlighter(lang, [THEMES.light, THEMES.dark])).shiki
@@ -45,10 +44,6 @@ function decorate(doc: ProseMirrorNode): DecorationSet {
   return DecorationSet.create(doc, decorations)
 }
 
-/**
- * The live editor's code blocks in the same Shiki colors as the rendered doc (server/utils/markdown-document.ts), as
- * decorations, so the text and its Markdown stay plain. A language loads the first time a block uses it.
- */
 export const CodeHighlight = Extension.create({
   name: "codeHighlight",
   addProseMirrorPlugins() {

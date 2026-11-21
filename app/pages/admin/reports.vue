@@ -3,7 +3,6 @@ useSeoMeta({ title: "Reports" })
 const { data, refresh, error } = await useApi("/api/admin/reports", { key: keys.adminReports })
 const { busy, run } = useAdminAction((id) => `/api/admin/reports/${id}`, "Could not update report", refresh)
 const confirm = useConfirm()
-// Quarantine and Ban take drops offline for everyone who opens them, so they ask first; Dismiss doesn't.
 const CONFIRMS = {
   quarantine: {
     title: "Quarantine this drop?",

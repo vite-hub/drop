@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Contextual preview controls inside the shared review dock. HTML/apps expose inspection tools; docs, images, HTML,
-// and apps take the Marker; documents and images otherwise only expose pin visibility and supported device sizing.
 import type { ViewerOverlays, ViewerTool } from "~/composables/useViewerAnnotations"
 
 const {
@@ -59,7 +57,6 @@ const viewItems = computed<Item[]>(() =>
         press: () => emit("toggle", "xray"),
       },
       {
-        // Pressed means hidden, like the others: pressed is the one that changes the page.
         id: "pins",
         label: "Hide comments",
         icon: overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",

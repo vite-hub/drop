@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A copyable snippet. The copy button sits on its own strip so long commands never run under it, and turns into a
-// check once it copied.
 const { code } = defineProps<{ code: string }>()
 </script>
 

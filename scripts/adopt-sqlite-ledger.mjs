@@ -4,10 +4,8 @@ import { DatabaseSync } from "node:sqlite"
 import { pathToFileURL } from "node:url"
 import { migrations } from "./migrations.mjs"
 
-/** Adopt a known shipped 0.x hash without replaying a migration or changing shipped SQL. */
 export function adoptSqliteLedger(database) {
   if (!database.prepare("SELECT name FROM sqlite_master WHERE name = '__drizzle_migrations'").get()) return
-  // Named ledgers have already been adopted by Drizzle 1.0.
   if (
     database
       .prepare("PRAGMA table_info('__drizzle_migrations')")

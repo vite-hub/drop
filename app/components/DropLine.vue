@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A drop on the Drops page's list, read like a list of posts: its name, a word on what it is, and when, right-aligned in
-// fixed-width digits. No boxes, no rules between lines; whitespace keeps them apart. Hovering, or focus inside, swaps
-// the time for Copy link and the ⋯ menu. The page decides what a click does (`pick`), as with DropCard.
 import { RelativeTime } from "vite-hub/ui"
 import { SHARE_ICONS } from "#shared/share"
 import type { DropSummary } from "#shared/types"

@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A drop on the Drops page's grid: its preview (DropPreview, from usePeek) above its name, who dropped it and when,
-// and a globe or a team when it's shared. Hovering, or focus inside, brings up Copy link and the ⋯ menu over the
-// preview's corner. The page decides what a click does (`pick`): one click previews, a double-click or Enter opens.
 import { RelativeTime } from "vite-hub/ui"
 import { SHARE_ICONS } from "#shared/share"
 import { linkSource } from "#shared/resources"

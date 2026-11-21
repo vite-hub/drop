@@ -18,7 +18,6 @@ const GitHubIdentity = v.object({
 })
 const GitHubEmails = v.array(v.object({ email: v.string(), primary: v.boolean(), verified: v.boolean() }))
 
-/** Exchange oauth2-proxy's GitHub token for Drop's session. Header names alone prove nothing. */
 export const proxyAuth = () => ({
   id: "drop-proxy",
   endpoints: {
@@ -38,7 +37,6 @@ export const proxyAuth = () => ({
           },
         )
       }
-      // Better Auth's GitHub getUserInfo erases HTTP errors, including a revoked token after membership was cached.
       const identity = v.safeParse(GitHubIdentity, await githubApi("user", token))
       if (!identity.success)
         throw new APIError("SERVICE_UNAVAILABLE", { message: "GitHub identity is unavailable. Try again shortly." })
@@ -50,7 +48,6 @@ export const proxyAuth = () => ({
         profile.email ||
         (addresses.find((entry) => entry.primary) ?? addresses[0])?.email ||
         `${accountId}@users.noreply.github.com`
-      // Parallel proxy requests must finish provisioning the GitHub account before another sign-in reads it.
       const key = `${ctx.context.baseURL}:${accountId}`
       const previous = signIns.get(key)
       const finished = Promise.withResolvers<void>()
@@ -80,9 +77,7 @@ export const proxyAuth = () => ({
   },
 })
 
-/** Keep GitHub's credential failures distinct from unavailable or malformed profile data. */
 async function githubApi(path: string, token: string): Promise<unknown> {
-  // The sign-in still answers; its wide event says what GitHub did.
   const failed = (reason: unknown) => {
     requestLog(authRequest.getStore())?.warn("GitHub API call failed", {
       github: { path, failure: reason instanceof Error ? reason.message : String(reason) },

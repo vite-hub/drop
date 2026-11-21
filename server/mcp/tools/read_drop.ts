@@ -85,25 +85,20 @@ export default defineMcpTool({
       at: new Date(createdAt).toISOString(),
     }))
     const meta = mcpDrop(detail, event.url.origin, drop)
-    // Its owner's and admins' agents only, like Details.
     const views = detail.views ? mcpViews(detail.views) : null
     const links = detail.resources ? `\n${resourcesLines(detail.resources)}` : ""
     const resources = detail.resources ? { resources: detail.resources } : {}
     const toolbar = await toolbarComments(drop.id, new URL(meta.url).pathname, who)
     if (drop.kind === "site") {
-      // Every open one, past Comments' 500 at once; with `resolved`, the 500 most active besides.
       const { list, unavailable } = await unlessUnavailable(
         Promise.all([
           siteItems(drop, who.userId, event.url.origin, undefined, { open: true }),
           resolved ? siteItems(drop, who.userId, event.url.origin) : [],
         ]).then(([open, all]) => {
-          // A comment resolved between the two reads is in both: keep the open read's.
           const seen = new Set(open.map((item) => item.n))
           return [...open, ...all.filter((item) => item.resolved && !seen.has(item.n))]
         }),
       )
-      // Every comment on the preview, not only the asked page's: reviewers comment across tabs in one round, and an agent
-      // that read one page left the comments on its sibling tab pinned for the next review.
       const preview = page && isSitePattern(drop.siteUrl!) ? originOf(page) : null
       const items = list
         .filter((item) => (resolved || !item.resolved) && (!preview || Boolean(item.page?.startsWith(preview))))
@@ -151,11 +146,9 @@ export default defineMcpTool({
         },
       }
     }
-    // A board reads as an outline of its frames, items and arrows; view_board shows what the outline can't.
     if (drop.kind === "board")
       detail.content = `${boardOutline(await readBoard(drop))}\n\nCall view_board to see the board or one frame as an image, and edit_board to change it.`
     const errors = drop.kind === "app" || drop.kind === "html" ? await runtimeErrors(drop.id, drop.version) : []
-    // Every block's results, though the user's own page shows only the ones they answered: an agent acts for them.
     const link = drop.id
     const answers =
       drop.kind === "markdown"
@@ -169,10 +162,8 @@ export default defineMcpTool({
     const children = detail.children?.map((child) => mcpDrop(child, event.url.origin))
     const folder = detail.ancestors.map((crumb) => crumb.title).join(" / ")
     const pages = drop.kind === "app" ? appPageLinks(meta.url, detail.paths ?? []) : []
-    // A doc's text without the bytes of its inline figures: a converted paper's ran to 3 MB.
     const source = detail.content !== undefined ? withoutInlineData(detail.content) : null
 
-    // An earlier version read through a `?v=` link isn't the one to build on.
     const versionsLead =
       drop.head || drop.kind === "folder" || drop.kind === "link"
         ? ""
@@ -227,11 +218,8 @@ export default defineMcpTool({
           n: comment.n,
           kind: comment.kind,
           target: commentTarget(comment),
-          // The words that would replace the quote; empty suggests deleting it.
           ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
-          // The second of the video's frame it's on; its image is that frame.
           ...(comment.at === null ? {} : { at: comment.at }),
-          // The number of the PDF's page it's on, from 1; its image is that page.
           ...(comment.pdfPage === null ? {} : { pdfPage: comment.pdfPage }),
           body: comment.body,
           author: writtenBy(comment),
@@ -259,10 +247,6 @@ export default defineMcpTool({
   },
 })
 
-/**
- * The threads a handoff carries, the sender's asks first and others' quotes after, with their words, so the agent
- * answers each ask in its thread. A thread that was deleted since, or that the sender can't read now, is left out.
- */
 function handoffSection<
   T extends { id: string; n: number; resolved: boolean; agent: unknown; replies: { agent: unknown }[] },
 >(handoff: Handoff, comments: T[], line: (comment: T) => string) {
@@ -314,10 +298,6 @@ function handoffSection<
   }
 }
 
-/**
- * The comments, or what to say in their place when Comments can't be read (a 503 from server/utils/comments.ts). The
- * rest of the drop still comes back, and the agent is told not to take the empty list for no comments.
- */
 async function unlessUnavailable<T>(pending: Promise<T[]>): Promise<{ list: T[]; unavailable: string | null }> {
   try {
     return { list: await pending, unavailable: null }
@@ -330,11 +310,6 @@ async function unlessUnavailable<T>(pending: Promise<T[]>): Promise<{ list: T[];
   }
 }
 
-/**
- * For a Drop admin, the open threads people left with the ViteHub Comments toolbar on this drop's page in Drop: they
- * are about Drop's interface there, kept apart from the drop's own comments, and only the comments_* tools read them.
- * Nothing when there are none, or for anyone else.
- */
 async function toolbarComments(dropId: string, path: string, who: Identity) {
   if (who.role !== "admin") return null
   const heading = "## Toolbar comments on this drop's page"
@@ -357,16 +332,10 @@ async function toolbarComments(dropId: string, path: string, who: Identity) {
 
 const pct = (n: number) => `${Math.round(n / 10)}%`
 
-/** When a group's newest comment was sent. */
 const latest = (list: SiteReviewItem[]) => Math.max(...list.map((item) => item.createdAt))
 
-/** A comment's page without its query or hash, so the filters someone had on don't split one page into many. */
 const pathOf = (page: string | null) => (page ?? "/").replace(/[?#].*$/, "") || "/"
 
-/**
- * The site's comments by page: the page the agent asked about first, then the rest, most recent first, so the round
- * a reviewer just left reads together.
- */
 function byPage(items: SiteReviewItem[], page: string | null) {
   const groups = new Map<string, SiteReviewItem[]>()
   for (const item of items) groups.set(pathOf(item.page), [...(groups.get(pathOf(item.page)) ?? []), item])
@@ -379,7 +348,6 @@ function byPage(items: SiteReviewItem[], page: string | null) {
     .sort((a, b) => Number(b.asked) - Number(a.asked) || latest(b.items) - latest(a.items))
 }
 
-/** "8 open on 2 pages, from Max and Ana", and what the agent owes each of them before it's done. */
 function coverageLine(groups: ReturnType<typeof byPage>) {
   const open = groups.flatMap((group) => group.items).filter((item) => !item.resolved)
   if (!open.length) return "None open."
@@ -389,7 +357,6 @@ function coverageLine(groups: ReturnType<typeof byPage>) {
   return `${open.length} open on ${pages} ${pages === 1 ? "page" : "pages"}, from ${people.length > 1 ? `${people.slice(0, -1).join(", ")} and ${people.at(-1)}` : people[0]}${waiting ? `; ${waiting} answered by an agent and waiting on the reviewer` : ""}. Each one needs an answer before you say the review is done: once your fix is on the site, reply with what you changed and resolve: true; otherwise reply with why it stays open (a question, a plan, out of scope) and leave it open.`
 }
 
-/** A site comment for agents: where it was sent from, what the box covers, and the screenshot and images to look at. */
 const siteLine = (item: SiteReviewItem, origin: string) =>
   [
     `${item.n}. ${item.page ?? "/"} (${writtenBy(item)})${item.resolved ? " [resolved]" : ""}`,
@@ -399,7 +366,6 @@ const siteLine = (item: SiteReviewItem, origin: string) =>
     ...(item.attachments.length ? [`   Images: ${imageUrls(item, origin).join(" ")}`] : []),
   ].join("\n")
 
-/** Every file of an app with its size, then the text of the smaller ones. A built bundle stays a line. */
 function appFiles(files: Record<string, string>, sizes: Record<string, number>) {
   const all = Object.keys(sizes).sort()
   const left = all.filter((path) => !(path in files))

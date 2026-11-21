@@ -24,29 +24,13 @@ import { scripts as propertiesScripts } from "comark-properties/html"
 import { describeTime } from "comark-time"
 import type { DropResource } from "#shared/types"
 
-/** A drop's link key (shared/links.ts), alone or in its page's address: `/d/<link>/<slug>`. */
 const DROP_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
 
-/**
- * `::embed` plays a drop's page (`/d/<link>`) as another drop shown in the doc, on any host: a render is cached for
- * every reader, so it can't know which address a self-hosted Drop's readers use. comark-linter, which runs without this,
- * reads the same link as a card, so an agent's doc lints clean before it's published.
- */
 const dropPlayer = (url: URL) => {
   const link = url.pathname.match(DROP_LINK)?.[1]
   return link ? { provider: "drop", src: `/d/${link}`, label: "Embedded drop", size: "app" as const } : undefined
 }
 
-/**
- * Every comark-ui package, through its preset, with what a Worker rendering other people's docs needs: include stays
- * off and cast, table, and tests read no files (the preset's defaults), chips take each site's icon from Drop's own
- * endpoint (server/utils/favicons.ts; the address is made absolute per read, absoluteFavicons) and leave avatars for the
- * reader's browser instead of downloading them here, plain images keep Drop's own lightbox, where a click comments,
- * PlantUML, Graphviz, D2, and the other Kroki fences draw through kroki.io, Mermaid draws at most 4 diagrams and 8,000
- * characters of source a doc, Shiki colors code in the languages Drop loads (GitHub light, and GitHub dark for the
- * viewer's dark mode) up to 200,000 characters a doc, so a huge dump can't eat the Worker's CPU, and Drop supplies the
- * document's typography. Math is typeset as MathML while parsing, so a doc without it loads nothing for it.
- */
 const preset = comarkUi({
   chips: { download: false, favicon: (host) => `${FAVICON_PATH}${host}` },
   diagrams: true,
@@ -60,24 +44,15 @@ const preset = comarkUi({
     themes: { light: "github-light", dark: "github-dark" },
     maxSource: 200_000,
   },
-  // Drop keeps a render for up to 30 days and shares one preset across docs, so relative dates would stay at the
-  // words they had on the first read.
   time: false,
   typeset: false,
   zoom: { images: false },
 })
 
-/**
- * The inline scripts the renderer writes itself, which the /f/ pages' CSP allows by hash: Mermaid's copy buttons and
- * comark-zoom, which zooms diagrams and annotated screenshots. Scripts in a document's own source stay blocked.
- */
 export const RENDERER_SCRIPTS = [
   mermaidScript,
   ...scriptsOf(await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })),
-  // comark-properties writes a box's dates relative to the reader's clock, and comark-time lets Escape close their
-  // tooltips.
   ...propertiesScripts,
-  // comark-outline's side outline marks the section being read and makes way for wide blocks.
   ...outlineScripts,
 ]
 
@@ -85,26 +60,18 @@ function scriptsOf(html: string): string[] {
   return [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(([, script]) => script!)
 }
 
-/**
- * The components skills/vitehub-drop/references/markdown.md documents for agents: Drop's own boxes (`::note` and its
- * kinds), and comark-annotate's screenshot, compare, and annotation for PR evidence. Its blocks.md documents every
- * other plugin.
- */
 export const COMPONENT_TAGS =
   "alert annotation callout caution compare important info note screenshot tip warning".split(" ")
-/** `::drop{link=…}`, which showed another drop in a doc before `::embed` did. Published docs never change. */
 const LEGACY_TAGS = ["drop"]
 const ALLOWED_TAGS = [...preset.tags, ...Object.keys(preset.components), ...COMPONENT_TAGS, ...LEGACY_TAGS]
 
 export const renderPlugins = [
-  // A bare URL is a link, as on GitHub. Comark 0.9 moved it into the defaults Drop leaves out, so it's listed here.
   linkify(),
   frontmatter(),
   taskList(),
   components(),
   attributes(),
   ...preset.plugins,
-  // Last, so it checks what every plugin drew from the doc.
   security({
     allowedProtocols: ["http", "https", "mailto", "data"],
     allowedTags: ALLOWED_TAGS,
@@ -119,11 +86,6 @@ export const renderPlugins = [
 
 const parse = createMarkdownParser({ plugins: renderPlugins, registerDefaultPlugins: false })
 
-/**
- * comark-annotate 0.2 renamed two props that Drop's pr-evidence skill taught agents before it: a screenshot's `url` is
- * `href`, and `label` is `title` on a screenshot or a compare. Published docs never change, so their old names are
- * read as the new ones, on the block's own line, rather than reported as problems.
- */
 const LEGACY_BLOCK = /^(\s*:{2,}(screenshot|compare)\{)(.*)$/gm
 const renameLegacyProps = (markdown: string) =>
   markdown.replace(LEGACY_BLOCK, (_, open: string, block: string, props: string) => {
@@ -134,14 +96,8 @@ const renameLegacyProps = (markdown: string) =>
     )
   })
 
-/** The parse Drop renders with: every plugin, Drop's own, and the tag allowlist. */
 export const parseMarkdown = (markdown: string) => parse(renameLegacyProps(markdown))
 
-/**
- * The parse a reader's render uses: the same, plus comark-outline's side outline ("On this page") at the end of a doc
- * with two headings or more. Only here, since the linter and the live editor read the doc's own blocks, and the
- * outline isn't one.
- */
 const parseForReaders = createMarkdownParser({
   plugins: renderPlugins.map((plugin) => (plugin.name === "comark-outline" ? outline({ rail: true }) : plugin)),
   registerDefaultPlugins: false,
@@ -161,7 +117,6 @@ function tableChipCount(node: MarkdownNode): number {
   return tag === "chip" ? 1 : children.reduce((count, child) => count + tableChipCount(child), 0)
 }
 
-/** Temporary compatibility for the table preview: match its 32-character prose measure, excluding headers. */
 function markScrollableTables(nodes: MarkdownNode[]): void {
   for (const node of nodes) {
     if (!Array.isArray(node) || node[0] === null) continue
@@ -196,7 +151,6 @@ function documentTitle(document: Awaited<ReturnType<typeof parseMarkdown>>): str
   const title = textValue(document.frontmatter.title)?.trim()
   if (title) return title
 
-  // The comments plugin wraps the whole document; headings inside other blocks still aren't document titles.
   const nodes = document.nodes.flatMap((node) => {
     if (!Array.isArray(node) || node[0] !== "comments") return [node]
     const [, , ...children] = node
@@ -224,11 +178,6 @@ const renderCallout: NodeHandler = async ([tag, attrs, ...children], { render })
 
 const EMBED_HEIGHT = { min: 120, max: 1600, default: 480 }
 
-/**
- * Another drop, shown inside the doc. The render is cached for every reader, so it only holds the link: the viewer
- * fetches the drop as the reader, and only an HTML drop they may open fills the box (EMBEDS_SCRIPT in
- * #shared/documents), in a sandbox of its own. On the /f/ page, which runs no scripts, the box stays a link.
- */
 function dropBox(link: string, height: unknown, title: string) {
   const pixels = Math.round(Number(height ?? Number.NaN))
   const clamped = Number.isFinite(pixels)
@@ -240,7 +189,6 @@ function dropBox(link: string, height: unknown, title: string) {
   )
 }
 
-/** `::embed` with a drop's page draws its box, and comark-embed draws every other link. */
 const renderEmbed: NodeHandler = (node, state) => {
   const [, attrs] = node
   const link = attrs.provider === "drop" ? textValue(attrs.src)?.match(DROP_LINK)?.[1] : undefined
@@ -248,7 +196,6 @@ const renderEmbed: NodeHandler = (node, state) => {
   return preset.components.embed?.(node, state) ?? ""
 }
 
-/** `::drop{link=…}`, in docs published before `::embed` showed drops. */
 const renderDropEmbed: NodeHandler = ([, attrs]) => {
   const link = textValue(attrs.link)?.trim().match(DROP_LINK)?.[1]
   if (!link)
@@ -261,13 +208,8 @@ const PROBLEM_ICON =
 const FOLD_ICON =
   '<svg aria-hidden="true" class="render-error-fold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
 
-/**
- * The box above a doc that lists its problems, open so its author sees them, foldable so a reader can put it away.
- * Plugins quote Markdown in backticks (`::question`), which reads as code here.
- */
 function problemsHtml(issues: string[]) {
   const title = issues.length === 1 ? "This doc has a problem" : `This doc has ${issues.length} problems`
-  // "`::question` 2 has no id" counts blocks of a kind; "#2" says it's an ordinal rather than part of the sentence.
   const items = issues.map(
     (issue) =>
       `<li>${escapeHtml(issue)
@@ -281,7 +223,6 @@ function problemsHtml(issues: string[]) {
   )
 }
 
-/** Problems a network failure caused, which the next render may not have: an icon or a Kroki server out of reach. */
 const RETRIED_RULE = /\/(?:download-failed|server-unreachable)$/
 
 type DocumentMeta = Awaited<ReturnType<typeof parseMarkdown>>["meta"]
@@ -289,7 +230,6 @@ type DocumentMeta = Awaited<ReturnType<typeof parseMarkdown>>["meta"]
 const Issues = v.fallback(v.array(v.string()), [])
 const IssueRules = v.fallback(v.record(v.string(), v.string()), {})
 
-/** The problems the plugins report, each named by its rule (`comark/<plugin>/<rule>`), for the box above the doc. */
 function issuesOf(meta: DocumentMeta) {
   const all = v.parse(Issues, meta.issues)
   const rules = v.parse(IssueRules, meta.issueRules)
@@ -298,37 +238,20 @@ function issuesOf(meta: DocumentMeta) {
 
 interface MarkdownProblem {
   rule: string
-  /** An error stops the doc from publishing; a warning publishes with it. */
   severity: "error" | "warning"
-  /** 1-based, counting the front matter. */
   line: number
   column?: number
   message: string
   fix: string
 }
 
-/**
- * What a doc can't publish with: every rule comark-linter marks as an error (invalid front matter, script URLs, a quiz
- * without an answer), and Drop's stricter extras, which the linter only warns about: a block that never closes, broken
- * `{…}` attributes, a component Drop doesn't render, and every problem of an annotated screenshot, whose marks would
- * land in the wrong place.
- */
 const DROP_ERROR_RULE = /^comark\/(?:unclosed-block|malformed-attributes|unknown-component|annotate\/.+)$/
 
-/** The components a doc may write: the allowlist, and the blocks comark-ui's plugins turn into other components. */
 const LINT_COMPONENTS = [...ALLOWED_TAGS, ...preset.blocks]
 
-/**
- * comark-linter over the parse Drop renders with: the same plugins, the components the allowlist keeps, and the
- * legacy props read as their new names. Every problem has its line and how to fix it. Links to other files and
- * external URLs aren't checked: a published doc has no folder around it. The checks read the source, so they can say
- * an annotation's box is outside its image, not that it points at the button it means.
- */
 export async function lintMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
   const found = await lint(renameLegacyProps(markdown), { plugins: renderPlugins, components: LINT_COMPONENTS })
   return found.flatMap(({ rule, severity, line, column, message, fix, cause }) => {
-    // A rule that threw is comark-linter's bug, not the doc's, and its message says so; Comark failing to parse the doc
-    // is the doc's.
     if (cause !== undefined && !(rule === "comark/invalid-frontmatter" || message.startsWith("Comark could not"))) {
       logError(event, cause, { action: "markdown_lint", rule, message })
       return []
@@ -338,14 +261,9 @@ export async function lintMarkdown(markdown: string, event?: H3Event): Promise<M
   })
 }
 
-/** A problem as lint-comark prints it: `line:column rule message fix`. */
 export const problemLine = ({ line, column, rule, message, fix }: MarkdownProblem) =>
   `${line}${column ? `:${column}` : ""} ${rule} ${message}${fix ? ` ${fix}` : ""}`
 
-/**
- * Lints a Markdown doc before it's stored: one with an error is refused with all its problems, as `message`, and as
- * `data.problems` for clients. Returns the warnings it publishes with.
- */
 export async function requirePublishableMarkdown(markdown: string, event?: H3Event): Promise<MarkdownProblem[]> {
   const problems = await lintMarkdown(markdown, event)
   const errors = problems.filter((problem) => problem.severity === "error")
@@ -362,10 +280,6 @@ export async function requirePublishableMarkdown(markdown: string, event?: H3Eve
   })
 }
 
-/**
- * The one Markdown renderer: Comark with front matter, task lists, every comark-ui package, and a tag allowlist. The
- * /f/ document pages and the viewer (via /api/drops/:id) both show its output.
- */
 async function renderMarkdownBody(
   markdown: string,
   blobKey: string,
@@ -402,7 +316,6 @@ async function renderMarkdownBody(
     }
   } catch (error) {
     logError(event, error, { action: "markdown_render", blobKey })
-    // Kept for minutes, not the month a render is: reads don't each fail again.
     return {
       title: "Untitled document",
       html: `<p class="render-error">Drop could not render this document. Its immutable source is still available below.</p><pre><code>${escapeHtml(markdown)}</code></pre>`,
@@ -411,10 +324,6 @@ async function renderMarkdownBody(
   }
 }
 
-/**
- * Blobs never change once uploaded, so a render is keyed by its blob key and cached for a month in the Worker's
- * KV (Nitro `cache` storage). /f/ pages and the viewer share it; uploads warm it.
- */
 export const renderMarkdownCached = (key: string, markdown: () => Promise<string>, event?: H3Event) =>
   cachedMarkdown(key, markdown, (text) => renderMarkdownBody(text, key, event), event)
 
@@ -454,11 +363,6 @@ export async function renderMarkdownDocument(
 
 type PropertyNode = [string, Record<string, string>, ...(PropertyNode | string)[]]
 
-/**
- * A moment in comark-time's markup, as comark-properties writes a front matter date: the server writes the date in UTC,
- * which reads right in any cached copy, and the box's script turns it into "2 days ago", with the full date and time in
- * its tooltip, in the reader's browser.
- */
 function timeNode(at: number): PropertyNode {
   const time = describeTime(new Date(at).toISOString(), { timeZone: "UTC", threshold: "none" })!
   const label = new Intl.DateTimeFormat("en-US", {
@@ -467,7 +371,6 @@ function timeNode(at: number): PropertyNode {
     year: "numeric",
     timeZone: "UTC",
   }).format(at)
-  // One per page, and the same on every read, so a render stays the same while the version does.
   const id = `cfm-updated-${at}`
   return [
     "time",
@@ -477,20 +380,10 @@ function timeNode(at: number): PropertyNode {
   ]
 }
 
-// comark-properties' box opens with `<dl class="cfm"`, then whatever attributes its release adds, such as 0.10's
-// data-comark-frame.
 const PROPERTIES_BOX = /<dl class="cfm"[^>]*>/
 const CHIP_STYLES = /<style data-comark-chips[^>]*>[\s\S]*?<\/style>/
 const PROPERTIES_STYLES = /<style data-comark-properties[^>]*>[\s\S]*?<\/style>/
 
-/**
- * A doc's properties box with what Drop knows about it beside what its front matter says: the pages it links to (its
- * pull request, its issue, its preview deploy) and when this version was published. They read as more front matter
- * rows, at the top of the doc, where a reader looks for what a doc is about, each link a chip with its site's icon from
- * Drop (server/utils/favicons.ts), as the front matter's own links are. A doc without front matter gets the box. A link its front matter already shows isn't repeated.
- *
- * Added to the cached render on each read, since a doc's links change without a new version.
- */
 export async function withDocProperties(html: string, doc: { resources: DropResource[]; updatedAt: number }) {
   const open = html.search(PROPERTIES_BOX)
   const close = open === -1 ? -1 : html.indexOf("</dl>", open)
@@ -518,12 +411,8 @@ export async function withDocProperties(html: string, doc: { resources: DropReso
     { nodes: [["properties", {}, ...rows]] } as Parameters<typeof renderHtmlFromDocument>[0],
     { components: preset.components },
   )
-  // comark-chips writes its styles before the first chip, inside the rows, and the doc's render has its own copy when
-  // its box or text has a chip. The page keeps one: the doc's, or the rows' when the doc has none.
   const own = CHIP_STYLES.test(html)
   if (open === -1) return (own ? rendered.replace(CHIP_STYLES, "") : rendered) + html
-  // The page already has the box's styles: only its rows go in, after the front matter's. A box without a date of its
-  // own has no date script yet, so the Updated row brings comark-time's runtime before the box and the script after it.
   const opening = PROPERTIES_BOX.exec(rendered)!
   const start = opening.index + opening[0].length
   const end = rendered.lastIndexOf("</dl>")

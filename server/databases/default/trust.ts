@@ -4,7 +4,6 @@ export const abuseReports = sqliteTable(
   "abuse_reports",
   {
     id: text("id").primaryKey(),
-    // Keep the report after a drop or account is deleted.
     dropId: text("drop_id"),
     ownerId: text("owner_id"),
     target: text("target").notNull(),

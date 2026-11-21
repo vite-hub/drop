@@ -1,8 +1,4 @@
 <script setup lang="ts">
-// Like T3 Code: once the sidebar is folded away, the button that brings it back leads the page's top bar. Wide
-// screens only, as the sidebar is; below lg the top bar has the menu toggle instead. A plain button, not Nuxt UI's
-// collapse toggle: on a link opened straight away the sidebar is out of sight while its own state says open.
-// A newer deploy puts a dot on it, since the sidebar's Update ready row (UpdateReady) is out of sight.
 const { hidden, toggle } = useSidebarHidden()
 const updateReady = useUpdateReady()
 const { ui } = useAppConfig()

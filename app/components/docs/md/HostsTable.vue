@@ -1,6 +1,4 @@
-<script setup lang="ts">
-// `::hosts-table`: each host Drop runs on, with its database, files, rate limits, and code images, from the same list the deploy buttons use.
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <div class="overflow-x-auto rounded-lg border border-default">

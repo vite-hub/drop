@@ -117,11 +117,9 @@ export default defineMcpTool({
     }
     if (!Object.keys(change).length && !resolves?.length && !resources)
       throw new HTTPError({ status: 400, message: "Nothing to change." })
-    // A site's reviewers and their agents resolve each other's comments; anything else is its managers'.
     const mayResolve = drop.kind === "site" ? mayResolveSite(drop, who, false) : permissions(drop, who).manage
     if (resolves?.length && (isAttachment(drop) || !mayResolve))
       throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
-    // Whoever may publish its next version may set its links, as publish does.
     const links = resources && resourceList(resources)
     if (links && (isAttachment(drop) || !permissions(drop, who).edit))
       throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })

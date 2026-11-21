@@ -1,23 +1,15 @@
 <script setup lang="ts">
-/**
- * Where an MCP client's sign-in lands (Better Auth's OAuth provider sends both its login and consent steps
- * here, with a signed `oauth_query`). Signed out: sign in with GitHub, and the provider resumes the
- * authorization by itself. Signed in: allow or deny the agent, then go back to it.
- */
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
 const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn, ready: sessionKnown } = useUserSession($auth)
-// Until the session is known, a signed-in person would see "Sign in" for a moment.
 const mounted = useMounted()
 const ready = computed(() => mounted.value && sessionKnown.value)
 
 const clientId = computed(() => textValue(route.query.client_id) ?? "")
 const valid = computed(() => Boolean(clientId.value && route.query.sig))
 
-// The agent's name, as it registered itself ("Claude Code", "Codex"…). Readable once signed in, so it loads on the
-// client when the session does.
 const { data: client } = useAsyncData(
   keys.oauthClient,
   async () => {
@@ -34,8 +26,6 @@ const { data: client } = useAsyncData(
 )
 const agentName = computed(() => client.value?.client_name || "An agent")
 
-// Where Allow sends the agent's access. Anyone can register an agent under any name, so the name proves nothing; the
-// redirect is part of this signed link, so it is where the code really goes.
 const destination = computed(() => {
   const uri = textValue(route.query.redirect_uri) ?? ""
   if (!URL.canParse(uri)) return null

@@ -68,7 +68,6 @@ export default defineMcpTool({
       (drop) =>
         (!kind || drop.kind === kind) &&
         (shared === undefined || (drop.share !== "private") === shared) &&
-        // Your drops and a folder's searched on the server, text included; the Trash and Shared with me filter here.
         (inside ||
           !(trash || sharedWithMe) ||
           words.every((word) =>

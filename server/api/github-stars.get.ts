@@ -4,7 +4,6 @@ import * as v from "valibot"
 
 const Repo = v.object({ stargazers_count: v.pipe(v.number(), v.integer(), v.minValue(0)) })
 
-// Cache failures too, so GitHub rate limits don't trigger a lookup per visitor.
 export default defineCachedHandler(
   async () => {
     const repo: unknown = await $fetch("https://api.github.com/repos/vite-hub/drop", {

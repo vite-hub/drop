@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The docs nav as a tree under the sidebar's Docs item: each section folds, and the one holding the current page starts open.
 const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
 const active = (to: string) => isActivePath(route.path, to)

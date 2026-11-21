@@ -19,7 +19,6 @@ const BoardImages = v.object({
   ),
 })
 
-/** The overview and frame images a browser rendered after saving, for agents to look at (view_board). */
 export default defineValidatedHandler({
   validate: { body: BoardImages },
   async handler(event) {

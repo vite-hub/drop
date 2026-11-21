@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Links in the docs' Markdown: other pages through the router, everything else as a plain link.
 defineProps<{ href: string }>()
 </script>
 

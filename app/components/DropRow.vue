@@ -5,8 +5,6 @@ import type { DropSummary } from "#shared/types"
 import { daysUntil, purgesAt } from "#shared/expiry"
 import { linkSource } from "#shared/resources"
 
-// A folder's row opens in place: its icon toggles the drops in it, indented one step per level (`depth`). In a team
-// folder (`inTeam`) anyone may move a teammate's drop to the Trash.
 const {
   drop,
   depth = 0,
@@ -64,14 +62,12 @@ const detail = computed(() => {
           size="sm"
           variant="outline"
         />
-        <!-- In the Trash the status column says when it's deleted for good. -->
         <ExpiryBadge v-if="!drop.parentId && !trashed" class="shrink-0" :drop="drop" />
       </NuxtLink>
       <p class="mt-0.5 truncate font-mono text-xs text-muted">
         <template v-if="folder"
           >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
-        <!-- A site review or a link holds no file: its address says more than "0 B". -->
         <template v-else-if="drop.kind === 'site' || drop.kind === 'link'"
           >{{ detail }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
@@ -80,7 +76,6 @@ const detail = computed(() => {
           }}<span class="md:hidden"> · <RelativeTime format="short" :at="drop.updatedAt" /></span
         ></template>
       </p>
-      <!-- A search that matched the doc's text, not its name: the words around the match. -->
       <p v-if="drop.snippet" class="mt-1 line-clamp-2 text-sm text-muted">{{ drop.snippet }}</p>
     </div>
     <div class="hidden min-w-0 md:block">
@@ -109,7 +104,6 @@ const detail = computed(() => {
     <span v-else-if="!changeable" class="hidden items-center gap-1.5 text-sm text-muted md:flex">
       <UIcon :name="SHARE_ICONS[drop.share]" class="size-3.5" />{{ drop.teamFolder ? "The team's" : status }}
     </span>
-    <!-- Shared through a folder above: the folder's share is changed there, this drop's own on its page. -->
     <span
       v-else-if="drop.sharedFrom"
       class="hidden min-w-0 items-center gap-1.5 text-sm text-muted md:flex"

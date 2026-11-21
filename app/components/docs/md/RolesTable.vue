@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ROLE_LABELS, ROLE_SUMMARY, ROLES } from "#shared/roles"
-
-// `::roles-table`: each role and what it can do, from the same list the app checks.
 </script>
 
 <template>

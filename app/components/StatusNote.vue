@@ -1,18 +1,17 @@
 <script setup lang="ts">
-// What went right says so in a small pill at the bottom that leaves on its own: no close button, no countdown bar.
-// One with an action (Undo, Open) stays longer, and holds while hovered or focused. Failures stay toasts.
 const note = useStatusNote()
 const pill = useTemplateRef<HTMLElement>("pill")
 let hovered: EventTarget | null = null
-let timer: ReturnType<typeof setTimeout> | undefined
+const { start, stop: pause } = useTimeoutFn(
+  () => (note.value = null),
+  () => (note.value?.action ? 6000 : 1800),
+  { immediate: false },
+)
 function hold() {
-  clearTimeout(timer)
-  if (note.value && pill.value !== hovered && !pill.value?.matches(":focus-within"))
-    timer = setTimeout(() => (note.value = null), note.value.action ? 6000 : 1800)
+  pause()
+  if (note.value && pill.value !== hovered && !pill.value?.matches(":focus-within")) start()
 }
 watch(note, hold, { flush: "post" })
-const pause = () => clearTimeout(timer)
-onBeforeUnmount(pause)
 function enter(event: PointerEvent) {
   hovered = event.currentTarget
   pause()
@@ -29,8 +28,6 @@ function act() {
 </script>
 
 <template>
-  <!-- A grid of one cell: a note replacing another enters over it while it leaves, instead of beside it. Leaving runs
-       faster than entering, with a nudge back down where it came from. -->
   <div
     aria-live="polite"
     class="pointer-events-none fixed inset-x-0 bottom-6 z-[100] grid justify-items-center px-4 *:col-start-1 *:row-start-1"

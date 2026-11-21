@@ -6,13 +6,8 @@ import { commentsMcpTools } from "vite-hub/comments/runtime"
 import comments from "../comments"
 import { requireIdentity } from "../utils/identity"
 
-/** The ViteHub Comments tools, by name: the same ones the ViteHub Console's MCP serves. */
 const tools = new Map(commentsMcpTools(comments).map((tool) => [tool.name, tool]))
 
-/**
- * Runs a ViteHub Comments tool for a Drop admin. Comments on Drop's own pages are the team's notes about Drop, so
- * only admins, the people the Console lets use them, read or change them here.
- */
 async function run(name: string, input: Record<string, unknown>, event: H3Event) {
   const who = await requireIdentity(event)
   if (who.role !== "admin")
@@ -32,15 +27,9 @@ async function run(name: string, input: Record<string, unknown>, event: H3Event)
   }
 }
 
-/** Where agents find what they usually want instead: the comments people left on the site they're fixing. */
 const SITE_REVIEWS =
   "For comments people left on a site under review, such as a pull request's preview, call read_drop with the page's address, then reply with resolve: true once you've fixed each one."
 
-/**
- * The ViteHub description, led by the words people use for these comments ("ViteHub comments", "the toolbar
- * comments"), and said to be about Drop's interface, so agents asked about a drop's content or a reviewed site pick
- * read_drop instead. The list tool says where they are; the others act on its threads.
- */
 const describe = (name: string) =>
   `${
     name === "comments_list_threads"
@@ -50,10 +39,6 @@ const describe = (name: string) =>
 
 const thread = v.pipe(v.string(), v.minLength(1), v.description("The thread id, from comments_list_threads."))
 
-/**
- * Comments that admins left on Drop's own pages, a drop's page included, with the ViteHub Comments toolbar: the agent
- * reads where each one is (page, element, Vue components and their files), fixes the code, then replies and resolves.
- */
 export const siteCommentTools = [
   defineMcpTool({
     name: "comments_list_threads",
@@ -92,7 +77,6 @@ export const siteCommentTools = [
     inputSchema: toStandardJsonSchema(
       v.object({
         id: thread,
-        // No v.trim(): it can't become JSON Schema, and one schema that fails breaks tools/list for every tool.
         body: v.pipe(v.string(), v.minLength(1), v.maxLength(4000), v.description("The reply, in plain words.")),
       }),
     ),

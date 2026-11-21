@@ -1,6 +1,5 @@
 import type { LocationQueryRaw, Router } from "vue-router"
 
-// The address each router is still navigating to. A key on the router, so server requests don't share it.
 const pending = new WeakMap<Router, { location: string; query: LocationQueryRaw; hash: string }>()
 
 const queryKey = (query: LocationQueryRaw) =>
@@ -10,12 +9,6 @@ const queryKey = (query: LocationQueryRaw) =>
     .sort()
     .join("&")
 
-/**
- * Writes viewer state into the address's query, so the address bar can be shared as it is. Replaces the history entry
- * unless `push`, which gives the browser's Back a step to undo. `undefined` drops a key. Each write builds on the one
- * still landing, so a thread opened and closed at once leaves no `?comment=`, and one that changes nothing is skipped.
- * `hash` replaces the address's hash; without it the hash stays.
- */
 export function useSetQuery() {
   const route = useRoute()
   const router = useRouter()

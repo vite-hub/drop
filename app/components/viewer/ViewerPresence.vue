@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Who else is looking at the drop (usePresence): their faces in the bar, ringed in the color of their cursor. Pressing
-// them lists each person and where they are, with the switch that hides everyone's cursors.
 import { AvatarStack } from "vite-hub/ui"
 import type { PresencePerson } from "~/composables/usePresence"
 
@@ -9,7 +7,6 @@ const showCursors = defineModel<boolean>("showCursors", { required: true })
 
 const label = computed(() => `Who's here: ${props.people.map((person) => person.name).join(", ")}`)
 
-/** Where someone is, for the list: a reviewed site's page, or nothing on a doc, where everyone is on it. */
 function whereOf(person: PresencePerson) {
   if (!props.site) return ""
   if (!person.at) return "In Drop"

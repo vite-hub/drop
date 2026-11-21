@@ -4,28 +4,17 @@ import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge
 import type { DropPublicConfig } from "./runtime/script.ts"
 
 export interface DropModuleOptions {
-  /** Drop's address, such as `https://drop.example.com`. `NUXT_PUBLIC_DROP_URL` sets it at runtime. Empty: no review.js. */
   url?: string
-  /** The edge review.js's toolbar starts on. `NUXT_PUBLIC_DROP_EDGE` sets it at runtime. */
   edge?: "top" | "right" | "bottom" | "left"
-  /** The place along that edge, from 0 to 100. `NUXT_PUBLIC_DROP_AT` sets it at runtime. */
   at?: number
-  /** The toolbar starts as the small mark. `NUXT_PUBLIC_DROP_COLLAPSED` sets it at runtime. */
   collapsed?: boolean
-  /**
-   * Mark this build as a preview: the page names its repository and commit in `<meta name="vitehub:build">`, so Drop
-   * can find the pull request. Set it only in preview builds. Default: `DROP_PREVIEW=1` when the build runs.
-   */
   preview?: boolean
 }
 
 export type { DropPublicConfig }
 
-/** What a module's setup may return, the same in Nuxt 4 and 5 (`ModuleSetupReturn`). */
 type DropModuleSetupResult = false | void | { timings?: { setup?: number; [key: string]: number | undefined } }
 
-// Structurally a Nuxt 4 and Nuxt 5 `NuxtModule<DropModuleOptions>`, without naming either version's `Nuxt` type. The
-// method signature keeps `nuxt` bivariant, so the real module, which takes Nuxt's `Nuxt`, fits it.
 export type DropNuxtModule = {
   setup(
     this: void,

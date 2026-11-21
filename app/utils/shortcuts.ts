@@ -1,10 +1,6 @@
-// Every keyboard shortcut, once: the ? dialog (ShortcutsModal) and the docs' table read this list. The bindings
-// themselves live where they act (the dashboard layout, the Drops page, DropViewer); keep them in step with it.
-// Keys are UKbd values, so `meta` shows as ⌘ on a Mac and Ctrl elsewhere.
 interface Shortcut {
   keys: string[]
   label: string
-  /** Where it works, when that's narrower than its group's. */
   where?: string
 }
 
@@ -53,7 +49,6 @@ export const SHORTCUT_GROUPS: { title: string; where: string; shortcuts: Shortcu
   },
 ]
 
-/** How the docs print a key that isn't a single letter. The docs show a Mac's ⌘ and say Ctrl works elsewhere. */
 export const KEY_LABELS = new Map([
   ["meta", "⌘"],
   ["escape", "Esc"],

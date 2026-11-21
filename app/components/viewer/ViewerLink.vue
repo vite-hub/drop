@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A link item's page: the page it opens, with its site's icon, what the address says (a pull request's repo#number),
-// and the note on what it is. Comments, Details and the share controls work as on any drop.
 import { linkSource } from "#shared/resources"
 import type { DropDetail } from "#shared/types"
 

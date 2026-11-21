@@ -1,14 +1,3 @@
-// What a site under review loads from Drop: /review.js (server/routes/review.js.get.ts), from a script tag in its
-// preview builds or from the "Review with Drop" bookmarklet. It adds one element, a toolbar in a closed shadow root,
-// so the page's CSS can't reach it and it touches nothing else on the page. Presses, focus, and keys inside it stop at
-// that element, so the page doesn't take them for its own: a menu it has open stays open while someone comments on it.
-// Until someone presses Comment or Highlight, it only asks whether any drop links to the page, to show Related links.
-// It carries no key: Drop finds the site drop from the page's origin when someone connects.
-//
-// The toolbar is ViteHub's page pill, the same code as ViteHub's page tools (vite-hub/vitehub#3377): it docks to
-// any edge, its mark drags it there and collapses it to the hexagon, and the browser remembers both for the site. The
-// script tag sets where it starts: data-edge (top, right, bottom, left), data-at (0 to 100 along it), data-collapsed.
-// The bookmarklet has no tag, so it starts at the bottom middle.
 import PAGE_PILL from "vite-hub/page/pill.js?raw"
 import DROP_MARK from "./drop-mark.svg?raw"
 import { ELEMENT_NAMING, INK, KEY_SCROLL, PALETTE_KEY } from "./plan-runtime"
@@ -139,8 +128,6 @@ drop-review-pill:is([edge=left], [edge=right]) .seg .sep { width: 16px; height: 
 @media (prefers-reduced-motion: reduce) { .people .face { transition: none; } }
 ` + PRESENCE_CURSOR_STYLE
 
-// Line icons, drawn with the stroke in STYLE. The bubble is Comment, the stack is the list of threads, and the marker,
-// pen, arrow, and T are Highlight's tips.
 const svg = (path: string) => `<svg viewBox="0 0 256 256" aria-hidden="true">${path}</svg>`
 const ICONS = {
   comment: svg(`<path d="M128 32a96 96 0 0 0-84 142l-12 42 42-12a96 96 0 1 0 54-172z"/>`),
@@ -169,8 +156,6 @@ const COMPOSE = (label: string, placeholder: string, send: string, cancel: boole
   `<button class="btn primary" type="submit" aria-keyshortcuts="Meta+Enter Control+Enter">${send}</button>` +
   `</div><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>`
 
-// Highlight's controls, in place of the toolbar while someone draws: the tips, four sizes, the colours, Undo, Cancel,
-// and Done. The script sizes and colours the dots.
 const SEPARATOR = `<span class="sep" aria-hidden="true"></span>`
 const TOOLS =
   `<div class="seg tools" slot="highlight" role="group" aria-label="Highlight" hidden>` +
@@ -212,27 +197,6 @@ ${TOOLS}
 <div class="toast" role="status" hidden></div>
 </div>`
 
-/**
- * The review toolbar. Comment opens Drop's connect popup the first time (Drop's origin, Drop's session), which hands
- * back a review token for this origin only; the token stays in sessionStorage. Then click a spot or drag a box, write,
- * add images if they help, and Send: the script takes a screenshot of the viewport as the spot is picked and posts it
- * with the note, the images, the page's address, the element under it with where on it the pin goes, and the box in
- * thousandths of the viewport. Requests carry the token and never cookies. The token is sealed: neither it nor
- * anything Drop answers tells the page which drop the comments go to.
- *
- * Highlight draws on the page instead: a marker, a pen, arrows, or text labels, on a screenshot taken as it opens, while
- * the page holds still. Done anchors the comment to the smallest element under the strokes and sends the screenshot with the
- * strokes on it; the strokes stay on the page, scrolling with it, while the note is written.
- *
- * Once connected, the page shows its threads the way Figma does: a pin with the author's picture on the element each
- * was left on, found again by its CSS path, that opens the thread to read, reply (with images too), and resolve. A
- * thread whose element isn't on the page any more still shows in the list, with the screenshot it came with.
- *
- * When a drop links to the site, like a pull request's before/after doc listing its preview, the pill shows Related
- * links, a segment of its own with a menu of that doc, its links (the pull request), and the drops that link to those,
- * two links deep. The page learns whether one exists before anyone connects; which ones, only for a reviewer who'd
- * find them in Drop.
- */
 export const REVIEW_SCRIPT = String.raw`(() => {
   // A bookmarklet adds this script with a plain script element, where currentScript works too.
   const script = document.currentScript || Array.from(document.scripts).find((s) => /\/review\.js(?:[?#]|$)/.test(s.src));

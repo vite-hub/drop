@@ -15,14 +15,6 @@ import type { Identity } from "./identity"
 import { background } from "./logs"
 import { withDropQuota } from "./quotas"
 
-/**
- * Images in comments. Each one is an image drop under the drop the comment is on, owned by that drop's owner, like a
- * doc's attachment: it shares the drop's sharing, lifetime, and Trash, stays out of lists and search, and takes no
- * plan slot (its bytes count). The message it's in lists its id in `attachments`; `comment_attachments` marks it a
- * comment's image and says which thread (by its first message) or reply it belongs to. Deleting the thread or the reply
- * deletes its images.
- */
-
 type ImageType = (typeof COMMENT_IMAGE_TYPES)[number]
 export type CommentImage = { bytes: Uint8Array; contentType: ImageType; filename: string }
 
@@ -33,13 +25,11 @@ const EXTENSIONS: Record<ImageType, string> = {
   "image/gif": "gif",
 }
 
-/** The image's real type from its first bytes, whatever the browser claimed. */
 function imageType(bytes: Uint8Array): ImageType | null {
   const type = detectContentType(bytes)
   return COMMENT_IMAGE_TYPES.find((known) => known === type) ?? null
 }
 
-/** A safe name for an image, with the extension of its real type. */
 function imageName(name: string, contentType: ImageType) {
   const base =
     (name || "image")
@@ -50,7 +40,6 @@ function imageName(name: string, contentType: ImageType) {
   return `${base}.${EXTENSIONS[contentType]}`
 }
 
-/** The most a comment's multipart body may weigh: its images, a screenshot, and the JSON beside them. */
 const MAX_COMMENT_FORM_BYTES = (MAX_COMMENT_IMAGES + 1) * MAX_FILE_BYTES + 64 * 1024
 
 export async function readForm(event: H3Event) {
@@ -63,7 +52,6 @@ export async function readForm(event: H3Event) {
   }
 }
 
-/** The `image` files of a comment's form: at most MAX_COMMENT_IMAGES, each checked by its bytes and at most 4 MiB. */
 export async function imagesOf(form: FormData): Promise<CommentImage[]> {
   const files = form.getAll("image")
   if (files.length > MAX_COMMENT_IMAGES)
@@ -81,10 +69,6 @@ export async function imagesOf(form: FormData): Promise<CommentImage[]> {
   return images
 }
 
-/**
- * A comment or reply body: JSON as before, or multipart with the JSON in `data` and up to MAX_COMMENT_IMAGES `image`
- * files. `schema` checks the JSON either way.
- */
 export async function readCommentBody<T extends v.GenericSchema>(
   event: H3Event,
   schema: T,
@@ -102,21 +86,11 @@ export async function readCommentBody<T extends v.GenericSchema>(
   return { input: parsed.output, images: form ? await imagesOf(form) : [] }
 }
 
-/**
- * A comment or reply from the viewer's outbox says whom it was written as (`as`, their user id; none for a guest). When
- * the session isn't them, because they signed out or someone else signed in, it answers 401 and stores nothing: the
- * outbox holds it until they sign in again, rather than send it as someone else.
- */
 export function requireSender(who: Identity | null, as: string | undefined) {
   if (as !== undefined && as !== who?.userId)
     throw new HTTPError({ status: 401, statusText: "Sign in again to send this comment." })
 }
 
-/**
- * Refuses a comment or reply before its body is read: with `refusal`, unless the body was written as someone the
- * session isn't (requireSender). So a person signed out of a drop only members see gets the 401 that holds their
- * outbox, not the 404 that drops what they wrote. An unreadable body gets `refusal`.
- */
 export async function refuseSend(event: H3Event, who: Identity | null, refusal: HTTPError): Promise<never> {
   const multipart = event.req.headers.get("content-type")?.startsWith("multipart/form-data")
   const data: unknown = await (
@@ -127,7 +101,6 @@ export async function refuseSend(event: H3Event, who: Identity | null, refusal: 
   throw refusal
 }
 
-/** An image of `parent`'s, stored as `key`: private, since it follows its parent's sharing. */
 export function imageDrop(
   parent: Pick<DropRow, "id" | "ownerId" | "teamId">,
   image: { key: string; contentType: string; size: number; filename: string; title: string; note?: string | null },
@@ -176,10 +149,6 @@ export function imageDrop(
   }
 }
 
-/**
- * Where a comment's images live: the drop it's on, or the site a screenshot came from, so a site's images are all
- * its own children. A folder holds drops, not attachments, so it takes none.
- */
 export async function imageParent(drop: DropRow) {
   if (drop.kind === "folder") throw new HTTPError({ status: 400, statusText: "Comments on folders take no images." })
   if (drop.kind === "image" && drop.parentId) {
@@ -189,12 +158,6 @@ export async function imageParent(drop: DropRow) {
   return drop
 }
 
-/**
- * Stores `images` under `parent` as image drops, before the comment or reply they go in exists, so their ids can be its
- * `attachments`. The parent's owner pays for the bytes, as for a site's screenshots. A `comment_attachments` row marks
- * each one a comment's image from the start, which keeps it out of lists and search; `linkImages` then says whose it
- * is. When anything fails, the blobs go and nothing points at them.
- */
 async function storeImages(parent: DropRow, images: CommentImage[], actorName: string): Promise<DropRow[]> {
   if (!images.length) return []
   const bytes = images.reduce((sum, image) => sum + image.bytes.byteLength, 0)
@@ -226,10 +189,9 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
       }
       await quota.commit([
         db.insert(drops).values(rows),
-        db.insert(commentAttachments).values(
-          // Apart by a millisecond, so they keep the order they were sent in. Not anyone's until linkImages.
-          rows.map((row, index) => ({ dropId: row.id, commentId: "", replyId: null, createdAt: now + index })),
-        ),
+        db
+          .insert(commentAttachments)
+          .values(rows.map((row, index) => ({ dropId: row.id, commentId: "", replyId: null, createdAt: now + index }))),
       ])
     } catch (error) {
       if (stored.length) {
@@ -243,13 +205,11 @@ async function storeImages(parent: DropRow, images: CommentImage[], actorName: s
   })
 }
 
-/** Says which thread (by its first message) or reply the stored images are in. */
 async function linkImages(ids: string[], owner: { commentId: string; replyId: string | null }) {
   if (!ids.length) return
   await db.update(commentAttachments).set(owner).where(inArray(commentAttachments.dropId, ids))
 }
 
-/** A comment image as Drop's API answers it. ViteHub Comments serves its file (`readAttachment` in server/comments.ts). */
 export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType" | "size">) => ({
   id: row.id,
   filename: row.filename,
@@ -258,12 +218,6 @@ export const toAttachment = (row: Pick<DropRow, "id" | "filename" | "contentType
   url: commentAttachmentUrl(row.id),
 })
 
-/**
- * Stores the images, then runs `write` (which adds a comment or a reply that lists them in `attachments`), then links
- * them to it. If `write` fails, the images go, so a retry doesn't leave them behind. `owner` says which comment or reply
- * they're in, or null when `write` returned one that an earlier request with the same retry key added, which lists
- * that request's images: then these go too, and `attachments` is null.
- */
 export async function withImages<T extends { id: string }>(
   parent: DropRow | null,
   images: CommentImage[],
@@ -289,11 +243,9 @@ export async function withImages<T extends { id: string }>(
   return { row, attachments: stored.map(toAttachment) }
 }
 
-/** Whether a message lists all of `ids`: the images this request stored, rather than an earlier request's. */
 export const lists = (message: { attachments: readonly string[] } | undefined, ids: string[]) =>
   ids.every((id) => message?.attachments.includes(id))
 
-/** The comment images `ids` names, as Drop's API answers them, for a comment or reply an earlier request stored. */
 export async function attachmentsById(ids: readonly string[]): Promise<Map<string, CommentAttachment>> {
   if (!ids.length) return new Map()
   const rows = await db
@@ -304,10 +256,6 @@ export async function attachmentsById(ids: readonly string[]): Promise<Map<strin
   return new Map(rows.map((row) => [row.id, toAttachment(row)]))
 }
 
-/**
- * A file sent through ViteHub's surfaces (`comments.upload`) for a thread on a drop or a site: checked by its bytes,
- * like a Drop comment's images, and stored the same way. Returns the image drop's id, which the message keeps.
- */
 export async function storeCommentFile(
   file: { name: string; size: number; data: Uint8Array },
   subject: CommentSubject | undefined,
@@ -328,11 +276,6 @@ export async function storeCommentFile(
   return row!.id
 }
 
-/**
- * Images in the threads on Drop's own pages (`page` subjects, the admins' toolbar): there is no drop to keep them under,
- * so each is a private blob at `comments/page/<uuid>/<name>`, checked by its bytes and at most 4 MiB like a drop's. The
- * caller checked that the writer may comment there. Returns the key, which the message keeps.
- */
 export async function storePageImage(file: { name: string; size: number; data: Uint8Array }): Promise<string> {
   if (file.size > MAX_FILE_BYTES)
     throw new HTTPError({ status: 413, statusText: `${file.name} exceeds the 4 MiB limit.` })
@@ -347,17 +290,11 @@ export async function storePageImage(file: { name: string; size: number; data: U
 const PAGE_IMAGE_KEY =
   /^comments\/page\/[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}\/[\w .-]{1,84}\.(png|jpg|webp|gif)$/
 
-/** The image type of a key `storePageImage` makes, from its extension; null for any other key. */
 export function pageImageType(key: string): ImageType | null {
   const extension = PAGE_IMAGE_KEY.exec(key)?.[1]
   return COMMENT_IMAGE_TYPES.find((type) => EXTENSIONS[type] === extension) ?? null
 }
 
-/**
- * The comment images stored under the drops `parents` selects (a subquery, or one id), oldest first. A comment's images
- * live under the drop it's on, or under the site a screenshot came from (imageParent), so this reads a list's images
- * beside its threads; their messages name them by id.
- */
 export const attachmentsUnder = (parents: SQL) =>
   db
     .select({
@@ -372,7 +309,6 @@ export const attachmentsUnder = (parents: SQL) =>
     .where(sql`${drops.parentId} IN (${parents})`)
     .orderBy(asc(commentAttachments.createdAt))
 
-/** Deletes comment images by their ids: a thread's or a reply's `attachments`. */
 export async function deleteImages(ids: readonly string[]) {
   for (const id of ids) {
     const row = await findDrop(id)

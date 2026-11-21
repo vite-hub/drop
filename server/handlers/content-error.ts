@@ -12,10 +12,6 @@ import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 const theme = `${THEME_CSS.replace(":root.dark {", "@media (prefers-color-scheme: dark) { :root {")}\n}`
 const mark = DROP_MARK.replace("<svg ", '<svg class="content-unavailable-mark" aria-hidden="true" focusable="false" ')
 
-/**
- * A lookup this page did without. The request's own event is often out already (evlog emits it as the error is
- * thrown), so this is an event of its own, with the request's id.
- */
 function fellBack(event: H3Event, step: string, error: unknown) {
   background.warn({
     action: "content-error",
@@ -32,10 +28,6 @@ async function signedIn(event: H3Event) {
   return identify(event)
 }
 
-/**
- * The link of the drop a `/d/<link>/…` address names, when this person may open it, so its 404 is about the address
- * and not about access. Null when they can't, so nothing tells them a drop is there.
- */
 async function openableDrop(event: H3Event, path: string, identity: Awaited<ReturnType<typeof signedIn>>) {
   const key = path.match(/^\/d\/([^/]+)/)?.[1]
   if (!key) return null
@@ -54,14 +46,11 @@ async function openableDrop(event: H3Event, path: string, identity: Awaited<Retu
   }
 }
 
-/** Raw file errors need trusted chrome too. Returning nothing keeps Nitro's normal API error handler. */
 export default async function contentError(error: HTTPError<{ shareReview?: string }>, event: H3Event) {
   const path = event.url.pathname
   if (!path.startsWith("/f/") && !path.startsWith("/d/")) return
-  // evlog emitted this request's event as the error was thrown; the lookups below add nothing to it.
   event.context.logClosed = true
   const status = error.status >= 400 && error.status <= 599 ? error.status : 500
-  // Reuse the access gate's identity when it ran. For missing files, resolve it only on this error path.
   let identity: Awaited<ReturnType<typeof signedIn>> = null
   try {
     identity = await signedIn(event)
@@ -69,7 +58,6 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
     fellBack(event, "identity", failure)
   }
   const drop = status === 404 ? await openableDrop(event, path, identity) : null
-  // A browser that was signed in before goes back through sign-in instead of reading why it can't open this.
   if (
     !identity &&
     !drop &&
@@ -96,7 +84,6 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
         error.data?.shareReview === "pending",
         authProxy().enabled,
       )
-  // A pasted link to a drop a stranger can't open still unfurls as Drop's card (app.vue), not as this error.
   const card = path.startsWith("/d/")
     ? `<meta property="og:site_name" content="Drop"><meta property="og:title" content="Shared on Drop"><meta property="og:image" content="${escapeHtml(event.url.origin)}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">`
     : ""

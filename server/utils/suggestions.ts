@@ -13,7 +13,6 @@ import type { Identity } from "./identity"
 
 const acceptedNote = (thread: DropThread) => `Accepted suggestion #${thread.n}`
 
-/** Who may accept or undo a suggestion: editors of its Markdown doc, from the page or an agent. */
 function requireSuggestion(drop: DropRow | null, thread: DropThread | null, who: Identity | null) {
   if (
     !thread ||
@@ -39,7 +38,6 @@ async function acceptanceOf(drop: DropRow, thread: DropThread) {
   return receipt
 }
 
-/** Publishes a suggestion as the next version, then resolves its thread. Retries finish only the resolution. */
 export async function acceptSuggestion(
   row: DropRow | null,
   found: DropThread | null,
@@ -51,7 +49,6 @@ export async function acceptSuggestion(
     throw new HTTPError({ status: 409, statusText: "This suggestion is already resolved." })
   await requireRateLimit(event, "drop-version", { key: `${drop.id}:${who.userId}`, limit: 20, window: "1m" })
   const accepted = await acceptanceOf(drop, thread)
-  // Publication and Comments are separate writes. The receipt survives outages, restarts, and later versions.
   if (accepted && accepted.undoneVersion === null) {
     await setResolved(thread, true, who)
     return drop
@@ -74,7 +71,6 @@ export async function acceptSuggestion(
   return next
 }
 
-/** Publishes the text before an accepted suggestion, then reopens it. History keeps both versions. */
 export async function undoSuggestion(
   row: DropRow | null,
   found: DropThread | null,
@@ -83,7 +79,6 @@ export async function undoSuggestion(
 ) {
   const { drop, thread, who } = requireSuggestion(row, found, identity)
   const accepted = await acceptanceOf(drop, thread)
-  // Reopening or restoring the handoff can fail after the reversal committed. Never publish it twice.
   if (accepted?.undoneVersion != null) {
     if (thread.status === "resolved") {
       await setResolved(thread, false, who)

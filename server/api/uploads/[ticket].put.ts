@@ -7,12 +7,6 @@ import { logActor } from "../../utils/logs"
 import { publishInput } from "../../utils/publish"
 import { claimUpload, readUpload, releaseUpload } from "../../utils/uploads"
 
-/**
- * The upload URL `publish` hands out for a file or a built app: `curl -T before.png '<uploadUrl>'`, or
- * `tar -czf - -C dist . | curl -T - '<uploadUrl>'`. The ticket in the path stands in for the agent's sign-in, so this
- * needs no token. It finishes that publish call with the body's bytes and answers with the drop, like `publish` would
- * have.
- */
 export default defineHandler(async (event) => {
   const upload = await readUpload(event, getRouterParam(event, "ticket")!)
   if (!upload) {
@@ -22,11 +16,9 @@ export default defineHandler(async (event) => {
       statusText: "This upload URL has run out or isn't valid. Call publish again for a new one.",
     })
   }
-  // An archive is compressed, so it never needs more room than the largest app unpacked.
   const [limit, what] = upload.input.archive ? [MAX_ARCHIVE_BYTES, "archive"] : [MAX_FILE_BYTES, "file"]
   const tooLarge = () =>
     new HTTPError({ status: 413, statusText: `The ${what} exceeds the ${Math.round(limit / MIB)} MiB limit.` })
-  // `curl -T -` streams the body chunked, with no length to check up front: h3 counts the bytes as they arrive.
   let bytes: Uint8Array
   try {
     assertBodySize(event, limit)

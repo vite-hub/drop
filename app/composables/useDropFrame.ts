@@ -1,15 +1,7 @@
 import { type FrameMessage, parseFrameMessage } from "#shared/frame-messages"
 
-/** Where the frame sits on the page, and how much it's scaled down there (a device's size, ViewerDevice). */
 export type FrameBox = { left: number; top: number; scale: number }
 
-/**
- * The postMessage bridge to the sandboxed iframe. Messages are matched by source window. An opaque-origin frame
- * has no origin to check; a frame on the content origin (`origin`) must also come from, and only hears back on,
- * that origin, so nothing reaches a page the app navigated away to. The frame runs the drop's own code, so a message
- * that isn't one Drop's runtime sends (#shared/frame-messages) is dropped. `box` is the frame's place and scale, for
- * turning frame coordinates into page ones.
- */
 export function useDropFrame(
   frame: Readonly<Ref<HTMLIFrameElement | null | undefined>>,
   origin: MaybeRefOrGetter<string | undefined>,

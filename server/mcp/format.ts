@@ -6,11 +6,9 @@ import type { QuizTally, StoredAnswer } from "../utils/answers"
 import { dropPageUrl, type DropRow } from "../utils/drops"
 import { writtenBy } from "#shared/agents"
 
-/** How every tool describes the share input: one state, the same names the pages use. */
 export const SHARE_INPUT =
   "Who can open it: private (only the user), team (everyone on the team opens and comments: everyone signed in to a team Drop, or a team's members in its folders), team_edit (the team also edits a Markdown doc, or the Markdown in a folder, together in the browser), public (anyone with the link opens it, signed-in people comment), or public_comment (anyone with the link comments too, guests included). On a team Drop a public link closes after a few days and it's back to team. Leave it out to keep the current share; a new drop starts as this Drop's default: team on a team Drop or in a team's folders, private otherwise, and inside a folder it shares at least as wide as the folder. Make it public only when the user asks or it's clearly meant for people outside, such as a pull request asset."
 
-/** What agents get back for a drop: enough to link it, embed its file, and know who can open it and for how long. */
 export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "blobKey">) {
   const file = row?.blobKey ? `/f/${row.blobKey}` : drop.thumbnail
   return {
@@ -19,42 +17,31 @@ export function mcpDrop(drop: DropSummary, origin: string, row?: Pick<DropRow, "
     kind: drop.kind,
     version: drop.version,
     url: dropPageUrl(origin, drop),
-    // Embed this in a doc (Markdown image, ::screenshot src) to make the file part of that doc.
     ...(file && (drop.kind === "image" || drop.kind === "file") ? { fileUrl: new URL(file, origin).href } : {}),
-    // Search results say where a drop sits.
     ...(drop.path?.length ? { folder: drop.path.map((crumb) => crumb.title).join(" / ") } : {}),
-    // A doc found by its text: the words around the match.
     ...(drop.snippet ? { match: drop.snippet } : {}),
     ...(drop.items !== undefined ? { items: drop.items } : {}),
-    // A link item: the page it opens.
     ...(drop.href ? { href: drop.href } : {}),
     share: drop.share,
     ...(drop.publicUntil ? { publicUntil: new Date(drop.publicUntil).toISOString() } : {}),
     ...(drop.teamFolder ? { teamFolder: true } : {}),
-    // The share comes from a folder above, wider than the drop's own.
     ...(drop.sharedFrom ? { sharedThrough: drop.sharedFrom.title } : {}),
     ...(drop.owner ? { owner: drop.owner.name } : {}),
     ...(drop.shareReview === "pending" ? { waitingForReview: true } : {}),
     lifetime: drop.lifetime,
     ...(drop.keepReason ? { keepReason: drop.keepReason } : {}),
     status: expiryLabel(drop, Date.now()),
-    // A folder's note is its description: what goes in it and how.
     ...(drop.note ? (drop.kind === "folder" ? { description: drop.note } : { note: drop.note }) : {}),
   }
 }
 
 type McpDrop = ReturnType<typeof mcpDrop>
 
-/**
- * A drop in a folder lives as long as the folder, so a `lifetime` passed with it isn't the one it got. Said out loud, or
- * an agent that asked to keep a drop reads "review" and thinks the call went wrong.
- */
 export function folderLife(drop: Pick<McpDrop, "lifetime">, asked: Lifetime | undefined) {
   if (!asked || asked === drop.lifetime) return ""
   return `\nIt lives as long as its folder, which is ${drop.lifetime}, not ${asked}. To change that, pass lifetime to update_drop on the top-most folder.`
 }
 
-/** A drop's views for its owner's agents, split the way Details shows them. */
 export const mcpViews = (views: Record<ViewerKind, number>) => ({
   total: views.person + views.anonymous + views.agent,
   signedIn: views.person,
@@ -62,23 +49,17 @@ export const mcpViews = (views: Record<ViewerKind, number>) => ({
   agents: views.agent,
 })
 
-/** A drop's links, for agents that read text: one per line, so they can pass them back to update_drop. */
 export const resourcesLines = (resources: DropResource[]) =>
   `Links:\n${resources.map((resource) => `- ${resource.title ? `${resource.title}: ` : ""}${resource.url}`).join("\n")}`
 
 export const viewsLine = (views: ReturnType<typeof mcpViews>) =>
   `Views: ${views.total} (${views.signedIn} signed in, ${views.anonymous} anonymous, ${views.agents} by agents), each viewer counted once a day`
 
-/** One line per drop for clients that only read text. */
 export const dropLine = (drop: McpDrop) =>
   `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : drop.href ? `link to ${drop.href}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
 const pct = (n: number) => `${Math.round(n / 10)}%`
 
-/**
- * Where a comment points, in words: the quoted text, a spot or area as percentages of an image or element, or the whole
- * page. An anchor's path starts at its nearest element with an id, which names the section it sits in (`in #v-prism`).
- */
 export function commentTarget(
   comment: Pick<DropComment, "kind" | "selector" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">,
 ) {
@@ -90,29 +71,24 @@ export function commentTarget(
     comment.ow || comment.oh
       ? `the area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
       : `the spot ${pct(comment.ox)} across, ${pct(comment.oy)} down`
-  // The Marker's comments carry the words under their strokes.
   const marked = comment.quote ? ` marking > ${comment.quote}` : ""
   return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]${marked}${within}`
 }
 
-/** `version` is the one being read: a comment written on an earlier version says which. */
 export const commentLine = (comment: DropComment, version: number, origin: string) =>
   `${comment.n}. ${commentTarget(comment)}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${writtenBy(comment)}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
 
-/** The images sent with a comment or a reply, as full addresses an agent can fetch. */
 export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>
   item.attachments.map((file) => new URL(file.url, origin).href)
 
 const imageLine = (item: Pick<DropComment, "attachments">, origin: string, indent = "   ") =>
   item.attachments.length ? `\n${indent}Images: ${imageUrls(item, origin).join(" ")}` : ""
 
-/** A comment's thread under it, oldest first, one line per reply. */
 export const replyLines = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies
     .map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body}${imageLine(reply, origin, "     ")}`)
     .join("")
 
-/** The thread for structured output. */
 export const replyItems = (comment: Pick<DropComment, "replies">, origin: string) =>
   comment.replies.map((reply) => ({
     body: reply.body,
@@ -121,11 +97,6 @@ export const replyItems = (comment: Pick<DropComment, "replies">, origin: string
     images: imageUrls(reply, origin),
   }))
 
-/**
- * A doc's questions, polls, and recall cards for the user's agents, in the doc's order (`order`, the ids it shows) and
- * then the ones only earlier versions had: how everyone answered each question and poll, and the user's own first and
- * latest answer. Never anyone else's.
- */
 export function mcpAnswers(results: Map<string, QuizTally>, mine: StoredAnswer[], order: Iterable<string>) {
   const own = new Map(mine.map((answer) => [answer.id, answer]))
   const ids = new Set([...order].filter((id) => results.has(id) || own.has(id)))
@@ -156,7 +127,6 @@ type McpAnswer = ReturnType<typeof mcpAnswers>[number]
 const picked = ({ choice, correct }: QuizAnswer) =>
   `${choice.join(" + ") || "nothing"}${correct === null ? "" : correct ? " (right)" : " (wrong)"}`
 
-/** The blocks for agents that read text: one line each, the most picked option first. */
 export const answersLines = (answers: McpAnswer[]) =>
   `## Answers\nPeople signed in, each counted once: a question by their first try, a poll by their current vote. Option keys are the doc's own. "The user" is the one you act for.\n${answers
     .map(({ id, kind, people, counts, userAnswer }) => {
@@ -177,7 +147,6 @@ export const answersLines = (answers: McpAnswer[]) =>
     })
     .join("\n")}`
 
-/** An app's pages with their links, so an agent can send the one a reviewer should open. */
 export function pagesSection(pages: { page: string; url: string }[]) {
   const shown = pages.slice(0, MAX_LISTED_PAGES)
   return [
@@ -187,12 +156,9 @@ export function pagesSection(pages: { page: string; url: string }[]) {
   ].join("\n")
 }
 
-/** Base64 shorter than this stays in the text: an icon costs less than the placeholder that would replace it. */
 const KEEP_INLINE = 1024
-/** Match data URIs first so unmatched Markdown image prefixes cannot cause quadratic rescanning. */
 const INLINE_DATA = /data:([\w.+-]+\/[\w.+-]+)?(?:;[\w.+-]+=[^;,)"'\s]*)*;base64,([A-Za-z0-9+/=]+)/gi
 
-/** A figure whose bytes `withoutInlineData` left out of a doc's text. */
 export interface InlineFigure {
   n: number
   alt: string | null
@@ -203,15 +169,10 @@ export interface InlineFigure {
 const sizeLabel = (bytes: number) =>
   bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
 
-/**
- * A doc's text with each inline figure (a base64 `data:` URI) replaced by `[inline figure N: type, size, left out]`.
- * A converted paper keeps its figures inline, and read_drop then sent 3 MB of base64 that no agent can read as text.
- */
 export function withoutInlineData(text: string): { text: string; figures: InlineFigure[] } {
   const figures: InlineFigure[] = []
   let previousEnd = 0
   const out = text.replace(INLINE_DATA, (match, type: string | undefined, data: string, offset: number) => {
-    // Each gap is inspected once, and only after finding a data URI.
     const before = text.slice(previousEnd, offset)
     previousEnd = offset + match.length
     const imageStart = before.lastIndexOf("![")
@@ -226,6 +187,5 @@ export function withoutInlineData(text: string): { text: string; figures: Inline
   return { text: out, figures }
 }
 
-/** What read_drop says above a doc whose inline figures it left out, and where their bytes are. */
 export const inlineFiguresNote = (figures: InlineFigure[]) =>
   `${figures.length} inline ${figures.length === 1 ? "figure" : "figures"} (${sizeLabel(figures.reduce((sum, figure) => sum + figure.bytes, 0))}) left out of this text as [inline figure N: …]. For their bytes, or to publish a next version that keeps them, read the source with read_file.`

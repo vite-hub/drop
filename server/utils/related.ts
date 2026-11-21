@@ -12,36 +12,17 @@ import { listedNode } from "./nodes"
 import { resourcesOf } from "./resources"
 import { sharePolicy } from "./share"
 
-/**
- * Related drops. Nothing stores a relation: drops are related through the pages they link to (their `resources`,
- * #shared/resources). A pull request's before/after doc lists the PR and its preview, so it is related to the preview's
- * site, to the PR, and to every other drop that lists the PR. A site drop is related to the drops that link to the site
- * it reviews. Changing a drop's links changes its relations, with nothing to keep in sync.
- *
- * The search follows links two hops out from where it starts, and only through drops the person would find in Drop
- * anyway, so a drop they can't see never leads them to another one.
- */
-
-/**
- * A page that drops link to: any page on an origin, any page on an origin a site pattern covers (`https://*.example.dev`,
- * #shared/review), or one address.
- */
 export type LinkTarget = { origin: string } | { site: string } | { url: string }
 
-/** A related drop, with the links of its that weren't already listed. */
 export interface RelatedGroup {
   drop: DropRow
   links: DropResource[]
 }
 
-/** How many drops one hop finds, newest first, and how many groups the whole search returns. */
 const PER_HOP = 20
 const MAX_GROUPS = 20
 const HOPS = 2
 
-// The stored JSON holds each link as `"url":"<address>"`: an origin matches the start of an address, a pattern the
-// host's end and the path's start, an address the whole of it. resourceUrl() normalizes every stored address, so the
-// same page is the same text.
 const patternOf = (target: LinkTarget) =>
   "origin" in target ? `"${target.origin}/` : "site" in target ? `${target.site.split("*")[1]}/` : `"${target.url}"`
 const hits = (url: string, target: LinkTarget) =>
@@ -51,11 +32,9 @@ const hits = (url: string, target: LinkTarget) =>
       ? siteMatches(target.site, new URL(url).origin)
       : url === target.url
 
-/** Non-site drops whose links hit one of `targets`. A cheap match on the stored JSON, which `linkingDrops` checks again. */
 const linking = (targets: LinkTarget[]) =>
   and(
     isNotNull(drops.resources),
-    // instr, not LIKE: D1 refuses LIKE patterns over 50 bytes, and an address can be longer.
     or(...targets.map((target) => sql`instr(${drops.resources}, ${patternOf(target)}) > 0`)),
     ne(drops.kind, "site"),
     listedNode,
@@ -63,7 +42,6 @@ const linking = (targets: LinkTarget[]) =>
     isNull(drops.quarantinedAt),
   )
 
-/** Whether any drop links to a page on `origin`. That much is all a page learns before it has a token. */
 export async function linkedFrom(origin: string) {
   for (let offset = 0; ; offset += PER_HOP) {
     const rows = await db
@@ -80,7 +58,6 @@ export async function linkedFrom(origin: string) {
 
 const newestFirst = (rows: DropRow[]) => rows.toSorted((a, b) => b.updatedAt - a.updatedAt).slice(0, PER_HOP)
 
-/** Refill past skipped, inexact, and inaccessible matches: only eligible drops consume the per-hop budget. */
 async function findableMatches(
   where: SQL | undefined,
   matches: (drop: DropRow) => boolean,
@@ -110,7 +87,6 @@ async function findableMatches(
   return newestFirst(found)
 }
 
-/** The drops, outside `skip`, whose links hit one of `targets`, checked link by link: a title quoting an address doesn't count. */
 async function linkingDrops(targets: LinkTarget[], skip: Set<string>, who: Identity, event?: H3Event) {
   const found = new Map<string, DropRow>()
   for (const chunk of d1Chunks(targets))
@@ -125,7 +101,6 @@ async function linkingDrops(targets: LinkTarget[], skip: Set<string>, who: Ident
   return newestFirst([...found.values()])
 }
 
-/** The site drops, outside `skip`, that review a page `targets` point at, like the preview a doc links to. */
 async function reviewingSites(targets: LinkTarget[], skip: Set<string>, who: Identity, event?: H3Event) {
   const origins = [
     ...new Set(
@@ -154,12 +129,6 @@ async function reviewingSites(targets: LinkTarget[], skip: Set<string>, who: Ide
   return newestFirst([...found.values()])
 }
 
-/**
- * The drops related to `seeds` that `who` would find in Drop, as groups: each drop with its links, where a link already
- * listed, one that `hide` names, and the seeds themselves stay out. The first hop finds the drops that link to a seed;
- * the second, the drops that link to a page one of those links to. Site drops reviewing those pages come with
- * `sites`. Guests find none.
- */
 export async function relatedDrops(
   seeds: LinkTarget[],
   who: Identity | null,
@@ -194,11 +163,9 @@ export async function relatedDrops(
   return groups.slice(0, MAX_GROUPS)
 }
 
-/** Only a currently open, approved public link on the path can grant discovery from a recorded visit. */
 const publicPathOf = (drop: DropRow, now: number) =>
   [drop.raw ?? drop, ...(drop.ancestors ?? [])].flatMap((node) =>
     isPublic(node.share) &&
-    // findDrop clears the resolved review when current policy waives it; raw nodes keep their stored flags.
     (!node.shareReview || !drop.shareReview) &&
     (node.publicUntil === null || node.publicUntil > now)
       ? [node.id]
@@ -206,12 +173,6 @@ const publicPathOf = (drop: DropRow, now: number) =>
   )
 const grantsOf = (drop: DropRow) => drop.grants ?? [{ share: drop.share }]
 
-/**
- * The ones of `found` that `who` would find in Drop anyway: their own, ones a team share reaches, and public links on a
- * team Drop, or on a personal Drop the ones they opened while signed in, as Shared with me lists them. A public link
- * nobody gave them stays hidden, since finding a drop through a page it links to is not having its link. Admins don't
- * find other people's private drops this way.
- */
 export async function findableBy(who: Identity, found: DropRow[], event?: H3Event) {
   const viewable = found.filter((drop) => permissions(drop, who).view)
   const shared = new Set(
@@ -221,7 +182,6 @@ export async function findableBy(who: Identity, found: DropRow[], event?: H3Even
         reaches({ ...drop, grants: grantsOf(drop).filter((grant) => !isPublic(grant.share)) }, who),
     ),
   )
-  // A public link: a team Drop lists it for the team, a personal one once they opened it, or the folder it's in.
   const linked = new Set(
     viewable.filter((drop) => !shared.has(drop) && grantsOf(drop).some((grant) => isPublic(grant.share))),
   )

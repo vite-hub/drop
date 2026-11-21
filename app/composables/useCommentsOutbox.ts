@@ -11,48 +11,35 @@ import {
 import type { CommentReply, DropComment } from "#shared/types"
 import { readOutboxAuthor, writeOutboxAuthor } from "../lib/comment-outbox-storage.client"
 
-/** A drop page that shows its comments as they land. A drop without one only loads its list again. */
 interface OutboxPage {
   drop: () => string
-  /** The server took a comment: `comment` when the route answered it, else the page loads its list again. */
   created: (requestId: string, comment: DropComment | null) => void | Promise<void>
   replied: (requestId: string, threadId: string, reply: CommentReply) => void
-  /** Another tab sent one of this drop's comments: the page loads its list again, which now has it. */
   refresh: () => Promise<unknown>
 }
 
 type Client = CommentsClient & { readonly outbox: CommentsOutbox }
 
 export interface AppCommentsOutbox {
-  /** Whose new writes the active queue accepts. */
   account: Readonly<Ref<string>>
   author: (account: string) => CommentUser | undefined
-  /** Saved entries readable by the current author. */
   entries: Readonly<Ref<readonly CommentsOutboxEntry[]>>
   heldIds: Readonly<Ref<readonly string[]>>
-  /** The comments and replies the server took in this tab, by `requestId`, with the thread each is in. */
   accepted: ReadonlyMap<string, string>
-  /** The client that saves new comments and replies, once the browser started it. */
   writable: () => Promise<Client>
   retry: (id: string) => Promise<void>
-  /** Takes a waiting or refused comment or reply out, with the replies that wait on it. `false` while it's going out. */
   discard: (id: string) => Promise<boolean>
-  /** Changes a waiting or refused one's words and sends it again. `false` while it's going out. */
   edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
-  /** Shows the page's drop's comments as they land, until the page's scope ends. */
   attach: (page: OutboxPage) => void
-  /** Discards the specified account's queue, even if it is no longer active. */
   clear: (account: string) => Promise<void>
 }
 
-/** Whose entries this browser's outbox holds, and whether they go out (`held`: not while that person is signed out). */
 interface Holder {
   account: string
   user?: CommentUser
   held: boolean
 }
 
-/** Moves what a guest wrote in this browser to the person who signed in here, so it goes out as them. */
 async function adoptGuests(store: CommentsOutboxStore, account: string) {
   const guests = await store.list(GUEST_ACCOUNT)
   if (!guests.length) return
@@ -64,12 +51,6 @@ async function adoptGuests(store: CommentsOutboxStore, account: string) {
   })
 }
 
-/**
- * The app's one comments outbox: what the reader wrote keeps going out after they leave the drop page, every page can
- * count what still waits, and the tab-close guard and sign-out read it. It sends the signed-in person's entries, or the
- * guests' ones (GUEST_ACCOUNT). What a guest wrote goes out as whoever signs in next in this browser. Signed out, the
- * last person's entries stay held, with only their count and discard controls visible until they sign in again.
- */
 export function createCommentsOutbox(
   options: { store?: CommentsOutboxStore; environment?: CommentsOutboxEnvironment } = {},
 ): AppCommentsOutbox {
@@ -82,7 +63,6 @@ export function createCommentsOutbox(
   const heldIds = computed(() => heldEntries.value.map((entry) => entry.id))
   const pages = new Set<OutboxPage>()
   const accepted = new Map<string, string>()
-  // What this tab sent, including site reviews.
   const sentHere = new Set<string>()
   const outbox: AppCommentsOutbox = {
     account: computed(() => holder.value?.account ?? GUEST_ACCOUNT),
@@ -104,12 +84,10 @@ export function createCommentsOutbox(
     },
     clear: async () => {},
   }
-  // The outbox lives in the browser: the server renders the comments it has.
   if (import.meta.server) return outbox
 
   const notify = useNotify()
   const { data: me, status } = useMe()
-  // One store for every account, so a person's entries are still there when they sign in again in this page.
   const store = options.store ?? createIndexedDBOutboxStore()
   const pageOf = (drop: string | undefined) => [...pages].find((page) => page.drop() === drop)
 
@@ -134,8 +112,6 @@ export function createCommentsOutbox(
     if (readOutboxAuthor() === account) writeOutboxAuthor()
   }
 
-  // ViteHub won't change uncertain entries. Local recovery can remove them without deleting a server copy, or edit
-  // a refused entry without changing its retry key. Check in the transaction that no tab is currently sending it.
   const revise = async (id: string, change?: (entry: CommentsOutboxEntry) => CommentsOutboxEntry) => {
     const isActive = activeEntries.value.some((entry) => entry.id === id)
     const saved = (isActive ? activeEntries.value : heldEntries.value).find((entry) => entry.id === id)
@@ -153,7 +129,6 @@ export function createCommentsOutbox(
       }
       return true
     })
-    // Reads the store again and tells the other tabs; a changed entry goes back in the queue.
     if (changed) await lib.retry(id)
     return changed
   }
@@ -162,7 +137,6 @@ export function createCommentsOutbox(
     (activeEntries.value.some((entry) => entry.id === id) && (await active.value?.outbox.edit(id, body, mentions))) ||
     revise(id, (entry) => {
       const words = { body, ...(mentions ? { mentions } : {}) }
-      // Each kind apart, so the entry keeps its own input type.
       return entry.kind === "create"
         ? { ...entry, input: { ...entry.input, ...words } }
         : { ...entry, input: { ...entry.input, ...words } }
@@ -176,7 +150,6 @@ export function createCommentsOutbox(
     }
   }
 
-  // Who's signed in is known once /api/me first answers; until then nothing goes out as a guest by mistake.
   const retryIdentity = () => {
     if (status.value === "error") void refreshNuxtData(keys.me)
   }
@@ -254,9 +227,7 @@ export function createCommentsOutbox(
             else if (drop) void refreshNuxtData(keys.comments(drop))
           },
           refused(error) {
-            // Only the plan-limit dialog speaks now; the comment itself says it waits or was refused.
             if (quotaFailureOf(error)) notify.problem(error)
-            // The session isn't the person who wrote it: learn who's signed in now. The entry waits until they sign in again.
             if (statusOf(error) === 401) void refreshNuxtData(keys.me)
           },
         })
@@ -272,7 +243,6 @@ export function createCommentsOutbox(
         const stopChange = next.onChange(() => {
           const now = next.outbox.entries
           visible.value = now
-          // One that left without this tab sending it went out from another tab: the drop's list loads it.
           const left = before.filter(
             (entry) => !sentHere.has(entry.requestId) && !now.some((item) => item.id === entry.id),
           )
@@ -283,7 +253,6 @@ export function createCommentsOutbox(
             const page = pageOf(drop)
             void (page ? page.refresh() : refreshNuxtData(keys.comments(drop)))
           }
-          // Whose they are outlives a sign-out while any wait, and goes with the last of them.
           if (now.length && who.user) writeOutboxAuthor(who.account)
           else if (emptied && readOutboxAuthor() === who.account) writeOutboxAuthor()
         })
@@ -302,7 +271,6 @@ export function createCommentsOutbox(
   connect(holder, active, activeEntries)
   connect(heldHolder, held, heldEntries)
 
-  // Closing the tab asks first while anything waits or was refused, on any page of the app.
   const guard = (event: Event) => {
     if (activeEntries.value.length || heldIds.value.length) event.preventDefault()
   }
@@ -313,12 +281,10 @@ export function createCommentsOutbox(
 
 const outboxes = new WeakMap<object, AppCommentsOutbox>()
 
-/** The app's comments outbox (createCommentsOutbox), started by the comments-outbox plugin and kept for the app's life. */
 export function useCommentsOutbox() {
   const nuxtApp = useNuxtApp()
   const known = outboxes.get(nuxtApp)
   if (known) return known
-  // Detached, so no page's scope stops it. The plugin calls this first, in the app's context.
   const outbox = effectScope(true).run(() => createCommentsOutbox())
   if (!outbox) throw new Error("The comments outbox didn't start.")
   outboxes.set(nuxtApp, outbox)

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A site drop's comments as the page's main content: one row each, its screenshot as a thumbnail, newest first. A row
-// opens its thread in the review dock; "Review this page" opens the page it was written on in the frame.
 import { RelativeTime } from "vite-hub/ui"
 import type { DropComment, SiteReviewItem } from "#shared/types"
 
@@ -8,9 +6,7 @@ const props = defineProps<{
   comments: DropComment[]
   screenshots: Map<string, SiteReviewItem["screenshot"]>
   canManage: boolean
-  /** Whether the site is a pattern, so each comment names the preview it came from. */
   pattern: boolean
-  /** The page's full address, when the frame can open it. */
   pageUrl: (comment: DropComment) => string | undefined
 }>()
 const emit = defineEmits<{
@@ -34,7 +30,6 @@ const visible = computed(() =>
     .filter((comment) => comment.resolved === (filter.value === "resolved"))
     .toSorted((a, b) => b.createdAt - a.createdAt),
 )
-// Where a comment was written, short enough for the card: the path, after the preview's name on a pattern.
 function pageLabel(comment: DropComment) {
   const page = comment.page
   if (!page || !URL.canParse(page)) return page ?? ""
@@ -85,7 +80,6 @@ function pageLabel(comment: DropComment) {
         :key="comment.id"
         class="group/row relative flex gap-4 p-3 transition-colors duration-150 has-[[data-comment-id]:focus-visible]:bg-elevated/50 pointer-fine:hover:bg-elevated/50"
       >
-        <!-- The screenshot at thumbnail size, so the list reads as comments; the thread shows it large. -->
         <figure
           class="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted p-1.5 max-sm:hidden"
         >
@@ -111,7 +105,6 @@ function pageLabel(comment: DropComment) {
           <UIcon v-else name="i-mingcute-chat-3-line" class="size-5 text-dimmed" />
         </figure>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <!-- The whole row opens the thread; the button's area covers it, under the actions. -->
           <button
             :data-comment-id="comment.id"
             class="flex min-w-0 cursor-pointer items-center gap-2 text-left outline-none before:absolute before:inset-0"
@@ -120,7 +113,6 @@ function pageLabel(comment: DropComment) {
           >
             <UAvatar :alt="comment.authorName" :src="comment.authorImage ?? undefined" size="3xs" />
             <span class="truncate text-sm font-medium text-highlighted">{{ comment.authorName }}</span>
-            <!-- A comment still in the outbox has no number yet: a clock takes its place. -->
             <span class="flex shrink-0 items-center gap-1 font-mono text-xs text-muted"
               ><UIcon
                 v-if="comment.delivery"
@@ -145,7 +137,6 @@ function pageLabel(comment: DropComment) {
                 comment.replies.length === 1 ? "1 reply" : `${comment.replies.length} replies`
               }}
             </span>
-            <!-- Shown on the row the pointer is on, or always on touch screens, so the list stays quiet. -->
             <span
               class="ml-auto flex shrink-0 items-center gap-3 transition-opacity duration-150 pointer-fine:opacity-0 pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:opacity-100"
             >

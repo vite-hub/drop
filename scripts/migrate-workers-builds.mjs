@@ -2,8 +2,6 @@ import { readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 import { migrateD1 } from "./migrate-d1.mjs"
 
-// Workers Builds' default deploy command, `npx wrangler deploy`, ships a Worker without applying D1 migrations,
-// so the build applies migrations before deploy only when the Production build settings explicitly opt in.
 export async function migrateWorkersBuild(env = process.env, configPath = ".output/server/wrangler.json") {
   const productionBranch = env.DROP_PRODUCTION_BRANCH
   if (env.WORKERS_CI !== "1" || !productionBranch || env.WORKERS_CI_BRANCH !== productionBranch) return

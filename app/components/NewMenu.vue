@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// "New" beside Upload on the Drops page and in a folder: one ghost button for the drops you make here rather than
-// upload, a folder or a site to review. On a phone it keeps only its icon, so the bar doesn't push the title out.
 import type { DropdownMenuItem } from "@nuxt/ui"
 
-// `folder` false hides the folder entry: in a team folder only admins add folders.
 const { folder = true } = defineProps<{ folder?: boolean }>()
 const emit = defineEmits<{ folder: []; site: []; doc: []; board: [] }>()
 

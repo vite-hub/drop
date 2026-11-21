@@ -1,11 +1,5 @@
 import * as v from "valibot"
 
-/**
- * POSTs a form with a file, like `$fetch`, and reports how much of it has gone, from 0 to 1. `fetch` can't say how far
- * an upload got, so this goes through XMLHttpRequest. The answer is read with `schema`. A failure rejects with what
- * `$fetch` would have: `status`, `statusText`, and the server's body as `data`, so `errorText` and the plan-limit dialog
- * read it the same way.
- */
 export function sendFile<Schema extends v.GenericSchema>(
   url: string,
   body: FormData,
@@ -51,14 +45,11 @@ export function sendFile<Schema extends v.GenericSchema>(
   })
 }
 
-/** An upload the server refused, shaped like ofetch's FetchError. */
 class SendFileError extends Error {
-  // The answer's request id (Cloudflare's `cf-ray`), which finds the upload in the server's logs.
   readonly requestId: string | undefined
 
   constructor(
     readonly status: number,
-    // Undefined rather than empty: HTTP/2 sends no status text, and errorText reads the first one that's set.
     readonly statusText: string | undefined,
     readonly data: unknown,
     { message = `${status} ${statusText ?? ""}`.trim(), requestId }: { message?: string; requestId?: string } = {},

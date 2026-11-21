@@ -5,11 +5,6 @@ import { ReviewSitesSchema } from "#shared/schemas"
 import { identify } from "../../utils/identity"
 import { sealChoice, sitesFor } from "../../utils/review"
 
-/**
- * The connect popup (/review/connect) asks here, on Drop's own origin and with Drop's session, which site drops cover
- * the page that opened it and let this person comment. Each comes with a sealed `choice` to ask for its token with,
- * never its id or link. An empty list means sign in, or ask the owner to share it.
- */
 export default defineValidatedHandler({
   validate: { body: ReviewSitesSchema },
   async handler(event) {

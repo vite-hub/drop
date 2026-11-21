@@ -1,11 +1,6 @@
 import { createHighlighterCore, type HighlighterCore } from "shiki/core"
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript"
 
-/**
- * One Shiki setup for code images, rendered Markdown code blocks, and the live editor's code blocks. The JavaScript
- * regex engine keeps the Worker free of WASM; languages and themes load on first use, in the browser too.
- */
-
 const LANGUAGES = {
   bash: () => import("@shikijs/langs/bash"),
   c: () => import("@shikijs/langs/c"),
@@ -35,7 +30,6 @@ const LANGUAGES = {
   yaml: () => import("@shikijs/langs/yaml"),
 } as const
 
-/** The names the live editor's language select shows. */
 export const CODE_LANGUAGE_LABELS: Record<keyof typeof LANGUAGES, string> = {
   bash: "Bash",
   c: "C",
@@ -99,7 +93,6 @@ const THEMES = {
 
 export type CodeTheme = keyof typeof THEMES
 
-/** Whether `name` is one of `table`'s own keys, so a name like "constructor" never reaches Object's. */
 const isKeyOf = <T extends object>(table: T, name: string): name is Extract<keyof T, string> =>
   Object.hasOwn(table, name)
 
@@ -107,10 +100,6 @@ export const isCodeTheme = (name: string): name is CodeTheme => isKeyOf(THEMES, 
 
 export type CodeLanguage = keyof typeof LANGUAGES
 
-/**
- * The Shiki language a fence's language (or one of its aliases) stands for, if Drop highlights it. Only the first word
- * counts: the editor keeps a fence's whole info string, `ts {2} [file.ts]`, as its language.
- */
 export function codeLanguage(name: string | null | undefined): CodeLanguage | undefined {
   const requested = name?.trim().split(/\s/, 1)[0]?.toLowerCase()
   return requested ? (isKeyOf(LANGUAGES, requested) ? requested : LANGUAGE_ALIASES.get(requested)) : undefined
@@ -118,7 +107,6 @@ export function codeLanguage(name: string | null | undefined): CodeLanguage | un
 
 let highlighter: Promise<HighlighterCore> | undefined
 
-/** The highlighter with `language` and `themes` loaded. `lang` is "text" when Drop doesn't know the language. */
 export async function loadHighlighter(language: string | undefined, themes: CodeTheme[]) {
   highlighter ??= createHighlighterCore({ themes: [], langs: [], engine: createJavaScriptRegexEngine() })
   const shiki = await highlighter

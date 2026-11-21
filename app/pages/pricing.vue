@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// What Drop costs under its license (LICENSE): free for one or two people, $9 per member a month from three. A Drop
-// that bills its own teams through Stripe (server/utils/teams.ts) also shows that Team plan; without billing,
-// /api/pricing is a 404 and the page shows the license alone.
 const { data: plans } = await useFetch("/api/pricing")
 
 const LICENSE_URL = "https://github.com/vite-hub/drop/blob/main/LICENSE"

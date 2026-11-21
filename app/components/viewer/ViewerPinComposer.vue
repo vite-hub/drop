@@ -1,10 +1,4 @@
 <script setup lang="ts">
-// A new comment's composer as one small surface beside what it's on: ViteHub's CommentComposer as a row, so it reads
-// and works as the box in the dock does. Enter sends, Shift+Enter breaks the line, Escape drops it, "@" names people.
-// The words and pictures are the review draft's, so they follow the reader to other text they select. A picture can
-// still come in: the one the frame takes of a tooltip under an area, or one pasted or dropped into the box.
-// Comment or Suggest is picked before it opens (the selection bar, C or E); a suggestion gets the full composer.
-// The bubble around it is the frame (DropViewer), so the field draws none and the bubble shows the focus.
 import { CommentComposer, type CommentComposerSubmit } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 

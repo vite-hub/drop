@@ -7,11 +7,6 @@ import DocsEnv from "~/components/docs/DocsEnv.vue"
 import DocsFigure from "~/components/docs/Figure.vue"
 import DocsHostFacts from "~/components/docs/DocsHostFacts.vue"
 
-// Every docs page is Markdown in content/docs, served by ViteHub Content (server/content.ts). Tags in the Markdown,
-// such as `::docs-env` or `:kbd[R]`, render with the components in components/docs/md, or Drop's Docs components.
-// The docs layout comes from the `/docs/**` route rule (nuxt.config.ts).
-
-// Landing stories stand in for screenshots on the Features page, and hydrate only once they scroll into view.
 const LandingDocStory = defineLazyHydrationComponent(
   "visible",
   () => import("~/components/landing/LandingDocStory.vue"),
@@ -47,8 +42,6 @@ const { data: doc } = await useAsyncData(
   () => `docs:${path.value}`,
   () => docs.get(path.value),
 )
-// Fatal, or a link followed in the browser to a page that isn't there would only log the error: Nuxt shows its error
-// page for a client-side error only when it is fatal.
 if (!doc.value) throw createError({ status: 404, statusText: "No docs page here.", fatal: true })
 </script>
 

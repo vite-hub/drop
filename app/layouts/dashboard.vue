@@ -1,18 +1,4 @@
 <script setup lang="ts">
-// shadcn's sidebar (sidebar-07) on Executor's flat console: one step lighter or darker than the page (bg-muted, at
-// shadcn's --sidebar lightness), a hairline between sidebar and page, your search above the drops, Drops with a + to
-// make one (the Drops page lists them, so the sidebar doesn't), the workspace pages and Docs at the bottom, how much of
-// the plan you use, and the account menu (NavUser) opening upward.
-//
-// Docs is a pane of its own: picking it slides everything under Search out to the left and the docs nav in from the
-// right, with Back at its top; Back slides the other way and stays on the page. The logo, Search and the account menu
-// hold still. Docs pages use another layout (docs.vue wraps this one), so the slide runs here first and the page opens
-// once it's done; the sidebar there starts on the docs pane, and the swap doesn't show.
-//
-// ⌘B or the button in its header folds the whole sidebar away, like T3 Code; the pages' top bars then lead with the
-// button that brings it back (SidebarExpand). The sidebar's cookie keeps it folded across visits. A drop's link opened
-// straight away reads without it, until the next page (useOpenedOnLink).
-// ? opens the keyboard shortcuts (ShortcutsModal).
 import { promiseTimeout } from "@vueuse/core"
 import { RETURNING_COOKIE } from "#shared/sign-in"
 
@@ -29,29 +15,19 @@ watch(
   (name) => name !== "d-id-slug" && (onLink.value = false),
 )
 defineShortcuts({ meta_b: toggle })
-// The page in view tells the ⌘K palette (SearchPalette) which drop or folder is open.
 providePaletteContext()
 
 const onDrops = computed(() => route.path === "/drops" && route.query.tab !== "with-me")
 const onShared = computed(() => route.path === "/drops" && route.query.tab === "with-me")
-// A team Drop leads with the team's folders, and its Team page takes the place of Shared with me.
 const teamOpen = ref(true)
 const { data: me } = useMe()
-// Someone signed in on this browser: a drop it can't open later may only need signing in again
-// (server/handlers/content-error.ts).
 const returning = useCookie(RETURNING_COOKIE, { maxAge: 60 * 60 * 24 * 365, sameSite: "lax" })
 if (me.value && !returning.value) returning.value = "1"
 const team = computed(() => me.value?.mode === "team")
-// A personal Drop with teams lists each team you're on, its folders below it.
 const teams = computed(() => me.value?.teams ?? null)
-// Rows end in a count like Executor v2's nav: muted totals for what you have, and a marked one for what waits on you.
-// Both are the keyed caches the trees and the Drops page read; only a personal Drop's Shared with me, which no tree
-// shows, costs a fetch of its own.
 const { total: dropCount } = useSidebarDrops()
 const { data: shared } = useSharedWithMe()
-// A personal Drop's teams list their folders under Teams, not under Shared with me.
 const withMe = computed(() => (team.value ? shared.value : shared.value.filter((drop) => !drop.team)))
-// Members see Skills only while one is on, since only admins can switch them on.
 const admin = computed(() => me.value?.role === "admin")
 const workspace = computed(() => [
   {
@@ -86,11 +62,9 @@ const workspace = computed(() => [
     : []),
 ])
 
-// The policies live outside /docs but sit in its nav.
 const inDocs = computed(() => at("/docs") || DOCS_PAGES.some((page) => isActivePath(route.path, page.to)))
 const pane = ref<"main" | "docs">(inDocs.value ? "docs" : "main")
 const slide = ref<"forward" | "back">("forward")
-/** As long as `.sidebar-forward-*` / `.sidebar-back-*` in main.css run, so the page opens once the docs pane is in. */
 const SLIDE_MS = 220
 const motion = usePreferredReducedMotion()
 async function openDocs() {
@@ -98,10 +72,8 @@ async function openDocs() {
   pane.value = "docs"
   if (inDocs.value) return
   await promiseTimeout(motion.value === "reduce" ? 0 : SLIDE_MS)
-  // Back during the slide cancels the trip.
   if (pane.value === "docs") await navigateTo("/docs")
 }
-// The Docs row is a button, so it gets no link prefetch: load the page's code on hover, ready when the slide ends.
 const preloadDocs = () => void preloadRouteComponents("/docs")
 function leaveDocs() {
   slide.value = "back"
@@ -142,14 +114,11 @@ function leaveDocs() {
         </UTooltip>
       </template>
 
-      <!-- Opens the ⌘K palette (SearchPalette), which every dashboard page mounts below. -->
       <UDashboardSearchButton class="mb-2 w-full text-muted" label="Search" size="sm" />
 
-      <!-- Everything between Search and the account menu: the main pane or the docs pane, sliding past each other. -->
       <div class="relative -mx-2 flex min-h-0 flex-1 overflow-hidden">
         <Transition :name="`sidebar-${slide}`">
           <div v-if="pane === 'main'" key="main" class="flex min-h-0 w-full min-w-0 flex-col bg-muted px-2">
-            <!-- The team's folders, your drops, and what's shared with you: the part of this pane that scrolls. -->
             <nav aria-label="Main" class="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <template v-if="team">
                 <SidebarItem
@@ -161,7 +130,6 @@ function leaveDocs() {
                   to="/drops?tab=with-me"
                   @navigate="close"
                 >
-                  <!-- The carets' hit areas (before:) reach the row's full 32px, past their 24px square. -->
                   <button
                     :aria-expanded="teamOpen"
                     :aria-label="teamOpen ? 'Collapse team folders' : 'Expand team folders'"
@@ -180,7 +148,6 @@ function leaveDocs() {
                   <TeamTree @navigate="close" />
                 </div>
               </template>
-              <!-- Drops lists them on its page; the + beside it makes one from anywhere. -->
               <SidebarItem
                 active-icon="i-mingcute-layers-fill"
                 :active="onDrops"
@@ -240,7 +207,6 @@ function leaveDocs() {
             </div>
           </div>
 
-          <!-- The wrapper carries the curtain (main.css): the nav inside scrolls, which would clip it. -->
           <div v-else key="docs" class="sidebar-pane-docs relative z-10 flex min-h-0 w-full min-w-0 bg-muted">
             <nav aria-label="Docs" class="flex min-h-0 w-full min-w-0 flex-col gap-0.5 overflow-y-auto px-2 pb-2">
               <SidebarItem

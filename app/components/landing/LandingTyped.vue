@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Types its text out once, from when it mounts. All at once under reduced motion.
 const { text, cps = 30, delay = 0 } = defineProps<{ text: string; cps?: number; delay?: number }>()
 const count = ref(0)
 const motion = usePreferredReducedMotion()

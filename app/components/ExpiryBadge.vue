@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Only what needs attention: a drop in the Trash, or one that goes there within two weeks unless someone opens it.
-// Grayscale until it's in the Trash; red is reserved for that.
 import { DAY_MS, daysUntil, purgesAt, TEMPORARY_DAYS } from "#shared/expiry"
 import type { DropSummary } from "#shared/types"
 

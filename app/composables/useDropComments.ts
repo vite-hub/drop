@@ -9,24 +9,12 @@ import { type CommentCan, useComments } from "vite-hub/ui/headless"
 import type { DropComment } from "#shared/types"
 import type { Sent } from "~/composables/useDrop"
 
-/** What a viewer action sent, or its failure as the error the comment parts show under the box. */
 async function settled<T>(sent: Promise<Sent<T>>) {
   const result = await sent
   if (!("value" in result)) throw new Error(result.error ?? "That didn't go through. Try again.")
   return result.value
 }
 
-/**
- * The comments of the open drop for vite-hub/ui's comment parts (CommentPanel, CommentThread, CommentComposer).
- *
- * Threads answer the comments the viewer already holds (useDrop), the waiting ones too: the pins in the frame and the
- * parts show the same list, and a change from either side shows in both. New comments and replies go into useDrop's
- * outbox, which sends them to Drop's own routes, so a composer here empties as soon as its words are saved. Whom "@" names and the comment images go straight to ViteHub's
- * Comments API (`createRestTransport`), which asks server/comments.ts who may.
- *
- * `source` is what the dock lists: the drop's comments, or an image's in the lightbox. `page` is the app page a new
- * comment on the whole page is about.
- */
 function useDropComments(options: { source: () => DropComment[]; page: () => string | undefined }) {
   const state = injectDrop()!
   const { data: me } = useMe()
@@ -39,7 +27,6 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
       : undefined,
   )
 
-  // Files a composer attached, until the comment that carries them is sent: Drop's routes take them with the comment.
   const files = new Map<string, File>()
   let next = 0
   const stash = (list: File[]) =>
@@ -112,12 +99,9 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
       await state.resolveComment(threadId, false)
       return threadOf(threadId)
     },
-    // Signed-out readers name nobody (server/comments.ts `canMention`), so they don't ask.
     users: (input) => (user.value ? rest.users({ ...input, subject: subject.value }) : Promise.resolve([])),
   }
 
-  // As Drop's routes decide: whoever may comment replies; a thread's author or the drop's managers resolve it; authors
-  // edit their own words; authors and managers delete them. The routes still check.
   const mine = (author: CommentUser) => Boolean(user.value && author.id === user.value.id)
   const can: CommentCan = (action, { thread, message }) => {
     const shown = drop()
@@ -129,8 +113,6 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     return shown.isOwner || mine(message.author)
   }
 
-  // The client and the parts keep their own copy of the threads. Whatever changes the viewer's list (a send, a new
-  // version, the lightbox) has them read it again.
   const client = createCommentsClient({ transport, user: user.value, refreshOnFocus: false })
   watch(
     [options.source, subject],
@@ -140,7 +122,6 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
   const comments = useComments({ client, subject, user, can, hotkey: false })
 
   const images = computed(() => attachmentsOf(options.source()))
-  // The people the comments mention, so their "@" shows as a chip even to readers who can't look people up.
   const people = computed(() => {
     const named = new Map<string, CommentUser>()
     for (const comment of options.source())
@@ -154,18 +135,12 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     people,
     can,
     upload: async (list: File[]) => stash(list),
-    /**
-     * A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. One
-     * still waiting in the outbox shows from the browser's copy (LOCAL_ATTACHMENT).
-     */
     attachmentUrl: (key: string) => {
       const file = images.value.get(key)
       const url = key.startsWith(LOCAL_ATTACHMENT) && file ? file.url : rest.attachmentUrl(key)
       return { url, ...(file ? { name: file.filename, type: file.contentType } : {}) }
     },
-    /** The thread of a comment the viewer holds, for a CommentThread outside the panel. */
     thread: (comment: DropComment): CommentThread => toThread(comment, subject.value),
-    /** Sends a reply from a CommentThread outside the panel; a failure keeps the text and says why. */
     reply: async (id: string, body: string, mentions: string[], attached: File[]) => {
       await transport.reply({ threadId: id, body, mentions, attachments: stash(attached) })
     },
@@ -175,5 +150,4 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
   }
 }
 
-/** DropViewer provides the drop's comments; the dock, the thread, and the composer inject them. */
 export const [provideDropComments, injectDropComments] = createInjectionState(useDropComments)

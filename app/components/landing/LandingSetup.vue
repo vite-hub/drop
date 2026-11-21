@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// Try it now: the agents are the picker. The selected one grows its name and takes its color, the others name
-// themselves on hover. The card eases to each snippet's height inside a box sized for the tallest, so nothing under
-// it moves when you switch.
 const SNIPPETS = mcpSnippets(`${useRequestURL().origin}/mcp`)
 const TRY = [
   { value: "claude", icon: "i-simple-icons-claude", color: "#D97757" },
@@ -23,7 +20,6 @@ const { height } = useElementSize(content, undefined, { box: "border-box" })
 </script>
 
 <template>
-  <!-- Tall enough for the six-line snippets (Cursor, VS Code). -->
   <div class="min-h-[14.5rem] sm:min-h-[13.5rem]">
     <div
       class="overflow-hidden rounded-xl border border-default bg-default shadow-xs transition-[height] duration-300 ease-(--ease-out) motion-reduce:transition-none"
@@ -56,7 +52,6 @@ const { height } = useElementSize(content, undefined, { box: "border-box" })
                   class="size-4 shrink-0 transition-colors duration-200"
                   :style="client === item.value && 'color' in item ? { color: item.color } : undefined"
                 />
-                <!-- The name opens from zero width: a grid track that eases from 0fr to 1fr. -->
                 <span
                   class="grid transition-[grid-template-columns,opacity] duration-300 ease-(--ease-out) motion-reduce:transition-none"
                   :class="client === item.value ? 'grid-cols-[1fr] opacity-100' : 'grid-cols-[0fr] opacity-0'"

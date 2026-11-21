@@ -1,12 +1,4 @@
 <script setup lang="ts">
-// A folder's page: the drops in it as a list, like a file browser. On wide screens a click previews one beside the list
-// (ViewerFolderPreview, its width dragged from its edge) and a double-click, Enter or Open goes to its page: in the app
-// for people signed in, at its share link on a public page. As in Finder, a slower second click on a picked drop's name,
-// F2, or Rename in its right-click menu renames it. What goes in the folder (its description) is in Details
-// (ViewerOverview). Everyone on the team adds to a team folder, by Upload, by pasting files, or by dropping them on the
-// page; only admins add folders to it or change what it says. A link item opens its page outside Drop in a new tab,
-// and Copy link copies that page's address. A public skill hub, and each skill's folder in it, offers Install
-// (ViewerInstallSkills).
 import { RelativeTime } from "vite-hub/ui"
 import { breakpointsTailwind } from "@vueuse/core"
 import { dropPath } from "#shared/links"
@@ -32,8 +24,6 @@ const meta = (child: DropSummary) =>
   ]
     .filter(Boolean)
     .join(" · ")
-// Search goes to the ⌘K palette with `in:<folder>` typed in, where kinds and other folders filter too. A public page
-// has no palette, so signed-in people search below the folder there (ViewerFolderResults). Both go through /api/drops.
 const { data: me } = useMe()
 const palette = Boolean(injectPaletteContext())
 const openPalette = usePaletteOpener()
@@ -45,7 +35,6 @@ defineShortcuts({ "/": () => palette && searchable.value && searchFolder() })
 const live = computed(() => !props.drop.trashedAt)
 const adds = computed(() => live.value && Boolean(me.value) && (props.drop.isOwner || Boolean(props.drop.teamFolder)))
 const addsFolders = computed(() => props.drop.isOwner)
-// ⌘K's new drops go in here too, where the New menu would put them.
 usePaletteOffer("folder", () =>
   adds.value ? { id: props.drop.id, title: props.drop.title, folders: addsFolders.value } : null,
 )
@@ -56,45 +45,38 @@ async function newFolder() {
     await refreshNuxtData(keys.drop(props.drop.id))
 }
 
-// One click picks, a double-click opens. Below `lg` there's no room beside the list, so a click opens at once, and so do
-// clicks with a modifier (a new tab) everywhere, and Enter on a row (a click with no `detail`).
 const wide = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 }).greaterOrEqual("lg")
 const selected = ref<string | null>(null)
 const picked = computed(() => (wide.value ? children.value.find((child) => child.id === selected.value) : undefined))
 const list = useTemplateRef("list")
 const rowOf = (id: string) => list.value?.querySelector<HTMLElement>(`[data-id="${id}"]`)
 let pickedAt = 0
-let slowClick: ReturnType<typeof setTimeout> | undefined
+const slowClick = useTimeoutFn((child: DropSummary) => startRename(child), 500, { immediate: false })
 function pick(event: MouseEvent, child: DropSummary) {
   if (!wide.value || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0 || !event.detail) return
   event.preventDefault()
-  clearTimeout(slowClick)
+  slowClick.stop()
   if (event.detail > 1) return open(child)
   if (selected.value !== child.id) {
     selected.value = child.id
     pickedAt = event.timeStamp
     return
   }
-  // A second click on the name, slower than a double-click, renames: it waits out the double-click first.
   const onName = event.target instanceof Element && event.target.closest("[data-name]")
-  if (onName && event.timeStamp - pickedAt > 500) slowClick = setTimeout(() => startRename(child), 500)
+  if (onName && event.timeStamp - pickedAt > 500) slowClick.start(child)
 }
-onBeforeUnmount(() => clearTimeout(slowClick))
 
-// Renaming: the folder's owner (or a team folder's drop's), and admins. The new name shows at once; it goes back if the
-// server says no.
 const manages = (child: DropSummary) =>
   Boolean(me.value) &&
   !props.publicView &&
   live.value &&
   (me.value?.role === "admin" || (props.drop.teamFolder ? !child.owner && !child.teamFolder : props.drop.isOwner))
-// In a team folder anyone may move a teammate's drop to the Trash, as on the Drops page.
 const trashes = (child: DropSummary) => manages(child) || (adds.value && Boolean(props.drop.teamFolder))
 const renaming = ref<string | null>(null)
 const titles = ref<Record<string, string>>({})
 const nameOf = (child: DropSummary) => titles.value[child.id] ?? child.title
 function startRename(child: DropSummary) {
-  clearTimeout(slowClick)
+  slowClick.stop()
   if (manages(child)) renaming.value = child.id
 }
 async function renamed(child: DropSummary, title: string | null) {
@@ -108,8 +90,6 @@ async function renamed(child: DropSummary, title: string | null) {
   titles.value = rest
 }
 
-// Right-click (or the menu key) on a row: what the Drops page's row menu does, and Rename. The row picks itself, so the
-// preview shows what the menu acts on.
 const moveTo = useMoveDialog()
 const { copy } = useCopy()
 const origin = useRequestURL().origin
@@ -117,7 +97,6 @@ const menuDrop = shallowRef<DropSummary | null>(null)
 function aim(event: MouseEvent) {
   const row = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-id]") : null
   const child = children.value.find((item) => item.id === row?.dataset.id)
-  // A field being renamed keeps the browser's own menu, and so does the space between rows.
   if (!child || (event.target instanceof Element && event.target.closest("input"))) return event.stopPropagation()
   menuDrop.value = child
   if (wide.value) selected.value = child.id
@@ -128,7 +107,6 @@ const menu = computed(() => {
   return [
     [
       { label: "Open", icon: "i-mingcute-arrow-right-up-line", onSelect: () => open(child) },
-      // A link opens in a new tab already; its own page, with its comments and Details, is the other way in.
       child.href
         ? {
             label: "Open in Drop",
@@ -161,8 +139,6 @@ const menu = computed(() => {
       : []),
   ]
 })
-// Rename waits for the menu to close: its focus trap would take the focus back from the field. Otherwise the focus goes
-// back to the row, unless a dialog the menu opened (Move to folder) has it.
 let renameNext: DropSummary | null = null
 function menuClosed(event: Event) {
   event.preventDefault()
@@ -176,18 +152,14 @@ async function trash(child: DropSummary) {
   await refreshNuxtData(keys.drop(props.drop.id))
 }
 
-// The preview's width, dragged from its left edge, kept for every folder.
 const preview = useResizeHandle(useFolderPreviewWidth(), { min: 18, max: 40, initial: 22 })
 const previewing = computed(() => Boolean(picked.value && !search.value.trim()))
-// The list stays centered on the whole page while the preview is open, so opening or resizing it doesn't move the
-// list's left edge: the preview takes its room from the list's right.
 const listStyle = computed(() =>
   previewing.value
     ? { marginLeft: `max(0px, (100% + ${preview.width.value}rem + 1px - var(--container-5xl)) / 2)` }
     : undefined,
 )
 
-// Arrows walk the list with the preview following; Escape closes it; F2 renames the row in focus.
 function walk(event: KeyboardEvent) {
   if (event.key === "F2") {
     const row = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-id]") : null
@@ -208,9 +180,6 @@ function walk(event: KeyboardEvent) {
   rowOf(children.value[next]!.id)?.focus()
 }
 
-// Upload, a paste, and files dropped on the page all land here, one after another, each a row at the top of the list
-// (DropUpload) until its drop is in. The last one shows in the preview; on a narrow screen a single file opens instead,
-// as it did before the preview.
 const { pending, uploading, uploadFiles, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), {
   folder: () => props.drop,
   enabled: () => adds.value,
@@ -219,15 +188,12 @@ const { pending, uploading, uploadFiles, openPicker, isOverDropZone } = useUploa
 })
 const dropping = computed(() => adds.value && isOverDropZone.value)
 
-// A screenshot on the clipboard pastes as "image.png"; it gets the time instead, so a folder of them tells apart.
-// Typing fields keep their paste.
 useEventListener("paste", (event: ClipboardEvent) => {
   const target = event.target instanceof Element ? event.target : null
   if (!adds.value || target?.closest("input, textarea, [contenteditable]")) return
   const files = [...(event.clipboardData?.files ?? [])]
   if (!files.length) return
   event.preventDefault()
-  // The reader's own clock, as "2026-10-25 11.30.12": Swedish dates read year first.
   const stamp = new Date().toLocaleString("sv-SE").replaceAll(":", ".")
   void uploadFiles(
     files.map((file) =>
@@ -250,11 +216,7 @@ async function newBoard() {
 </script>
 
 <template>
-  <!-- A row's icon and its kind and time, the same whether it links or its name is being edited. -->
   <DefineRowParts v-slot="{ child, part }">
-    <!-- An image shows its top, the header of a screenshot, with a hairline so a white one keeps its edge; the rest get
-         their kind's icon. The image's own size, not the grid's auto row, sets its box: a tall screenshot would
-         stretch that row past the 28px and over the rows below. -->
     <span v-if="part === 'icon'" class="grid size-7 shrink-0 place-items-center">
       <span
         v-if="child.href"
@@ -288,8 +250,6 @@ async function newBoard() {
   <div ref="root" class="relative flex min-h-0 flex-1">
     <div class="min-w-0 flex-1 overflow-y-auto">
       <div class="max-w-5xl px-4 py-3 sm:px-6 sm:py-4" :class="{ 'mx-auto': !previewing }" :style="listStyle">
-        <!-- Search and the folder's actions share one bar; visitors, who can't search, see how much it holds instead.
-             The search box is a button that opens ⌘K on this folder. -->
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <button
             v-if="searchable && palette"
@@ -335,7 +295,6 @@ async function newBoard() {
             </template>
           </div>
         </div>
-        <!-- Search results replace the normal rows, but uploads still show their progress above them. -->
         <ul v-if="search.trim() && pending.length" aria-label="Uploading" class="-mx-2 mb-3 flex flex-col gap-px">
           <DropUpload v-for="item in pending" :key="item.key" class="px-2 py-1.5" layout="row" :upload="item" />
         </ul>
@@ -352,7 +311,6 @@ async function newBoard() {
           </p>
         </div>
         <template v-else>
-          <!-- Column names give the quiet rows their grid. -->
           <div
             aria-hidden="true"
             class="-mx-2 flex items-center gap-3 border-b border-default px-2 pb-1.5 text-xs text-dimmed"
@@ -412,7 +370,6 @@ async function newBoard() {
       </div>
     </div>
     <template v-if="picked && previewing">
-      <!-- The pane's left border is its handle: drag it, double-click it to reset, or focus it and use the arrows. -->
       <div
         aria-label="Resize the preview"
         aria-orientation="vertical"
@@ -436,7 +393,6 @@ async function newBoard() {
         />
       </aside>
     </template>
-    <!-- Files dragged over the page: one target for the whole folder. -->
     <div
       v-if="dropping"
       class="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-lg border-2 border-dashed border-inverted bg-default/85"

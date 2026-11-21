@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// The images in an image's folder, in the review dock's bar the way a prototype's variants sit there (ViewerVariants):
-// previous, a thumbnail of each image with the one showing ringed, how far along it is, and next. Each thumbnail links
-// to its image. When the bar runs out of room the strip scrolls, keeping the ringed one in view. ← and → step too while
-// the page has focus, or the gallery's own buttons (the viewer's side arrows carry data-gallery); the frame sends the
-// ones pressed in it (useViewerFrame's `arrow`). A menu or a field keeps its arrows.
 import type { DropGalleryItem } from "#shared/types"
 
 const props = defineProps<{ items: DropGalleryItem[]; at: number; to: (item: DropGalleryItem) => string }>()
@@ -25,7 +20,6 @@ useEventListener("keydown", (event: KeyboardEvent) => {
   else return
   event.preventDefault()
 })
-// A plain click moves there; one with a modifier opens the image in a new tab, as a link does.
 function pick(event: MouseEvent, index: number) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
   event.preventDefault()
@@ -58,7 +52,6 @@ function pick(event: MouseEvent, index: number) {
         :content="{ side: 'top', sideOffset: 8 }"
         :text="item.title"
       >
-        <!-- The ring is drawn over the picture: the strip scrolls, so it would clip an outline drawn around it. -->
         <NuxtLink
           :aria-current="index === at ? 'page' : undefined"
           :aria-label="item.title"

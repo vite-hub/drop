@@ -2,13 +2,9 @@ import type { DropComment, DropDetail, SiteReviewItem } from "./types"
 import { suggestionLine } from "./suggestion"
 import { writtenBy } from "./agents"
 
-// The prompts that hand a drop's comments to an agent: the viewer's Copy prompt, and the server's later. Comment words
-// come from the people who wrote them, so the prompt says whose they are and quotes everyone else's.
-
 const pct = (n: number) => `${(n / 10).toFixed(0)}%`
 const sitePct = (coordinate: number) => `${coordinate / 10}%`
 
-/** What a comment points at: its quote, the page, or an element and where on it. */
 function target(comment: DropComment) {
   if (comment.quote) return `> ${comment.quote}`
   if (comment.kind === "page") return "The whole page"
@@ -18,7 +14,6 @@ function target(comment: DropComment) {
     : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
 }
 
-/** Attachments use absolute addresses so pasted feedback can be read outside Drop. */
 const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
   item.attachments.length
     ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
@@ -35,7 +30,6 @@ function siteAnchor(comment: DropComment, screenshot: Screenshot | null, url: st
   return `${element}${box}${image}`
 }
 
-/** Comments as a numbered Markdown list: what each points at, its words, its replies, and its images. */
 const commentList = (comments: DropComment[], url: string, version: number, screenshots?: Screenshots) =>
   comments
     .map((comment) => {
@@ -46,7 +40,6 @@ const commentList = (comments: DropComment[], url: string, version: number, scre
     })
     .join("\n")
 
-/** Open comments as Markdown, ready to paste back to the agent. `version` is the one being viewed. */
 export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
   const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
   return `## Feedback on "${title}"\n\n${url}\n\n${commentList(open, url, version) || "No open comments."}\n\nDrop a new version that addresses these.`
@@ -76,15 +69,10 @@ function nextStep(drop: PromptDrop, comments: DropComment[]) {
   return `${read}${accept} Only if edits are still needed, publish the next version from the latest content with previous "${drop.id}", base set to the version read_drop showed, and a note saying what changed. Include in resolves only the still-open comments addressed by that publish from [${numbers}]. Where words are the answer, use reply in the comment's thread instead. ${fallback}`
 }
 
-/** `ask`: the reader wrote the thread or spoke last in it. `quote`: someone else's, which the reader hands on as context. */
 export type WaitingMark = "ask" | "quote"
 
 export type WaitingThread = DropComment & { mark: WaitingMark }
 
-/**
- * Every open thread, from anyone, whose last message isn't an agent's, by number. `me` is the reader's user id; their
- * threads, and those they answered last, are asks, and everyone else's are quotes.
- */
 export function waitingForAnswer(comments: DropComment[], { me }: { me: string }): WaitingThread[] {
   return comments
     .flatMap((comment) => {
@@ -98,15 +86,8 @@ export function waitingForAnswer(comments: DropComment[], { me }: { me: string }
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`)
 
-/** Every line of `text` as a Markdown quote. */
 const quoted = (text: string) => text.replace(/^/gm, "> ")
 
-/**
- * A prompt that hands an agent the threads waiting on an answer, with their words, so it can start without Drop, and
- * the tool calls that resolve them where it has Drop's MCP server. The reader's own come first, as what they ask; the
- * threads `waitingForAnswer` marks `quote` follow as others' words, quoted, never as the reader's instructions. A
- * comment with no mark is the reader's own.
- */
 export function promptMarkdown(
   drop: PromptDrop,
   url: string,

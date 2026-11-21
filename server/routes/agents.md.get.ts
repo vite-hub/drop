@@ -5,10 +5,6 @@ import dropMd from "../../skills/vitehub-drop/SKILL.md?raw"
 
 const MIB = 1024 * 1024
 
-/**
- * The agent start guide at a stable URL: how to connect, this deployment's limits, then the vitehub-drop skill, so an
- * agent without Drop's MCP server or skills yet has one page to read.
- */
 export default defineHandler((event) => {
   const origin = event.url.origin
   const config = quotaConfig()

@@ -3,7 +3,6 @@ useSeoMeta({ title: "Review" })
 const consoleAuth = consoleUrl("/auth")
 const { data, error } = await useApi("/api/admin/review", { key: keys.adminReview })
 const now = useRelativeNow()
-// The sidebar's Members count comes from /api/me, so it reloads with the queue.
 const { busy, run } = useAdminAction(
   (id) => `/api/admin/review/${id}`,
   "Could not review member",

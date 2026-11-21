@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// What one Get started step says and offers: under its title on the first run, in a popover once there are drops.
 import type { DropSummary } from "#shared/types"
 
 const { step, team, firstDoc } = defineProps<{ step: string; team: boolean; firstDoc?: DropSummary }>()

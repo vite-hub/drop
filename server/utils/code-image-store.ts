@@ -11,12 +11,7 @@ import { deleteBlobKeys } from "./drops"
 import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
 
-/**
- * Turns code into an image. SVG comes straight from Shiki's tokens; PNG is a Browser Run screenshot of that
- * SVG, so only Drops on Cloudflare have it (and default to it). The URL is public and lasts five minutes.
- */
 export async function createCodeImage(event: H3Event, who: Identity, input: CodeImageInput) {
-  // Cloudflare Rate Limiting on Workers, ViteHub's in-memory limiter elsewhere (local dev included).
   await requireRateLimit(event, "code-image", { key: who.userId, limit: 10, window: "1m" })
   const format = input.format ?? (PNG_CODE_IMAGES ? "png" : "svg")
   const { svg, width, height } = await renderCodeSvg(input)
@@ -34,8 +29,6 @@ export async function createCodeImage(event: H3Event, who: Identity, input: Code
     const [storageError, stored] = await blob.put(key, image, {
       contentType: format === "png" ? "image/png" : "image/svg+xml",
     })
-    // No code_images row points at the key yet, so the hourly cleanup would never find it: deleteBlobKeys queues a
-    // retry when the delete fails.
     if (storageError || !stored.url) {
       await deleteBlobKeys([key])
       throw new HTTPError({ status: 503, statusText: "The code image could not be stored." })

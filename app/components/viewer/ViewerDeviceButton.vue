@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Device mode's switch, in the review toolbar under HTML docs, apps, and reviewed sites. On, the page shows at the last device
-// or size picked, with the device bar above it (ViewerDevice); off, it fills the pane again.
 const device = useDeviceSize()
 const toggle = () => (device.value = { ...device.value, on: !device.value.on })
 </script>

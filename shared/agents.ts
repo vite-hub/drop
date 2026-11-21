@@ -1,15 +1,8 @@
-// Known agents by the name their MCP client registers with ("Claude Code", "Claude Code (drop)", "Executor"…). Marks are
-// the official ones from Simple Icons (via @iconify-json/simple-icons), brand colors only where the mark is colored.
-// Each agent's logo is also a file in public/agents/: the avatar its comments show, the mark on a round tile.
-
 export interface KnownAgent {
   key: string
-  /** How a comment names it, beside the person it acts for: "Claude (Maxi)". */
   label: string
-  /** The Iconify mark, when Simple Icons has one. */
   icon?: string
   color?: string
-  /** The avatar, a file in public/agents/. */
   logo: string
   names: readonly string[]
 }
@@ -70,13 +63,10 @@ const AGENTS: readonly KnownAgent[] = [
     logo: "/agents/github-actions.svg",
     names: ["github actions"],
   },
-  // T3 Code's mark from t3.codes, white on its black tile; Simple Icons has none. Send delivers to it (app/utils/comment-send.ts).
   { key: "t3", label: "T3 Code", logo: "/agents/t3.svg", names: ["t3 code"] },
-  // Executor's own mark (MIT, github.com/UsefulSoftwareCo/executor); Simple Icons has none.
   { key: "executor", label: "Executor", logo: "/agents/executor.png", names: ["executor", "executor cli"] },
 ]
 
-/** The known agent for a key or a client's name ("Claude Code", "codex cli"…), or null. */
 export function knownAgent(name: string): KnownAgent | null {
   const needle = name.trim().toLowerCase()
   return (
@@ -86,6 +76,5 @@ export function knownAgent(name: string): KnownAgent | null {
   )
 }
 
-/** Who wrote a comment or a reply, as text: "Claude (Maxi)" for an agent's, else the author. */
 export const writtenBy = (item: { authorName: string; agent?: { name: string } | null }) =>
   item.agent ? `${item.agent.name} (${item.authorName})` : item.authorName

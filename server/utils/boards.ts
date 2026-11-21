@@ -20,13 +20,6 @@ import { type DropRow, escapesFolder, MAX_FILE_BYTES, readText, storageFailure }
 import type { Identity } from "./identity"
 import { textStatements } from "./search"
 
-// A board is one living file. Unlike a doc, whose versions never change, people and agents edit the latest version
-// of a board in place, the way an app's next version replaces its files: a whiteboard changes stroke by stroke, and a
-// version per stroke would bury its history. Publishing with `previous` still makes a new version to come back to.
-//
-// TODO(board-realtime): browsers send their changes here and poll for everyone else's. A Realtime room per board
-// (like server/realtime/drafts.ts for Markdown) would show other people's cursors and strokes as they draw.
-
 export async function readBoard(drop: DropRow): Promise<Board> {
   if (drop.kind !== "board" || !drop.blobKey)
     throw new HTTPError({ status: 400, statusText: "That drop isn't a board." })
@@ -38,12 +31,6 @@ export async function readBoard(drop: DropRow): Promise<Board> {
   }
 }
 
-/**
- * Merges the elements people changed in Excalidraw, or an agent's edit, into the board, and stores it. Per element the
- * higher version wins (mergeElements): two people moving the same note keep the later move. Elements a board doesn't
- * take (images, embeds, anything malformed) are skipped rather than failing the save, so one bad element can't stop a
- * person's other strokes from saving.
- */
 export async function writeBoard(
   drop: DropRow,
   change: { elements: unknown[]; who: Identity | null } | { edit: BoardEdit; who: Identity },
@@ -72,11 +59,6 @@ export async function writeBoard(
   return { board, changed, updatedAt: now }
 }
 
-// Images: the browser that saves a board renders the overview and each frame as PNG (Excalidraw only renders in a
-// browser) and sends them here, so agents can look at drawings the outline can only locate.
-
-// Frame ids come from the board's elements, which may name any string: one that would leave the board's folder once the
-// blob store decodes it gets no image.
 const imageKey = (drop: DropRow, name: string) => (escapesFolder(name) ? null : `boards/${drop.id}/${name}.png`)
 export const OVERVIEW = "overview"
 
@@ -86,7 +68,6 @@ export async function storeBoardImages(drop: DropRow, images: { frame: string; p
   for (const image of images) {
     if (image.frame !== OVERVIEW && !frames.has(image.frame)) continue
     const bytes = Uint8Array.from(atob(image.png), (char) => char.charCodeAt(0))
-    // A PNG starts with these 8 bytes; anything else isn't stored.
     const key = imageKey(drop, image.frame)
     if (!key || bytes.byteLength > MAX_FILE_BYTES || bytes[0] !== 0x89 || bytes[1] !== 0x50) continue
     const [error] = await blob.put(key, bytes, { contentType: "image/png" })
@@ -94,13 +75,11 @@ export async function storeBoardImages(drop: DropRow, images: { frame: string; p
   }
 }
 
-/** The stored PNG of the overview or a frame, base64-encoded for an MCP image result, or null before any was sent. */
 export async function boardImage(drop: DropRow, frame: string) {
   const key = imageKey(drop, frame)
   if (!key) return null
   const [error, file] = await blob.get(key)
   if (error?.code === "BLOB_NOT_FOUND") return null
-  // Any other error is the store failing, which must not read as "no image yet".
   if (error) throw storageFailure(error)
   if (!file) return null
   return base64(new Uint8Array(await file.arrayBuffer()))

@@ -1,17 +1,3 @@
-/**
- * Live cursors, as script and style text for the two places that draw on someone else's page: the comment layer in a
- * drop's frame (./plan-runtime) and the review script on a reviewed site (./review-script). Both run it next to
- * ELEMENT_NAMING, whose `pathOf` names elements.
- *
- * A cursor is where a person's pointer is, said the way ViteHub's comments overlay says it: the element under the pointer
- * (`selector`) and the spot inside it in thousandths of its box (`x`, `y`). Readers have different widths, so a raw
- * x and y would land on the wrong word; an element and a spot in it survive the page reflowing.
- *
- * `mountCursors(root, under)` draws other people's cursors in `root` (in the script's shadow root) and names the spot
- * under a point with `anchorAt`; `under(x, y)` is the element at a point, past the script's own elements. `set` takes
- * the cursors to show; each one's label fades after it stays still for a while, and the cursor itself hides while its
- * element is off screen or gone.
- */
 export const PRESENCE_CURSORS = String.raw`function mountCursors(root, under) {
     const STILL_MS = 3000;
     const layer = document.createElement("div");
@@ -89,11 +75,6 @@ export const PRESENCE_CURSORS = String.raw`function mountCursors(root, under) {
     return { anchorAt, set };
   }`
 
-/**
- * The cursors' look: the person's color for the arrow and the name tag, a 1px ring that keeps both visible on any page,
- * and moves that glide over one update (presence updates come every 50 ms or so), interrupted by the next one. Under
- * reduced motion they jump instead. Nothing here takes a click.
- */
 export const PRESENCE_CURSOR_STYLE =
   ".pcs{position:fixed;inset:0;overflow:hidden;pointer-events:none}" +
   ".pc{position:absolute;left:0;top:0;display:flex;align-items:flex-start;gap:2px;transition:transform 80ms linear,opacity 200ms ease;will-change:transform}" +

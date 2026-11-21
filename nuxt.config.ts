@@ -24,13 +24,9 @@ declare module "nuxt/schema" {
 const contentErrorHandler = fileURLToPath(new URL("./server/handlers/content-error.ts", import.meta.url))
 
 const { host, database } = deployment()
-// VPS and Deno answer /api/health with Drop's database-only check (server/handlers/database-health.ts), not ViteHub's
-// route, which also probes Blob: the fs driver can read a broken root as a missing file, and S3 can deny a missing key
-// while existing files stay readable, so a healthy store would fail (drop#245).
 const databaseOnlyHealth = host === "vps" || host === "deno"
 const healthRoute = "/api/health"
 
-// What every wide event and Drop's database-only health handler report: the app version and the commit the host built.
 const release = {
   version: JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version,
   commit:
@@ -42,16 +38,10 @@ const release = {
 }
 const liveEditing = host === "cloudflare" || host === "vps"
 
-// The browser keeps a file but asks again on every use: the access gate runs each time, and an unchanged file answers
-// 304 without its bytes (the blob handler handles conditional requests). server/plugins/content-headers.ts agrees.
-// `access: "public"` only means ViteHub runs no check of its own: server/middleware/0.drop-access.ts gates every
-// `/f/` request first, per drop and per share link, which ViteHub's `authorize` can't do without the request's event.
 const files = { serve: { route: "/f", access: "public", headers: { "Cache-Control": "private, no-cache" } } } as const
 
-// drop.vitehub.dev's own D1, in Cloudflare's EEUR region, which runs it in Milan.
 const HOSTED_D1 = "d634358e-4605-45ca-970f-d390584795a5"
 
-// D1's HTTP driver works from every host. The account, API token, and database id are read at runtime.
 const d1 = (fallback: string) => ({
   driver: "cloudflare" as const,
   databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || fallback,
@@ -59,55 +49,36 @@ const d1 = (fallback: string) => ({
   cloudflare: { http: true },
 })
 
-/**
- * ViteHub per host. A Definition folder turns its feature on (server/realtime/, server/schedules/), so hosts without
- * that feature set it to false. Only Cloudflare has Browser Run (PNG code images), a distributed rate limiter, and KV
- * for Nitro's cache. Elsewhere code images are SVG only, rate limits count per server instance (ViteHub's
- * in-memory limiter), and Nitro's cache stays in memory. The host comes from DROP_HOST or the build env
- * (scripts/deployment.ts).
- */
 const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
   cloudflare: {
     host: "cloudflare",
-    // drop.vitehub.dev's files sit in Eastern Europe beside its D1 and Worker: from the WNAM bucket each file read
-    // cost 200-700 ms in Milan (measured 2026-11-11). Its own binding name, because wrangler.jsonc's BLOB keeps the
-    // Deploy button's bucket for self-hosted Drops.
     blob:
       process.env.CLOUDFLARE_D1_DATABASE_ID === HOSTED_D1
         ? { ...files, binding: "BLOB_EEUR", bucketName: "vitehub-drop-eeur" }
         : files,
-    // Stateless Browser Run actions only (code-image screenshots): no Playwright, no page sessions.
     browser: true,
     database: {
       driver: "cloudflare",
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME || cloudflareTemplate.d1_databases[0]!.database_name,
-      // Local dev and `nuxt prepare` run against a local D1; deploys read the real id from the environment.
       databaseId:
         process.env.CLOUDFLARE_D1_DATABASE_ID ||
         cloudflareTemplate.d1_databases[0]!.database_id ||
         "00000000-0000-4000-8000-000000000000",
-      // Reads go to the D1 replica nearest the Worker once replication is on for the database (Cloudflare API,
-      // read_replication.mode "auto"); a request that writes sets a bookmark cookie, so its reader sees the write next.
       readReplication: true,
     },
     kv: true,
-    // Cached functions and handlers share the Worker's KV, under the nitro-cache: prefix.
     cache: { driver: "kv" },
     rateLimit: true,
     schedule: true,
-    // Live editing: rooms in a SQLite Durable Object, drafts in BLOB (server/utils/live-drafts.ts).
     realtime: { driver: "cloudflare" },
   },
-  // Vercel Blob (a private store, BLOB_READ_WRITE_TOKEN), D1 over HTTP, and cleanup as a Vercel Cron Job.
   vercel: {
     host: "vercel",
     blob: { ...files, driver: "vercel", access: "private" },
     database: d1("vitehub-drop-vercel"),
-    // Vercel Hobby runs cron jobs at most once a day; other hosts keep the hourly cron.
     schedule: { cron: { cleanup: "0 0 * * *" } },
     realtime: false,
   },
-  // Netlify Blobs, D1 over HTTP, and the cleanup as a scheduled function (.netlify/v1/functions).
   netlify: {
     host: "netlify",
     blob: files,
@@ -115,10 +86,6 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     schedule: { providerOutput: "standalone" },
     realtime: false,
   },
-  // Deno Deploy has no blob store of its own, so files go to an S3-compatible bucket (R2, S3, Tigris). The hourly
-  // cleanup is off here: ViteHub runs a Deno Schedule from Deno.cron outside Nitro, without its plugins, and nobody has
-  // run Drop's cleanup that way yet. Until then expired drops and code images stop being served but stay stored, the
-  // Trash is never purged, and unused OAuth clients stay registered.
   deno: {
     host: "deno",
     blob: {
@@ -132,8 +99,6 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     schedule: false,
     realtime: false,
   },
-  // One Node process: local SQLite or explicit D1, files on disk under .data/, in-memory rate limits, and cleanup on a
-  // timer inside the process (its run history in KV files).
   vps: {
     host: "node",
     blob: { ...files, driver: "fs", base: ".data/blob" },
@@ -149,15 +114,12 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: { driver: "memory" },
     schedule: { runtime: { driver: "process" } },
-    // Live editing rooms stay in this one process and save their drafts to .data/blob.
     realtime: { driver: "memory" },
   },
 }
 
 type RouteRule = NonNullable<NuxtConfig["routeRules"]>[string]
 
-// Drops' pages show drops in srcdoc frames, which inherit the page's CSP: no script policy there, only frame-ancestors
-// (shared/csp.ts; app/plugins/csp-boundary.client.ts loads them fresh from a page that has one).
 const DROP_PAGE: RouteRule = {
   security: {
     headers: {
@@ -183,90 +145,54 @@ export default defineNuxtConfig({
   vitehub: {
     ...VITEHUB[host],
     publicUrl: process.env.DROP_PUBLIC_URL || undefined,
-    // On a VPS a reverse proxy ends HTTPS, so URLs built from the request (the GitHub callback, the OAuth issuer, the
-    // MCP resource) take `https:` from X-Forwarded-Proto. Hosted platforms already see https.
     trustProxy: true,
     ...(!databaseOnlyHealth && { health: { route: healthRoute } }),
-    // Browser writes that carry Drop's cookies must come from Drop's own pages: the content origin is a sibling
-    // subdomain, so SameSite=Lax still sends the session. /mcp takes bearer tokens only, from any origin. Send's pair
-    // route takes an agent's post without cookies, which this lets through already.
     sameOriginWrites: { exclude: ["/mcp"] },
-    // Uncaught browser errors (window errors, unhandled rejections, Vue and Nuxt errors) land in the wide event of
-    // POST /_vitehub/browser-errors. Failures the app catches still go through reportClientError()
-    // (app/utils/client-errors.ts), which adds the answer's status, request id and drop that ViteHub's report lacks.
     observability: { browserErrors: true },
-    // /sitemap.xml lists only server/sitemap.ts (INDEXED_PATHS while seoIndex is on), not every page. /robots.txt
-    // names it and keeps crawlers out of the API. Without DROP_PUBLIC_URL, both use the origin of the request.
     seo: { sitemap: { pages: false }, robots: { disallow: ROBOTS_DISALLOW } },
     auth: true,
-    // The review dock shows who's here (ViewerPresence, from Drop's presence rooms), so the comments toolbar on Drop's
-    // own pages leaves out its faces and cursors; with both, a reader saw the same person twice.
     comments: { overlay: { presence: false } },
     console: { authorize: fileURLToPath(new URL("./server/console-authorize.ts", import.meta.url)) },
     env: {
       server: {
         auth: {
           github: {
-            // Declared secret so wrangler passes it through with the others (it only injects declared secrets).
             clientId: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_ID") }),
             clientSecret: env({ secret: true, optional: true, source: env.source("GITHUB_CLIENT_SECRET") }),
           },
           secret: env({ secret: true, source: env.source("BETTER_AUTH_SECRET") }),
         },
-        // Every Drop setting is read at runtime: changing one needs a restart, not a rebuild. Each also reads its
-        // canonical VITEHUB_DROP_* name first (VITEHUB_DROP_QUOTAS_ENABLED for quotas.enabled).
         drop: {
-          // Emails of the admins, comma-separated. Whoever signs in with one of them, verified by any sign-in method, is an admin.
           admins: env({ secret: true, source: env.source("DROP_ADMINS") }),
-          // personal: drops start private and share by public link. team: everyone signed in is a teammate, drops start
-          // shared with the team, and admins keep the team's folders (shared/share.ts).
           mode: env.enum(["personal", "team"], { source: env.source("DROP_MODE"), default: "personal" }),
-          // Days a public link stays open: empty for the mode's default (team 7, personal until changed), 0 turns them off.
           publicLinkDays: env({ source: env.source("DROP_PUBLIC_LINK_DAYS"), default: "" }),
-          // The only people who may sign in, open shared links, or use MCP: ViteHub Auth's VITEHUB_MEMBERS, such as
-          // `github:22072217,ada@example.com,@acme.com,github-org:acme`. Admins always may. Empty lets anyone in. Drop
-          // reads it only to know whether it is members-only, and for oauth2-proxy's organization.
-          // This Auth-owned setting only accepts VITEHUB_MEMBERS, without a VITEHUB_DROP_MEMBERS alias.
           members: env({ secret: true, optional: true, source: env.source("VITEHUB_MEMBERS", { canonical: false }) }),
-          // Sign in through an existing GitHub oauth2-proxy instead of Drop's own GitHub app (server/utils/proxy-auth.ts).
           authProxy: env.boolean({ source: env.source("DROP_AUTH_PROXY"), default: false }),
           authProxyCookie: env({ source: env.source("DROP_AUTH_PROXY_COOKIE"), default: "" }),
-          // Email and password sign-in outside `nuxt dev`, for the runtime tests.
           testSignin: env.boolean({ source: env.source("DROP_TEST_SIGNIN"), default: false }),
           shareApproval: env.boolean({ source: env.source("DROP_SHARE_APPROVAL"), default: false }),
           abuseEmail: env({ source: env.source("DROP_ABUSE_EMAIL"), default: "" }),
-          // Days a review drop lives after its last visit (temporary ones at most 14); 0 keeps every drop.
           expiryDays: env.number({ source: env.source("DROP_EXPIRY_DAYS"), default: DEFAULT_EXPIRY_DAYS }),
-          // false lets only admins keep drops.
           customExpiry: env.boolean({ source: env.source("DROP_CUSTOM_EXPIRY"), default: true }),
-          // Where apps and HTML docs run: https://*-drop.example.com gives each drop its own subdomain (see server/utils/content-origin.ts).
           contentOrigin: env({ source: env.source("DROP_CONTENT_ORIGIN"), default: "" }),
-          // Owner quotas: one plan for everyone (shared/quotas.ts).
           quotas: {
             enabled: env.boolean({ source: env.source("DROP_QUOTAS"), default: false }),
             plan: env.enum(PLANS, { source: env.source("DROP_DEFAULT_PLAN"), default: "free" }),
-            // Unset keeps Pro drops unlimited; a number caps them.
             proDrops: env.number({ optional: true, source: env.source("DROP_PRO_DROPS") }),
             proBytes: env.number({ source: env.source("DROP_PRO_BYTES"), default: DEFAULT_PRO_LIMITS.bytes }),
             proWrites: env.number({ source: env.source("DROP_PRO_WRITES"), default: DEFAULT_PRO_LIMITS.writes }),
-            // Drops a Free plan keeps forever at once; Pro keeps any number.
             freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
           },
-          // Teams on a personal Drop: people make a team, invite others, and share its folders with them (server/utils/teams.ts).
           teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
-          // Paid teams through Stripe. Billing is on once the key, the webhook secret, and the per-member price are all set.
           billing: {
             stripeSecretKey: env({ secret: true, optional: true, source: env.source("STRIPE_SECRET_KEY") }),
             stripeWebhookSecret: env({ secret: true, optional: true, source: env.source("STRIPE_WEBHOOK_SECRET") }),
-            // A recurring price per member (quantity = members), and optionally its yearly one.
             priceId: env({ source: env.source("STRIPE_TEAM_PRICE_ID"), default: "" }),
             annualPriceId: env({ source: env.source("STRIPE_TEAM_ANNUAL_PRICE_ID"), default: "" }),
-            // Members a team has before it needs a subscription.
             freeMembers: env.number({
               source: env.source("DROP_FREE_TEAM_MEMBERS"),
               default: DEFAULT_FREE_TEAM_MEMBERS,
             }),
-            // Stripe as merchant of record, which files sales tax and VAT. Turn off to sell under your own account.
             managedPayments: env.boolean({ source: env.source("STRIPE_MANAGED_PAYMENTS"), default: true }),
           },
         },
@@ -274,7 +200,6 @@ export default defineNuxtConfig({
     },
   },
 
-  // `nuxt dev` has no R2 binding; keep files on disk (.vitehub/data/blob) while developing.
   $development: {
     vitehub: { blob: { driver: "fs", serve: { route: "/f", access: "public" } } },
   },
@@ -288,41 +213,28 @@ export default defineNuxtConfig({
   devtools: false,
   compatibilityDate: "2026-07-17",
 
-  // Off: every page answers noindex (server/plugins/content-headers.ts).
-  // `realtime`: the host has Realtime rooms, so a doc's readers follow its new versions (useLatestVersion).
-  // Better Auth's rate limits use only the host's trusted client address (shared/client-ip.ts).
   runtimeConfig: {
     release,
-    // Which host this build is for, on every wide event (server/plugins/wide-events.ts).
     deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
   },
 
-  // nuxt-security (patched for Nuxt 5) writes the security headers, and its request middlewares stay off: ViteHub's
-  // `requireRateLimit` and `sameOriginWrites` cover rate limits and cross-site writes, and the routes that take
-  // files check their own body sizes.
   security: {
     rateLimiter: false,
     requestSizeLimiter: false,
     xssValidator: false,
     corsHandler: false,
     allowedMethodsRestricter: false,
-    // It would strip console from the server bundle too, which is where Drop's logs go.
     removeLoggers: false,
     sri: false,
     headers: {
-      // The review popup must keep `window.opener` to the site under review, and Drop frames other origins: its
-      // content origin and sites under review.
       crossOriginOpenerPolicy: false,
       crossOriginEmbedderPolicy: false,
-      // server/middleware/0.07.frame-options.ts sends DENY on Drop's own origin only: the content origin must stay
-      // frameable, and this header would reach it as a route rule.
       xFrameOptions: false,
       referrerPolicy: "strict-origin-when-cross-origin",
       strictTransportSecurity: { maxAge: 31536000, includeSubdomains: false },
-      // Screen capture stays on for Drop itself: reviewing a site inside Drop screenshots it that way.
       permissionsPolicy: {
         camera: [],
         microphone: [],
@@ -344,7 +256,6 @@ export default defineNuxtConfig({
         "style-src": ["'self'", "https:", "'unsafe-inline'"],
         "img-src": ["'self'", "https:", "data:", "blob:"],
         "font-src": ["'self'", "https:", "data:"],
-        // Sites under review may be http on localhost, and self-hosted Drops may run over http.
         "upgrade-insecure-requests": false,
       },
     },
@@ -352,18 +263,13 @@ export default defineNuxtConfig({
 
   routeRules: {
     ...Object.fromEntries(DROP_PAGE_ROUTES.map((route) => [route, DROP_PAGE])),
-    // The signed-in pages and the docs by path, instead of each page's definePageMeta. Nuxt merges every rule a path
-    // matches, so `/drops` gets SIGNED_IN from `/drops/**` too. The landing (pages/index.vue) and shared links
-    // (pages/d/) pick their own layout in their own middleware.
     "/drops/**": { ...DROP_PAGE, ...SIGNED_IN },
     "/agents": SIGNED_IN,
     "/teams/**": SIGNED_IN,
     "/skills/**": SIGNED_IN,
     "/admin/**": SIGNED_IN,
-    // Never cached, like /f/ and /d/ (server/plugins/content-headers.ts sets theirs).
     "/signin": { headers: { "cache-control": "private, no-store" } },
     "/docs/**": { appLayout: "docs" },
-    // The policies sit in the docs nav, so they keep its sidebar.
     "/terms": { appLayout: "docs" },
     "/acceptable-use": { appLayout: "docs" },
     "/abuse": { appLayout: "docs" },
@@ -372,11 +278,9 @@ export default defineNuxtConfig({
 
   experimental: {
     typescriptPlugin: true,
-    // How often an open tab asks for the newest build id (app/plugins/update-ready.client.ts). Nuxt's default is an hour.
     checkOutdatedBuildInterval: 2 * 60_000,
   },
 
-  // media-chrome's elements (app/components/viewer/ViewerVideo.vue) are web components, not Vue components.
   vue: { compilerOptions: { isCustomElement: (tag) => tag.startsWith("media-") } },
 
   typescript: {
@@ -394,8 +298,6 @@ export default defineNuxtConfig({
   },
 
   app: {
-    // Not Nuxt's default /_nuxt/: apps built with Nuxt load their chunks from /_nuxt/ on their content origin, which this
-    // same deployment serves, and Drop's own asset paths come first there (server/utils/app-files.ts).
     buildAssetsDir: "/_drop-ui/",
     head: {
       htmlAttrs: { lang: "en" },
@@ -408,19 +310,15 @@ export default defineNuxtConfig({
     },
   },
 
-  // Switching themes swaps every color at once instead of fading each element's own transition.
   colorMode: { disableTransition: true },
 
   ui: {
     colorMode: true,
-    // Geist is self-hosted from Fontsource (see `css`).
     fonts: false,
   },
 
   icon: {
     provider: "none",
-    // The scanner reads templates and Markdown by default. Icons picked at runtime (KIND_ICONS, SHARE_ICONS, DEVICES,
-    // agent logos, Nuxt UI's own in app.config) are named in TypeScript, so it reads the app's and shared/'s too.
     clientBundle: {
       scan: { globInclude: ["**/*.{vue,md}", "app.config.ts", "app/**/*.ts", "shared/**/*.ts"] },
     },
@@ -436,26 +334,17 @@ export default defineNuxtConfig({
         },
       ],
     }),
-    // Keep Node for local development; ViteHub emulates Cloudflare bindings separately.
     devServer: { runner: "node-worker" },
-    // `nuxt dev` keeps Nitro's cache in memory instead of the dev KV store.
     devStorage: { cache: { driver: "memory" } },
-    // One structured "wide event" per request (evlog), with who called, what they did, and why it failed.
-    // On Workers it prints JSON to the console, which Workers Logs indexes and lets you query.
     modules: [evlog(evlogOptions(release)), legacyViteHubRoutes],
     cloudflare: {
       wrangler: {
         name: cloudflareTemplate.name,
         observability: { enabled: true, head_sampling_rate: 1, logs: { enabled: true, invocation_logs: true } },
-        // A page waits on D1 queries one after another, each a round trip from wherever the Worker runs, so it runs
-        // next to the database; static assets are still served from the edge. Smart Placement kept drop.vitehub.dev's
-        // Worker in the visitor's city, 40 ms from its D1 per query; in Milan, by it, a query takes 6 ms (measured
-        // 2026-10-29). Self-hosted Drops keep Smart Placement: their database can be anywhere.
         placement:
           process.env.CLOUDFLARE_D1_DATABASE_ID === HOSTED_D1 ? { region: "gcp:europe-west8" } : { mode: "smart" },
       },
     },
-    // Added to Nuxt's own list, which already serves `public/`.
     publicAssets: [
       { baseURL: "/vendor/pdfjs/wasm", dir: "node_modules/pdfjs-dist/wasm", maxAge: 60 * 60 * 24 * 365 },
       { baseURL: "/vendor/medium-zoom", dir: "node_modules/medium-zoom/dist", maxAge: 60 * 60 * 24 * 365 },
@@ -464,9 +353,6 @@ export default defineNuxtConfig({
 
   hooks: {
     "nitro:config": function (config) {
-      // Raw files and share pages get their own error page (server/handlers/content-error.ts); everything else keeps
-      // Nuxt's, which renders app/error.vue. Nuxt only adds its handler when nitro.errorHandler is unset, so ours goes
-      // in front of it here instead.
       config.errorHandler = [contentErrorHandler, ...[config.errorHandler ?? []].flat()]
     },
   },

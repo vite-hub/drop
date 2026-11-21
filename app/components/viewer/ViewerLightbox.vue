@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Zoomed image. Click a spot or drag a rectangle to comment; existing comments show as numbered pins and outlined
-// areas. Opened from a page, it zooms out of the image's place there (FLIP), like medium-zoom.
 import type { DropComment } from "#shared/types"
 
 type Area = { ox: number; oy: number; ow: number; oh: number }
@@ -10,9 +8,7 @@ const props = defineProps<{
   alt: string
   comments: DropComment[]
   canComment: boolean
-  /** Where the image sat on the page, in viewport pixels: the zoom starts there. */
   from?: { left: number; top: number; width: number; height: number }
-  /** The area being commented on, kept on screen while the popover is open. */
   draft?: Area
 }>()
 const emit = defineEmits<{
@@ -27,14 +23,11 @@ const header = useTemplateRef<HTMLElement>("header")
 const backdrop = useTemplateRef<HTMLElement>("backdrop")
 const motion = usePreferredReducedMotion()
 const animate = computed(() => motion.value !== "reduce")
-// Hidden until the image is measured, so it doesn't flash at its final size before zooming there.
 const shown = ref(!props.from)
 onKeyStroke("Escape", () => void close())
 
-// The click that opened the image left focus in the drop's frame, where Escape never reaches this page.
 onMounted(() => root.value?.focus({ preventScroll: true }))
 
-// Back closes the image, like a photo viewer. Opening adds a history entry, and closing any other way removes it.
 let popped = false
 onMounted(() => history.pushState({ ...history.state, dropLightbox: true }, ""))
 useEventListener(window, "popstate", () => {
@@ -79,7 +72,6 @@ async function close() {
   emit("close")
 }
 
-// Thousandths of the image box. A press that barely moves is a click: a point, not an area.
 const drag = ref<{ x: number; y: number; rect: DOMRect; area?: Area } | null>(null)
 const at = (value: number, start: number, size: number) =>
   Math.min(1000, Math.max(0, Math.round(((value - start) / size) * 1000)))
@@ -140,10 +132,7 @@ const shownDraft = computed(() => drag.value?.area ?? props.draft)
       <span v-if="canComment" class="label-mono ml-auto">Click a spot or drag an area to comment</span>
     </div>
     <div class="relative grid min-h-0 flex-1 place-items-center overflow-auto p-6">
-      <!-- A click around the image closes it. A drag that starts on the image and ends here clicks the parent, not this.
-           A comment being drafted keeps it open. -->
       <div ref="backdrop" class="absolute inset-0 bg-muted" @click="draft || close()" />
-      <!-- Sized from the aspect ratio: SVGs with only a viewBox have no intrinsic size. -->
       <div
         ref="box"
         class="relative select-none"

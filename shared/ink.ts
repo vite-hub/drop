@@ -1,12 +1,10 @@
 import * as v from "valibot"
 import { type Ink, InkSchema } from "./schemas"
 
-/** The most characters one comment metadata field holds in ViteHub Comments. */
 const MAX_INK_CHARS = 4000
 
 type Point = [number, number]
 
-// Ramer–Douglas–Peucker: the points a line keeps when nothing it drops lies more than `tolerance` pixels off it.
 function simplify(points: Point[], tolerance: number): Point[] {
   if (points.length < 3 || tolerance <= 0) return points
   const keep = new Uint8Array(points.length)
@@ -37,18 +35,12 @@ function encodeWith(ink: Ink, tolerance: number) {
       stroke.points.map(([x, y]): Point => [Math.round(x), Math.round(y)]),
       stroke.tool === "text" ? 0 : tolerance,
     )
-    // The first point, then each one as the step from the one before.
     const steps = points.flatMap(([x, y], i) => (i ? [x - points[i - 1]![0], y - points[i - 1]![1]] : [x, y]))
     return [stroke.tool, stroke.color, stroke.width, stroke.straight ? 1 : 0, stroke.text ?? "", steps]
   })
   return JSON.stringify([Math.round(ink.w), Math.round(ink.h), strokes])
 }
 
-/**
- * The Marker's strokes as one metadata string: whole pixels, each point as the step from the one before. A drawing too
- * detailed for MAX_INK_CHARS loses the points that bend its lines least, a pixel at a time, up to 8; null when it
- * still doesn't fit, and the comment keeps its box and its picture only.
- */
 export function encodeInk(ink: Ink): string | null {
   for (const tolerance of [0, 0.5, 1, 2, 4, 8]) {
     const text = encodeWith(ink, tolerance)
@@ -63,7 +55,6 @@ const Encoded = v.tuple([
   v.array(v.tuple([v.string(), v.string(), v.number(), v.number(), v.string(), v.array(v.number())])),
 ])
 
-/** The strokes encodeInk saved, or null when there are none or they don't read. */
 export function decodeInk(text: string | null | undefined): Ink | null {
   if (!text) return null
   let raw: unknown

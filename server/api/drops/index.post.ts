@@ -3,7 +3,6 @@ import { NewDocSchema } from "#shared/schemas"
 import { createDocDrop, toSummary } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
 
-/** Create a doc from text, or its next version with `supersedes`. */
 export default defineValidatedHandler({
   validate: { body: NewDocSchema },
   async handler(event) {

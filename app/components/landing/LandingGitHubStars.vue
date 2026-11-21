@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The server shares a cached count across visitors. Hide it until it loads, and on failure.
 const { data } = useApi<{ stars: number | null }>("/api/github-stars", {
   key: keys.githubStars,
   server: false,
