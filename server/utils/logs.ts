@@ -65,7 +65,7 @@ export function logActor(event: H3Event, who: Pick<Identity, "userId" | "role" |
 export type AuthDenial = "banned" | "not-member"
 
 export function logDenied(event: H3Event | undefined, denied: AuthDenial) {
-  requestLog(event)?.set({ auth: { denied } })
+  requestLog(event)?.set({ identity: { denied } })
 }
 
 type LoggedDrop = Pick<DropRow, "id" | "kind" | "version">

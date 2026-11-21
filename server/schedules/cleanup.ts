@@ -34,8 +34,12 @@ const STEPS = {
  */
 export default defineSchedule({
   cron: "0 * * * *",
-  async handler({ scheduledAt }) {
-    const run = background.logger({ schedule: "cleanup", scheduledAt: scheduledAt.toISOString() })
+  async handler({ scheduledAt, id, runId = id }) {
+    const run = background.logger({
+      action: "cleanup",
+      scheduledAt: scheduledAt.toISOString(),
+      ...(runId && { runId }),
+    })
     // Each step runs even when another fails, so a storage hiccup doesn't hold back the Trash purge.
     const errors: unknown[] = []
     const failed: string[] = []

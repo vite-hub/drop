@@ -125,7 +125,7 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
     .catch((error: unknown) => {
       // An outage answers 503; any other failure answers as signed out, and the wide event keeps why.
       rethrowMembershipOutage(error)
-      logError(event, error, { auth: { session: "failed" } })
+      logError(event, error, { identity: { session: "failed" } })
       return null
     })
     .finally(() => {

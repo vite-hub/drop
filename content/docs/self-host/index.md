@@ -119,7 +119,8 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | --- | --- |
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
-| `auth.denied` | Why Drop refused a session: `banned` or `not-member`. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `identity.denied`, `identity.session` | Why Drop refused a session (`banned` or `not-member`), or that a session lookup failed. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `roomAccess.refused` | Which of Drop's access rules refused a realtime connection. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
 | `audit` | Admin and account actions, abuse reports, and billing changes from Stripe. |
@@ -128,7 +129,9 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 
 **Left out.** The health check and static files write no event. Upload URLs and password reset links lose their token, and IP addresses are masked.
 
-**The hourly cleanup** writes one event a run, `schedule: "cleanup"`, with what each step did, how long it took, and the steps that failed.
+**The hourly cleanup** writes an `action: "cleanup"` event with its `runId` when ViteHub supplies one, the scheduled time, what each step did, how long it took, and any failures.
+
+**Browser errors.** ViteHub reports uncaught errors on `browserError`. Failures Drop catches go through its own reporter with the response status, request ID, and drop when known. It skips refusals, aborts, offline browsers, pages that are closing, and 5xx responses that carry Drop's own error body.
 
 ## Database and migrations {#database}
 

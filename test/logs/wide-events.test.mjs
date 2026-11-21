@@ -204,14 +204,14 @@ test("a person in the browser is their id on the event, never their name; an age
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {
   session.current = { user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true } }
   const banned = await request("/api/me", identify)
-  assert.equal(banned.event.auth.denied, "banned")
+  assert.equal(banned.event.identity.denied, "banned")
   assert.equal(banned.event.user, undefined)
 
   session.current = new Error("D1 is unavailable")
   const failed = await request("/api/me", identify)
   assert.equal(failed.event.level, "error")
   assert.equal(failed.event.error.message, "D1 is unavailable")
-  assert.equal(failed.event.auth.session, "failed")
+  assert.equal(failed.event.identity.session, "failed")
 
   // A GitHub membership outage still answers 503, not signed out.
   session.current = Object.assign(new Error("GitHub is down"), { body: { code: "AUTH_GITHUB_UNAVAILABLE" } })
@@ -237,11 +237,13 @@ test("the hourly cleanup emits one event a run, with each step's count, and name
     .prepare("INSERT INTO code_images (blob_key, owner_id, size, expires_at) VALUES (?, ?, ?, ?)")
     .run("code-images/expired.png", "owner", 10, now - 1)
   state.failDelete = true
-  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now) }))
-  const runs = background.filter((event) => event.schedule === "cleanup")
+  const runId = `run_cleanup_${new Date(now).toISOString()}`
+  await assert.rejects(cleanup.handler({ scheduledAt: new Date(now), id: runId }))
+  const runs = background.filter((event) => event.action === "cleanup")
   assert.equal(runs.length, 1)
   const [run] = runs
   assert.equal(run.level, "error")
+  assert.equal(run.runId, runId)
   assert.equal(run.version, "1.2.3")
   assert.deepEqual(run.deployment, { host: "vps" })
   assert.deepEqual(run.failed, ["codeImages"])
@@ -330,7 +332,7 @@ test("a purge that fails halfway still lists the drops the run deleted", async (
   } finally {
     sql.exec("DROP TRIGGER fail_second")
   }
-  const run = background.find((event) => event.schedule === "cleanup")
+  const run = background.find((event) => event.action === "cleanup")
   assert.deepEqual(run.failed, ["drops"])
   assert.deepEqual(run.steps.drops.deleted, [{ id: "first", owner: "owner", reason: "deleted" }])
 })
@@ -401,7 +403,7 @@ test("a realtime room says why it refused someone", async () => {
   const { event } = await request("/_vitehub/realtime/latest/gone", (event) =>
     latest.authorize({ event, documentId: "gone", mode: "read" }),
   )
-  assert.deepEqual(event.realtime, { reason: "not-found" })
+  assert.deepEqual(event.roomAccess, { refused: "not-found" })
 })
 
 test("a missing drop's page adds nothing to its request's event, which is already out", async () => {
