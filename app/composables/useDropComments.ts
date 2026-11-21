@@ -19,9 +19,9 @@ async function settled<T>(sent: Promise<Sent<T>>) {
 /**
  * The comments of the open drop for vite-hub/ui's comment parts (CommentPanel, CommentThread, CommentComposer).
  *
- * Threads go through Drop's own comment routes, which keep the anchor, the suggestion, and the screenshot Drop's viewer
- * draws, and answer the comments the viewer already holds (useDrop): the pins in the frame and the parts show the same
- * list, and a change from either side shows in both. Whom "@" names and the comment images go straight to ViteHub's
+ * Threads answer the comments the viewer already holds (useDrop), the waiting ones too: the pins in the frame and the
+ * parts show the same list, and a change from either side shows in both. New comments and replies go into useDrop's
+ * outbox, which sends them to Drop's own routes, so a composer here empties as soon as its words are saved. Whom "@" names and the comment images go straight to ViteHub's
  * Comments API (`createRestTransport`), which asks server/comments.ts who may.
  *
  * `source` is what the dock lists: the drop's comments, or an image's in the lightbox. `page` is the app page a new
@@ -122,9 +122,9 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
   const can: CommentCan = (action, { thread, message }) => {
     const shown = drop()
     if (!shown) return false
-    if (action === "reply") return shown.canComment
-    if (action === "resolve") return shown.isOwner || mine(thread.author)
-    if (!message) return false
+    if (action === "reply") return shown.canComment && (!thread.delivery || thread.delivery.error?.status !== 401)
+    if (action === "resolve") return !thread.delivery && (shown.isOwner || mine(thread.author))
+    if (!message || message.delivery) return false
     if (action === "edit") return mine(message.author)
     return shown.isOwner || mine(message.author)
   }
@@ -154,10 +154,14 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     people,
     can,
     upload: async (list: File[]) => stash(list),
-    /** A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. */
+    /**
+     * A comment image by its key (its drop id), served by ViteHub's Comments API to whoever may read the thread. One
+     * still waiting in the outbox shows from the browser's copy (LOCAL_ATTACHMENT).
+     */
     attachmentUrl: (key: string) => {
       const file = images.value.get(key)
-      return { url: rest.attachmentUrl(key), ...(file ? { name: file.filename, type: file.contentType } : {}) }
+      const url = key.startsWith(LOCAL_ATTACHMENT) && file ? file.url : rest.attachmentUrl(key)
+      return { url, ...(file ? { name: file.filename, type: file.contentType } : {}) }
     },
     /** The thread of a comment the viewer holds, for a CommentThread outside the panel. */
     thread: (comment: DropComment): CommentThread => toThread(comment, subject.value),

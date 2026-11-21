@@ -30,11 +30,14 @@ import {
   authorOf,
   type DropThread,
   findThread,
+  type Reader,
+  readerOf,
   removeThread,
   siteCommentList,
   threadsFor,
   toComment,
 } from "./comments"
+import { guestIdOf } from "./guests"
 import { siteCoversDrop } from "./content-origin"
 import { isExpired, expiryPolicy, renewDrop } from "./expiry"
 import { createFolder } from "./folders"
@@ -69,8 +72,18 @@ import { findableBy } from "./related"
  * ones that person may comment on. Neither the drop's link nor its id reaches the page, so nothing there opens the review.
  */
 
-/** What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin. */
-const ReviewClaims = v.object({ d: v.string(), u: v.nullable(v.string()), n: v.string(), o: v.string(), e: v.number() })
+/**
+ * What a review token says: the site drop, who sends (null for a guest on a "Can comment" link), and the page's origin.
+ * `g` is a guest's id, their browser's in Drop (./guests.ts), so their comments from the site are theirs in Drop too.
+ */
+const ReviewClaims = v.object({
+  d: v.string(),
+  u: v.nullable(v.string()),
+  n: v.string(),
+  o: v.string(),
+  e: v.number(),
+  g: v.optional(v.pipe(v.string(), v.startsWith("guest:"), v.maxLength(80))),
+})
 export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
 /** What the popup sends back when someone picks a site drop: which one, for which origin and person. Sealed too. */
@@ -219,9 +232,10 @@ export async function findDropOrSite(ref: string, who: Identity, event: H3Event)
 export const originOf = (page: string) => /^https?:\/\/[^/]+/.exec(page)?.[0] ?? page
 
 /**
- * Who may resolve or reopen a thread on a site review: its author, guests included, and anyone signed in who may
- * comment on the site, with their agents. The people reviewing a site and the agents fixing it close each other's
- * comments once they're fixed; otherwise fixed comments stay pinned to the page until the site's owner comes by.
+ * Who may resolve or reopen a thread on a site review: its author when signed in, and anyone signed in who may comment
+ * on the site, with their agents. A guest resolves nothing, their own comments included. The people reviewing a site
+ * and the agents fixing it close each other's comments once they're fixed; otherwise fixed comments stay pinned to the
+ * page until the site's owner comes by.
  */
 export const mayResolveSite = (site: DropRow, who: Identity | null, wrote: boolean) =>
   wrote || permissions(site, who).manage || (who !== null && permissions(site, who).comment)
@@ -293,7 +307,9 @@ export async function reviewSession(event: H3Event) {
   if (claims && site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, origin)) {
     event.res.headers.set("Access-Control-Allow-Origin", origin)
     const who = await reviewer(claims)
-    if (who !== false && permissions(site, who).comment) return { site, claims, who }
+    // A guest's token from before tokens named them stands for them until it runs out.
+    const guest = who || !token ? null : (claims.g ?? (await guestIdOf(token)))
+    if (who !== false && permissions(site, who).comment) return { site, claims, who, guest }
   } else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
   throw new HTTPError({ status: 401, statusText: "Your review session ended. Connect again to comment." })
 }
@@ -532,7 +548,7 @@ export async function readReviewComment(
  */
 export async function addReviewComment(
   site: DropRow,
-  author: { who: Identity | null; name: string },
+  author: { who: Identity | null; name: string; guest: string | null },
   input: ReviewCommentInput,
   shot: Screenshot | null,
   origin: string,
@@ -601,7 +617,7 @@ async function submittedReview(site: Pick<DropRow, "id">, requestId: string) {
 
 async function insertReviewComment(
   site: DropRow,
-  author: { who: Identity | null; name: string },
+  author: { who: Identity | null; name: string; guest: string | null },
   input: ReviewCommentInput,
   shot: Screenshot | null,
   origin: string,
@@ -622,7 +638,7 @@ async function insertReviewComment(
     elementX: input.selector && input.spot ? input.spot.x : null,
     elementY: input.selector && input.spot ? input.spot.y : null,
   }
-  const thread = { body: input.body, author: authorOf(author.who, author.name), attachments }
+  const thread = { body: input.body, author: authorOf(author.who, author.name, author.guest), attachments }
   // The page's path, without its query and hash.
   const path = input.page.replace(/[?#].*$/, "") || "/"
   if (!shot)
@@ -684,7 +700,7 @@ async function insertReviewComment(
  */
 export async function siteItems(
   site: Pick<DropRow, "id" | "kind" | "parentId" | "version">,
-  who: Identity | null,
+  reader: Reader,
   origin: string,
   page?: string,
   { open = false } = {},
@@ -706,7 +722,7 @@ export async function siteItems(
       const { meta } = thread
       const shot = byId.get(meta.dropId)
       return {
-        ...toComment(thread, who, attachments),
+        ...toComment(thread, reader, attachments),
         requestId: meta.requestId,
         spot: spotOf(meta),
         screenshot: shot?.blobKey
@@ -735,7 +751,7 @@ type ReviewItem = Omit<SiteReviewItem, "screenshot"> & { screenshot: { id: strin
  */
 export function reviewThreads(site: DropRow, who: Identity | null, items: SiteReviewItem[]): ReviewThread[] {
   const others = mayResolveSite(site, who, false)
-  return items.map((item) => reviewThread(item, others))
+  return items.map((item) => reviewThread(item, others, who !== null))
 }
 
 /**
@@ -745,6 +761,7 @@ export function reviewThreads(site: DropRow, who: Identity | null, items: SiteRe
 export function reviewThreadOf(
   site: DropRow,
   who: Identity | null,
+  guest: string | null,
   thread: DropThread,
   attachments: CommentAttachment[],
 ): ReviewThread {
@@ -752,16 +769,18 @@ export function reviewThreadOf(
   const { meta } = thread
   return reviewThread(
     {
-      ...toComment(thread, who, files),
+      ...toComment(thread, readerOf(who, guest), files),
       requestId: meta.requestId,
       spot: spotOf(meta),
       screenshot: meta.dropId === site.id ? null : { id: meta.dropId },
     },
     mayResolveSite(site, who, false),
+    who !== null,
   )
 }
 
-function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
+/** `others`: the reader may resolve anyone's thread. A guest's own (`mine`) aren't theirs to resolve. */
+function reviewThread(item: ReviewItem, others: boolean, signedIn: boolean): ReviewThread {
   return {
     n: item.n,
     requestId: item.requestId,
@@ -771,7 +790,7 @@ function reviewThread(item: ReviewItem, others: boolean): ReviewThread {
     createdAt: item.createdAt,
     resolved: item.resolved,
     mine: item.mine,
-    canResolve: others || item.mine,
+    canResolve: others || (signedIn && item.mine),
     page: item.page,
     element: item.label ? { selector: item.label, label: item.quote } : null,
     spot: item.spot,

@@ -1,19 +1,11 @@
 import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
-import type { CommentInput } from "#shared/schemas"
 import * as v from "valibot"
+import { replyMessageId } from "vite-hub/comments/client"
+import type { CommentPlace, SiteCommentPlace } from "../utils/comment-outbox"
 
 /** What a comment box waits on: what it posted, or the sentence to show under it (none when the plan-limit dialog says it). */
 export type Sent<T> = { value: T } | { error?: string }
-
-/** A comment's or reply's body: JSON, or multipart with the JSON in `data` when it carries images. */
-function withImages(data: Partial<CommentInput> & { body: string; mentions: string[] }, files: File[]) {
-  if (!files.length) return data
-  const form = new FormData()
-  form.append("data", JSON.stringify(data))
-  for (const file of files) form.append("image", file, file.name || "image")
-  return form
-}
 
 /**
  * One drop and its comments, with the actions the viewer needs: its latest version, or the earlier one `version`
@@ -32,35 +24,156 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     default: () => [],
   })
 
-  // Each comment this reader writes, once it went through: the presence room tells the others to load them now
+  // Each comment this reader writes, once the server took it: the presence room tells the others to load them now
   // (usePresence's `commented`). Loading them again never fires it, so two viewers can't keep waking each other.
   const wrote = createEventHook<void>()
 
-  // No toast either way: the new pin shows it went through, and a failure shows under the box that sent it.
+  // New comments and replies go through the app's outbox (useCommentsOutbox): saved in the browser with their images,
+  // shown at once, and sent to Drop's routes once each, in order, as soon as the network lets them, on whatever page
+  // the reader is by then. While this page is open, they land in its list.
+  const subject = () => ({ kind: "drop", id: toValue(id) })
+  const app = useCommentsOutbox()
+  app.attach({
+    drop: () => toValue(id),
+    async created(_requestId, comment) {
+      if (comment) comments.data.value = [...comments.data.value.filter((item) => item.id !== comment.id), comment]
+      else await Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))])
+      void wrote.trigger()
+    },
+    replied(_requestId, threadId, reply) {
+      setReplies(threadId, (replies) => [...replies.filter((item) => item.id !== reply.id), reply])
+      void wrote.trigger()
+    },
+    // Another tab sent it, and told nobody here: the list has it now. That tab announced it.
+    refresh: () => Promise.all([comments.refresh(), refreshNuxtData(keys.review(toValue(id)))]),
+  })
+  const view = () => ({
+    drop: toValue(id),
+    author: app.author,
+    accepted: app.accepted,
+  })
+  // The id the server gives each waiting reply, so a list that already holds its copy (loaded before the reply's own
+  // answer came back, or in another tab) shows it once. Worked out in the browser, which hashes asynchronously.
+  const replyIds = shallowRef<ReadonlyMap<string, string>>(new Map())
+  watch(
+    () => waitingReplies(comments.data.value, app.entries.value, view()),
+    async (replies) => {
+      const missing = replies.filter(([thread, requestId]) => !replyIds.value.has(replyKey(thread, requestId)))
+      if (!missing.length) return
+      const found = await Promise.all(
+        missing.map(async ([thread, requestId]) => {
+          // crypto.subtle exists only on HTTPS and localhost: elsewhere the reply's requestId alone matches it.
+          const message = await replyMessageId(thread, requestId).catch(() => undefined)
+          return message ? [[replyKey(thread, requestId), message] as const] : []
+        }),
+      )
+      if (found.flat().length) replyIds.value = new Map([...replyIds.value, ...found.flat()])
+    },
+    { immediate: true },
+  )
+  // A waiting comment's images show from the browser's copy; their addresses go once their entry leaves the outbox.
+  const imageUrls = fileUrls()
+  watch(app.entries, (entries) => imageUrls.keep(fileKeys(entries)))
+  onScopeDispose(() => imageUrls.clear())
+  /** The drop's comments with the ones that wait to go out, each shown once. */
+  const list = computed(() =>
+    withOutbox(comments.data.value, app.entries.value, {
+      ...view(),
+      replyIds: replyIds.value,
+      fileUrl: (key, file) => imageUrls.urlOf(key, file),
+    }),
+  )
+  const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
+
+  /**
+   * Saves the comment and returns it at once, waiting to go out. No toast either way: the new pin shows it, and the
+   * comment itself says when it waits or was refused. Fails only when the browser can't keep it.
+   */
   async function addComment(
-    input: Omit<CommentInput, "body" | "mentions">,
+    input: CommentPlace,
     body: string,
     files: File[] = [],
     mentions: string[] = [],
   ): Promise<Sent<DropComment>> {
+    const requestId = randomId()
     try {
-      const comment = await $fetch<DropComment>(`/api/drops/${toValue(id)}/comments`, {
-        method: "POST",
-        query: query.value,
-        body: withImages({ ...input, body, mentions }, files),
+      const displayed = drop.data.value
+      const at = toValue(version)
+      const revision = at ?? displayed?.version ?? 0
+      const pinned = at ?? (displayed?.kind === "app" ? undefined : displayed?.version)
+      const target = toValue(id)
+      const inputSubject = subject()
+      const client = await app.writable()
+      const thread = await client.create({
+        subject: inputSubject,
+        anchor: { kind: "page" },
+        body,
+        mentions,
+        files,
+        requestId,
+        metadata: targetMetadata({
+          route: "comment",
+          drop: target,
+          ...(pinned ? { v: pinned } : {}),
+          version: revision,
+          place: input,
+        }),
       })
-      comments.data.value = [...comments.data.value, comment]
-      void wrote.trigger()
+      const comment = list.value.find((item) => item.requestId === requestId || item.id === thread.id)
+      if (!comment) throw new Error("The comment didn't stay in this browser. Try again.")
       return { value: comment }
     } catch (error) {
-      return { error: notify.problem(error, "Couldn't send the comment") }
+      return { error: notify.problem(error, "Couldn't keep the comment") }
     }
   }
 
-  const findComment = (commentId: string) => comments.data.value.find((comment) => comment.id === commentId)
+  /**
+   * A comment drawn on a site in Drop's frame, with the screenshot of its box first among its images: it goes to the
+   * site review's route (POST /api/drops/:id/review) through the same outbox.
+   */
+  async function addSiteComment(origin: string, place: SiteCommentPlace, body: string, files: Blob[]) {
+    try {
+      const inputSubject = subject()
+      const revision = drop.data.value?.version ?? 0
+      const client = await app.writable()
+      await client.create({
+        subject: inputSubject,
+        anchor: { kind: "page" },
+        body,
+        files,
+        requestId: randomId(),
+        metadata: targetMetadata({
+          route: "review",
+          drop: inputSubject.id,
+          version: revision,
+          origin,
+          place,
+        }),
+      })
+      return true
+    } catch (error) {
+      notify.fail("Couldn't keep the comment", error)
+      return false
+    }
+  }
+
+  /** Whether the message (a comment's own `messageId`, or a reply's id) still waits in the outbox. */
+  const waiting = (commentId: string, messageId = commentId) => {
+    const comment = findComment(commentId)
+    if (!comment) return false
+    if (comment.messageId === messageId) return Boolean(comment.delivery)
+    return Boolean(comment.replies.find((reply) => reply.id === messageId)?.delivery)
+  }
+  /** Takes a waiting comment or reply out of the outbox, unless it's already on its way. */
+  async function discard(messageId: string, title: string) {
+    if (await app.discard(messageId)) return
+    notify.alert(title, "It's on its way to the server. Delete it once it's there.")
+  }
 
   // Optimistic: the checkbox flips at once and rolls back if the server says no.
   async function resolveComment(commentId: string, resolved: boolean) {
+    // A waiting comment has nothing to resolve on the server yet.
+    if (waiting(commentId)) return
     const before = comments.data.value
     // Resolving again marks the replies since the last time seen, so it counts from the newest one.
     const resolvedAt = (comment: DropComment) =>
@@ -78,6 +191,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   }
 
   async function removeComment(commentId: string) {
+    if (waiting(commentId)) return discard(commentId, "Couldn't delete the comment")
     try {
       await $fetch(`/api/comments/${commentId}`, { method: "DELETE" })
       comments.data.value = comments.data.value.filter((comment) => comment.id !== commentId)
@@ -92,27 +206,41 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       comment.id === commentId ? { ...comment, replies: change(comment.replies) } : comment,
     ))
 
+  /** Saves the reply and returns it at once, as addComment does. A reply to a waiting comment goes out after it. */
   async function addReply(
     commentId: string,
     body: string,
     files: File[] = [],
     mentions: string[] = [],
   ): Promise<Sent<CommentReply>> {
+    const requestId = randomId()
     try {
-      const reply = await $fetch<CommentReply>(`/api/comments/${commentId}/replies`, {
-        method: "POST",
-        body: withImages({ body, mentions }, files),
-      })
-      setReplies(commentId, (replies) => [...replies, reply])
-      void wrote.trigger()
+      const inputSubject = subject()
+      const client = await app.writable()
+      await client.reply({ threadId: commentId, body, mentions, files, requestId, subject: inputSubject })
+      const reply = list.value.flatMap((comment) => comment.replies).find((item) => item.requestId === requestId)
+      if (!reply) throw new Error("The reply didn't stay in this browser. Try again.")
       return { value: reply }
     } catch (error) {
-      return { error: notify.problem(error, "Couldn't send the reply") }
+      return { error: notify.problem(error, "Couldn't keep the reply") }
     }
   }
 
   /** New words for one's own comment (its `messageId`) or reply. */
-  async function editMessage(commentId: string, messageId: string, body: string, mentions: string[] = []) {
+  async function editMessage(
+    commentId: string,
+    messageId: string,
+    body: string,
+    mentions: string[] = [],
+  ): Promise<Sent<CommentReply>> {
+    // Waiting words change in the outbox and go out as edited.
+    if (waiting(commentId, messageId)) {
+      if (!(await app.edit(messageId, body, mentions)))
+        return { error: "It's on its way to the server. Edit it once it's there." }
+      const comment = findComment(commentId)
+      const edited = comment?.replies.find((reply) => reply.id === messageId) ?? comment
+      return edited ? { value: { ...edited, id: messageId } } : { error: "This comment is gone." }
+    }
     try {
       const edited = await $fetch<CommentReply>(`/api/messages/${messageId}`, {
         method: "PATCH",
@@ -130,13 +258,14 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
         }
       })
       void wrote.trigger()
-      return { value: edited } satisfies Sent<CommentReply>
+      return { value: edited }
     } catch (error) {
-      return { error: notify.problem(error, "Couldn't edit the message") } satisfies Sent<CommentReply>
+      return { error: notify.problem(error, "Couldn't edit the message") }
     }
   }
 
   async function removeReply(commentId: string, replyId: string) {
+    if (waiting(commentId, replyId)) return discard(replyId, "Couldn't delete the reply")
     try {
       await $fetch(`/api/replies/${replyId}`, { method: "DELETE" })
       setReplies(commentId, (replies) => replies.filter((reply) => reply.id !== replyId))
@@ -190,12 +319,15 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   return {
     drop,
     comments,
+    /** What the viewer shows: the server's comments and the ones that wait in the outbox, marked by `delivery`. */
+    list,
+    /** The saved comments and replies that haven't gone out, of every drop, for the dock. */
+    outboxEntries: app.entries,
     /** Runs after each comment write of this reader's, for whoever else should hear of it. */
     onWrote: wrote.on,
-    /** For a comment written outside these actions, such as a site review's screenshot comment. */
-    wrote: () => void wrote.trigger(),
     findComment,
     addComment,
+    addSiteComment,
     resolveComment,
     removeComment,
     addReply,

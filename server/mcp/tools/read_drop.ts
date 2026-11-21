@@ -94,8 +94,8 @@ export default defineMcpTool({
       // Every open one, past Comments' 500 at once; with `resolved`, the 500 most active besides.
       const { list, unavailable } = await unlessUnavailable(
         Promise.all([
-          siteItems(drop, who, event.url.origin, undefined, { open: true }),
-          resolved ? siteItems(drop, who, event.url.origin) : [],
+          siteItems(drop, who.userId, event.url.origin, undefined, { open: true }),
+          resolved ? siteItems(drop, who.userId, event.url.origin) : [],
         ]).then(([open, all]) => {
           // A comment resolved between the two reads is in both: keep the open read's.
           const seen = new Set(open.map((item) => item.n))
@@ -164,7 +164,7 @@ export default defineMcpTool({
             quizBlocks(detail.html ?? "").keys(),
           )
         : null
-    const { list: comments, unavailable } = await unlessUnavailable(listComments(drop, who))
+    const { list: comments, unavailable } = await unlessUnavailable(listComments(drop, who.userId))
     const shown = comments.filter((comment) => resolved || !comment.resolved)
     const children = detail.children?.map((child) => mcpDrop(child, event.url.origin))
     const folder = detail.ancestors.map((crumb) => crumb.title).join(" / ")

@@ -8,7 +8,8 @@ const person = (id: string, name: string, image: string | null): CommentUser => 
   id,
   name,
   ...(image ? { image } : {}),
-  ...(id.startsWith("guest:") ? { guest: true } : {}),
+  // A guest's id from the server, or "guest" for a guest's words still waiting in the outbox (GUEST_ACCOUNT).
+  ...(id === "guest" || id.startsWith("guest:") ? { guest: true } : {}),
 })
 
 /** The agent that wrote it, which the parts show in place of its author, with its logo. */
@@ -43,6 +44,8 @@ function message(thread: DropComment, item: DropComment | CommentReply, id: stri
     attachments: item.attachments.map((file) => file.id),
     createdAt: item.createdAt,
     ...(item.editedAt ? { editedAt: item.editedAt } : {}),
+    // A message waiting in the outbox (useDrop), for the parts' pending and failed states.
+    ...(item.delivery ? { delivery: item.delivery } : {}),
   }
 }
 
@@ -70,6 +73,8 @@ export function toThread(comment: DropComment, subject: CommentSubject): Comment
     revision: comment.version,
     createdAt: comment.createdAt,
     updatedAt: Math.max(...messages.map((item) => item.editedAt ?? item.createdAt)),
+    ...(comment.requestId ? { requestId: comment.requestId } : {}),
+    ...(comment.delivery ? { delivery: comment.delivery } : {}),
   }
 }
 

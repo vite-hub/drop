@@ -849,13 +849,17 @@ function embedded(id, data, { screenshot, origin = SITE } = {}) {
 test("Drop's embedded review stores a box on a screen capture like the script's, for addresses the site covers", async () => {
   site("previews", { site_url: PATTERN })
   state.who = ada
-  const sent = await embedded("previews", {}, { screenshot: PNG })
+  const data = { requestId: crypto.randomUUID() }
+  const sent = await embedded("previews", data, { screenshot: PNG })
   assert.equal(sent.status, 200)
-  assert.deepEqual(await json(sent), { n: 1 })
+  const receipt = await json(sent)
+  assert.deepEqual(await json(await embedded("previews", data, { screenshot: PNG })), receipt)
   const image = sql.prepare("SELECT * FROM drops WHERE kind = 'image'").get()
   assert.equal(image.parent_id, "previews")
   assert.equal(image.title, "Screenshot of pr12-acme.preview.example.com/pricing")
   const [row] = threads()
+  assert.deepEqual(receipt, { n: 1, id: row.id })
+  assert.equal(threads().length, 1)
   assert.deepEqual(
     [row.metadata.dropId, row.metadata.kind, row.metadata.page, row.author.id, row.author.name, row.metadata.label],
     [image.id, "image", `${SITE}/pricing`, "ada", "Ada", null],
@@ -1456,7 +1460,7 @@ test("an agent finds the review by a page's address on a fixed staging host and 
   assert.match((await call(readDrop, { id: "http://staging.example.org/settings/billing" })).message, /No drop/)
 })
 
-test("on a site review, people signed in who may comment resolve each other's comments; guests only their own", async () => {
+test("on a site review, people signed in who may comment resolve each other's comments; guests resolve nothing", async () => {
   state.mode = "team"
   site()
   state.who = null
@@ -1466,23 +1470,27 @@ test("on a site review, people signed in who may comment resolve each other's co
   await comment(guest, { body: "From a guest" })
   const [thread] = (await json(await count(ada_, "/pricing?plan=pro"))).threads
   assert.equal(thread.canResolve, true, "a teammate may resolve the guest's comment")
-  const resolve = (bearer) =>
+  const resolve = (bearer, n = 1) =>
     answer(
       threadPatch,
-      request("/api/review/comments/1", {
+      request(`/api/review/comments/${n}`, {
         method: "PATCH",
         headers: { origin: SITE, authorization: `Bearer ${bearer}`, "content-type": "application/json" },
         body: JSON.stringify({ resolved: true }),
-        params: { n: "1" },
+        params: { n: String(n) },
       }),
     )
   await comment(ada_, { body: "Ada's" })
   const asGuest = (await json(await count(guest, "/pricing?plan=pro"))).threads
   assert.deepEqual(
-    asGuest.map((item) => item.canResolve),
-    [false, false],
-    "a guest resolves nothing, since a guest's comments aren't tied to them",
+    asGuest.map((item) => [item.body, item.mine, item.canResolve]),
+    [
+      ["Ada's", false, false],
+      ["From a guest", true, false],
+    ],
+    "a guest's own comment is theirs to see, not to resolve",
   )
+  assert.equal((await resolve(guest, 2)).status, 403)
   assert.equal((await resolve(guest)).status, 403)
   assert.equal((await resolve(ada_)).status, 200)
 })
@@ -1715,7 +1723,8 @@ test("a resolved comment in Drop still takes replies from people who may comment
       id: "doc",
     }),
   )
-  assert.deepEqual([posted.authorName, posted.mine, posted.n], ["Guest", false, 1])
+  // Theirs, by their browser's cookie: nobody else's.
+  assert.deepEqual([posted.authorName, posted.mine, posted.n], ["Guest", true, 1])
   state.who = who
   const [listed] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
   assert.equal(listed.mine, false, "a guest's comment is nobody's")
@@ -1731,7 +1740,7 @@ test("a resolved comment in Drop still takes replies from people who may comment
       id: posted.id,
     }),
   )
-  assert.deepEqual([reply.authorName, reply.mine], ["Guest", false])
+  assert.deepEqual([reply.authorName, reply.mine], ["Guest", true])
   const [after] = await dropComments(request("/api/drops/doc/comments", { id: "doc" }))
   assert.equal(after.resolved, true)
   assert.deepEqual(
