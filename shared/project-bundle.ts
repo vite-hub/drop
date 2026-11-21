@@ -226,7 +226,11 @@ export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
   }
   for (const [path, text] of Object.entries(sent)) {
     if (path.endsWith(".html") || path.endsWith(".htm")) {
-      const html = text.replace(/<!--[\s\S]*?-->/g, "")
+      const html = text
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<script\b[^>]*\btype=["']?([^"'\s>]+)[^>]*>[\s\S]*?<\/script>/gi, (tag, type: string) =>
+          /^(?:module|importmap|(?:text|application)\/(?:java|ecma)script)$/i.test(type) ? tag : "",
+        )
       for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what)
       for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true)
       for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi))

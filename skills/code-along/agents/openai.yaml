@@ -1,0 +1,3 @@
+interface:
+  display_name: "Code along"
+  short_description: "A guide in steps beside an editor and a live preview, from one lesson.md"

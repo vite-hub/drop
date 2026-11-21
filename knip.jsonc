@@ -1,5 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  // code-along's page imports CodeMirror and marked by name from the import map in its page.html, not from node_modules.
+  "ignoreIssues": { "skills/code-along/assets/app.js": ["unlisted"] },
   "workspaces": {
     ".": {
       // The Nuxt plugin finds app/ and server/{api,middleware,plugins,routes}. These are the other entries: files
