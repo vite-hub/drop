@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The settings every Drop needs or most often sets, plus the host's own (`extra`). Shown on each host page.
 const { extra = [] } = defineProps<{ extra?: Array<[name: string, what: string]> }>()
 
 const COMMON: Array<[string, string]> = [

@@ -5,8 +5,8 @@ import { transpileModule } from "typescript"
 import { test } from "vite-plus/test"
 
 const source = readFileSync(new URL("../../app/components/DropViewer.vue", import.meta.url), "utf8")
-const eligibility = source.slice(source.indexOf("const onPage ="), source.indexOf("// Whether the Comments list"))
-const pdfPins = source.slice(source.indexOf("const pdfComments ="), source.indexOf("/** A PDF's page, still"))
+const eligibility = source.slice(source.indexOf("const onPage ="), source.indexOf("let listBefore"))
+const pdfPins = source.slice(source.indexOf("const pdfComments ="), source.indexOf("function showPage("))
 
 test("PDF pins respect resolved threads and hidden-comment exceptions", () => {
   const open = { id: "open", kind: "image", pdfPage: 1, resolved: false }

@@ -1,18 +1,9 @@
-// shadcn/ui's sizes and surfaces (new-york v4) on Nuxt UI's parts, so pages don't restyle them one by one:
-// h-9 controls (h-8 small), 8px corners, hairline borders, one soft shadow only on floating layers, and a tooltip in
-// the inverted color. The editor's menus share the floating surface. Tokens live in app/assets/css/main.css.
 const floating = "bg-default ring ring-default rounded-lg shadow-md"
 const surface = `${floating} [animation:pop-in_120ms_var(--ease-out)]`
 
 export default defineAppConfig({
-  // MingCute draws in 2px strokes, a third heavier than the 14px labels beside its icons; 1.75 sits between that and
-  // Phosphor's 1.5. A global hook keeps each icon's class name, so the server render and hydration agree. In CSS mode
-  // Iconify passes only the body, not the prefix; the other sets (Phosphor, simple-icons) are fills with no stroke.
   icon: {
     customize: (content: string) => content.replaceAll('stroke-width="2"', 'stroke-width="1.75"'),
-    // vite-hub/ui's comment parts and live editor name Lucide icons, a set Drop doesn't ship, so their buttons drew
-    // blank (Resolve, Close, Edit, Delete, attach, send, the editor's toolbar and "/" menu). Each one Drop shows gets
-    // its MingCute twin.
     aliases: {
       "lucide-arrow-left": "mingcute:arrow-left-line",
       "lucide-arrow-up": "mingcute:arrow-up-line",
@@ -52,7 +43,6 @@ export default defineAppConfig({
   },
   ui: {
     colors: { primary: "neutral", neutral: "neutral" },
-    // MingCute for Nuxt UI's own icons too. vite-hub's own parts keep the Phosphor they ship with.
     icons: {
       arrowDown: "i-mingcute-arrow-down-line",
       arrowLeft: "i-mingcute-arrow-left-line",
@@ -71,7 +61,6 @@ export default defineAppConfig({
       copyCheck: "i-mingcute-check-line",
       dark: "i-mingcute-moon-line",
       drag: "i-mingcute-dots-line",
-      // The filled dots: the line icon draws its dots as strokes alone, which the 1.75 hook above thins to specks.
       ellipsis: "i-mingcute-more-1-fill",
       error: "i-mingcute-close-circle-line",
       external: "i-mingcute-arrow-right-up-line",
@@ -99,8 +88,6 @@ export default defineAppConfig({
       upload: "i-mingcute-upload-2-line",
       warning: "i-mingcute-alert-line",
     },
-    // Press feedback: a pressed button settles to 96% and springs back on release, a transition so letting go mid-press
-    // glides instead of snapping. Colors keep their own transition beside it.
     button: {
       slots: {
         base: "transition-[color,background-color,border-color,box-shadow,scale] duration-150 ease-out motion-safe:active:not-disabled:not-aria-disabled:scale-[0.96]",
@@ -121,7 +108,6 @@ export default defineAppConfig({
         { color: "neutral", variant: "outline", class: "ring-default shadow-xs dark:bg-elevated/40" },
       ],
     },
-    // 16px text on phones, as shadcn's: iOS Safari zooms the page into any field set smaller, the ⌘K palette's too.
     input: {
       variants: {
         size: {
@@ -142,7 +128,6 @@ export default defineAppConfig({
     card: {
       slots: { root: "rounded-xl", header: "p-6 pb-0", body: "p-6", footer: "p-6 pt-0" },
     },
-    // Tab counts (Open 3, Resolved 1) change in place as comments resolve: equal-width digits keep the tabs still.
     tabs: {
       slots: { trailingBadge: "tabular-nums" },
       compoundVariants: [
@@ -151,8 +136,6 @@ export default defineAppConfig({
           variant: "pill",
           class: {
             indicator: "bg-default dark:bg-accented shadow-xs",
-            // Until hydration there is no indicator, and Nuxt UI paints the active tab with `before:bg-inverted`: a solid
-            // black pill with dark text. Paint that fallback like the indicator.
             trigger:
               "data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented",
           },
@@ -166,7 +149,6 @@ export default defineAppConfig({
     tooltip: {
       slots: { content: "bg-inverted text-inverted ring-0 shadow-none rounded-md h-auto px-3 py-1.5 text-xs" },
     },
-    // Nuxt UI closes a modal as slowly as it opens it. Leaving runs faster: the decision to leave is already made.
     modal: {
       slots: { content: "ring-default" },
       variants: {
@@ -178,7 +160,6 @@ export default defineAppConfig({
         },
       },
     },
-    // The mobile panel (DropViewer) leaves faster than it arrives, its overlay in step with it.
     slideover: {
       variants: {
         transition: { true: { overlay: "data-[state=closed]:animate-[fade-out_150ms_var(--ease-out)]" } },

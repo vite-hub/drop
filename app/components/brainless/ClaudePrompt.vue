@@ -1,7 +1,4 @@
-<script setup lang="ts">
-// Claude Code's composer: ❯ between two rules, and the mode line under it.
-// Ported from Brainless (MIT, see LICENSE); the input is display-only, filled by the default slot.
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <div class="min-w-0 font-mono text-[13px] leading-[1.6]">

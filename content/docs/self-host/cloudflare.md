@@ -42,13 +42,13 @@ The root `wrangler.jsonc` describes resources for the button. Cloudflare writes 
    pnpm exec wrangler r2 bucket create vitehub-drop
    ```
 
-   The KV namespace for Drop's render cache has no id to fill in. The first deploy creates it.
+   The KV namespace for Drop's render cache has no id to fill in. Wrangler creates it on the first deploy.
 3. Fill `.env` with the settings below. Uncomment the D1 database id and name:
 
    ```sh
    cp .env.example .env
    ```
-4. Deploy. With a `.env`, `pnpm run deploy` runs ViteHub's `vitehub deploy`: it builds, applies the D1 migrations, and publishes the Worker with the settings Drop declares as its secrets. Other names in `.env`, such as `CLOUDFLARE_API_TOKEN`, stay on your machine. It lists any resource it has to create and asks first:
+4. Deploy. With a `.env`, `pnpm run deploy` builds, applies the D1 migrations, and publishes the Worker. It uploads only nonempty runtime values allowed by the generated deployment manifest. `CLOUDFLARE_API_TOKEN` is used by Wrangler and is not uploaded, even if a previous deploy left a secret with that name on the Worker. Unspecified Worker secrets are left unchanged. Console is optional:
 
    ```sh
    pnpm run deploy

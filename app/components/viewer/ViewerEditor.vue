@@ -1,8 +1,4 @@
 <script setup lang="ts">
-// The live editor's page: the same column and typeset as the reader (shared/documents.ts), so editing a doc looks
-// like reading it. ViteHub's MarkdownEditor brings the bubble toolbar, the "/" block menu, the drag handle, and image
-// uploads on the Realtime room's editor; Drop adds the ":" emoji menu, the "@" people menu, and the code languages.
-// Emoji and names go in as plain text, so the Markdown stays plain.
 import type { EditorEmojiMenuItem } from "@nuxt/ui"
 import type { Editor } from "@tiptap/vue-3"
 import { MarkdownEditor } from "@vite-hub/ui/markdown-editor"
@@ -15,7 +11,6 @@ const props = defineProps<{ editor?: Editor; synced: boolean; publishing: boolea
 const notify = useNotify()
 const prompt = usePrompt()
 
-// The people who may read this drop, for "@", from the same list as the comment boxes.
 const { people: members } = usePeople()
 const people = computed(() =>
   members.value.map((member) => {
@@ -24,13 +19,11 @@ const people = computed(() =>
   }),
 )
 
-// GitHub's emoji set, loaded with the editor rather than with the page. Custom GitHub images have no character to insert.
 const emojis = shallowRef<EditorEmojiMenuItem[]>([])
 onMounted(async () => {
   emojis.value = (await import("@tiptap/extension-emoji")).gitHubEmojis.filter((emoji) => emoji.emoji)
 })
 
-// MarkdownEditor keeps the editor it mounted with, and the room makes a new one for a new draft or connection.
 const editorIds = new WeakMap<Editor, number>()
 let lastEditorId = 0
 const editorKey = computed(() => {
@@ -102,7 +95,6 @@ provide(viewerEditorControls, {
 <template>
   <div class="drop-doc min-h-0 flex-1 overflow-y-auto">
     <main class="relative mx-auto px-6 pt-14 pb-24" :style="{ maxWidth: DOC_WIDTHS[width] }">
-      <!-- The header says how the connection is going; here the doc's shape stands in until its text arrives. -->
       <div v-if="!editor || !synced" aria-live="polite" class="space-y-4">
         <p class="sr-only">Loading the doc</p>
         <USkeleton class="h-8 w-2/3" />

@@ -1,16 +1,10 @@
-/** What the module puts in `runtimeConfig.public.drop`. `NUXT_PUBLIC_DROP_URL` and the other `NUXT_PUBLIC_DROP_*` variables set it at runtime. */
 export interface DropPublicConfig {
-  /** Drop's address. Empty: the page loads no review.js. */
   url: string
-  /** The edge the toolbar starts on: `top`, `right`, `bottom` or `left`. Empty: review.js's default. */
   edge: string
-  /** The place along that edge, from 0 to 100. A negative value: review.js's default. */
   at: number
-  /** The toolbar starts as the small mark. */
   collapsed: boolean
 }
 
-/** The src and data attributes of the review.js tag, or `undefined` when `url` is not an http(s) address. */
 export function reviewScript(
   config: Partial<DropPublicConfig> | undefined,
 ): { src: string; data: Record<string, string> } | undefined {

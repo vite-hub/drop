@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import ts from "typescript"
+import { useIntervalFn, useRafFn, useTimeoutFn } from "@vueuse/core"
 import { test, vi } from "vite-plus/test"
+import { ref } from "vue"
 import { saveRetryDelay } from "../../app/utils/backoff.ts"
 
 test("a board save that keeps failing waits twice as long each time, then keeps trying once a minute", () => {
@@ -31,6 +33,10 @@ for (const status of [429, 503, 403, 413])
       "window",
       "document",
       "requestAnimationFrame",
+      "ref",
+      "useTimeoutFn",
+      "useIntervalFn",
+      "useRafFn",
       `${code}; return sync`,
     )(
       { drop: { id: "board" } },
@@ -44,6 +50,10 @@ for (const status of [429, 503, 403, 413])
       { addEventListener() {}, removeEventListener() {} },
       { hidden: false },
       () => {},
+      ref,
+      useTimeoutFn,
+      useIntervalFn,
+      useRafFn,
     )
     const board = sync({}, api, [], true)
     board.onChange(scene)

@@ -10,7 +10,6 @@ const state = reactive<InferInput<typeof ReportSchema>>({
   details: "",
   email: "",
 })
-// The stored values stay as they are; people pick from sentence-case labels.
 const REASON_LABELS: Record<(typeof ReportSchema.entries.reason.options)[number], string> = {
   phishing: "Phishing",
   malware: "Malware",
@@ -37,7 +36,6 @@ async function submit(event: FormSubmitEvent<InferInput<typeof ReportSchema>>) {
     sending.value = false
   }
 }
-// ⌘/Ctrl+Enter in Details sends, as the button does; not again while a send is out.
 const shortcut = () => void (sending.value || form.value?.submit())
 </script>
 

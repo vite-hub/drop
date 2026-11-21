@@ -1,5 +1,3 @@
-// Better Auth tables (user, session, account, verification, rate_limit), its OAuth provider's (./oauth.ts), its teams
-// and billing (./teams.ts), and Drop's own (./drops.ts).
 import { defineDatabase } from "vite-hub/database"
 import { sql } from "drizzle-orm"
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core"
@@ -56,10 +54,6 @@ export const user = sqliteTable("user", {
     .notNull(),
 })
 
-/**
- * The drops someone pinned, for the Drops page's Pinned view and ⌘K: theirs or anyone's they can open. Pins are
- * personal; a pin to a drop they can no longer open stays and lists again if it opens to them again.
- */
 export const dropPins = sqliteTable(
   "drop_pins",
   {
@@ -141,8 +135,6 @@ export const verification = sqliteTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 )
 
-// Better Auth's rate limits (`rateLimit.storage: "database"`, server/auth.ts): Drop builds its Auth per request, so a
-// counter in memory would start empty every time.
 export const rateLimit = sqliteTable("rate_limit", {
   id: text("id").primaryKey(),
   key: text("key").notNull().unique(),
@@ -181,7 +173,6 @@ export {
   oauthResource,
 }
 
-// Where it lives (D1 binding, D1 over HTTP, or local SQLite) is per host, in nuxt.config.ts `vitehub.database`.
 export default defineDatabase({
   schema: {
     quotaReservations,

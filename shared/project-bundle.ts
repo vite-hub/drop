@@ -1,13 +1,8 @@
-// Serves a project folder inside one sandboxed document, so an app drop behaves like static hosting:
-// stylesheets, scripts and SVGs are inlined, ES module imports resolve to inline modules, fetch() of a
-// project file returns that file, and links to other pages switch pages.
-
 import { lookup } from "mrmime"
 import { prependToHead } from "./plan-runtime.ts"
 
 type ProjectFiles = Record<string, string>
 
-/** Resolves `ref` relative to the file at `from`. Returns null for external URLs. Embedded in the page runtime. */
 function resolvePath(from: string, ref: string): string | null {
   if (!ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) return null
   const clean = ref.split("#")[0]!.split("?")[0]!
@@ -20,25 +15,15 @@ function resolvePath(from: string, ref: string): string | null {
   return parts.join("/")
 }
 
-/** The page a URL path opens, the way a static host serves it: `/` and `/docs/` open their index.html. Embedded in the page runtime. */
 export function pageAt(pages: string[], path: string): string | null {
   const clean = path.replace(/^\/+/, "")
   const candidates = [clean, `${clean.replace(/\/$/, "")}/index.html`.replace(/^\//, ""), `${clean}.html`]
   return candidates.find((candidate) => candidate && pages.includes(candidate)) ?? null
 }
 
-/**
- * The URL path a static host serves `page` at: an index.html at its folder, any other page without `.html`, the clean
- * URL Cloudflare Pages, Netlify and Vercel serve and a built site's router expects (`/guide/setup` for
- * guide/setup.html).
- */
 export const pageUrl = (page: string): string =>
   encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1").replace(/\.html$/, "")}`)
 
-/**
- * The page a static host answers `location` with: the page at its path, else 404.html, a single-page app's 200.html,
- * or its index.html. `location` is an app address, path with its query and hash.
- */
 export function appPageFor(pages: string[], location: string): string {
   let path = location.replace(/[?#].*$/s, "")
   try {
@@ -47,13 +32,8 @@ export function appPageFor(pages: string[], location: string): string {
   return pageAt(pages, path) ?? ["404.html", "200.html"].find((page) => pages.includes(page)) ?? "index.html"
 }
 
-/** The most pages an agent's reply lists, each with its link. */
 export const MAX_LISTED_PAGES = 100
 
-/**
- * The app's pages, each with the link that opens the drop at it: `index.html` at `dropUrl` itself, every other at
- * `?path=` and its clean URL. 404.html and 200.html answer addresses the app lacks, so nobody links to them.
- */
 export function appPageLinks(dropUrl: string, paths: string[]): { page: string; url: string }[] {
   return paths
     .filter((path) => path.endsWith(".html") && path !== "404.html" && path !== "200.html")
@@ -65,11 +45,6 @@ export function appPageLinks(dropUrl: string, paths: string[]): { page: string; 
     })
 }
 
-/**
- * The app address in a drop link's `?path=` (`/guide/setup?tab=vue#install`), with a leading slash, or null for one
- * that would leave the app's origin (`//other.example`, `https://…`). Hand-written links put the hash outside, after
- * the query, so `hash` (the drop link's own) completes a path that has none.
- */
 export function appLocation(path: string | null | undefined, hash = ""): string | null {
   if (!path) return null
   const base = "https://app.invalid"
@@ -85,7 +60,6 @@ export function appLocation(path: string | null | undefined, hash = ""): string 
 
 export const contentTypeOf = (path: string): string => lookup(path) ?? "text/plain"
 
-/** Files the viewer and agents read as text. The rest (fonts, images, wasm) only a browser loads. */
 export const isTextFile = (path: string): boolean =>
   /^(text\/|application\/(javascript|json|xml|manifest\+json)|image\/svg\+xml)/.test(contentTypeOf(path))
 
@@ -119,8 +93,6 @@ function bundleModule(files: ProjectFiles, path: string, seen: Set<string>): str
 
 function pageRuntime(files: ProjectFiles, page: string): string {
   const assets = Object.fromEntries(Object.entries(files).filter(([path]) => !path.endsWith(".html")))
-  // On the content origin the app has a real URL: links navigate like on any static host, and the viewer follows
-  // along. In the opaque sandbox nothing can navigate, so links to other pages ask the viewer to switch.
   return `<script>(() => {
   const resolvePath = ${resolvePath.toString()};
   const pageAt = ${pageAt.toString()};
@@ -193,7 +165,6 @@ function pageRuntime(files: ProjectFiles, page: string): string {
 })();</script>`
 }
 
-/** One self-contained HTML document for `page`, ready for injectRuntime (theme + comments). */
 export function buildProjectDocument(files: ProjectFiles, page: string): string {
   const source = files[page]
   if (source === undefined) {
@@ -229,7 +200,6 @@ export function buildProjectDocument(files: ProjectFiles, page: string): string 
   return prependToHead(html, pageRuntime(files, page))
 }
 
-/** What a bare import names: a package, maybe scoped, maybe with a subpath, like `preact` or `@vue/reactivity/dist`. */
 const PACKAGE = /^(?:@[a-z0-9][\w.~-]*\/)?[a-z0-9][\w.~-]*(?:\/[\w.~@-]+)*$/i
 
 const LINK_TAGS: [RegExp, string][] = [
@@ -238,12 +208,6 @@ const LINK_TAGS: [RegExp, string][] = [
   [/<(?:img|source|image|use|video|audio|iframe)\b[^>]*?\s(?:src|href)=["']([^"']+)["']/gi, "image or media"],
 ]
 
-/**
- * References in the sent files that point at nothing in the app, the way the viewer resolves them: a script,
- * stylesheet, image, CSS url(), module import, fetch() of a literal path, or a link to a page. Also bare module
- * imports ("react") without an import map, which no browser can load. Template-built paths are skipped. Each issue
- * is one sentence an agent can act on.
- */
 export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
   const all = new Set(paths)
   const pages = paths.filter((path) => path.endsWith(".html"))
@@ -273,7 +237,6 @@ export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
     } else if (/\.m?js$/.test(path)) scanScript(path, text)
   }
   function scanScript(path: string, code: string) {
-    // `from` and `import` as keywords, not inside a name like "show-from" in a bundle's CSS classes.
     for (const match of code.matchAll(/(?<![\w$.-])(?:from\s*|import\s*\(\s*|import\s+)(['"])([^'"\n]+)\1/g)) {
       const specifier = match[2]!
       if (/^(?:\.{1,2}\/|\/)/.test(specifier)) check(path, specifier, "a module")

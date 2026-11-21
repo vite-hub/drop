@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// A site review's screenshot with the box the reviewer drew, in thousandths of the screenshot (SiteReviewItem).
 import type { DropComment } from "#shared/types"
 
 defineProps<{ comment: DropComment; url: string }>()

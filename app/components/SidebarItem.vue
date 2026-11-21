@@ -1,11 +1,4 @@
 <script setup lang="ts">
-// One sidebar link in shadcn's SidebarMenuButton shape: h-8, 8px corners, a 16px icon that fills in when active.
-// Active is bg-accented, hover 60% of it: the sidebar is bg-muted, where bg-elevated barely shows.
-// Both icon names are literals at the call site, so the icon bundle's scanner sees them. The slot is SidebarMenuAction:
-// a control on the row's right edge, beside the link rather than inside it. Without `to` the row is a button, for rows
-// that do something before (or instead of) navigating, like Docs sliding the sidebar over.
-// `count` ends the row in mono, like Executor v2's nav; `alert` marks one that waits on you, with `countLabel` saying
-// what it counts to screen readers.
 defineProps<{
   to?: string
   external?: boolean

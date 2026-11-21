@@ -4,11 +4,6 @@ import { toSummary } from "../utils/drops"
 import { createFolder, requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 
-/**
- * New folder, at the top or inside `folder`, with a description of what goes in it. It starts with this Drop's default
- * share, like any drop. `team` makes it one of the team's folders, which only admins do; `teamId` one of that team's,
- * which its owner and admins do.
- */
 export default defineValidatedHandler({
   validate: { body: FolderSchema },
   async handler(event) {

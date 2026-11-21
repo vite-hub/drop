@@ -1,23 +1,16 @@
 <script setup lang="ts">
-// A drop drawn small, filling its box (a 16:10 card, a folder's fan, a list's thumbnail): an image as itself, a doc's
-// first words on a page, a board's as sticky notes, an app or a reviewed site in a window, a folder fanning out its
-// newest drops, an empty folder dashed. Type is sized in container units, so it reads the same at every size. Until its
-// peek arrives (usePeek), the kind's icon holds the place at the same size.
 import type { DropKind, DropPeek } from "#shared/types"
 
 const { kind, title, peek, address, items, thumbnail } = defineProps<{
   kind: DropKind
   title: string
   peek?: DropPeek | null
-  /** A site's address, an app's or a file's name. */
   address?: string
-  /** A folder's drop count, known before its peek. */
   items?: number
   thumbnail?: string
 }>()
 const image = computed(() => thumbnail ?? peek?.thumbnail)
 const words = computed(() => peek?.text ?? "")
-// A board's words, a few to a note.
 const notes = computed(() => {
   const parts = words.value.split(/\s+/).filter(Boolean)
   return [0, 1, 2].flatMap((at) => {
@@ -44,7 +37,6 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       :src="image"
     />
 
-    <!-- A doc: its title and first words on a page, fading out where the card ends. -->
     <div
       v-else-if="(kind === 'markdown' || kind === 'html') && peek !== undefined"
       class="size-full bg-default px-[8cqw] pt-[7cqw] [mask-image:linear-gradient(to_bottom,#000_60%,transparent)]"
@@ -53,7 +45,6 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       <p class="mt-[2.5cqw] text-[3.6cqw] leading-[1.55] text-muted">{{ words || "Nothing written yet." }}</p>
     </div>
 
-    <!-- A board: its words on sticky notes over the dot grid. -->
     <div
       v-else-if="kind === 'board' && peek !== undefined"
       class="relative size-full bg-default bg-[radial-gradient(var(--ui-border)_1px,transparent_1px)] bg-size-[6cqw_6cqw]"
@@ -73,7 +64,6 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       />
     </div>
 
-    <!-- An app or a reviewed site: a window with its name or address in the bar. -->
     <div v-else-if="kind === 'app' || kind === 'site'" class="flex size-full flex-col bg-muted p-[5cqw] pb-0">
       <div
         class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[2.5cqw] bg-default shadow-xs ring-1 ring-default"
@@ -89,7 +79,6 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       </div>
     </div>
 
-    <!-- A folder: its newest drops fanned out, how many it holds in the corner; an empty one dashed. -->
     <div
       v-else-if="kind === 'folder' && (items === 0 || (peek && !inside.length))"
       class="grid size-full place-content-center justify-items-center gap-[2cqw] p-[4cqw] text-[4cqw] text-muted"
@@ -109,7 +98,6 @@ const FAN = ["left-[24%] z-30", "left-[8%] top-[18%] z-20 -rotate-6", "left-[40%
       </div>
     </div>
 
-    <!-- Anything else, and every kind until its peek arrives: its icon, and a file's name. -->
     <div
       v-else
       class="grid size-full place-content-center justify-items-center gap-[2cqw] bg-muted px-[6cqw] text-center"

@@ -2,9 +2,6 @@
 import { resourceLabel } from "#shared/resources"
 import type { DropResource, RelatedDrop } from "#shared/types"
 
-// A drop's own links, and with `relatedTo` the drops related to it through the pages they link to
-// (server/utils/related.ts), like a site review's before/after doc, with the links of theirs not listed yet. One list,
-// every row alike: a related drop opens here, a link in a new tab.
 const props = defineProps<{ resources: DropResource[]; relatedTo?: string }>()
 const related = ref<RelatedDrop[]>([])
 watch(
@@ -21,7 +18,6 @@ watch(
   { immediate: true },
 )
 
-// The host goes after a title. Without one, the label is the host or `owner/repo#n`, which already says where it goes.
 const label = (resource: DropResource) => {
   const host = new URL(resource.url).hostname.replace(/^www\./, "")
   return { ...resource, label: resourceLabel(resource), host: resource.title ? host : "" }
@@ -35,15 +31,11 @@ const rows = computed<Row[]>(() => [
   ]),
 ])
 const count = computed(() => rows.value.length)
-// The chips: the drop's own links first, then the related drops' links, then a related drop's kind.
 const chipUrls = computed(() => [...props.resources, ...related.value.flatMap((drop) => drop.links)].map((r) => r.url))
 const shown = computed(() => chipUrls.value.slice(0, 3))
 const more = computed(() => Math.max(0, chipUrls.value.length - shown.value.length))
-// The ring takes the pill's fill: its surface, the hover's lighter grey, or white while the list is open. A site icon
-// sits on white, as sites draw them for, so a black mark like Airtable's stays visible on the dark pill.
 const rings =
   "ring-2 ring-(--ui-bg) group-hover/links:ring-(--ui-bg-elevated) group-focus-visible/links:ring-(--ui-bg-elevated) group-aria-expanded/links:ring-(--ui-bg-inverted)"
-// The list rises centered over the whole pill, as the comments panel does, not over the icons at its end.
 const trigger = useTemplateRef<HTMLButtonElement>("trigger")
 const bar = computed(() => trigger.value?.closest<HTMLElement>('[aria-label="Document tools"]') ?? undefined)
 const chip = `${rings} grid size-5 place-items-center rounded-full bg-white inset-ring inset-ring-black/10 [--ui-text-muted:var(--color-neutral-500)]`
@@ -61,8 +53,6 @@ const chip = `${rings} grid size-5 place-items-center rounded-full bg-white inse
   >
     <template #default="{ open }">
       <UTooltip :disabled="open" text="Related links" :content="{ side: 'top', sideOffset: 8 }">
-        <!-- In the review dock, beside Share. Each chip is cut out of the pill's fill by a ring of that fill, so the
-             overlap reads on every state of the button; a hairline keeps a white favicon's edge. -->
         <button
           ref="trigger"
           :aria-label="`Related links (${count})`"

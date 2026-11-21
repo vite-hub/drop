@@ -1,6 +1,5 @@
 import { signInPath } from "./sign-in"
 
-/** Recovery guidance never depends on the hidden content or its owner's identity. */
 export function contentUnavailable(
   status: number,
   path: string,
@@ -32,7 +31,6 @@ export function contentUnavailable(
       action: { label: "Home", to: "/" },
     }
   const thing = path.startsWith("/f/") ? "file" : "drop"
-  // Behind an auth proxy, signing in again returns the same GitHub account to the same page: a loop, not a fix.
   if (email)
     return {
       title: `You can't open this ${thing}`,
@@ -42,9 +40,6 @@ export function contentUnavailable(
         ? { label: "My drops", to: "/drops" }
         : { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
     }
-  // Most people who land here signed out were sent a team link they can open: say only what to do. Whether it's private
-  // or deleted is for the signed-in card above, once there's an account to compare; a private, team or deleted drop all
-  // answer the same 404 here, so these words tell nobody which one this is.
   return {
     title: `Sign in to open this ${thing}`,
     description: `${thing === "file" ? "Files" : "Drops"} shared with you or your team open right after you sign in.`,
@@ -53,10 +48,6 @@ export function contentUnavailable(
   }
 }
 
-/**
- * A 404 under a drop this person may open: the drop is there, only the address isn't, so nothing about access or
- * accounts applies. `drop` is the drop's own link.
- */
 export const missingInDrop = (drop: string, email?: string | null) => ({
   title: "Nothing is at this address in the drop.",
   description: "The drop is here, and you can open it, but it has no page at this address.",

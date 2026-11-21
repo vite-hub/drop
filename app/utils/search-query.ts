@@ -1,10 +1,5 @@
 import { DROP_KINDS, type DropKind } from "#shared/types"
 
-// The ⌘K palette's search reads like GitHub's: plain words, plus `in:<folder>` and `kind:<kind>` qualifiers anywhere in
-// it. A folder's name with spaces goes in quotes, `in:"Card Mailer"`. The filter chips under the palette write the same
-// words, so what someone clicks is what they could have typed.
-
-/** Words a kind answers to besides its own name. */
 const KIND_WORDS = new Map<string, DropKind>([
   ["doc", "markdown"],
   ["docs", "markdown"],
@@ -27,9 +22,7 @@ const kindOf = (word: string) =>
 const QUALIFIER = /(?:^|\s)(in|kind):(?:"([^"]*)"?|(\S*))/gi
 
 export interface SearchQuery {
-  /** The words without the qualifiers. */
   words: string
-  /** What `in:` names: a folder's title or id. */
   folder?: string
   kinds: DropKind[]
 }
@@ -50,10 +43,8 @@ export function parseSearch(term: string): SearchQuery {
   return { words: words.replace(/\s+/g, " ").trim(), folder, kinds: [...kinds] }
 }
 
-/** `in:` for a folder, its title quoted when it has a space. */
 export const inFolder = (title: string) => `in:${/[\s"]/.test(title) ? `"${title.replaceAll('"', "")}"` : title}`
 
-/** The term with `kind:<kind>` added, or taken out with every other word that names that kind. */
 export function toggleKind(term: string, kind: DropKind) {
   const on = parseSearch(term).kinds.includes(kind)
   if (!on) return `${term.trimEnd()} kind:${kind} `.trimStart()
@@ -64,7 +55,6 @@ export function toggleKind(term: string, kind: DropKind) {
   return rest.replace(/\s+/g, " ").trimStart()
 }
 
-/** The term with its `in:` taken out, or put in for `title`. */
 export function toggleFolder(term: string, title: string) {
   const rest = term
     .replace(/(^|\s)in:(?:"[^"]*"?|\S*)/gi, "$1")

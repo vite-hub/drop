@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Edit, for a doc the live editor can't open. A disabled button swallows hover and click, so the reason never showed;
-// this one stays clickable and says why, with the way to change the doc anyway.
 defineProps<{ note: string; canComment: boolean }>()
 const emit = defineEmits<{ copy: [] }>()
 const open = defineModel<boolean>("open", { default: false })

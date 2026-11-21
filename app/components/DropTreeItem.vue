@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// One drop in the sidebar tree. A folder opens to the drops in it (fetched when opened, see DropTreeChildren) and an
-// app to its pages; either is open on its own page unless toggled shut. Hovering a drop you may change shows its menu:
-// rename it, or move it to the Trash.
 import * as v from "valibot"
 import { appLocation, appPageFor, pageUrl } from "#shared/project-bundle"
 import type { DropSummary } from "#shared/types"
@@ -11,7 +8,6 @@ const emit = defineEmits<{ navigate: [] }>()
 const route = useRoute()
 const open = useTreeOpen()
 const pages = computed(() => appPages(props.drop.paths ?? []))
-// The app page open in the viewer: the one its `?path=` (or an older link's `?file=`) shows.
 const file = computed(() => {
   const at = appLocation(textValue(route.query.path))
   return at ? appPageFor(pages.value, at) : (textValue(route.query.file) ?? "index.html")
@@ -22,7 +18,6 @@ const expandable = computed(
 )
 const expanded = computed(() => open.value[props.drop.id] ?? here.value)
 
-// Yours, or a team folder when you're an admin, as on the Drops page's rows (DropRow).
 const { data: me } = useMe()
 const changeable = computed(() => !props.drop.owner && (!props.drop.teamFolder || me.value?.role === "admin"))
 const { rename, remove } = useDropActions()
@@ -47,7 +42,6 @@ const menu = [
 const row = "group flex h-7 min-w-0 items-center gap-2 rounded-md pl-2 pr-1 text-sm transition-colors"
 const idle = "text-muted hover:bg-accented/60 hover:text-highlighted"
 const active = "bg-accented text-highlighted"
-// Hidden until the row is hovered or focused, so titles keep the width; touch screens always show it.
 const reveal = "hidden group-hover:grid group-focus-within:grid data-[state=open]:grid pointer-coarse:grid"
 </script>
 

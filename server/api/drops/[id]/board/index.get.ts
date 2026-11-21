@@ -4,10 +4,6 @@ import { readBoard } from "../../../../utils/boards"
 import { identify } from "../../../../utils/identity"
 import { routeId } from "../../../../utils/params"
 
-/**
- * A board's Excalidraw scene, of its latest version or the one `?v=<n>` names, and whether this person may draw on it:
- * only on the latest version, like live editing.
- */
 export default defineHandler(async (event) => {
   const version = Number(event.url.searchParams.get("v")) || undefined
   const drop = await findDropAt(await routeId(event), version, event)

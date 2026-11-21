@@ -4,11 +4,8 @@ import { blob } from "vite-hub/blob"
 
 const DOCUMENT_PATH =
   /^\/f\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(md|markdown|html|htm))$/i
-// Fonts only as data URIs: the hand-drawn ones comark-annotate's notes and comark-comments' pen inline with their styles.
 const markdownContentSecurityPolicy = (scriptHashes: string[]) =>
   `default-src 'none'; img-src https: data:; media-src https:; script-src 'self' ${scriptHashes.map((hash) => `'sha256-${hash}'`).join(" ")}; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
-// Scripts run, but in a sandbox without allow-same-origin: the page gets an opaque origin, so it can't read
-// Drop's cookies or call its API with the viewer's session.
 const HTML_CONTENT_SECURITY_POLICY =
   "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https:; style-src 'unsafe-inline' https:; font-src data: https:; img-src https: data: blob:; connect-src https:; frame-src 'self' about:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
@@ -46,11 +43,8 @@ export default defineHandler(async (event) => {
     const { htmlLanding } = await import("#shared/html-landing")
     return event.req.method === "HEAD" ? "" : htmlLanding(text, event.url.pathname)
   }
-  // Loaded lazily: middleware lands in the Worker's entry module, and its static imports would be re-exported
-  // from there, which Workers rejects for anything that isn't a handler.
   const { renderMarkdownDocument, RENDERER_SCRIPTS } = await import("../utils/markdown-document")
   const { base64, sha256 } = await import("#shared/utils/bytes")
-  // Authorize only the renderer's exact inline runtimes, never scripts supplied by the document's author.
   const scriptHashes = await Promise.all(
     RENDERER_SCRIPTS.map(async (script) => base64(await sha256(new TextEncoder().encode(script)))),
   )

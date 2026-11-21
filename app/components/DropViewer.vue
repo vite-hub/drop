@@ -1,12 +1,9 @@
 <script setup lang="ts">
-// No top bar: most readers arrive from a shared link, so the drop gets the whole height. The bottom review pill owns
-// the way back to Drop, editing, comments, sharing, Details, and History.
-// Frame annotations open their composer or thread in the same review dock.
 import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
 import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
-import { breakpointsTailwind } from "@vueuse/core"
+import { breakpointsTailwind, promiseTimeout } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { ViewerVariants } from "~/composables/useViewerFrame"
 import { expiryLabel } from "#shared/expiry"
@@ -29,7 +26,6 @@ import {
   type ConnectionStatusState,
   createCommentVisibility,
 } from "vite-hub/ui"
-// The parts' one stylesheet: comments, presence, and the editor's carets.
 import "vite-hub/ui/styles.css"
 
 const { publicView = false } = defineProps<{ publicView?: boolean }>()
@@ -37,10 +33,8 @@ const { publicView = false } = defineProps<{ publicView?: boolean }>()
 const state = injectDrop()!
 const drop = computed(() => state.drop.data.value!)
 const publishedComments = computed(() => state.comments.data.value)
-// With the ones that wait in the outbox, each marked by its `delivery` (useDrop).
 const comments = computed(() => state.list.value)
 
-// Site reviews attach screenshots to the same comment threads. Fetch the thumbnails once for list and thread.
 const siteReview =
   drop.value.kind === "site"
     ? useApi<SiteReviewItem[]>(() => `/api/drops/${drop.value.id}/review`, {
@@ -62,20 +56,15 @@ const { width: windowWidth, height: windowHeight } = useWindowSize()
 const isApp = computed(() => drop.value.kind === "app")
 const video = computed(() => (drop.value.kind === "file" ? videoType(drop.value.filename) : undefined))
 const pdf = computed(() => drop.value.kind === "file" && isPdf(drop.value.filename))
-// The owner gets their controls on the public link too: it is where they land after sharing it.
 const owner = computed(() => drop.value.isOwner)
-// Signed-in people read a public link inside the app, sidebar included (pages/d/[id]/[[slug]].vue); visitors see it alone.
 const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
-// The pill's "N waiting": what's still on its way after its quiet start, so a send on a working network never shows it.
 const second = useNow({ interval: 1000 })
 const deliveryCount = computed(() => waitingCount(comments.value, second.value.getTime()))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
-// A doc's link opens its latest version. Someone reading an earlier one, pinned (`?v=`) or from History, can go to the
-// latest; someone whose old link moved them to the latest (`?from=`) can go back to the version they were sent.
 const latest = computed(() => drop.value.versions[0] ?? drop.value)
 const older = computed(() => latest.value.version !== drop.value.version)
 const latestTo = computed(() => (publicView ? dropPath(drop.value) : `/drops/${drop.value.id}`))
@@ -91,14 +80,9 @@ async function restoreDrop() {
   restoring.value = false
 }
 
-// Wide screens float a new comment's card over the page; narrower ones write it in the dock.
 const breakpoints = useBreakpoints(breakpointsTailwind, { ssrWidth: 1280 })
 const wide = breakpoints.greaterOrEqual("lg")
 const phone = breakpoints.smaller("sm")
-/**
- * The drop's details and actions, in a segment that grows inside the review pill (ViewerDetailsSegment): ⓘ or I opens
- * it, and `detailsPop` is whether its chip's popover is open, the details above History.
- */
 const detailsOpen = ref(false)
 const detailsPop = ref(false)
 const hasHistory = computed(() => drop.value.versions.length > 1)
@@ -107,8 +91,6 @@ function showDetails(pop = false) {
   detailsOpen.value = true
   detailsPop.value = pop
 }
-// Share, a segment popover, and Comments would stack over each other: opening one closes the others. An Escape that
-// just closed the popover (Reka hears it first) leaves the segment open: the next one folds it.
 let detailsPopClosedAt = 0
 watch(
   detailsPop,
@@ -149,11 +131,6 @@ function toggleComments() {
   if (commentsOpen.value) closeComments()
   else showComments()
 }
-/**
- * Comments as a mode (ViewerCommentsSegment): while it's on, a click or a drag on the page comments on that spot, and
- * the dock's panel opens only for the list or a comment on the whole page. One of the pill's segments shows at a time:
- * turning this on folds Details, and opening Details turns this off.
- */
 const commentMode = ref(false)
 function toggleCommentMode() {
   if (!hasComments.value || editing.value || trashed.value) return
@@ -186,8 +163,6 @@ const { pages, page, location: appAt } = app
 
 const live = useLiveEditor(drop, { publicView: publicView })
 const editing = live.editing
-// ConnectionStatus waits 1.5 s before it says Reconnecting: a dropped socket usually comes back sooner, and Yjs keeps
-// the edits meanwhile.
 const liveLabels = { connecting: "Connecting", connected: "Live", reconnecting: "Reconnecting" } as const
 const liveLabel = (status: ConnectionStatusState) =>
   live.publishing.value && status === "connected" ? "Publishing" : liveLabels[status]
@@ -195,14 +170,12 @@ const liveLabel = (status: ConnectionStatusState) =>
 const annotationsEnabled = computed(() => !route.query.changes && !trashed.value)
 const variants = shallowRef<ViewerVariants | null>(null)
 const prototypeCanvas = computed(() => Boolean(variants.value?.canvas))
-/** The picture the frame took of the tooltip or menu the new comment is on, among the draft's images. */
 let autoShot: File | null = null
 const annotations = useViewerAnnotations({
   drop,
   editing,
   enabled: annotationsEnabled,
   canvas: prototypeCanvas,
-  // The page takes clicks for comments while the mode is on or the dock's panel is open; putting them away ends both.
   reviewOpen: computed({
     get: () => commentMode.value || commentsOpen.value,
     set: (value: boolean) => {
@@ -218,7 +191,6 @@ const annotations = useViewerAnnotations({
     autoShot = file
     if (autoShot) images.add([autoShot])
   },
-  // Pin style: a click on the page puts away the thread beside a pin, or a composer with nothing typed in it.
   onPageClick: () => {
     if (pinThread.value) popover.value = null
     else if (pinDraft.value && !reviewDraft.body.value.trim()) popover.value = null
@@ -241,8 +213,6 @@ const {
   pickImage,
   pen,
 } = annotations
-// The selection bar sits centred over the selection, kept 8px inside the window by its measured width, so a selection
-// at the page's edge doesn't push Comment or Suggest out of sight.
 const selectionBarRef = useTemplateRef<HTMLElement>("selectionBarRef")
 const { width: selectionBarWidth } = useElementSize(selectionBarRef, undefined, { box: "border-box" })
 const selectionBarStyle = computed(() => {
@@ -252,14 +222,12 @@ const selectionBarStyle = computed(() => {
   const center = Math.max(half, Math.min((rect.left + rect.right) / 2, windowWidth.value - half))
   return { left: `${center}px`, top: `${Math.max(56, rect.top - 8)}px` }
 })
-// Hidden comments (the review pill's eye) stay hidden on every drop until the eye shows them again.
 const commentsShown = useCommentsShown()
 overlays.pins = commentsShown.value
 watch(
   () => overlays.pins,
   (pins) => (commentsShown.value = pins),
 )
-/** Whether the drop shows in the frame, where the toolbar's tools work: not an editor, a folder, a site, a board, a link, a video, a PDF. */
 const framed = computed(
   () =>
     !editing.value &&
@@ -268,12 +236,7 @@ const framed = computed(
     !(drop.value.kind === "file" && !drop.value.html),
 )
 watch(framed, (value) => !value && (tool.value = "browse"))
-/** Whether the page can show at a device's size (ViewerDevice): HTML docs and apps, not Markdown docs, images, or spreadsheets. */
 const sizable = computed(() => framed.value && !prototypeCanvas.value && ["html", "app"].includes(drop.value.kind))
-/** Whether the viewer stops above the review dock: boards and files have controls along their bottom edge. A video
- * clears the dock inside its own stage, so the stage's color runs under the dock, and a PDF's pages scroll under it. Apps and sites run under the dock like
- * an HTML doc, so a page fills the pane instead of ending at a cut-off strip; a site's setup page keeps its own trailing
- * room (ViewerSite). */
 const dockClearance = computed(
   () =>
     !editing.value &&
@@ -294,15 +257,11 @@ watch(shareOpen, (open) => {
   if (commentsOpen.value) closeComments()
 })
 
-// Someone reading a doc's link (not a pinned or older version) moves to each new version as it's published, unless
-// they're commenting, selecting, or sharing. Editors are left out: the live editor tells them itself (useLiveEditor).
 useLatestVersion(drop, {
   enabled: () => publicView && !route.query.v && !older.value && !trashed.value && !editing.value,
   busy: () => Boolean(commentsOpen.value || selection.value || lightbox.value || shareOpen.value),
 })
 
-// Who else has the drop open, and their cursors on this version or app page (usePresence). The others load comments
-// the moment someone writes one, rather than on their next look.
 const presence = usePresence(drop, {
   at: () => (drop.value.kind === "site" ? null : `v${drop.value.version}${isApp.value ? app.page.value : ""}`),
   enabled: () => !visitor.value && !trashed.value,
@@ -322,8 +281,6 @@ function startEdit() {
   detailsPop.value = false
   void live.open()
 }
-// Both pages key this viewer by the drop's id and version, so another version (a teammate's "Open", the sidebar, an app
-// republished in place) mounts a new one; the old one leaves its draft's room as it unmounts (useLiveEditor).
 onMounted(() => {
   if (route.query.edit === "1" && drop.value.canEdit) startEdit()
 })
@@ -336,37 +293,22 @@ const pageComments = computed(() =>
     : comments.value,
 )
 
-// Open comments carry over from earlier versions (server/utils/comments.ts). One is outdated when this version no
-// longer has what it pointed at: the frame couldn't find its text or element (it says which), or the drop is an image,
-// where every version is a new picture.
-// TODO(apps): apps replace their files in place, so their comments all count as this version's and never go
-// outdated. That needs app versions kept (see publishApp in server/utils/drops.ts).
 const replaced = (comment: DropComment) => drop.value.kind === "image" && comment.version < drop.value.version
-// A resolved comment leaves the page and stays in the panel's Resolved list; it shows again while its thread is open.
 const onPage = (comment: DropComment) =>
   !comment.resolved || (popover.value?.type === "thread" && popover.value.id === comment.id)
-// Comments on the whole page have nothing in it to pin to; they live in the panel.
 const pinned = computed(() =>
   pageComments.value.filter((comment) => onPage(comment) && !replaced(comment) && comment.kind !== "page"),
 )
 
-// Whether the Comments list was open when a new comment started: it comes back once that comment is sent or dropped.
 let listBefore = false
 function startComment() {
   listBefore = commentsOpen.value
   showComments()
 }
 watch(popover, (value, before) => {
-  // A thread floats beside its pin or over its card in the margin, so the list comes back after it only if it was open
-  // before.
   if (!before && (value?.type === "new" || value?.type === "thread")) startComment()
   else if (value) showComments()
 })
-/**
- * Hidden comments stay hidden while someone writes one or opens one from the list. ViteHub's visibility model decides
- * what still shows: the open thread's pin, and a comment just sent for 2.5 s, then it pops out (`only` in the view the
- * frame gets). It is the same model the ViteHub pill and CommentLayer use.
- */
 const visibility = createCommentVisibility({ visibility: overlays.pins ? "all" : "hidden" })
 const shownWhileHidden = shallowRef<readonly string[]>(visibility.only)
 const stopVisibility = visibility.subscribe(() => (shownWhileHidden.value = visibility.only))
@@ -389,14 +331,7 @@ watch(
   () => siteRef.value?.pending,
   (pending) => pending && startComment(),
 )
-// On wide screens a new comment on a selection, an element, or an area is written in a card floating over the page,
-// where its card lands once sent: in the margin beside a doc's text (the frame keeps that place, draft-place), else
-// under what it points at. Page-wide comments, threads, sites, and the lightbox's keep the dock.
-// The Pin style (useCommentStyle) on a Markdown doc's text: a pin in the gutter, and beside it, at any width, a small
-// composer for a new comment or the thread of the pin clicked. Selected text gets the selection bar either way, so the
-// reader picks Comment or Suggest before writing.
 const commentStyle = useCommentStyle()
-// Cards or Pins, picked in the Comments segment; only a Markdown doc's text has the choice.
 const commentStyleModel = computed({
   get: () => (drop.value.kind === "markdown" ? commentStyle.value : undefined),
   set: (value?: CommentStyle) => {
@@ -408,13 +343,6 @@ const pinOpen = computed(() => commentsOpen.value && !editing.value && !trashed.
 const pinDraft = computed(
   () => pinStyle.value && pinOpen.value && popover.value?.type === "new" && popover.value.pending.kind === "text",
 )
-/**
- * Where the open thread is written in, so a reply never sends the reader to the dock: over its card in the margin
- * (`rail`), else beside its pin, as the frame reports it while the page scrolls. The lightbox's pins aren't in the frame,
- * so a thread opened there sits beside the pin that was clicked. A thread opened from the list waits for its place.
- */
-// A thread that opened in the dock, because its place came too late or never, stays there until it closes: moving it
-// later would mount a new reply box and drop what the reader typed.
 const dockedThread = ref<string | null>(null)
 const threadSpot = computed(() => {
   const open = popover.value
@@ -427,7 +355,6 @@ const threadSpot = computed(() => {
   return commentsOpen.value && threadPlace.value?.id === open.id ? threadPlace.value : undefined
 })
 const pinThread = computed(() => Boolean(threadSpot.value))
-// Escape in the compact composer drops the draft, words and pictures.
 function dropPinDraft() {
   reviewDraft.body.value = ""
   reviewDraft.images.clear()
@@ -437,15 +364,10 @@ const PIN_BUBBLE_WIDTH = 300
 const THREAD_WIDTH = 340
 const pinRef = useTemplateRef<HTMLElement>("pinRef")
 const { height: bubbleHeight } = useElementSize(pinRef, undefined, { box: "border-box" })
-// Right of the pin, level with it; past the page's right edge, under it instead, else above it. The bubble grows from
-// the pin. A thread on a card in the margin covers the card, its right edge on the card's, and grows from the card's
-// top. Wherever it goes, it stays inside the window, over the pin or its area if nothing else fits, so the reply box
-// can always be reached.
 const pinBubbleStyle = computed(() => {
   const spot = pinDraft.value ? undefined : threadSpot.value
   const rect = pinDraft.value ? draftPlace.value?.rect : spot?.rect
   if (!rect) return undefined
-  // Until it's measured, the bubble counts as tall as it may grow (max-h-[min(28rem,60dvh)]).
   const height = bubbleHeight.value || Math.min(448, windowHeight.value * 0.6)
   const inWindow = (top: number) => Math.max(56, Math.min(top, windowHeight.value - 12 - height))
   if (spot?.rail) {
@@ -480,7 +402,6 @@ const floating = computed(
       !siteRef.value?.pending &&
       popover.value?.type === "new"),
 )
-// A selection's card waits for its place, which the frame reports once the margin has made room for it.
 const floatShown = computed(
   () =>
     !pinStyle.value &&
@@ -488,8 +409,6 @@ const floatShown = computed(
     floating.value &&
     (popover.value?.type !== "new" || popover.value.pending.kind !== "text" || !!draftPlace.value),
 )
-// The floating card is one small surface, the line and its send button (ViewerPinComposer); a suggestion keeps the full
-// composer for the words that replace the quote.
 const compactFloat = computed(() => popover.value?.type === "new" && popover.value.pending.suggestion === undefined)
 const FLOAT_WIDTH = 288
 const floatStyle = computed(() => {
@@ -510,8 +429,6 @@ watch(floatShown, async (open) => {
   await whenHeld()
   if (floatShown.value) floatRef.value?.querySelector<HTMLElement>("[data-comment-editor] textarea")?.focus()
 })
-// A bubble that opens below the fold scrolls the page until it shows, above the dock; the frame then moves the pin
-// and the bubble follows.
 watch(
   () => pinShown.value && (pinDraft.value ? "new" : popover.value?.type === "thread" ? popover.value.id : null),
   async (open) => {
@@ -528,23 +445,17 @@ watch(
 watch(floating, (open, was) => {
   if (!open && was && commentsOpen.value && !popover.value && !listBefore) closeComments()
 })
-// The page loses its selection once the composer takes focus; it keeps the quote marked while the comment is written.
-// A new selection while one is held (the Pin style's draft moving with the reader) holds the new one.
 watch(
   () => (popover.value?.type === "new" && popover.value.pending.kind === "text" ? popover.value.pending : null),
   (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
-// Mark area turns on Comments mode where the page has it, so the reader drags on the page with nothing over it; the
-// Comments panel would cover what they draw on. Elsewhere the open panel is what lets the page take the drag.
 function toggleCommentArea() {
   if (!canMarkArea.value) return
   if (canUseCommentMode.value && !editing.value && !trashed.value) commentMode.value = true
   else showComments()
 }
-// A `?changes=` link opens with History over the diff, as if the version had been picked there.
 if (route.query.changes && hasHistory.value) showDetails(true)
 
-// A Markdown doc reads at the reader's width, the same in the editor. W steps through them.
 const docWidth = useDocWidth()
 const widths: { value: DocWidth; label: string }[] = [
   { value: "readable", label: "Readable" },
@@ -556,15 +467,11 @@ function nextWidth() {
   const at = widths.findIndex((item) => item.value === docWidth.value)
   docWidth.value = widths[(at + 1) % widths.length]!.value
 }
-// Zen mode, the reader's on every drop (the + segment's Zen, Z, or ⌘K): a Markdown doc reads without its outline, and
-// the pill folds to a small handle while nothing needs it (pillNeeded). The handle's press shows the pill for a while,
-// a peek, without leaving zen. Turning it on folds the pill at once, the + it was turned on from too.
 const zen = useZen()
 const peek = ref(false)
 const toggleZen = () => (zen.value = !zen.value)
 watch(zen, (on) => on && (detailsOpen.value = false))
 
-// An image in a folder moves along the folder's other images (useGallery).
 const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
@@ -576,9 +483,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     frame,
     app,
     pinned,
-    // The panel sits beside the frame, not over it: the doc has nothing to make room for.
     inset: ref(0),
-    // The dock floats over a doc (see dockClearance), which would cover the bottom of a zoom the doc opens.
     bottom: computed(() => {
       const top = reviewDock.value?.top
       if (prototypeCanvas.value && top && !lightbox.value) return Math.max(0, Math.ceil(frameBottom.value - top))
@@ -599,7 +504,6 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     arrow: (key) => galleryShown.value && gallery.step(key === "ArrowLeft" ? -1 : 1),
     presence,
     heading: (id, copySection) => {
-      // The address keeps the section without a new history entry, like the outline's own links on a page of its own.
       const here = new URL(route.fullPath, link.value)
       here.hash = id
       history.replaceState(history.state, "", `${here.pathname}${here.search}${here.hash}`)
@@ -609,7 +513,6 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
       void copy(shared.href, { announce: "Link to the section copied" })
     },
     docAction: (action) => {
-      // A frame without the Clipboard API asks the viewer to copy.
       if (action === "markdown") void copyMarkdown()
       else if (action === "download") download()
       else if (printsPdf.value) exportPdf()
@@ -623,9 +526,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     toggleZen,
     escape: leaveZen,
   })
-/** A prototype's canvas is in the bar (ViewerVariants), where its Move and Hand tools are. */
 const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
-/** The Hand tool pans: picking it puts Drop's comment and inspection tools down, and picking one of those puts it down. */
 function canvasTool(command: "move" | "hand") {
   if (command === "hand") {
     commentMode.value = false
@@ -637,8 +538,6 @@ watch(
   () => commentMode.value || tool.value !== "browse",
   (busy) => busy && variants.value?.tool === "hand" && picker("move"),
 )
-// A link to a section (#id) opens the doc there, once the frame has it. The frame also gets the drop's link, for the
-// headings' # links.
 watch(ready, (loaded) => {
   if (!loaded || drop.value.kind !== "markdown") return
   send({ type: "page-link", href: link.value })
@@ -656,10 +555,6 @@ const outdated = computed(
         .map((comment) => comment.id),
     ),
 )
-/**
- * The version whose changes show in place of the document (ViewerDiff), and the one before it. It lives in the address
- * (`?changes=<n>`), so the link opens the same diff and the browser's Back returns to the document.
- */
 const router = useRouter()
 const setQuery = useSetQuery()
 const shownVersion = computed(() => {
@@ -672,13 +567,9 @@ const previousVersion = computed(() =>
       null)
     : null,
 )
-// The folder's images show over the image, not over its lightbox or a version's changes.
 const galleryShown = computed(() => galleryItems.value.length > 0 && !lightbox.value && !shownVersion.value)
-// Opening a diff from the document adds a history entry; moving between versions replaces it, so one Back always
-// lands on the document. Closing steps back over that entry rather than adding another one.
 let pushedChanges = false
 watch(shownVersion, (value) => !value && (pushedChanges = false))
-/** Picking the open version again goes back to the document. On a phone History steps aside for the diff. */
 function showVersion(version: DropVersion) {
   if (editing.value) return
   if (shownVersion.value?.version === version.version) return closeChanges()
@@ -693,8 +584,6 @@ function closeChanges() {
   void setQuery({ changes: undefined })
 }
 
-// Apps and HTML pages open alone in another window (ViewerPresent): a deck for the projector, which Slidev's presenter
-// view in this frame then drives.
 const presents = computed(() => isApp.value || drop.value.kind === "html")
 function openWindow() {
   const query = new URLSearchParams({ present: "" })
@@ -702,8 +591,6 @@ function openWindow() {
   if (isApp.value && appAt.value !== "/") query.set("path", appAt.value)
   window.open(`${dropPath(drop.value)}?${query}`, "_blank", "popup")
 }
-// A Slidev build (its runtime under assets/slidev/) presents in one step: the deck alone in a new window for the
-// projector, and Slidev's own presenter view (notes, next slide, timer) in this frame, which drives that window.
 const slidev = computed(
   () => isApp.value && Boolean(drop.value.paths?.some((path) => path.startsWith("assets/slidev/"))),
 )
@@ -713,10 +600,8 @@ function present() {
 }
 
 defineShortcuts({
-  // With text selected in the page, C and E work on it, as the bar over it says.
   c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
   e: () => (selection.value ? commentOnSelection(true) : edit()),
-  // On a prototype's canvas H is the Hand tool, as in Figma; History is still in Details.
   h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
   i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
   r: toggleCommentArea,
@@ -739,7 +624,6 @@ defineShortcuts({
   z: toggleZen,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
 })
-// The Marker's size and Done, while it's on and nothing is being typed.
 const typing = (event: KeyboardEvent) =>
   event.target instanceof HTMLElement &&
   (event.target.isContentEditable || /^(input|textarea|select)$/i.test(event.target.tagName))
@@ -753,14 +637,11 @@ onKeyStroke(["[", "]", "Enter"], (event) => {
   }
   annotations.resize(event.key === "[" ? -1 : 1)
 })
-// An Escape pressed in a dialog or a menu, such as ⌘K's palette, closed that, though it still reaches the document here.
 const inLayer = (event: KeyboardEvent) =>
   event.target instanceof Element &&
   Boolean(event.target.closest('[role="dialog"], [role="menu"], [role="listbox"], [data-reka-popper-content-wrapper]'))
-// Dialogs and menus consume Escape first. Only handle it here when it reaches the document unhandled.
 onKeyStroke("Escape", (event) => {
   if (event.defaultPrevented || shareOpen.value || lightbox.value || editing.value) return
-  // The segment's popover closes itself first (Escape stops there); the next Escape folds the segment.
   if (detailsPop.value) {
     detailsPop.value = false
     return
@@ -777,7 +658,6 @@ onKeyStroke("Escape", (event) => {
   annotations.dismiss()
 })
 
-/** Saves the stored file under its uploaded name; the raw URL is same-origin, so `download` names it. */
 function download() {
   if (!drop.value.url) return
   const anchor = document.createElement("a")
@@ -786,17 +666,11 @@ function download() {
   anchor.click()
 }
 
-// Export as PDF: the frame prints itself (plan-runtime.ts), so the PDF holds the whole doc as rendered, not the
-// slice of it the viewer shows. Only Markdown docs: their frame alone may open the print dialog (previewSandbox).
 const printsPdf = computed(() => drop.value.kind === "markdown" && !editing.value && ready.value)
 const exportPdf = () => send({ type: "print", title: drop.value.title })
 
-// The version on screen, as agents get it (server/routes/d/[link]/[slug].md.get.ts). Only Markdown docs: an HTML page's
-// Markdown loses whatever its scripts draw, so its readers download the HTML instead.
 const copiesMarkdown = computed(() => drop.value.kind === "markdown")
 
-// Drops are related through the pages they link to, so only a drop with links, or a site, can have related drops. A
-// Markdown doc lists its links and related drops in its header (docHeader); every other drop in the dock, beside Share.
 const relatesTo = computed(() =>
   drop.value.kind === "site" || drop.value.resources?.length ? drop.value.id : undefined,
 )
@@ -815,8 +689,6 @@ watch(
   { immediate: true },
 )
 
-// The owner's views as the Details used to count them (server/utils/views.ts): a total, then who they came from, only
-// the kinds that have any, each saying on hover what it counts.
 function viewsFact(views: { person: number; anonymous: number; agent: number }): DocHeaderFact {
   const total = views.person + views.anonymous + views.agent
   const parts = [
@@ -832,11 +704,6 @@ function viewsFact(views: { person: number; anonymous: number; agent: number }):
   }
 }
 
-/**
- * Who dropped the doc: its owner with the agent that published this version, "[avatar] Max · [logo] Claude Code", and
- * on hover what it came through ("via Executor"), the model and the reasoning level. Without an owner (an anonymous
- * drop), the name the version was published under.
- */
 const droppedBy = computed<DocHeaderWho>(() => {
   const d = drop.value
   const agent = d.versions.find((version) => version.version === d.version)?.agent ?? null
@@ -858,7 +725,6 @@ const droppedBy = computed<DocHeaderWho>(() => {
   }
 })
 
-// The doc's folder, for the list its header opens: the newest drops in it and this one, signed-in readers only.
 const FOLDER_ROWS = 8
 const KIND_ICON: Record<DropKind, DocHeaderKindIcon> = {
   markdown: "doc",
@@ -903,10 +769,6 @@ async function sendFolder() {
   })
 }
 
-/**
- * A Markdown doc's header (#shared/doc-header): Copy as Markdown, Download and Export as PDF at the top right of its
- * properties box, its related drops among its links, and under See more the facts the Details used to list.
- */
 const docHeader = computed<DocHeader | null>(() => {
   const d = drop.value
   if (d.kind !== "markdown" || editing.value) return null
@@ -940,8 +802,6 @@ watch(
   { immediate: true },
 )
 
-// The segment's chip: the version once there are several, else the size (a folder's item count), and for its owner the
-// views. A Markdown doc's header holds its size and views, so its chip is only the version.
 const detailsChip = computed(() => {
   const d = drop.value
   const details = d.kind !== "markdown"
@@ -956,9 +816,6 @@ const detailsChip = computed(() => {
   const views = details && d.views ? d.views.person + d.views.anonymous + d.views.agent : null
   return views === null ? lead : `${lead} · ${views} ${views === 1 ? "view" : "views"}`
 })
-// What the details panel listed as rows, as the segment's icons: the same rows for the same people. A Markdown doc's
-// Download, Copy as Markdown and Export as PDF are in its header (docHeader).
-// Anyone signed in pins a drop they can open, for their Drops page's Pinned view and ⌘K. Nobody else sees it.
 const canPin = computed(() => Boolean(me.value) && !trashed.value)
 const togglePin = (quiet = false) => void setPinned(drop.value, !drop.value.pinned, { quiet })
 const detailsActions = computed<DetailsAction[]>(() => [
@@ -966,7 +823,6 @@ const detailsActions = computed<DetailsAction[]>(() => [
     ? [
         {
           id: "pin",
-          // A toggle: "Pinned" and pressed while it's on, as a tool left on shows.
           label: drop.value.pinned ? "Pinned" : "Pin",
           icon: drop.value.pinned ? "i-mingcute-pin-fill" : "i-mingcute-pin-line",
           pressed: Boolean(drop.value.pinned),
@@ -1005,8 +861,6 @@ const detailsActions = computed<DetailsAction[]>(() => [
     ? [{ id: "trash", label: "Move to Trash", icon: "i-mingcute-delete-2-line", destructive: true, press: deleteDrop }]
     : []),
 ])
-// The version's Markdown, loaded once: the header asks for it when the pointer or focus reaches Copy, so a click copies
-// at once, and the shortcut and menus copy the same text.
 let markdownLoad: { key: string; text: Promise<string> } | null = null
 function markdownText() {
   const d = drop.value
@@ -1026,16 +880,11 @@ const sendMarkdown = () =>
     () => send({ type: "doc-markdown", text: null }),
   )
 const copyMarkdown = (announce?: string) => copyLoading(markdownText(), { key: "markdown", announce })
-// A copy by the shortcut or a menu shows on the header's Copy too.
 watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
 const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
-// Once a thread waits on an answer, from anyone, the pill hands the waiting threads to an agent: a signed-in member's
-// Send gives them to their own agent, and everyone else copies a prompt with them, the reader's as asks and others' as
-// quotes. A guest has no account, so their own threads are the ones marked `mine`. Both step aside while the reader
-// comments, so the comment actions keep the pill to one row.
 const readerId = computed(
   () =>
     me.value?.id ??
@@ -1043,12 +892,9 @@ const readerId = computed(
     "",
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
-// Send is for signed-in people who may comment here, as ViteHub checks again before each send.
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
 const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
 const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
-// A private drop has no working link yet, so its owner gets Share instead; a teammate's still copies. An app's link
-// opens the page showing (`?path=`).
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -1061,7 +907,6 @@ const canMarkArea = computed(
     !lightbox.value &&
     (canDrawArea.value || (drop.value.canComment && siteRef.value?.canDraw && !siteRef.value.pending)),
 )
-// The primary Comments action opens the list wherever the frame cannot take clicks for a sendable area comment.
 const canUseCommentMode = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
 const canCommentOnPage = computed(
   () => drop.value.canComment && annotationsEnabled.value && !editing.value && !lightbox.value,
@@ -1070,21 +915,15 @@ watch(canUseCommentMode, (available) => !available && (commentMode.value = false
 const inspectable = computed(
   () => framed.value && annotationsEnabled.value && !lightbox.value && ["html", "app"].includes(drop.value.kind),
 )
-/** Whether the Marker can draw on a snapshot of the page: docs, images, HTML, and apps in the frame. */
 const canMark = computed(() => framed.value && canDrawArea.value && !shownVersion.value)
 const marking = computed(() => tool.value === "mark")
-/** Whether Rulers can draw over the page: any page in the frame, an image or a doc too (#shared/plan-runtime). */
 const measurable = computed(() => framed.value && annotationsEnabled.value && !lightbox.value)
-// The preview tools fill the dock's +; the Marker stays in the pill. Measure and X-ray read an HTML page's elements, so
-// a prototype's canvas, a plane of many items, has neither until one opens in focus. Measure goes off with a second
-// press or V, so there's no Browse button.
 const inspectsPage = computed(() => inspectable.value && !prototypeCanvas.value)
 const previewTools = computed(() => (inspectsPage.value ? (["measure"] as const) : []))
 const previewViews = computed(() => [
   ...(measurable.value ? (["rulers"] as const) : []),
   ...(inspectsPage.value ? (["xray"] as const) : []),
 ])
-// What's on stays beside the + while it's closed, pressed, so one press turns it off.
 const pinnedTools = computed(() => (tool.value === "measure" ? (["measure"] as const) : []))
 const pinnedViews = computed(() => previewViews.value.filter((view) => overlays[view]))
 function finishMark() {
@@ -1093,7 +932,6 @@ function finishMark() {
   send({ type: "mark", do: "done" })
 }
 const undoMark = () => marking.value && send({ type: "mark", do: "undo" })
-// Send explicit picks even when they match the defaults; the open label may have another style.
 function colorMark(color: MarkColor) {
   pen.color = color
   send({ type: "pen", tool: pen.tip, color: MARK_COLORS[color] })
@@ -1102,9 +940,7 @@ function sizeMark(index: number) {
   pen.sizes[pen.tip] = index
   send({ type: "pen", tool: pen.tip, width: MARK_TIPS[pen.tip].sizes[index]! })
 }
-// Open when someone reaches for Edit on a doc the editor can't take: the popover says why.
 const editNoteOpen = ref(false)
-/** E and the palette's Edit together: the live editor, or the note that says why this doc can't take it. */
 function edit() {
   if (editing.value || !showEditTool.value) return
   if (drop.value.canEdit) startEdit()
@@ -1124,18 +960,16 @@ watch(shownVersion, (version) => {
   }
 })
 
-/** How long a send waits for the picture of its area before it goes without it. */
 const SHOT_WAIT = 1500
 
 async function submit(body: string, files: File[] = [], mentions: string[] = []) {
   const open = popover.value
   if (open?.type !== "new" || reviewDraft.waiting.value) return
   const draftScope = reviewDraft.scope.value
-  // A comment sent the moment its area is drawn still takes the picture the frame is taking of it, for a moment.
   const before = reviewDraft.images.picks.value.length
   reviewDraft.waiting.value = true
   try {
-    await Promise.race([annotations.waitForShot(), new Promise((done) => setTimeout(done, SHOT_WAIT))])
+    await Promise.race([annotations.waitForShot(), promiseTimeout(SHOT_WAIT)])
     if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
     const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
     const sent = await state.addComment(
@@ -1158,10 +992,6 @@ async function submit(body: string, files: File[] = [], mentions: string[] = [])
   }
 }
 
-/**
- * A thread or row that goes away with its comment (resolved, accepted, deleted) drops the focus it held. Hand it to the
- * comments' composer when they're open, else to the review button; focus the reader moved elsewhere stays put.
- */
 async function keepFocus() {
   await nextTick()
   if (document.activeElement && document.activeElement !== document.body) return
@@ -1175,7 +1005,6 @@ async function resolve(id: string, resolved: boolean) {
   await keepFocus()
 }
 
-// A suggestion goes into the doc from its latest version, by someone who could edit it by hand.
 const canAccept = computed(() => drop.value.kind === "markdown" && drop.value.canEdit && !shownVersion.value)
 const accepting = ref<string | null>(null)
 async function accept(id: string) {
@@ -1195,21 +1024,17 @@ async function removeComment(id: string) {
   await keepFocus()
 }
 
-// A comment's link opens the drop with its thread showing (?comment=<n>, read below). It's the drop's own link, so
-// it works for whoever can open the drop. The menu that copied it closes, so StatusNote says it was copied.
 function copyCommentLink(comment: DropComment) {
   const url = new URL(link.value)
   url.searchParams.set("comment", String(comment.n))
   void copy(url.href, { announce: "Link to the comment copied" })
 }
-/** The drop's link with the diff showing: it opens the same changes, History beside them. */
 function changesLink(version: DropVersion) {
   const url = new URL(link.value)
   url.searchParams.set("changes", String(version.version))
   return url.href
 }
 
-/** Select the thread immediately; the frame only scrolls to its anchor. */
 async function focusComment(comment: DropComment) {
   popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
   showComments()
@@ -1221,7 +1046,6 @@ async function focusComment(comment: DropComment) {
       .catch(() => {})
   }
   if (comment.kind === "page") return
-  // A comment on a video's frame opens that frame in the lightbox, with the thread beside it.
   if (comment.at !== null && video.value) {
     await until(videoRef)
       .toBeTruthy({ timeout: 5000 })
@@ -1235,7 +1059,6 @@ async function focusComment(comment: DropComment) {
     popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
     return
   }
-  // So does one on a PDF's page, after the pages scroll to it.
   if (comment.pdfPage !== null && pdf.value) {
     await until(pdfRef)
       .toBeTruthy({ timeout: 5000 })
@@ -1249,12 +1072,10 @@ async function focusComment(comment: DropComment) {
     popover.value = { type: "thread", id: comment.id, x: 0, y: 0 }
     return
   }
-  // A resolved comment joins the pins once its thread opens: the frame takes the new pins first.
   await nextTick()
   send({ type: "focus", id: comment.id, open: false })
 }
 
-// `?comment=<n>` from a copied link: once the frame has placed the pins, open that thread with the comments showing.
 onMounted(async () => {
   const n = Number(route.query.comment)
   if (!n || !hasComments.value) return
@@ -1273,13 +1094,7 @@ async function deleteDrop() {
 
 const moveTo = useMoveDialog()
 
-// ⌘K offers everything the review pill does, under the same conditions, each with the pill's key: the drop's actions,
-// then its comments, the Marker, the + segment's tools and views, the lifetime, a prototype's or a folder's images,
-// and the links it lists. What's on (a mode, a view, the choice made) is `active`, as the palette marks the theme.
-// Each group keeps to Nuxt UI's 12 items. Picking one does what pressing its control does.
 const lifetime = useLifetime(() => drop.value)
-// The Marker's inks as Tailwind classes, which Tailwind only builds from whole names in the source: MARK_COLORS are
-// these four.
 const INK_CLASSES: Record<MarkColor, string> = {
   pink: "text-pink-500",
   amber: "text-amber-500",
@@ -1287,7 +1102,6 @@ const INK_CLASSES: Record<MarkColor, string> = {
   green: "text-green-600",
 }
 const deviceSize = useDeviceSize()
-/** When the version on screen was published, or the drop dropped, against the page's clock. */
 const shownAt = computed(() => {
   const version = shownVersion.value?.version ?? drop.value.version
   return drop.value.versions.find((item) => item.version === version)?.createdAt ?? drop.value.updatedAt
@@ -1331,7 +1145,6 @@ usePaletteOffer("drop", () => {
             label: "Edit together",
             icon: "i-mingcute-pencil-line",
             kbds: ["E"],
-            // The note why this doc can't be edited opens from its Edit in the + segment, so the segment opens first.
             onSelect: () => {
               if (!drop.value.canEdit) showDetails()
               edit()
@@ -1382,7 +1195,6 @@ usePaletteOffer("drop", () => {
       : []),
   ]
 
-  // The Comments segment, which the Marker's controls take the place of while it draws.
   const reviewing = hasComments.value && !marking.value
   const listOpen = commentsOpen.value && !popover.value
   const review: CommentStyle | undefined = reviewing ? commentStyleModel.value : undefined
@@ -1433,7 +1245,6 @@ usePaletteOffer("drop", () => {
               onSelect: () => (commentStyleModel.value = style.value),
             }))
           : []),
-        // Like the eye: on means hidden, the state that changes the page.
         ...(!lightbox.value && !shownVersion.value && framed.value && pinned.value.length > 0
           ? [
               {
@@ -1447,7 +1258,6 @@ usePaletteOffer("drop", () => {
       ]
     : []
 
-  // The Marker's tips while it's down, then, while it draws, its ink, its size, Undo, and Done. Browse puts it down.
   const marker: CommandPaletteItem[] =
     hasComments.value && canMark.value && !lightbox.value
       ? [
@@ -1495,7 +1305,6 @@ usePaletteOffer("drop", () => {
         ]
       : []
 
-  // The + segment's tools and views, its width and History chips, and who's here.
   const tooled = hasComments.value && !marking.value && !lightbox.value && !shownVersion.value
   const views: CommandPaletteItem[] = [
     ...(tool.value !== "browse"
@@ -1578,7 +1387,6 @@ usePaletteOffer("drop", () => {
             label: "History",
             suffix: `v${shownVersion.value?.version ?? drop.value.version} · ${timeAgo(shownAt.value, now.value)}`,
             icon: "i-mingcute-history-line",
-            // On a prototype's canvas H is the Hand tool, so History goes without its key there.
             kbds: canvasShown.value ? undefined : ["H"],
             onSelect: () => showDetails(true),
           },
@@ -1593,7 +1401,6 @@ usePaletteOffer("drop", () => {
     },
   ]
 
-  // The lifetime chip's menu (ViewerLifetime), for its owner.
   const folder = lifetime.folder.value
   const lifetimes: CommandPaletteItem[] =
     owner.value && lifetime.choosable.value
@@ -1620,12 +1427,10 @@ usePaletteOffer("drop", () => {
         ]
       : []
 
-  // A prototype's bar (ViewerVariants): its camera on the canvas, or a step either way in focus, then each item.
   const prototype = variants.value && !lightbox.value && !shownVersion.value ? variants.value : null
   const camera: CommandPaletteItem[] = prototype
     ? prototype.canvas
       ? [
-          // The canvas's Move and Hand tools (ViewerVariants), the one in use marked.
           {
             label: "Move",
             icon: "i-mingcute-cursor-3-line",
@@ -1659,7 +1464,6 @@ usePaletteOffer("drop", () => {
     active: !prototype?.canvas && prototype?.current === index,
     onSelect: () => picker("show", index),
   }))
-  // A folder's images (ViewerGallery).
   const images: CommandPaletteItem[] = galleryShown.value
     ? [
         {
@@ -1700,8 +1504,6 @@ usePaletteOffer("drop", () => {
   }
 })
 
-// Areas drawn over an image in the page anchor to that image, so the lightbox shows them too. A video's frame shows
-// the comments on that frame, and a PDF's page the ones on that page.
 const sameFrame = (comment: DropComment, at: number | undefined, pdfPage: number | undefined) =>
   (at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05) &&
   (comment.pdfPage ?? undefined) === pdfPage
@@ -1718,9 +1520,7 @@ const imageComments = computed(() =>
 )
 
 const videoRef = useTemplateRef<{ frameAt: (at?: number) => Promise<VideoFrame | null> }>("videoRef")
-/** The comments on a video's frames, for its markers. */
 const frameComments = computed(() => (video.value ? pageComments.value.filter((comment) => comment.at !== null) : []))
-/** A video's frame, still in the lightbox, where a click or a drag comments on it. */
 function showFrame(still: VideoFrame) {
   lightbox.value = {
     src: still.src,
@@ -1733,7 +1533,6 @@ function showFrame(still: VideoFrame) {
   }
 }
 const pdfRef = useTemplateRef<{ pageAt: (page?: number) => Promise<PdfPage | null> }>("pdfRef")
-/** The comments on a PDF's pages, for their pins. */
 const pdfComments = computed(() =>
   pdf.value
     ? pinned.value.filter(
@@ -1741,7 +1540,6 @@ const pdfComments = computed(() =>
       )
     : [],
 )
-/** A PDF's page, still in the lightbox, where a click or a drag comments on it. */
 function showPage(still: PdfPage) {
   lightbox.value = {
     src: still.src,
@@ -1753,7 +1551,6 @@ function showPage(still: PdfPage) {
     from: still.rect,
   }
 }
-// The dock's list, the open thread, and the composer share one ViteHub comments state over the drop's comments.
 provideDropComments({
   source: () => (lightbox.value ? imageComments.value : comments.value),
   page: () => (isApp.value ? page.value : undefined),
@@ -1762,8 +1559,6 @@ const threadComment = computed(() => {
   const open = popover.value
   return open?.type === "thread" ? comments.value.find((comment) => comment.id === open.id) : undefined
 })
-// A thread opened on the page waits a moment for the frame to say where its pin or card is, so the dock doesn't flash
-// open under it. A comment on the whole page, or one the frame can't place, then opens in the dock.
 const awaitingSpot = ref(false)
 const spotWait = useTimeoutFn(
   () => {
@@ -1784,12 +1579,6 @@ watch(
 )
 watch(pinThread, (shown) => shown && (awaitingSpot.value = false))
 
-/**
- * What the reader is doing with the pill, which zen can't fold away: editing, a tool (the Marker, Measure, an area),
- * comments (the mode, the list, a thread or a composer, one waiting for its place or a site's), Share, the + segment
- * and its popovers, a version's changes, and the lightbox. Each is left with Escape, so Escape leaves zen only once none
- * is on (leaveZen).
- */
 const reviewing = computed(
   () =>
     editing.value ||
@@ -1805,10 +1594,7 @@ const reviewing = computed(
     Boolean(shownVersion.value) ||
     Boolean(lightbox.value),
 )
-// A prototype's bar stands in for the picker the prototype draws itself (variantBar), so it is part of the page: folding
-// it would leave the variants out of reach.
 const pillNeeded = computed(() => reviewing.value || Boolean(variants.value && !lightbox.value && !shownVersion.value))
-/** Escape's last step, once nothing else is open: a peek folds, then zen ends. Whether it did either. */
 function leaveZen() {
   if (reviewing.value || selection.value) return false
   if (peek.value) peek.value = false
@@ -1816,7 +1602,6 @@ function leaveZen() {
   else return false
   return true
 }
-// The handle names what the folded pill would show: comments still open, and who else is here.
 const handleLabel = computed(() => {
   const people = presence.people.value.length
   return [
@@ -1827,7 +1612,6 @@ const handleLabel = computed(() => {
     .filter(Boolean)
     .join(", ")
 })
-// The open thread stays in the address (`?comment=<n>`, read above), so it can be shared from the address bar too.
 watch(
   () => (commentsOpen.value ? threadComment.value?.n : undefined),
   (n) => textValue(route.query.comment) !== (n ? String(n) : undefined) && void setQuery({ comment: n }),
@@ -1845,8 +1629,6 @@ watch(
   <DefineHistory>
     <LazyViewerHistory :comments="comments" :drop="drop" :selected="shownVersion?.version" @open="showVersion" />
   </DefineHistory>
-  <!-- A new comment's composer, or the open thread: in the dock, or beside the page for a new comment on what's selected
-       (floating). -->
   <DefineComposer>
     <div id="drop-site-composer" v-show="siteRef?.pending" class="flex min-h-0 flex-1 flex-col" />
     <ViewerCommentThread
@@ -1943,11 +1725,8 @@ watch(
         <USelect v-if="pages.length > 1" v-model="page" class="w-40 font-mono" :items="pages" size="xs" />
       </div>
 
-      <!-- Documents, HTML docs and images run under the glass; Markdown and the live editor already have trailing room.
-           Interactive viewers need clearance so their bottom controls stay clickable. -->
       <div class="relative flex min-h-0 flex-1 flex-col" :class="dockClearance ? 'pb-28 sm:pb-20' : ''">
         <div class="relative flex min-h-0 flex-1 flex-col">
-          <!-- A draft the room turned away never syncs again, but its text stays readable. -->
           <LazyViewerEditor
             v-if="editing"
             :drop-id="drop.id"
@@ -1993,7 +1772,6 @@ watch(
             @open="focusComment"
             @page="showPage"
           />
-          <!-- A file with html is a spreadsheet the server rendered; it shows in the frame like a doc. -->
           <div v-else-if="drop.kind === 'file' && !drop.html" class="grid flex-1 place-items-center p-10 text-center">
             <div>
               <UIcon name="i-mingcute-file-line" class="size-8 text-dimmed" />
@@ -2022,7 +1800,6 @@ watch(
               :src="frameSrc"
               :title="drop.title"
             />
-            <!-- Hydration mismatch reason: SSR/client bundlers format the srcdoc resolver differently. -->
             <iframe
               v-else
               ref="frame"
@@ -2036,7 +1813,6 @@ watch(
             />
           </ViewerDevice>
 
-          <!-- The folder's images on either side, like a carousel's; the bar below has them too. -->
           <template v-if="galleryShown">
             <UTooltip v-if="prevImage" :kbds="['←']" :text="prevImage.title">
               <UButton
@@ -2125,7 +1901,6 @@ watch(
             </ViewerComments>
           </template>
           <template #toolbar>
-            <!-- A plain link, so it opens in this tab and ⌘-click still opens a new one. -->
             <template v-if="!editing">
               <UTooltip :text="visitor ? 'Open Drop' : 'Go to your drops'">
                 <UButton
@@ -2162,8 +1937,6 @@ watch(
               <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>
             <template v-if="editing">
-              <!-- One presence ring instead of the outline's two: its inner ring is page-colored, not the glass behind it,
-              and the pair reached past the pill's padding. -->
               <AvatarStack
                 v-if="live.people.value.length"
                 class="ml-1 [&_[data-slot=avatar-stack-item]]:shadow-[0_0_0_2px_var(--vh-avatar-color,var(--ui-border))]"
@@ -2172,7 +1945,6 @@ watch(
                 :style="{ '--vh-avatar-size': '1.25rem' }"
                 variant="outline"
               />
-              <!-- A draft the room turned away has nothing to reconnect to (useLiveEditor). -->
               <span v-if="live.refused.value !== undefined" class="px-2 text-xs text-muted">{{
                 live.refused.value ? "Out of date" : "Can't edit"
               }}</span>
@@ -2259,7 +2031,6 @@ watch(
                 @pins="toggleOverlay('pins')"
               >
                 <template #tools>
-                  <!-- v-show, so a pairing in progress outlasts a comment or the lightbox. -->
                   <ViewerCommentSend
                     v-if="canSend"
                     v-show="!lightbox && !commentMode"
@@ -2368,7 +2139,6 @@ watch(
                     :note="drop.editNote"
                     @copy="copyMarkdown('Markdown copied')"
                   />
-                  <!-- Every drop has it, a folder too: the pill folds on any. -->
                   <UTooltip :kbds="['Z']" text="Zen mode: no outline, the pill folded to a handle">
                     <UButton
                       size="xs"
@@ -2392,8 +2162,6 @@ watch(
     </template>
   </UDashboardPanel>
 
-  <!-- On <body>: as the dashboard's last child they'd put the panel's lg:not-last:border-e on it, and the doc would
-       shift a pixel whenever text is selected. -->
   <Teleport to="body">
     <section
       v-if="floatShown"
@@ -2444,7 +2212,6 @@ watch(
     >
       <CommentSelectionBar suggest @comment="commentOnSelection()" @suggest="commentOnSelection(true)" />
     </div>
-    <!-- Focus stays in the page while text is selected there, so a screen reader hears the keys instead of the bar. -->
     <p aria-live="polite" class="sr-only">
       {{ selection ? "Text selected. Press C to comment on it, or E to suggest new words." : "" }}
     </p>

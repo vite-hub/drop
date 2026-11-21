@@ -35,7 +35,6 @@ export default defineValidatedHandler({
         drop: report.dropId,
         owner: report.ownerId,
       })
-    // Dismissing a report must never undo a quarantine.
     if (report.status === "quarantined" || report.status === "banned") {
       if (action === "dismiss") {
         audit()

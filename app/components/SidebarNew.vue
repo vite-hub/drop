@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// The + on the Drops row in the sidebar: what you make yourself, from any page. A folder, a doc, a board or a site
-// review open once made; a file uploads and opens. On a team Drop admins choose whether a new folder is the team's.
-// Agents make most drops, so this stays one quiet button rather than a bar of them.
 const { upload, createFolder, newSite, createDoc, createBoard } = useDropActions()
 const folderDialog = useFolderDialog()
 const { data: me } = useMe()
@@ -40,7 +37,6 @@ const items = [
     },
     { label: "Site review", icon: "i-mingcute-globe-line", onSelect: () => void newSite() },
   ],
-  // Opens the file picker straight from the pick, while the browser still counts it as the person's click.
   [{ label: "Upload a file", icon: "i-mingcute-upload-2-line", onSelect: () => picker.open() }],
 ]
 </script>

@@ -3,7 +3,6 @@ import { PeeksQuerySchema } from "#shared/schemas"
 import { requireIdentity } from "../../utils/identity"
 import { peeksOf } from "../../utils/drops/peeks"
 
-/** `?ids=a,b,c`: what the Drops page's cards preview for those of your drops (peeksOf), keyed by id. */
 export default defineValidatedHandler({
   validate: { query: PeeksQuerySchema },
   async handler(event) {

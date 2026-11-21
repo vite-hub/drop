@@ -5,23 +5,14 @@ import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import { LIVE_EDITOR_KIT } from "#shared/live-editor"
 import type { Viewer } from "#shared/types"
 
-/**
- * The live editor's room and its Tiptap editor: Yjs, ProseMirror, and the code highlighter. useLiveEditor imports this
- * only when someone opens the editor, so readers never download it. Run inside an effect scope: leaving the scope
- * leaves the room.
- */
 export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewer | null | undefined) {
   const realtime = useRealtimeTiptap("drafts", documentId, {
     enabled: () => Boolean(documentId.value),
-    // Drop's own viewer from /api/me. Realtime's default reads the Better Auth session, which Drop never loads outside
-    // sign-in, so this person's own face said "Anonymous" (the server names them to everyone else).
     identity: () => {
       const viewer = me()
       return viewer && { id: viewer.id, name: viewer.name, email: viewer.email, image: viewer.image ?? undefined }
     },
-    // The room's schema (server/utils/live-editor.ts).
     editor: createEditorCodec({ kit: LIVE_EDITOR_KIT }),
-    // A lighter selection tint than the default.
     carets: {
       selectionRender: (user) => ({
         class: "ProseMirror-yjs-selection",
@@ -31,16 +22,10 @@ export function useLiveRoom(documentId: Ref<string | undefined>, me: () => Viewe
   })
   const editor = shallowRef<Editor>()
   const uploading = ref(false)
-  // Whether this person typed since the editor opened. The room's own changes (loading the draft, others typing) come
-  // in as y-sync transactions and don't count.
   const edited = ref(false)
-  // Whether they typed something the room hasn't had yet: set by their edits while out of sync, cleared each time the
-  // room catches up.
   const unsaved = ref(false)
   watch(realtime.synced, (synced) => synced && (unsaved.value = false))
 
-  // The room's extensions exist once its Y.Doc and provider do. Rebuild the editor only for a new room: the extensions
-  // list is recomputed on reconnects too, and a rebuild would drop focus mid-sentence.
   watch([realtime.document, realtime.provider], () => {
     editor.value?.destroy()
     editor.value = undefined

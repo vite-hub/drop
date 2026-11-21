@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// A field of amber dots that swell and fade as slow noise drifts across it, and gather under the pointer. One WebGL quad,
-// drawn only while it's on screen. Reduced motion draws one still frame; without WebGL the canvas stays empty.
 const canvas = useTemplateRef<HTMLCanvasElement>("canvas")
 const colorMode = useColorMode()
 const motion = usePreferredReducedMotion()
@@ -8,7 +6,6 @@ const visible = useElementVisibility(canvas)
 
 const VERTEX = `attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`
 
-// Simplex noise by Ian McEwan and Ashima Arts (MIT).
 const FRAGMENT = `
 precision mediump float;
 uniform vec2 size;
@@ -101,7 +98,6 @@ function draw() {
     element.height = height
     gl.viewport(0, 0, width, height)
   }
-  // The Drop mark's amber: deeper on white, lighter on black.
   const [red, green, blue] = colorMode.value === "dark" ? [0.99, 0.83, 0.36] : [0.85, 0.47, 0.02]
   gl.uniform2f(uniforms.size, width, height)
   gl.uniform1f(uniforms.time, motion.value === "reduce" ? 12 : (performance.now() - started) / 1000)

@@ -16,18 +16,15 @@ export default defineValidatedHandler({
     const body = await event.req.json()
     const target = reportTarget(body.target)
     if (!target) throw new HTTPError({ status: 400, statusText: "Use a Drop share or file link." })
-    // Attachments take their doc's sharing here, so an image in a shared doc can be reported (and quarantined).
     const drop = target.startsWith("/d/")
       ? await findDrop(target.slice(3))
       : await findDropByBlob(decodeURIComponent(target.slice(3)))
     if (drop && drop.share === "private")
       throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
     if (!drop) {
-      // Only a file link is percent-decoded; a share link's id is matched as written.
       if (!target.startsWith("/f/")) throw new HTTPError({ status: 404, statusText: "No public drop with that link." })
       const key = decodeURIComponent(target.slice(3))
       if (key.startsWith("apps/")) throw new HTTPError({ status: 404, statusText: "No public file with that link." })
-      // Metadata only: reporting must not download the file.
       const [error, file] = await blob.head(key)
       if (error?.code === "BLOB_NOT_FOUND")
         throw new HTTPError({ status: 404, statusText: "No public file with that link." })
@@ -48,7 +45,6 @@ export default defineValidatedHandler({
       email: body.email || null,
       createdAt: Date.now(),
     })
-    // An audit event: kept whatever the sampling rate.
     logAudit(event, null, "report.create", { type: "report", id, target, reason: body.reason, drop: drop?.id })
     return { ok: true }
   },

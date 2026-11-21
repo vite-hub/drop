@@ -7,12 +7,8 @@ import { SEARCH_KINDS, searchableText } from "./search"
 import type { DropRow } from "./drops/types"
 import { escapeUTF8 as escapeHtml } from "entities"
 
-// A shared link's preview (Open Graph): the drop's title, a line of what it says, and a card image of both.
-
-/** About two lines in a chat app's preview. */
 const EXCERPT_LENGTH = 200
 
-// Search text keeps what a snippet can live with: callout markers (`[!NOTE]`), and a space where bold met a comma.
 const clip = (text: string, length: number) => {
   const line = text
     .replace(/\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/gi, " ")
@@ -23,10 +19,6 @@ const clip = (text: string, length: number) => {
   return `${line.slice(0, length).replace(/\s+\S*$/, "")}…`
 }
 
-/**
- * The line under a preview's title: a doc's first words, a folder's description, a site's address, a link's note. `source` is a
- * Markdown or HTML doc's text when the caller already read it; otherwise its search text answers, for latest versions.
- */
 export async function dropExcerpt(row: DropRow, source?: string) {
   let text: string | null | undefined
   if (row.kind === "folder") text = row.note
@@ -68,10 +60,6 @@ interface OgCard {
 export const OG_WIDTH = 1200
 export const OG_HEIGHT = 630
 
-/**
- * The card as a page for Browser Run to screenshot, in the look of /og.png: dark, a dot grid, Geist. The hand comes
- * from this Drop's favicon and the font from Google Fonts, so the screenshot waits for the network to settle.
- */
 export function ogCardHtml(card: OgCard, origin: string) {
   const size = card.title.length <= 40 ? 76 : card.title.length <= 90 ? 60 : 48
   const date = new Date(card.date).toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" })
@@ -97,10 +85,8 @@ footer span{border:1px solid #27272a;background:#18181b;border-radius:999px;padd
 </body></html>`
 }
 
-/** Bump when the card's look changes: every cached card renders again on its next request. */
 const CARD_VERSION = 1
 
-/** A cached card's key: it changes with whatever the card shows, so a renamed drop gets a new card. */
 export async function ogCardKey(id: string, card: OgCard) {
   return `og:${id}:${hex((await sha256(new TextEncoder().encode(JSON.stringify([CARD_VERSION, card])))).slice(0, 8))}`
 }

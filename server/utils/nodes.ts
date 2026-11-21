@@ -9,20 +9,13 @@ import type { DropRow } from "./drops"
 import { isExpired } from "./expiry"
 import { shareNow, sharePolicy } from "./share"
 
-// Every drop is a node: it may sit in a folder, and the files a doc embeds hang off the doc. A node takes the widest
-// share on its path, the strictest review and quarantine, and the lifetime and Trash of the top-most node. Reads work
-// this out from the ancestors, found in one recursive query, so sharing, moving or trashing a folder writes one row.
-// A node sits under its owner's folders, or under the team's folders, which hold everyone's drops.
-
 type Row = typeof drops.$inferSelect
 export interface Grant {
   share: Share
 }
 
-/** The most steps a walk up takes: a full folder path, then a doc, then a file it embeds. */
 const MAX_WALK = MAX_DEPTH + 2
 
-/** Each row's ancestors, nearest first, keyed by the row's id. One query per 90 rows: D1 binds at most 100 values. */
 export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[]) {
   const parents = [...new Set(rows.flatMap((row) => (row.parentId ? [row.parentId] : [])))]
   const byId = new Map<string, Row>()
@@ -50,10 +43,6 @@ export async function ancestorsOf(rows: (Pick<Row, "id" | "parentId" | "ownerId"
   return walkUp(rows, byId)
 }
 
-/**
- * The ids `hits` selects and the ids of every node above them, without binding each id or reading each ancestor chain
- * separately. `walkUp` walks them the way `ancestorsOf` does.
- */
 export const withAncestors = (hits: SQL) => sql`(
   WITH RECURSIVE up(id, depth) AS (
     SELECT id, 0 FROM drops WHERE id IN (${hits})
@@ -61,7 +50,6 @@ export const withAncestors = (hits: SQL) => sql`(
   ) SELECT id FROM up
 )`
 
-/** Each row's ancestors, nearest first, keyed by the row's id, from the nodes `byId` holds. */
 export function walkUp(
   rows: (Pick<Row, "id" | "parentId" | "ownerId"> & { teamFolder?: boolean })[],
   byId: Map<string, Row>,
@@ -69,8 +57,6 @@ export function walkUp(
   const result = new Map<string, Row[]>()
   for (const row of rows) {
     const path: Row[] = []
-    // A node sits under its owner's nodes, and anyone's under team folders, which only sit under team folders. Nothing
-    // writes a cycle, but one would end the walk here too.
     for (let id = row.parentId; id && path.length < MAX_WALK;) {
       const parent = byId.get(id)
       const below = path.at(-1) ?? row
@@ -90,15 +76,7 @@ export function walkUp(
   return result
 }
 
-/**
- * A row as its ancestors make it. `share` becomes the widest share in force on the path (a closed public link counts as
- * what it fell back to), and `grants` keeps every one for `permissions`, which picks the ones that reach the caller.
- * Review and quarantine anywhere above hold the whole subtree. Lifetime and the expiry window come from the top-most node; the nearest node in the Trash puts
- * everything below it there. `raw` keeps the row's own values, which is what changing it edits.
- */
 export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date.now()): DropRow {
-  // Inside a team's folders, a personal Drop shares like a team one (./share.ts modeFor). Team folders only sit under
-  // team folders, so one anywhere on the path puts the whole path in the team.
   const mode =
     sharePolicy().mode === "team" || [row, ...ancestors].some((node) => node.teamFolder && node.teamId)
       ? "team"
@@ -146,25 +124,19 @@ export function resolveNode(row: Row, ancestors: Row[], days: number, now = Date
   }
 }
 
-/** Whether a team folder holds it, at any depth: then anyone on the team may add to that folder and trash what's in it. */
 export const inTeamFolder = (row: Pick<DropRow, "ancestors">) => Boolean(row.ancestors?.some((node) => node.teamFolder))
 
-/** A file a doc embeds (or a site's screenshot): it hangs off a node that isn't a folder. Unknown ancestors count too. */
 export const isAttachment = (row: Pick<DropRow, "parentId" | "ancestors">) =>
   row.parentId !== null && row.ancestors?.[0]?.kind !== "folder"
 
-/** The node directly above, as its own ancestors make it. Null at the top. */
 export const parentNode = (row: Pick<DropRow, "ancestors">, days: number) =>
   row.ancestors?.length ? resolveNode(row.ancestors[0]!, row.ancestors.slice(1), days) : null
 
-/** The top-most node, whose lifetime and window the subtree lives by. */
 export const rootOf = (row: DropRow) => row.ancestors?.at(-1) ?? row
 
-/** How deep a node sits: 1 at the top. Embedded files don't count. */
 export const depthOf = (row: Pick<DropRow, "ancestors" | "kind">) =>
   1 + (row.ancestors?.filter((node) => node.kind === "folder").length ?? 0)
 
-/** The levels a node takes up, itself included: 1, or for a folder its deepest drop's depth below it. */
 export async function heightOf(row: Pick<Row, "id" | "kind">) {
   if (row.kind !== "folder") return 1
   const [deepest] = await db.all<{ depth: number }>(sql`WITH RECURSIVE down(id, kind, depth) AS (
@@ -174,7 +146,6 @@ export async function heightOf(row: Pick<Row, "id" | "kind">) {
   return deepest?.depth ?? 1
 }
 
-/** A folder and every folder below it, for searching a subtree. */
 export const foldersUnder = (id: string) => sql`(
   WITH RECURSIVE down(id, depth) AS (
     SELECT ${id}, 0
@@ -182,13 +153,8 @@ export const foldersUnder = (id: string) => sql`(
   ) SELECT id FROM down
 )`
 
-/** Drops people list and count: at the top or in a folder, not files a doc embeds. Written for queries on `drops` unaliased. */
 export const listedNode = sql`("drops"."parent_id" IS NULL OR EXISTS (SELECT 1 FROM drops p WHERE p.id = "drops"."parent_id" AND p.kind = 'folder'))`
 
-/**
- * `slug`, or `slug-2`, `slug-3` and so on when another drop in the same folder has it, like file names in a directory.
- * Drops at the top need no unique slug: their links tell them apart. `id` is the drop being named, which may keep its own.
- */
 export async function uniqueSlug(parentId: string | null, slug: string, id?: string | null) {
   if (!parentId || !slug) return slug
   const siblings = await db
@@ -211,11 +177,9 @@ export async function uniqueSlug(parentId: string | null, slug: string, id?: str
   }
 }
 
-/** A folder's time is its latest change, like a directory's: a drop added to it or moved in. */
 export const touchFolder = (id: string, now = Date.now()) =>
   db.update(drops).set({ updatedAt: now }).where(eq(drops.id, id))
 
-/** How many drops sit directly in each folder, Trash aside. */
 export async function itemCounts(ids: string[] | SQL) {
   const counts = new Map<string, number>()
   for (const chunk of Array.isArray(ids) ? d1Chunks(ids) : [ids]) {

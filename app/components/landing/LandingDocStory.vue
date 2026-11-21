@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Claude Code reads the team's folders and drops a plan where the folder's description says it goes. In the browser
-// you open the editor, Ben and Lea join, Ben adds a line, you publish v2, and History shows what v2 changed.
 import type { Beat } from "~/composables/useStoryboard"
 
 const BEATS = [
@@ -34,7 +32,6 @@ const v2 = computed(() => at("e.done"))
 const history = computed(() => at("h.open"))
 const diff = computed(() => at("h.diff"))
 
-// Your pointer, and the beats that end in a click where it rests: the next beat shows what the click did.
 const TARGETS: Partial<Record<Name, string>> = {
   "e.open": "edit",
   "e.edit": "publish",
@@ -147,7 +144,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
                 </div>
               </div>
 
-              <!-- The live editor's bar: who's in the draft, and Publish. -->
               <div
                 v-if="editing"
                 class="flex h-9 shrink-0 items-center gap-2 border-b border-default bg-muted px-4 text-xs [animation:fade-in_300ms_ease-out]"
@@ -163,7 +159,6 @@ const click = computed(() => (CLICKS[beat.value] ? BEATS[index.value]![1] - 380 
               </div>
 
               <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_13.5rem]">
-                <!-- What v2 changed, in place of the document. -->
                 <div
                   v-if="diff"
                   class="min-w-0 px-7 py-6 text-[13px] leading-relaxed [animation:fade-in_300ms_ease-out]"

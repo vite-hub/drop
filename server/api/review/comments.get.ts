@@ -4,11 +4,6 @@ import { defineValidatedHandler } from "h3"
 import { readerOf } from "../../utils/comments"
 import { reviewApi, reviewPage, reviewSession, reviewThreads, siteItems } from "../../utils/review"
 
-/**
- * The threads on a page (`?page=`, path and query), for the review script's pins, and how many are open. Only people
- * who may comment get them, by their token; nothing in them opens the review in Drop. The page's own scripts can read
- * what the review script fetches, which is the trade for seeing the threads where they were left, as in Figma.
- */
 export default reviewApi(
   defineValidatedHandler({
     validate: { query: ReviewCommentsQuerySchema },

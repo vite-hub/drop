@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Opened through useFolderDialog(): a new folder's name, what goes in it, and, for admins on a team Drop, whether it's
-// one of the team's. Resolves them, or null on cancel. Agents read the description to choose where to publish.
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 import { FolderSchema } from "#shared/schemas"

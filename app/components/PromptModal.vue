@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Opened through usePrompt(): resolves the trimmed value, or null on cancel. Validates with a valibot schema
-// whose single field is `value` (defaults to "not empty").
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as v from "valibot"
 

@@ -8,7 +8,6 @@ import { findSkill, setSkillEnabled } from "../../utils/skills"
 
 const Params = v.object({ name: v.pipe(v.string(), v.regex(/^[a-z0-9-]{1,64}$/)) })
 
-/** Admins switch a built-in skill on or off for the whole deployment: the catalog, MCP, and discovery. */
 export default defineValidatedHandler({
   validate: { body: SkillPatchSchema },
   async handler(event) {

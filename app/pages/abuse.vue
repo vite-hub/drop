@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Legal template. The instance owner must review this source, contact details, and DMCA procedures before public use.
 const { data: contact } = await useApi("/api/abuse-contact", { key: keys.abuseContact })
 </script>
 <template>

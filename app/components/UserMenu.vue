@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import type { DropdownMenuItem } from "@nuxt/ui"
 
-// `compact`: the public pages' header, where the menu is an avatar that opens downward; the dashboard sidebar gets
-// shadcn's NavUser row, opening upward.
 const { compact = false } = defineProps<{ compact?: boolean }>()
 
 const leave = useSignOut()
-// From /api/me, which SSR fetches with the session cookie; the client-side session only exists after hydration.
 const { data: me } = useMe()
 const shortcutsOpen = useShortcutsOpen()
 
@@ -34,8 +31,6 @@ const roleLabel = computed(() => ({ admin: "Admin", editor: "Editor", member: "M
     "
     :ui="{ content: compact ? 'w-60' : 'w-(--reka-dropdown-menu-trigger-width) min-w-52' }"
   >
-    <!-- One trigger element either way: the dropdown's slot hydrates a single node. Compact is just the avatar;
-         otherwise shadcn's NavUser, a large sidebar button with the avatar, name and role. -->
     <button
       class="flex cursor-pointer items-center rounded-md transition-colors"
       :class="

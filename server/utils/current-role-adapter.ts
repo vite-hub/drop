@@ -4,10 +4,8 @@ import * as v from "valibot"
 
 type Person = { email: string; emailVerified?: boolean | null }
 
-// Policy reads request the whole user; projections without an email stay as they are.
 const RoleSubject = v.object({ email: v.string(), emailVerified: v.nullish(v.boolean()) })
 
-/** Auth's membership policy runs before application hooks. Give it Drop's current role on every user read. */
 export function currentRoleAdapter(
   database: ReturnType<typeof drizzleAdapter>,
   role: (person: Person) => string,
@@ -15,7 +13,6 @@ export function currentRoleAdapter(
   function wrap(adapter: DBTransactionAdapter): DBTransactionAdapter {
     return {
       ...adapter,
-      // The inner read gives the row's type, so the wrapper keeps the type Better Auth asked for.
       findOne: (input) => (input.model === "user" ? withRole(adapter.findOne(input), role) : adapter.findOne(input)),
     }
   }

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 useSeoMeta({ title: "Skills" })
 
-// The catalog agents get over MCP: one row per skill with what it's for, and the full skill on GitHub.
-// Members see what's on; admins also see what they switched off, and switch it.
 const { data: me } = useMe()
 const admin = computed(() => me.value?.role === "admin")
 const { skills, status, setEnabled } = useSkills()

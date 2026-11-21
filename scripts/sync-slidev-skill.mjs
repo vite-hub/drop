@@ -1,8 +1,3 @@
-// Copies Slidev's own agent skill (skills/slidev in slidevjs/slidev, MIT) into skills/slidev, so Drop serves it next
-// to its own skills and vitehub-drop can send deck work there. Run it to pick up upstream changes:
-//   node scripts/sync-slidev-skill.mjs [ref]
-// It writes SKILL.md, references/ and Slidev's MIT LICENSE (which the copy must keep), deletes files upstream dropped,
-// and prints the commit to note in the README.
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises"
 
 const repo = "slidevjs/slidev"
@@ -19,7 +14,6 @@ const api = async (path) => {
 
 const { sha } = await api(`commits/${ref}`)
 const { tree } = await api(`git/trees/${sha}?recursive=1`)
-// The skill itself: SKILL.md and its references. README.md is for people browsing the repo.
 const paths = tree
   .filter((entry) => entry.type === "blob" && /^skills\/slidev\/(SKILL\.md|references\/[\w.-]+\.md)$/.test(entry.path))
   .map((entry) => entry.path.slice("skills/slidev/".length))

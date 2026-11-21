@@ -1,12 +1,3 @@
-// Boards: Excalidraw whiteboards people draw on together, and agents read and add to. A board drop stores an
-// Excalidraw scene (`.excalidraw`, the file excalidraw.com opens). People edit it in Excalidraw itself
-// (app/components/viewer/ViewerBoard.vue); agents never touch elements. They write a small format (items and edges,
-// below) that this module turns into elements, and read the board back as a text outline plus an image per frame
-// (server/utils/boards.ts).
-//
-// Every element carries a version that goes up with each change, and a deleted element stays in the scene marked
-// isDeleted. That is how Excalidraw merges scenes, and how Drop does too: per element, the higher version wins
-// (mergeElements), so a deletion reaches every open board like any other change.
 import { generateNKeysBetween } from "fractional-indexing"
 import * as v from "valibot"
 
@@ -31,13 +22,10 @@ export const BOARD_COLORS = [
 export const BOARD_ITEM_TYPES = ["note", "text", "box", "ellipse", "frame"] as const
 type BoardColor = (typeof BOARD_COLORS)[number]
 
-/** What an agent writes. `id` is the agent's own short name for it; edges and `in` refer to it. */
 interface BoardItem {
   id: string
   type: (typeof BOARD_ITEM_TYPES)[number]
-  /** The note's, box's or text's words; a frame's name. */
   text?: string
-  /** A frame's id: the item goes inside it, and x/y count from the frame's corner. */
   in?: string
   x?: number
   y?: number
@@ -53,13 +41,10 @@ interface BoardEdge {
 export interface BoardEdit {
   add?: BoardItem[]
   edges?: BoardEdge[]
-  /** Items to change, by id: only the fields given change. Moving an item into another frame isn't supported. */
   update?: (Partial<BoardItem> & { id: string })[]
-  /** Items to delete, by id, with the arrows that point at them. Deleting a frame deletes what's in it. */
   remove?: string[]
 }
 
-/** An Excalidraw element: the fields Drop reads and writes. Excalidraw keeps the rest as they are. */
 export interface BoardElement {
   id: string
   type: string
@@ -79,7 +64,6 @@ export interface BoardElement {
   name?: string | null
   startBinding?: { elementId: string } | null
   endBinding?: { elementId: string } | null
-  /** Drop's own: who added it, whether an agent did, what kind of item, and `fit` on words no browser measured yet. */
   customData?: {
     author?: string
     agent?: boolean
@@ -91,7 +75,6 @@ export interface BoardElement {
   [key: string]: unknown
 }
 
-/** An Excalidraw scene, the `.excalidraw` file. */
 export interface Board {
   type: "excalidraw"
   version: 2
@@ -104,7 +87,6 @@ export interface Board {
 const NOTE = 200
 const GAP = 40
 
-/** A board with nothing on it. */
 export function emptyBoard(): Board {
   return {
     type: "excalidraw",
@@ -116,7 +98,6 @@ export function emptyBoard(): Board {
   }
 }
 
-// Shapes, lines, text and frames. Images and embeds need files and URLs Drop doesn't keep, so boards don't take them.
 const ELEMENT_TYPES = ["rectangle", "diamond", "ellipse", "arrow", "line", "freedraw", "text", "frame"] as const
 const finite = v.pipe(v.number(), v.finite())
 const Element = v.looseObject({
@@ -135,26 +116,18 @@ const BoardFile = v.object({
   elements: v.array(v.looseObject({ id: v.string(), type: v.string() })),
 })
 
-/** Whether an element from a browser is one a board stores: a shape, line, text or frame with the fields Drop reads. */
 export function isBoardElement(element: unknown): element is BoardElement {
   return v.is(Element, element)
 }
 
-/** Parses a `.excalidraw` file. Elements a board doesn't take (images, embeds) are left out. Throws on anything else. */
 export function parseBoard(text: string): Board {
   const parsed = v.safeParse(BoardFile, JSON.parse(text))
   if (!parsed.success) throw new Error("Not a board.")
   return { ...emptyBoard(), elements: parsed.output.elements.filter(isBoardElement) }
 }
 
-/** A board as a `.excalidraw` file: what Drop stores and serves, so a downloaded board opens in excalidraw.com. */
 export const serializeBoard = (board: Board) => JSON.stringify(board)
 
-/**
- * Merges elements into a board in place, the way Excalidraw reconciles scenes: per element, the higher version wins,
- * and on a tie the lower versionNonce. Who added an element stays as it was; a new element without one gets `author`,
- * which read_drop's outline shows. Returns how many elements changed.
- */
 export function mergeElements(board: Board, incoming: BoardElement[], author?: string) {
   const at = new Map(board.elements.map((element, i) => [element.id, i]))
   let changed = 0
@@ -178,7 +151,6 @@ export function mergeElements(board: Board, incoming: BoardElement[], author?: s
   return changed
 }
 
-// Excalidraw's palette (open-color), as each agent color's line and fill: notes are filled, shapes and text outlined.
 const PALETTE: Record<BoardColor, { stroke: string; fill: string }> = {
   black: { stroke: "#1e1e1e", fill: "#e9ecef" },
   grey: { stroke: "#868e96", fill: "#e9ecef" },
@@ -195,18 +167,9 @@ const PALETTE: Record<BoardColor, { stroke: string; fill: string }> = {
   white: { stroke: "#ced4da", fill: "#ffffff" },
 }
 
-// Agents write paragraphs where people scribble a few words, so their items use a plain font at 16 px instead of the
-// hand-drawn default. It's Excalidraw's Helvetica, a system font: Excalidraw's own fonts load from a CDN, and a label
-// measured before they arrive keeps the narrower fallback's widths, so its words spill out of the shape. People can
-// still switch any item to another font in the style panel.
 const FONT = { family: 2, size: 16, lineHeight: 1.15 }
-// Excalidraw wraps a label to its shape's width by measuring the words, which only a browser can do: the first browser
-// that opens the board measures every label marked `fit` and saves it (ViewerBoard). Excalidraw doesn't grow a shape
-// to fit its label, so the shape's height comes from an estimate here: about 9 px a character at 16 px, inside
-// Excalidraw's 5 px label padding plus some air. Long words break, so the estimate errs tall.
 const LABEL = { line: FONT.size * FONT.lineHeight, padding: 16, char: 9 }
 
-/** How tall a label of `text` is when wrapped to `w`. */
 function textHeight(text: string, w: number) {
   const perLine = Math.max(1, Math.floor(w / LABEL.char))
   let lines = 0
@@ -225,7 +188,6 @@ function textHeight(text: string, w: number) {
   return Math.ceil(lines * LABEL.line)
 }
 
-/** How far a note or shape of w×h must grow down to hold its words. */
 export function labelGrowth(text: string, w: number, h: number) {
   if (!text.trim()) return 0
   return Math.max(0, textHeight(text, w - LABEL.padding * 2) + LABEL.padding * 2 - h)
@@ -263,7 +225,6 @@ function makeElement(fields: Partial<BoardElement> & Pick<BoardElement, "id" | "
   }
 }
 
-/** The same element, changed: its version goes up, so every open board takes the change. */
 const bump = (stored: BoardElement, fields: Partial<BoardElement>): BoardElement => ({
   ...stored,
   ...fields,
@@ -274,7 +235,6 @@ const bump = (stored: BoardElement, fields: Partial<BoardElement>): BoardElement
 
 const textId = (id: string) => `${id}:text`
 
-/** A label inside a shape or on an arrow, centered in `box`. */
 function labelFor(container: BoardElement, text: string, box: { x: number; y: number; w: number; h: number }) {
   const width = Math.max(1, box.w - LABEL.padding * 2)
   const height = textHeight(text, width)
@@ -301,11 +261,9 @@ function labelFor(container: BoardElement, text: string, box: { x: number; y: nu
 }
 
 const live = (board: Board) => board.elements.filter((element) => !element.isDeleted)
-/** What a board shows as items: everything but the labels inside shapes and on arrows. */
 const items = (board: Board) => live(board).filter((element) => !element.containerId)
 const isFrame = (element: BoardElement) => element.type === "frame" || element.type === "magicframe"
 
-/** The words of an item: a frame's name, a text's own words, or its label's. */
 function textOf(board: Board, item: BoardElement) {
   if (isFrame(item)) return item.name ?? ""
   if (item.type === "text") return item.originalText ?? item.text ?? ""
@@ -314,7 +272,6 @@ function textOf(board: Board, item: BoardElement) {
   return text ? (text.originalText ?? text.text ?? "") : ""
 }
 
-/** Where an arrow between two boxes leaves the first: on its edge, toward the second's center. */
 function edgePoint(from: Box, to: Box) {
   const cx = from.x + from.w / 2
   const cy = from.y + from.h / 2
@@ -337,10 +294,6 @@ const fail = (message: string): never => {
   throw new Error(message)
 }
 
-/**
- * A board edit as the elements to merge (mergeElements): new ones, and changed or deleted ones with their version
- * raised. Throws, naming the item, when one doesn't fit.
- */
 export function boardChanges(board: Board, edit: BoardEdit, author: string) {
   const put = new Map<string, BoardElement>()
   const current = (id: string) =>
@@ -348,18 +301,15 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
   const change = (id: string, fields: Partial<BoardElement>) => {
     const stored = current(id)
     if (!stored) return
-    // Whatever is in put is new or already went up a version in this edit: it goes up once.
     put.set(id, put.has(id) ? { ...stored, ...fields } : bump(stored, fields))
   }
   const meta = { author, agent: true }
 
-  // Frames first, so items placed in a frame added in the same edit find it.
   const added = [...(edit.add ?? [])].sort((a, b) => Number(b.type === "frame") - Number(a.type === "frame"))
   const children = new Map<string, BoardItem[]>()
   for (const item of added) if (item.in) children.set(item.in, [...(children.get(item.in) ?? []), item])
   let row = contentBottom(board)
 
-  // A frame's grid is four across, and each row is as tall as its tallest item, words included.
   const gridRows = (kids: BoardItem[]) => {
     const rows: number[] = []
     kids.forEach((kid, slot) => {
@@ -382,7 +332,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
       const w = item.w ?? 400
       return { w, h: item.h ?? textHeight(item.text ?? "", w) }
     }
-    // A note is always 200 wide and grows down; a box or ellipse grows down past the height it was given.
     const w = item.type === "note" ? NOTE : (item.w ?? NOTE)
     const h = item.type === "note" ? NOTE : (item.h ?? NOTE)
     return { w, h: h + labelGrowth(item.text ?? "", w, h) }
@@ -397,7 +346,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
     const siblings = item.in ? (children.get(item.in) ?? []) : []
     const slot = siblings.indexOf(item)
     const size = itemSize(item)
-    // Without x/y: items in a frame fill its grid, four across; loose items and frames start a row below the board.
     let x = item.x
     let y = item.y
     if (x === undefined || y === undefined) {
@@ -458,7 +406,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
     }
   }
 
-  // Moving or resizing items: their labels, a frame's contents and the arrows that touch them follow.
   const moved = new Set<string>()
   for (const changeTo of edit.update ?? []) {
     const stored = current(changeTo.id)
@@ -502,13 +449,11 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
       fields.height = textHeight(words, fields.width ?? item.width)
     change(item.id, fields)
     const now = current(item.id)!
-    // The label: new words, and centered in the shape again.
     if (!isFrame(item) && item.type !== "text" && item.type !== "arrow") {
       const bound = item.boundElements?.find((b) => b.type === "text")?.id
       if (words) {
         const fresh = labelFor(now, words, boxOf(now))
         const old = bound ? current(bound) : undefined
-        // The label keeps its own font and color; its words, place and size are new, and need measuring again.
         const { width, height, text, originalText } = fresh
         const at = { x: fresh.x, y: fresh.y }
         if (old)
@@ -557,7 +502,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
     }
   }
 
-  // Arrows follow what they connect when it moved.
   for (const arrow of live(board).filter((element) => element.type === "arrow")) {
     const a = arrow.startBinding?.elementId
     const b = arrow.endBinding?.elementId
@@ -572,14 +516,12 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
     if (!stored || stored.containerId) fail(`The board has no item "${ref}".`)
     const doomed = new Set([ref])
     for (const element of live(board)) if (element.frameId === ref) doomed.add(element.id)
-    // An arrow bound to a deleted item would point at nothing, so it goes too.
     for (const element of live(board))
       if (
         element.type === "arrow" &&
         (doomed.has(element.startBinding?.elementId ?? "") || doomed.has(element.endBinding?.elementId ?? ""))
       )
         doomed.add(element.id)
-    // Labels go with what holds them.
     for (const element of live(board))
       if (element.containerId && doomed.has(element.containerId)) doomed.add(element.id)
     for (const id of doomed) {
@@ -588,7 +530,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
     }
   }
 
-  // New elements stack above everything on the board, in the order they were made, each label right above its shape.
   const placed = [...put.values()].filter((element) => !board.elements.some((stored) => stored.id === element.id))
   const top = board.elements
     .map((element) => element.index)
@@ -600,7 +541,6 @@ export function boardChanges(board: Board, edit: BoardEdit, author: string) {
   return { put: [...put.values()] }
 }
 
-/** An arrow's place and points from one item's edge to the other's. */
 function arrowPath(from: BoardElement, to: BoardElement) {
   const start = edgePoint(boxOf(from), boxOf(to))
   const end = edgePoint(boxOf(to), boxOf(from))
@@ -620,7 +560,6 @@ function arrowPath(from: BoardElement, to: BoardElement) {
   }
 }
 
-/** Applies an agent's changes (boardChanges) to a board in place. */
 export function applyChanges(board: Board, put: BoardElement[]) {
   mergeElements(board, put)
   return board
@@ -632,7 +571,6 @@ function contentBottom(board: Board) {
   return Math.max(...top.map((element) => element.y + element.height)) + GAP * 2
 }
 
-/** A frame on the board, for the per-frame images agents look at. */
 export function boardFrames(board: Board) {
   return items(board)
     .filter(isFrame)
@@ -642,11 +580,6 @@ export function boardFrames(board: Board) {
 const round = (n: number) => Math.round(n)
 const byPlace = (a: BoardElement, b: BoardElement) => a.y - b.y || a.x - b.x
 
-/**
- * The board as text for agents: each frame with what's in it, then everything outside frames. Every line names the
- * item's id (for edges, update and remove), its words, where it is, and who added it. Arrows read `a → b`; freehand
- * drawings only say where they are, since their meaning is in the frame's image.
- */
 export function boardOutline(board: Board) {
   const all = items(board)
   const byId = new Map(all.map((element) => [element.id, element]))
@@ -691,7 +624,6 @@ export function boardOutline(board: Board) {
   return parts.join("\n\n") || "The board is empty."
 }
 
-/** The board's words, for search. */
 export const boardText = (board: Board) =>
   live(board)
     .map((each) => (isFrame(each) ? (each.name ?? "") : (each.originalText ?? each.text ?? "")))

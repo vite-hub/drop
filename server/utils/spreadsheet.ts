@@ -8,10 +8,8 @@ import { defineCachedFunction } from "nitro/cache"
 import { logError } from "./logs"
 import { FAILED_RENDER_TTL, MARKDOWN_CACHE_TTL } from "./markdown-cache"
 
-/** The spreadsheets Drop previews, read-only. Anything else stays a plain file with a download. */
 export const SPREADSHEET_EXTENSIONS = new Set([".csv", ".tsv", ".xlsx", ".xlsm", ".xls", ".ods"])
 
-// A preview, not the workbook: past these the table says what it left out, and Download has the rest.
 const MAX_ROWS = 2000
 const MAX_COLUMNS = 100
 
@@ -44,7 +42,6 @@ async function readSheets(bytes: Uint8Array, extension: string): Promise<Sheet[]
   return workbook.sheets.filter((sheet) => !sheet.kind || sheet.kind === "worksheet")
 }
 
-/** What the cell shows in Excel: its number format applied, a formula's last saved result. */
 function display(value: CellValue, cell: Cell | undefined): string {
   const shown = value ?? cell?.formulaResult ?? null
   if (shown === null) return ""
@@ -55,7 +52,6 @@ function display(value: CellValue, cell: Cell | undefined): string {
       return formatValue(shown, format ?? "yyyy-mm-dd")
     } catch {}
   }
-  // doctor-disable-next-line typescript/strict/no-runtime-typeof -- a cell's value is the parsed domain: Excel stores it as a number, text, boolean, or date
   if (typeof shown === "boolean") return shown ? "TRUE" : "FALSE"
   return String(shown)
 }
@@ -69,7 +65,6 @@ const columnLetter = (index: number) => {
 
 function sheetTable(sheet: Sheet): string {
   const rows = sheet.rows.slice(0, MAX_ROWS)
-  // Trailing empty columns and rows are formatting Excel kept, not data.
   let width = 0
   let height = 0
   rows.forEach((row, r) =>
@@ -82,7 +77,6 @@ function sheetTable(sheet: Sheet): string {
   const columns = Math.min(width, MAX_COLUMNS)
   if (!height) return `<p class="sheet-empty">This sheet is empty.</p>`
 
-  // A merge draws in its top-left cell; the cells it covers draw nothing.
   const spans = new Map<string, string>()
   const covered = new Set<string>()
   for (const merge of sheet.merges ?? []) {
@@ -108,7 +102,6 @@ function sheetTable(sheet: Sheet): string {
         const cell = sheet.cells?.get(key)
         const value = row[c] ?? null
         const shown = display(value, cell)
-        // doctor-disable-next-line typescript/strict/no-runtime-typeof -- a cell's value is the parsed domain: Excel stores it as a number, text, boolean, or date
         const numeric = typeof (value ?? cell?.formulaResult) === "number" || value instanceof Date
         const classes = [numeric && "n", cell?.style?.font?.bold && "b"].filter(Boolean).join(" ")
         return `<td${classes ? ` class="${classes}"` : ""}${spans.get(key) ?? ""}>${escapeHtml(shown)}</td>`
@@ -126,12 +119,10 @@ function sheetTable(sheet: Sheet): string {
   return `<div class="sheet-scroll"><table>${head}<tbody>${body}</tbody></table></div>${note}`
 }
 
-/** The spreadsheet as HTML for the viewer: a tab per visible sheet, each a read-only grid of what its cells show. */
 export async function renderSpreadsheet(bytes: Uint8Array, extension: string): Promise<string> {
   return (await renderSheets(bytes, extension)).html
 }
 
-/** The render, and the error when the workbook couldn't be read and the HTML says so instead. */
 async function renderSheets(bytes: Uint8Array, extension: string): Promise<{ html: string; failed?: unknown }> {
   try {
     const sheets = await readSheets(bytes, extension)
@@ -158,13 +149,11 @@ async function renderSheets(bytes: Uint8Array, extension: string): Promise<{ htm
   }
 }
 
-/** A render that failed is kept for FAILED_RENDER_TTL, not the month a render is. */
 interface SheetRender {
   html: string
   failed?: true
 }
 
-/** Keyed by blob key like Markdown renders (blobs never change); deleteMarkdownCache clears both. */
 const cached = defineCachedFunction(
   async (
     event: H3Event | undefined,

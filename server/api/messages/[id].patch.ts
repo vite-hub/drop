@@ -7,10 +7,6 @@ import { identify } from "../../utils/identity"
 import { logDrop } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 
-/**
- * New words for a comment or a reply (by its message id), from the person who wrote it, while they may still comment
- * on the drop. Its images stay. A guest's words can't be edited: their id is no proof of who they are.
- */
 export default defineValidatedHandler({
   validate: { body: CommentEditSchema },
   async handler(event) {

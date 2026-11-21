@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// `::mcp-tools`: a table of the MCP server's own catalog (tools, prompts, skill resources), so the docs never drift from it.
 const { data: catalog } = await useApi("/api/mcp", { key: keys.mcpCatalog, default: () => [] })
 const tools = computed(() =>
   catalog.value.map((item) => ({

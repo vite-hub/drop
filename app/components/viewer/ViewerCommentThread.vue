@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// A new comment, or the open thread, with vite-hub/ui's comment parts. A new comment is a CommentComposer: Enter sends,
-// Shift+Enter breaks, "@" names people who may read the drop, and images come from the button, a paste, or a drop,
-// beside the ones the viewer took (the Marker's snapshot, the area's picture). Suggest on a selection adds the words
-// that replace it above the note (`#extra`). The open thread is a CommentThread: the quote or the suggestion's redline
-// in `#anchor`, Accept and Copy link in `#actions`, a site's screenshot in `#after`.
 import { CommentComposer, type CommentComposerSubmit, CommentThread } from "vite-hub/ui"
 import { COMMENT_IMAGE_TYPES, type CommentInput } from "#shared/schemas"
 import type { DropComment, SiteReviewItem } from "#shared/types"
@@ -14,14 +9,11 @@ const props = defineProps<{
   screenshot?: SiteReviewItem["screenshot"]
   pending?: PendingComment
   comment?: DropComment
-  /** Whether this reader may put a suggestion's words into the doc (an editor, on its latest version). */
   canAccept?: boolean
   accepting?: boolean
-  /** The version on show, so a comment from an earlier one says so. */
   version?: number
   draft?: string
   draftError?: string
-  /** The thread floats beside its pin or over its card in the margin: it closes, rather than going back to the list. */
   floating?: boolean
 }>()
 const emit = defineEmits<{
@@ -31,7 +23,6 @@ const emit = defineEmits<{
   delete: [id: string]
   deleteReply: [id: string, replyId: string]
   copyLink: [comment: DropComment]
-  /** The suggested words were edited; the viewer keeps them on the pending comment, which sends them. */
   suggest: [text: string]
   accept: [id: string]
 }>()
@@ -39,7 +30,6 @@ const dropComments = injectDropComments()!
 const { user, people, attachmentUrl, can } = dropComments
 const accept = COMMENT_IMAGE_TYPES.join(",")
 
-// A new comment keeps its words and images in the viewer's draft while areas come and go.
 const draft = props.pending ? injectReviewDraft()! : undefined
 const body = draft?.body ?? ref("")
 if (props.draft && !body.value) body.value = props.draft
@@ -52,10 +42,8 @@ const lookup = async (query: string) => {
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
 const busy = computed(() => Boolean(draft?.waiting.value))
-// The composer's files are the draft's picks, so the viewer's own pictures show and go with the rest.
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
-// Programmatic mention selection must obey the same lock as native textarea edits.
 const composerBody = computed({
   get: () => body.value,
   set: (value) => {
@@ -75,7 +63,6 @@ const composerMentions = computed({
   },
 })
 
-// A suggested edit on the selection: the words that replace it, empty to delete it.
 const suggesting = computed(() => props.pending?.suggestion !== undefined)
 const suggestion = computed({
   get: () => props.pending?.suggestion ?? "",
@@ -83,7 +70,6 @@ const suggestion = computed({
 })
 const card = useTemplateRef<HTMLElement>("card")
 onMounted(() => {
-  // A suggestion starts as the selected words, selected, so typing replaces them.
   const field = card.value?.querySelector<HTMLTextAreaElement>(
     suggesting.value ? "[data-suggestion] textarea" : "textarea",
   )
@@ -117,7 +103,6 @@ const earlier = computed(() =>
     ? state.drop.data.value?.versions.find((item) => item.version === props.comment!.version)
     : undefined,
 )
-// Deleting the comment itself deletes its thread; the viewer then closes it.
 function remove(messageId: string) {
   const comment = props.comment
   if (!comment) return
@@ -138,7 +123,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
     :class="pending && 'p-2 in-[#drop-comments]:p-3'"
   >
     <template v-if="pending">
-      <!-- Only in the dock: the card floating over the page sits beside what it's on, which stays marked there. -->
       <div class="mb-3 hidden items-center justify-between gap-2 in-[#drop-comments]:flex">
         <span class="text-sm text-muted">{{
           pending.quote
@@ -185,7 +169,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         @submit="send"
       >
         <template v-if="suggesting" #extra>
-          <!-- Left edges line up with the note's text: the struck quote, the field, and the note. -->
           <div data-suggestion class="space-y-1 pt-0.5">
             <p class="line-clamp-3 text-sm leading-relaxed">
               <span class="sr-only">Replace </span><del class="redline-del px-1">{{ pending.quote }}</del>
@@ -253,7 +236,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
             @click="emit('accept', comment.id)"
           />
         </UTooltip>
-        <!-- Deleting the thread is the first message's Delete, which asks first. -->
         <UTooltip v-if="!comment.delivery" text="Copy link">
           <UButton
             aria-label="Copy link"

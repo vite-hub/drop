@@ -1,10 +1,4 @@
 <script setup lang="ts">
-// A site under review, open inside Drop: the page in a frame, an address bar above it, and Comment, which draws a box
-// over the frame and screenshots it with the browser's screen capture. Drop can't read a frame from another origin,
-// so a comment carries the screenshot, the box, and the address typed above, never the element under the box. Comments
-// are stored like the review script's (POST /api/drops/:id/review), so the list and agents read them the same way. They
-// go through the drop's outbox (useDrop), so a comment written offline waits with its screenshot and goes out once.
-// The page can show at a device's size (ViewerDevice), and the comment then says that size, not the scaled one.
 import { parseReviewScriptMessage } from "#shared/frame-messages"
 import { siteCovers } from "#shared/review"
 import type { DropDetail } from "#shared/types"
@@ -14,8 +8,6 @@ const emit = defineEmits<{ close: [] }>()
 
 const devicePane = useTemplateRef<HTMLElement>("devicePane")
 const { bottom: paneBottom } = useElementBounding(devicePane)
-// Device mode clears the actual pill plus its bottom resize grip. Off, ViewerDevice ignores the inset so the site
-// still fills the viewer. Measure in the same viewport coordinates to include wrapping and safe-area placement.
 const deviceBottom = computed(() =>
   props.dockTop && paneBottom.value ? Math.max(24, paneBottom.value - props.dockTop + 24) : 72,
 )
@@ -24,8 +16,6 @@ const notify = useNotify()
 const state = injectDrop()
 const capture = useTabCapture()
 
-// What's typed, and what the frame has open. Clicks inside the frame can't reach Drop, so the bar only changes when
-// someone types in it.
 const typed = ref(props.address)
 const open = ref(props.address)
 const valid = computed(() => siteCovers(props.drop.siteUrl, typed.value))
@@ -33,8 +23,6 @@ function go() {
   if (valid.value) open.value = new URL(typed.value).href
 }
 
-// Under Comments the layer over the frame keeps focus in Drop's window, so a scroll key would scroll nothing. It goes to
-// the site instead, whose review script scrolls the page (frameScrollKey). Only to the open address's origin.
 const siteFrame = useTemplateRef<HTMLIFrameElement>("siteFrame")
 useEventListener("keydown", (event: KeyboardEvent) => {
   const scroll = frameScrollKey(event)
@@ -44,8 +32,6 @@ useEventListener("keydown", (event: KeyboardEvent) => {
       new URL(open.value).origin,
     )
 })
-// The other way, the site's review script passes ⌘K on while the site has the focus, for the palette. It does once
-// Drop says it holds the frame, in answer to the script's "review-ready" on each page load.
 const openPalette = usePaletteOpener()
 useEventListener("message", (event: MessageEvent) => {
   const frame = siteFrame.value?.contentWindow
@@ -58,8 +44,6 @@ useEventListener("message", (event: MessageEvent) => {
 type Box = { left: number; top: number; width: number; height: number }
 const stage = useTemplateRef("stage")
 const capturing = ref(false)
-// While Comments is open the layer over the frame takes every press, so the site can't open a slideover or a menu to
-// comment on (drop#164). Use the site lifts the layer until it's pressed again or Comments opens again.
 const browsing = ref(false)
 watch(
   () => props.reviewing,
@@ -78,7 +62,6 @@ const pending = ref<{
 } | null>(null)
 const { body: note, images, clear, scope, waiting } = injectReviewDraft()!
 
-// In the page's own pixels: a device's size may scale the page down on screen.
 function point(event: PointerEvent) {
   const el = stage.value!
   const rect = el.getBoundingClientRect()
@@ -111,8 +94,6 @@ async function up() {
   const el = stage.value!
   const rect = el.getBoundingClientRect()
   const scale = rect.width / (el.offsetWidth || rect.width)
-  // A zoomed device page can extend beyond the browser viewport. Keep the image crop and normalized box in the same
-  // visible page coordinate space instead of recording coordinates relative to the clipped, full-size stage.
   const visible = {
     left: Math.max(0, rect.left),
     top: Math.max(0, rect.top),
@@ -126,7 +107,6 @@ async function up() {
     height: Math.max(0, (visible.bottom - visible.top) / scale),
   }
   if (crop.width < 1 || crop.height < 1) return (box.value = null)
-  // Hide the crosshair and the box first, so the screenshot shows the page as it is.
   capturing.value = true
   const owner = scope.value
   box.value = null
@@ -166,7 +146,6 @@ async function up() {
   }
 }
 
-// Images the reviewer adds beside the screenshot: from the button, a paste, or a drop on the form.
 const { picks, problem, files, remove, open: pickImages, paste, drop: dropImages } = images
 
 function discard() {
@@ -174,7 +153,6 @@ function discard() {
   pending.value = null
 }
 
-// The box in thousandths of the screenshot, as every review comment stores it.
 const thousandths = (value: number, whole: number) => Math.min(1000, Math.max(0, Math.round((value / whole) * 1000)))
 const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
@@ -269,8 +247,6 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
     <div ref="devicePane" class="relative flex min-h-0 flex-1 flex-col bg-muted">
       <ViewerDevice :bottom="deviceBottom" on>
         <div ref="stage" class="relative min-h-0 flex-1">
-          <!-- Sandboxed so the site can't navigate Drop's tab (to a fake sign-in, say). It keeps scripts, forms, popups,
-               dialogs, and its own origin, so it runs as it would on its own. No permissions are delegated to it. -->
           <iframe
             ref="siteFrame"
             :key="open"
@@ -308,7 +284,6 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
         </div>
       </ViewerDevice>
 
-      <!-- Deferred: its box mounts in the same update, in the dock or beside the page (DropViewer). -->
       <Teleport v-if="pending" defer to="#drop-site-composer">
         <form
           class="space-y-3 overflow-y-auto overscroll-contain p-3"
@@ -355,7 +330,6 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 @click="pickImages"
               />
             </UTooltip>
-            <!-- Beside the page the column's X does this; in the dock it reads as Cancel next to Send. -->
             <UButton
               class="hidden in-[#drop-comments]:inline-flex"
               color="neutral"

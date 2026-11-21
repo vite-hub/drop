@@ -15,10 +15,6 @@ import { requestLog } from "../../utils/logs"
 import { routeId } from "../../utils/params"
 import { countView } from "../../utils/views"
 
-/**
- * Owners, editors, admins, and anyone the drop is shared with. Private drops 404 for everyone else. `?v=<n>` reads an
- * earlier version.
- */
 export default defineHandler(async (event) => {
   const id = await routeId(event)
   const version = Number(event.url.searchParams.get("v")) || undefined
@@ -30,8 +26,6 @@ export default defineHandler(async (event) => {
   if (!drop || !permissions(drop, who).view)
     throw new HTTPError({ status: 404, statusText: "This drop is private, or it was deleted." })
   event.res.headers.set("Cache-Control", "private, no-store")
-  // Signed-in people and agents count here; anonymous visitors count through the page's visit beacon. The writes go
-  // alongside the reads below rather than before them.
   const visited = who
     ? Promise.all([
         recordVisit(event, drop, who, "beacon"),
@@ -39,13 +33,8 @@ export default defineHandler(async (event) => {
         recordSharedVisit(drop, who, event),
       ])
     : undefined
-  // Named after the drop, so every version of an HTML doc keeps the browser storage the last one left.
   const frameOrigin = drop.kind === "app" || drop.kind === "html" ? await contentOrigin(event, drop.id) : null
-  // An app on its own origin loads its files from there, pages too (the frame reads them), so the viewer needs only a
-  // grant to them.
   const served = drop.kind === "app" && !!frameOrigin && perDropOrigins(event)
-  // A folder a stranger opens may be a skill hub, or one of its skills; any other drop reads nothing more.
-  // Install metadata is optional: unavailable child content must not prevent browsing the folder itself.
   const hub =
     drop.kind === "folder" && permissions(drop, null).view
       ? import("../../utils/hub-skills")

@@ -1,7 +1,6 @@
 import { migrations } from "./migrations.mjs"
 import { pathToFileURL } from "node:url"
 
-// Node and Deno can run this without Wrangler or native dependencies.
 export async function migrateD1(env = process.env) {
   const required = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_D1_DATABASE_ID"]
   for (const name of required) {
@@ -31,14 +30,12 @@ export async function migrateD1(env = process.env) {
     return payload.result.at(-1)?.results || []
   }
 
-  // Use Wrangler's ledger so either migration command can follow the other.
   await query(
     "CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
   )
   const applied = new Set((await query("SELECT name FROM d1_migrations")).map((row) => row.name))
   for (const { name, sql } of migrations()) {
     if (applied.has(name)) continue
-    // D1 executes the SQL and ledger insert in one request. A failure rolls back both.
     await query(`${sql}\n; INSERT INTO d1_migrations (name) VALUES ('${name.replaceAll("'", "''")}');`)
     console.log(`Applied ${name}`)
   }

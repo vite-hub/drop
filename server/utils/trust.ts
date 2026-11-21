@@ -12,7 +12,6 @@ export async function shareReviewFor(ownerId: string, event?: H3Event, joinedOwn
   return needsShareReview(true, owner ?? undefined) ? ("pending" as const) : null
 }
 
-/** Code images have no drop row to quarantine, so their owner lookup checks for a report on the file itself. */
 export function rawFileQuarantine(target: string) {
   return exists(
     db

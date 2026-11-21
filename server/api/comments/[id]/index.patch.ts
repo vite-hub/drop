@@ -6,7 +6,6 @@ import { identify } from "../../../utils/identity"
 import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
-/** Resolve or reopen: the drop's managers, or the comment's author. */
 export default defineValidatedHandler({
   validate: { body: CommentPatchSchema },
   async handler(event) {

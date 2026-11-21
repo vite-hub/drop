@@ -3,7 +3,6 @@ import { canPinDrop, findDrop, setPinned } from "../../../utils/drops"
 import { requireIdentity } from "../../../utils/identity"
 import { routeId } from "../../../utils/params"
 
-/** Pins a drop you can open, for your Pinned view. Only for you: nobody else sees your pins. */
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const drop = await findDrop(await routeId(event), event)

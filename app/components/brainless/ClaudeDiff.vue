@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Claude Code's inline edit hunk: ⏺ Update(file), the ⎿ summary, and tinted +/- rows.
-// Ported from Brainless (MIT, see LICENSE).
 type DiffLine = { type: "add" | "del" | "ctx"; n?: number; text: string }
 defineProps<{ file: string; summary?: string; lines: DiffLine[] }>()
 const BG = { add: "rgba(78,169,111,.12)", del: "rgba(247,118,142,.14)", ctx: "transparent" }

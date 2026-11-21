@@ -6,18 +6,12 @@ export type Host = HostId
 
 const isHost = (value: string): value is Host => HOSTS.some((host) => host === value)
 
-/**
- * Build-time choices. Credentials and the SQLite path remain runtime settings. DROP_HOST wins; otherwise ViteHub reads
- * the host from the build env (VITEHUB_HOST, NITRO_PRESET, VERCEL, NETLIFY, ...), and ViteHub's build rejects a Nitro
- * preset that conflicts with it. Drop calls ViteHub's node host `vps`.
- */
 export function deployment(env: Record<string, string | undefined> = process.env) {
   const detected = detectHost(env)
   const host =
     env.DROP_HOST || (detected === "node" ? "vps" : detected) || (env.DROP_DATABASE_URL ? "vps" : "cloudflare")
   if (!isHost(host)) throw new Error(`DROP_HOST must be one of ${HOSTS.join(", ")}; got "${host}".`)
 
-  // Preserve existing VPS deployments with an explicit D1 database. Never switch a configured D1 to SQLite.
   const database =
     env.DROP_DATABASE ||
     (env.DROP_DATABASE_URL ? "sqlite" : host === "vps" && !env.CLOUDFLARE_D1_DATABASE_ID ? "sqlite" : "d1")

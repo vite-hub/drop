@@ -1,9 +1,4 @@
 <script setup lang="ts">
-// A link's site icon, from Drop's own endpoint (server/utils/favicons.ts), which falls back to a link icon itself; a plain
-// link icon also stands in if the endpoint can't be reached. Only once mounted: an image the server rendered can fail
-// before the page hydrates, and its error would never reach the handler.
-// Favicons are drawn for a light tab bar, and many (GitHub, Airtable, Vercel) are a black mark, so in the dark theme
-// each sits on a light plate: a ring of the plate's color grows it 2px past the icon without moving the layout.
 import { faviconUrl } from "#shared/resources"
 
 const props = defineProps<{ url: string }>()
@@ -28,7 +23,6 @@ watch(
     :src="tries[index]"
     @error="index++"
   />
-  <!-- An icon font's glyph is a mask over its own fill, so the plate goes on a box around it. -->
   <span
     v-else
     class="grid size-4 shrink-0 place-items-center rounded-xs text-muted dark:bg-white dark:text-neutral-500 dark:ring-2 dark:ring-white"

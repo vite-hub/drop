@@ -1,10 +1,4 @@
 <script setup lang="ts">
-// How much of the plan the drops use, at the foot of the sidebar: storage, drops, and file writes. Shown only
-// where a plan sets limits. Each limited quota gets its own bar, which turns to a warning near its limit, and near
-// any limit the block offers your own Drop, which has none.
-//
-// The sidebar is 15rem by default and 12rem at its narrowest, which leaves 208px and 160px here. Short labels keep
-// each label and value on one row at both; a value that still doesn't fit moves under its label.
 import { MIB, quotaNearLimit, usageNearLimit } from "#shared/quotas"
 
 const { data: usage } = useUsage()
@@ -22,7 +16,6 @@ const reached = computed(() => {
   )
 })
 
-// One fixed locale, so the server and the browser print the same digits.
 const count = new Intl.NumberFormat("en-US")
 const amount = (n: number | null) => (n === null ? "∞" : count.format(n))
 const mib = (bytes: number) => Math.ceil((bytes / MIB) * 10) / 10
@@ -84,7 +77,7 @@ const rows = computed(() => {
     <p v-if="near" class="text-pretty text-muted">
       {{ reached ? "Plan limit reached." : "Near your plan's limit." }}
       <ULink
-        class="whitespace-nowrap text-highlighted underline decoration-1 underline-offset-2 hover:decoration-2"
+        class="whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)"
         :to="usage.selfHostUrl"
         external
         >Deploy your own</ULink

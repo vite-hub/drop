@@ -3,7 +3,6 @@ import { AI_FETCHER } from "../utils/ai-fetcher"
 
 const notFound = () => new HTTPError({ status: 404, statusText: "Not found" })
 
-/** A path segment as written, or a 404 when its percent-encoding is malformed (decodeURIComponent throws). */
 function decoded(segment: string) {
   try {
     return decodeURIComponent(segment)
@@ -12,7 +11,6 @@ function decoded(segment: string) {
   }
 }
 
-/** Gates file URLs and shared pages before rendering; all utility imports stay out of the Worker entry. */
 export default defineHandler(async (event) => {
   if (event.url.pathname.startsWith("/f/")) {
     const key = decoded(event.url.pathname.slice(3))
@@ -23,10 +21,6 @@ export default defineHandler(async (event) => {
     event.context.dropAccessChecked = true
     return
   }
-  // `/d/<link>`, the address the page settles on, `/d/<link>/<slug>`, and a page of an app under it,
-  // `/d/<link>/<slug>/guide/setup`.
-  // The Markdown copy of a share link, `/d/<link>.md` or `/d/<link>/<slug>.md`, passes the same gate, then its route
-  // answers (server/routes/d).
   const markdown = /^\/d\/[^/]+(?:\/[^/]+)?\.md$/.test(event.url.pathname)
   const path = markdown ? event.url.pathname.slice(0, -".md".length) : event.url.pathname
   const page = path.match(/^\/d\/([^/]+)(?:\/[^/]*(\/.*)?)?$/)
@@ -45,7 +39,6 @@ export default defineHandler(async (event) => {
       ["GET", "HEAD"].includes(event.req.method) &&
       (AI_FETCHER.test(headers.get("user-agent") ?? "") || !/\btext\/html\b/i.test(headers.get("accept") ?? ""))
     )
-      // Missing and inaccessible drops give the same hint, so it cannot disclose a private drop.
       return new Response(
         event.req.method === "HEAD"
           ? null
@@ -67,9 +60,6 @@ export default defineHandler(async (event) => {
   if (markdown) return
   const { dropPath, slugify } = await import("../../shared/links")
   const to = dropPath({ link: drop.id, slug: drop.slug ?? slugify(drop.title) })
-  // A path under the link is a page of the app: the link opens it as `?path=`, where the viewer keeps an app's address
-  // (useAppFiles). The query keys Drop's page reads stay its own, and the rest go with the path to the app. The browser
-  // keeps the #hash across the redirect. A doc has no pages, so the path goes.
   if (page[2]) {
     if (!["GET", "HEAD"].includes(event.req.method)) throw notFound()
     const { DROP_PAGE_PARAMS } = await import("../../shared/links")
@@ -80,18 +70,13 @@ export default defineHandler(async (event) => {
     if (drop.kind === "app") ours.set("path", `${page[2]}${app.size ? `?${app}` : ""}`)
     return redirect(`${to}${ours.size ? `?${ours}` : ""}`)
   }
-  // A pinned `?v=` renders: the page checks that the version exists.
   if (!["GET", "HEAD"].includes(event.req.method) || event.url.searchParams.has("v")) return
-  // Let Content answer negotiable documents before the viewer's redirect and HTML HEAD shortcuts.
   if (drop.kind === "markdown" || drop.kind === "html") {
     const { acceptsMarkdown } = await import("vite-hub/content/markdown")
     const { headers } = event.req
     if (acceptsMarkdown(headers.get("accept")) || AI_FETCHER.test(headers.get("user-agent") ?? "")) return
   }
-  // The page moves to the doc's own address (pages/d/[id]/[[slug]].vue). Redirecting here saves rendering a page only
-  // to send that redirect, as `/d/<link>` without its slug did.
   if (event.url.pathname !== to) return redirect(to + event.url.search)
-  // HEAD wants the status, not the page (a full render, ~0.9 s).
   if (event.req.method === "HEAD")
     return new HTTPResponse(null, { headers: { "content-type": "text/html;charset=utf-8" } })
 })

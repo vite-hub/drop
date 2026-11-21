@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A doc's versions one after the other, newest first, like a commit log: what each one changed (its note), who
-// published it, and the comments written on it. A version shows what it changed (ViewerDiff) in place of the document;
-// `selected` is the one showing. Each one's link stays on that version, while the doc's link follows the latest.
 import { RelativeTime } from "vite-hub/ui"
 import { agentLabel } from "#shared/agent"
 import { dropPath } from "#shared/links"
@@ -12,7 +9,6 @@ const emit = defineEmits<{ open: [version: DropVersion] }>()
 const origin = useRequestURL().origin
 const versionLink = (version: DropVersion) => `${origin}${dropPath(props.drop, version.version)}`
 
-// Comments come up to the version being viewed (listComments), so later versions have none to count here.
 function talk(version: DropVersion) {
   if (version.version > props.drop.version) return ""
   const written = props.comments.filter((comment) => comment.version === version.version).length
@@ -21,8 +17,6 @@ function talk(version: DropVersion) {
 </script>
 
 <template>
-  <!-- TODO(repo-mirror): once versions also go to a repo the owner picks (@vite-hub/forge, see server/utils/drops.ts),
-       link each version to its commit here. -->
   <ol class="p-2">
     <li v-for="(version, index) in drop.versions" :key="version.version" class="group/row relative">
       <span

@@ -1,6 +1,3 @@
-// What Drop injects into every plan document.
-// The theme contract matches T3 Code's HTML renders (same shadcn token names, --chart-1…6, base stylesheet),
-// so a page an agent built for T3 renders the same way in Drop.
 import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
@@ -12,8 +9,6 @@ import { commentLeaveMs } from "vite-hub/ui/headless"
 
 const FONTS = `--font-sans: "Geist", ui-sans-serif, system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;`
 
-// The frame runs on another origin than Drop's assets, so Geist comes from Google Fonts here. The colors are the
-// app's own (shared/theme.css).
 export const THEME_CSS = `@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap");
 ${THEME}
 :root { ${FONTS} }
@@ -21,17 +16,12 @@ html { background: var(--background); color: var(--foreground); font-family: var
 body { margin: 0; }
 code, kbd, pre, samp { font-family: var(--font-mono); }`
 
-/** The rules agents follow when they build an HTML plan. Shown on the Agents page and shipped in the skill. */
 export const PLAN_AUTHORING_GUIDE = `Write one self-contained HTML document with inline <style> and <script>. Load libraries from a CDN (Chart.js, Mermaid, D3, KaTeX); they run as-is.
 Drop shows the page full screen, so center a readable column (max-width ~760px) with its own padding.
 When the page reads them, Drop injects its theme as CSS custom properties on :root and follows the reader's light/dark mode: --background, --foreground, --muted, --muted-foreground, --card, --border, --primary, --primary-foreground, --destructive, --code-background, --chart-1 … --chart-8 (use in order), --positive, --caution, --negative, --radius, --font-sans, --font-mono. Use them instead of fixed colors. Grayscale first: color only for chart series and status.
 Readers comment by selecting text, or with the Comment tool by clicking an element or drawing a rectangle over any part of the page; clicks stay your page's own. Prefer real text, lists, and tables over text baked into images.
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`
 
-/**
- * How a comment names an element of someone's page: a CSS path to it, a label (its tag and first words), and the
- * smallest element that holds a rectangle drawn over it. Shared by the frame's comment layer and the site review script.
- */
 export const ELEMENT_NAMING = String.raw`function pathOf(el) {
     const parts = [];
     while (el && el.nodeType === 1 && el !== document.documentElement && parts.length < 10) {
@@ -93,11 +83,6 @@ export const ELEMENT_NAMING = String.raw`function pathOf(el) {
     return null;
   }`
 
-/**
- * A scroll key Drop's window passed on, because its focus was there and not on the page: the page scrolls as it would
- * for the key itself (app/utils/frame-scroll-key.ts). Quick presses add up while the smooth scroll runs. `still` says
- * when a drawing tool holds the page. Shared by the frame's comment layer and the site review script.
- */
 export const KEY_SCROLL = String.raw`function keyScroller(still) {
   let target = 0, targetAt = -Infinity;
   return (key, shift) => {
@@ -114,24 +99,12 @@ export const KEY_SCROLL = String.raw`function keyScroller(still) {
   };
 }`
 
-/**
- * ⌘K on a Mac, Ctrl+K elsewhere: Drop's palette (SearchPalette), whose key never reaches Drop's window while a page in
- * a frame has the focus. The frame tells Drop instead, and takes the key from the browser, whose Ctrl+K would move the
- * focus to its own search. It matches Nuxt UI's `meta_k` (defineShortcuts): the same modifier, no Shift or Alt, and in
- * a field too, as the palette's own shortcut works in Drop's fields. A key the page used itself stays the page's.
- * Shared by the frame's comment layer and the site review script.
- */
 export const PALETTE_KEY = String.raw`function paletteKey(e) {
   if (e.defaultPrevented || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return false;
   const mac = /Macintosh;/.test(navigator.userAgent);
   return mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
 }`
 
-/**
- * What the frame's comment layer and the site review script share: the Marker's ink (the path of a stroke, a marker,
- * pen, or arrow in viewport pixels, or a text label, drawn on an SVG layer or a canvas, the pointer for a tip, and
- * drawing strokes and typing labels on a layer) and people's initials.
- */
 export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
   // The pointer is the tip: its size and colour, see-through for the marker. The arrow keeps the crosshair.
   function penCursor(pen) {
@@ -376,17 +349,6 @@ export const INK = String.raw`const SVG = "http://www.w3.org/2000/svg";
     return String(name || "?").trim().split(/\s+/).slice(0, 2).map((word) => word[0] || "").join("").toUpperCase() || "?";
   }`
 
-/**
- * Comment layer. Runs inside the drop's frame, on another origin than Drop, so it only talks to Drop via postMessage.
- * Select text to comment on it; click an image to zoom and comment on a spot. The viewer's toolbar picks a tool: with
- * Comment (R), click an element to pin a comment to it or drag a rectangle; with Measure, inspect sizes and distances;
- * with the Marker, draw on a still of the page and send it as a comment.
- * On a page someone else built (an HTML doc or an app, AUTHORED), clicks stay the page's own: no image zoom, no copy
- * buttons on its code. Its images take comments through the Comment tool.
- * Comark's own zoom, such as an annotated screenshot's, shows the comments on what it zooms and takes areas drawn on it.
- * Commented text is highlighted with the CSS Custom Highlight API and everything else draws in a shadow root, so the
- * author's DOM is never modified.
- */
 const ANNOTATOR_SCRIPT = String.raw`(() => {
   const AUTHORED = __AUTHORED__, THEMED = __THEMED__, DARK = __DARK__;
   const post = (message) => parent.postMessage(Object.assign({ __drop: true }, message), "*");
@@ -2234,12 +2196,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   post({ type: "ready" });
 })();`
 
-/**
- * While a tool is on (the comment layer's setTool), the page hears none of the pointer, mouse, touch, and focus events.
- * A tooltip, menu, or popover it has open stays open as the reviewer opened it: it misses the pointer leaving it for the
- * layer over the page, the click that ends a drawn box, and the blur when Drop's composer takes focus. It runs first in
- * the head, so its listeners come before any the page adds, and the layer gets what it stopped through `__dropHold`.
- */
 const EVENT_HOLD = String.raw`(() => {
   let hold = null;
   Object.defineProperty(self, "__dropHold", { value: (fn) => { hold = typeof fn === "function" ? fn : null; } });
@@ -2251,12 +2207,6 @@ const EVENT_HOLD = String.raw`(() => {
   for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) addEventListener(type, stop, { capture: true, passive: true });
 })();`
 
-/**
- * In an opaque-origin sandbox (no content origin configured), storage, cookies, and URL changes throw a
- * SecurityError ("The operation is insecure"), which crashes apps that never expected it. Give them in-memory
- * storage and cookies for the page's lifetime, and let history calls keep their state without changing the URL.
- * On a real origin it does nothing.
- */
 export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
   if (self.origin !== "null") return;
   const memory = () => {
@@ -2297,11 +2247,6 @@ export const OPAQUE_ORIGIN_SHIM = String.raw`(() => {
   }
 })();`
 
-/**
- * Reports the page's own failures to Drop so the agent that published it can read them: uncaught errors, rejected
- * promises nobody handled, console.error calls, and files that failed to load. Runs before the page's scripts.
- * At most 20 distinct reports per page load, each cut to 500 characters.
- */
 const ERROR_REPORTER = String.raw`(() => {
   const seen = new Set();
   const text = (value) => {
@@ -2329,29 +2274,16 @@ const ERROR_REPORTER = String.raw`(() => {
   };
 })();`
 
-/** Puts `snippet` first in the head, or after the doctype when there's no head tag, so the page keeps standards mode. */
 export function prependToHead(html: string, snippet: string): string {
   if (/<head(\s[^>]*)?>/i.test(html)) return html.replace(/<head(\s[^>]*)?>/i, (match) => match + snippet)
   const doctype = html.match(/^\s*<!doctype[^>]*>/i)?.[0] ?? ""
   return doctype + snippet + html.slice(doctype.length)
 }
 
-/**
- * Whether a page was written for Drop's theme (PLAN_AUTHORING_GUIDE): it reads Drop's tokens without setting its own.
- * A page with its own design, such as a Tailwind app, never gets Drop's fonts, base size, or dark class.
- */
 const DROP_TOKEN =
   /var\(\s*--(?:background|foreground|muted|muted-foreground|card|border|primary|primary-foreground|destructive|code-background|chart-\d|positive|caution|negative)\s*[,)]/
 const usesDropTheme = (html: string) => DROP_TOKEN.test(html) && !/--background\s*:/.test(html)
 
-/**
- * A prototype (skills/prototype) is a page with `data-variant` items. Drop owns its picker: it runs the current
- * skills/prototype/assets/picker.js in every one, whether the author pasted a copy or not, so a prototype published
- * before a picker change gets the new one and no prototype depends on a copy surviving intact. Any copy the author
- * pasted (whole, trimmed, or older) or loaded from the prototype asset path goes. Recognize Drop's header or a trimmed
- * copy's item setup and storage namespace together, so authored event handlers and unrelated dependencies stay intact.
- * A current copy that slips through steps aside for Drop's, which `__dropPicker` announces before the page's scripts run.
- */
 const PROTOTYPE = /<[a-z][^>]*\sdata-variant[\s=>]/i
 const SCRIPT_SRC = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i
 const PICKER_URL = /^(?:[^?#]*\/)?prototype\/assets\/picker\.js(?:[?#].*)?$/i
@@ -2380,18 +2312,9 @@ function withPicker(html: string): string {
     : marked + picker
 }
 
-/**
- * Tells a prototype's picker that the viewer's bottom bar shows its variants (ViewerVariants), so the page draws no bar
- * of its own. Only the viewer sets it: a drop open alone in a window (ViewerPresent) keeps the page's bar.
- */
 export const withVariantBar = (document: string) =>
   prependToHead(document, "<script>self.__dropVariantBar = true;</script>")
 
-/**
- * An HTML drop as a Markdown doc's `::drop` box shows it (EMBEDS_SCRIPT in ./documents): no comment layer or error
- * reporter, since the doc around it is what readers review, but storage that works in its opaque origin, Drop's theme
- * when it reads Drop's tokens, the reader's color mode as a `dark` class on its root either way, and a prototype's picker.
- */
 export function embedDocument(html: string, dark: boolean): string {
   const theme = usesDropTheme(html) ? `<style data-drop-theme>${THEME_CSS}</style>` : ""
   return prependToHead(
@@ -2400,13 +2323,6 @@ export function embedDocument(html: string, dark: boolean): string {
   )
 }
 
-/**
- * Injects Drop's runtime into a full HTML document. The author's markup stays as it is, except that a prototype runs
- * Drop's current picker in place of any it carries (withPicker).
- * `inset`: the room the viewer's floating panel takes on the right at load, so the text starts clear of it.
- * `authored`: a page someone else built (an HTML doc or an app page), which gets only what comments need: Drop's
- * theme only if it reads Drop's tokens, and a comment layer that leaves its clicks alone (ANNOTATOR_SCRIPT).
- */
 export function injectRuntime(html: string, dark: boolean, inset = 0, authored = false): string {
   const theme =
     authored && !usesDropTheme(html)

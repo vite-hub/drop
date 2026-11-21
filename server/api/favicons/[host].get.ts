@@ -1,12 +1,7 @@
 import { defineHandler, HTTPError } from "h3"
 import { FAVICON_HOST, siteIcon } from "../../utils/favicons"
 
-/**
- * A link's site icon (server/utils/favicons.ts), public like the drops that show it: docs load it from their frame,
- * which sends no session. It says nothing about who links where, only what a host's icon looks like.
- */
 export default defineHandler(async (event) => {
-  // comark-chips names a site by its URL's host, which keeps a port (localhost:3000); the icon is the host's.
   const host = decodeURIComponent(event.context.params?.host ?? "")
     .toLowerCase()
     .replace(/:\d{1,5}$/, "")

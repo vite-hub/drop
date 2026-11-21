@@ -1,12 +1,4 @@
 <script setup lang="ts">
-// The ⌘K palette on every dashboard page: drops you can open (yours at any depth, then teammates'), matched by name or
-// by a doc's words on the server, and, matched here, what you can do with the drop open, new drops to make, the app's
-// pages, the theme, and signing out. The sidebar's search button opens it too, a folder's search box opens it with
-// `in:<folder>` typed in, and a drop's frame passes ⌘K on while the page in it has the focus (useViewerFrame,
-// ViewerSiteFrame). `in:` and `kind:` narrow the drops (utils/search-query); the chips below write them.
-// With nothing typed it leads with the drops you pinned, then your newest.
-// The drop open offers everything its review pill does (DropViewer's usePaletteOffer), each with the pill's key, and a
-// mode or a view that's on, or the choice made, as `active`, as the Theme group marks the theme.
 import type { CommandPaletteGroup, CommandPaletteItem } from "@nuxt/ui"
 import { DROP_KINDS, type DropSummary } from "#shared/types"
 
@@ -16,7 +8,6 @@ const shortcutsOpen = useShortcutsOpen()
 const signOut = useSignOut()
 const { createDoc, createBoard, createFolder, newSite, upload } = useDropActions()
 const folderDialog = useFolderDialog()
-// The drop and the folder open on the page (usePaletteOffer): its commands, and where new drops go.
 const context = injectPaletteContext()
 const current = computed(() => context?.drop.value ?? null)
 const folder = computed(() => context?.folder.value ?? null)
@@ -27,25 +18,23 @@ const pinnedIds = computed(() => new Set(pinned.value.map((drop) => drop.id)))
 const recent = computed(() => newest.value.filter((drop) => !pinnedIds.value.has(drop.id)))
 const dropsView = useDropsView()
 const term = usePaletteTerm()
-// Opened with a term (a folder's search), the caret goes after it: the field selects it all, and the first key typed
-// would replace the folder's `in:`.
 const open = ref(false)
+function moveCaretToEnd() {
+  if (!import.meta.client) return
+  const input = document.querySelector<HTMLInputElement>("[role=dialog] input")
+  input?.setSelectionRange(input.value.length, input.value.length)
+}
+const caretToEnd = useRafFn(moveCaretToEnd, { once: true, immediate: false })
 watch(
   open,
   (opened) => {
-    if (!opened || !term.value) return
-    requestAnimationFrame(() => {
-      const input = document.querySelector<HTMLInputElement>("[role=dialog] input")
-      input?.setSelectionRange(input.value.length, input.value.length)
-    })
+    if (opened && term.value) caretToEnd.resume()
   },
   { flush: "post" },
 )
 const parsed = computed(() => parseSearch(term.value))
 const filtered = computed(() => Boolean(parsed.value.folder || parsed.value.kinds.length))
 
-// `in:` names the folder open on the page, or any folder your drops may go in: by id, by title, or by the start of one
-// title only. The list loads only when a search names a folder that isn't the one open.
 const named = computed(() => parsed.value.folder?.toLowerCase())
 const matches = (drop: Pick<DropSummary, "id" | "title">) =>
   drop.id === parsed.value.folder || drop.title.toLowerCase() === named.value
@@ -65,7 +54,6 @@ const searched = computed(() => {
   return pool.find(matches) ?? (new Set(starting.map((drop) => drop.id)).size === 1 ? starting[0] : undefined)
 })
 
-// The server gets the words and the kinds; a folder search goes to that folder's list instead of everything.
 const request = computed(() => ({
   url: searched.value ? "/api/drops" : "/api/search",
   query: {
@@ -83,12 +71,10 @@ const { data: found, status } = useApi<DropSummary[]>(() => asked.value.url, {
   server: false,
 })
 
-/** Where a drop lives: whose it is when it isn't yours, then its folders. */
 function where(drop: DropSummary) {
   const folders = drop.path?.map((crumb) => crumb.title).join(" / ")
   return [drop.owner?.name, folders && `in ${folders}`].filter(Boolean).join(" · ") || undefined
 }
-// The chips under the search: the folder open on the page, then each kind. They write `in:` and `kind:` into the search.
 const kinds = DROP_KINDS.map((kind) => ({ kind, label: KIND_LABELS[kind] }))
 const pending = computed(() => status.value === "pending" || !settled.value)
 const chip = (on: boolean) => [
@@ -105,8 +91,6 @@ const toItem = (drop: DropSummary): CommandPaletteItem => ({
   to: `/drops/${drop.id}`,
 })
 
-// Plain links: the three /drops tabs would all read as the current page otherwise. A team Drop's Team page takes the
-// place of Shared with me, as in the sidebar.
 const pages = computed<CommandPaletteItem[]>(() =>
   [
     { label: me.value?.mode === "team" ? "My drops" : "Drops", icon: "i-mingcute-layers-line", to: "/drops" },
@@ -123,7 +107,6 @@ const pages = computed<CommandPaletteItem[]>(() =>
       : { label: "Shared with me", icon: "i-mingcute-inbox-line", to: "/drops?tab=with-me" },
     { label: "Trash", icon: "i-mingcute-delete-2-line", to: "/drops?tab=trash" },
     { label: "Agents", icon: "i-mingcute-sparkles-line", to: "/agents" },
-    // As in the sidebar: members see Skills while one is on.
     ...(me.value?.role === "admin" || me.value?.skills
       ? [{ label: "Skills", icon: "i-mingcute-plugin-2-line", to: "/skills" }]
       : []),
@@ -142,7 +125,6 @@ const pages = computed<CommandPaletteItem[]>(() =>
       : []),
   ].map((page) => ({ ...page, active: false })),
 )
-// Groups of their own: Nuxt UI shows at most 12 items in a group.
 const docs = DOCS_PAGES.map((page) => ({
   label: page.label,
   suffix: "Docs",
@@ -181,9 +163,6 @@ async function uploadPicked(files: FileList | null) {
   if (result) await navigateTo(`/drops/${result.id}`)
 }
 
-// The New menu's drops and Upload. In a folder you add to they go in it, as its New menu would put them; a team
-// folder's members add drops but not folders, so their new folder goes at the top. Descriptions are searched too, so
-// "canvas" finds the board.
 const create = computed<CommandPaletteItem[]>(() => {
   const inside = folder.value ?? undefined
   const suffix = inside && `in ${inside.title}`
@@ -234,14 +213,11 @@ const create = computed<CommandPaletteItem[]>(() => {
       suffix,
       description: "A doc, page, image, video, or any file",
       icon: "i-mingcute-upload-2-line",
-      // Opens the file picker straight from the pick, while the browser still counts it as the person's click.
       onSelect: () => picker.open(),
     },
   ]
 })
 
-// Every match at once, on the Drops page as cards, in the view (Recent or Folders) the reader keeps there. A folder
-// search stays in the palette: the folder's own page lists it.
 const showAll = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
   const { words, kinds: picked } = parsed.value
   if (named.value || !(words || picked.length)) return []
@@ -266,15 +242,10 @@ const showAll = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => {
   ]
 })
 
-// Until the debounced words reach the server, the last results would answer the new words: show none instead. A folder
-// no one has is nothing to search.
 const settled = computed(() => JSON.stringify(asked.value) === JSON.stringify(request.value))
 const unknownFolder = computed(() => Boolean(named.value) && !searched.value)
-// The open drop's commands lead: they're about what's on screen. With words, matching pages and new drops follow: there
-// are few, and most searches match none. Theme commands stay ahead of delayed results so Enter keeps its target.
 const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
   ...showAll.value,
-  // With a filter on, only drops can match it.
   ...(filtered.value
     ? [
         {
@@ -321,7 +292,6 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
 </script>
 
 <template>
-  <!-- No open or close animation: a palette summoned many times a day should be there the moment ⌘K lands. -->
   <UDashboardSearch
     v-model:open="open"
     v-model:search-term="term"
@@ -342,7 +312,6 @@ const groups = computed<CommandPaletteGroup<CommandPaletteItem>[]>(() => [
         <template v-else>{{ pending ? "Searching…" : "Nothing matches." }}</template>
       </p>
     </template>
-    <!-- The chips keep the focus in the search (mousedown.prevent), so typing goes on where it was. -->
     <template #footer>
       <div
         class="flex items-center gap-1 overflow-x-auto px-2 py-1.5 [scrollbar-width:none]"

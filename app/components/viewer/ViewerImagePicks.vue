@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// The images a comment box will send, as small previews, each with a button to take it out.
 import type { ImagePick } from "~/composables/useImagePicks"
 
 defineProps<{ picks: ImagePick[] }>()

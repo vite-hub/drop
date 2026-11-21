@@ -2,9 +2,6 @@ import { sql } from "drizzle-orm"
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 import { user } from "./index"
 
-// Teams on a personal Drop (server/utils/teams.ts): Better Auth's organization plugin keeps who is on which team, and
-// its Stripe plugin keeps each team's subscription. A team's drops live in its team folders (`drops.team_id`).
-
 const createdAt = () =>
   integer("created_at", { mode: "timestamp_ms" })
     .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
@@ -19,20 +16,12 @@ export const organization = sqliteTable(
     logo: text("logo"),
     metadata: text("metadata"),
     stripeCustomerId: text("stripe_customer_id"),
-    /**
-     * The most members and pending invitations the team may have, or null for no limit. Drop writes it before each
-     * invitation or new member (server/utils/teams.ts `holdMemberLimit`), and a trigger refuses the insert past it.
-     */
     memberLimit: integer("member_limit"),
     createdAt: createdAt(),
   },
   (table) => [uniqueIndex("organization_slug_idx").on(table.slug)],
 )
 
-/**
- * Who is on a team: `owner` (made it, pays for it), `admin` (manages its folders and people), or `member`. Deleting an
- * account takes it off its teams first (server/utils/teams.ts `leaveTeams`); the foreign key catches any other delete.
- */
 export const member = sqliteTable(
   "member",
   {
@@ -52,7 +41,6 @@ export const member = sqliteTable(
   ],
 )
 
-/** An invitation by email. Drop sends no mail: whoever invites copies the link, and the invitee signs in with that email. */
 export const invitation = sqliteTable(
   "invitation",
   {
@@ -74,7 +62,6 @@ export const invitation = sqliteTable(
   ],
 )
 
-/** A team's Stripe subscription, written by the Stripe plugin from Stripe's webhooks. `referenceId` is the team. */
 export const subscription = sqliteTable(
   "subscription",
   {

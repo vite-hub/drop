@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// Opened through useConfirm(): resolves true when confirmed, false on cancel or dismiss.
 const { confirmLabel = "Confirm", destructive = false } = defineProps<{
   title: string
   description?: string

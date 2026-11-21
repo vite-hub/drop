@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// A UDropdownMenu that mounts on its trigger's first click instead of with the page, already open. Each closed menu
-// still builds Reka's whole menu tree, and the Drops page's rows and tree items hold one or two each: together they
-// took about a third of the page's server render. Enter and Space click the trigger too, so keyboards open it the same.
 import type { DropdownMenuItem, DropdownMenuProps } from "@nuxt/ui"
 
 const { items, content } = defineProps<{

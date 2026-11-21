@@ -1,12 +1,6 @@
 import type { DropDetail } from "#shared/types"
 import type { EffectScope } from "vue"
 
-/**
- * Follows a doc's link to its newest version while someone reads it. The link's Realtime room (server/realtime/latest.ts)
- * holds the version number of the doc's head, and publishing re-seeds it, so a new version arrives as soon as it's out.
- * A reader who isn't busy moves to it at once; a busy one (commenting, selecting, a dialog open) gets a note, and moves
- * once done.
- */
 export function useLatestVersion(
   drop: Ref<DropDetail>,
   options: { enabled: MaybeRefOrGetter<boolean>; busy: () => boolean },
@@ -14,7 +8,6 @@ export function useLatestVersion(
   const notify = useNotify()
   const config = useRuntimeConfig()
   const enabled = () => config.public.realtime && toValue(options.enabled)
-  // The room loads once the page shows and following is on (~/composables/latest-room), in a scope of this component's.
   const room = shallowRef<Readonly<Ref<number>>>()
   let scope: EffectScope | undefined
   let generation = 0
@@ -47,11 +40,8 @@ export function useLatestVersion(
   })
   const latest = computed(() => room.value?.value ?? 0)
 
-  // The page loads the doc behind the link again: another version mounts a new viewer (both pages key it by id and
-  // version), and an app, which keeps its id, gets its new files.
   const follow = () => refreshNuxtData([keys.dropLink(drop.value.link), keys.drop(drop.value.id)])
 
-  // Busy readers hear about it once per version, and move as soon as they're done (the comment sent, the dialog closed).
   const busy = computed(options.busy)
   let told = 0
   watch([latest, busy], ([version, waiting]) => {

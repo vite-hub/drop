@@ -1,9 +1,9 @@
+import { promiseTimeout } from "@vueuse/core"
 import type { FrameMessage } from "#shared/frame-messages"
 import type { CommentInput } from "#shared/schemas"
 import type { DropDetail } from "#shared/types"
 import type { FrameBox } from "~/composables/useDropFrame"
 
-// Spelled out here rather than imported from the popover and lightbox SFCs, whose types ESLint can't read.
 type PendingComment = Omit<CommentInput, "body" | "mentions">
 type Area = { ox: number; oy: number; ow: number; oh: number }
 type Rect = { left: number; top: number; right: number; bottom: number }
@@ -14,62 +14,36 @@ type Lightbox = {
   selector: string
   label: string
   from?: { left: number; top: number; width: number; height: number }
-  /**
-   * A video's frame or a PDF's page: the second it's at or the page's number, and the still as a file, which its
-   * comments carry for agents to see.
-   */
   at?: number
   pdfPage?: number
   file?: File
 }
-// `body` and `error`: a comment that didn't go through, back in its box with why.
 type Popover = { x: number; y: number } & (
   | { type: "new"; pending: PendingComment; body?: string; error?: string }
   | { type: "thread"; id: string }
 )
-/** The toolbar's tools (ViewerToolbar): the page as it is, the Comment tool, the Measure tool, or the Marker. */
 export type ViewerTool = "browse" | "comment" | "measure" | "mark"
-/** What the toolbar shows over the page under any tool. */
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 
-/** What the frame reports about the reader's pointer and keys, in frame coordinates. */
 type PointerMessage = Extract<
   FrameMessage,
   { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" | "page-click" }
 >
 
-/**
- * What the reader points at in the viewer: a text selection with its Comment button, an image zoomed in the lightbox,
- * the toolbar's tools and overlays, and the popover where a new comment is written or a thread read. The frame's reports
- * (`receive`) arrive with the frame's box, to turn their coordinates into the page's.
- */
 export function useViewerAnnotations(options: {
   drop: Ref<DropDetail>
   editing: Ref<boolean>
   enabled?: Ref<boolean>
   canvas?: Readonly<Ref<boolean>>
   reviewOpen?: Ref<boolean>
-  /**
-   * The frame's picture of the tooltip or menu the comment being written is on, for its images; null once that comment
-   * is on another area, sent, or put away, so its picture goes too.
-   */
   shot?: (file: File | null) => void
-  /** Pin style: the reader clicked the page away from its pins while something was open beside one. */
   onPageClick?: () => void
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
   const popover = ref<Popover | null>(null)
-  /**
-   * Where the frame keeps the place of the comment being written on a selection or a drawn area, in page coordinates
-   * (draft-place). An area's moves with what it's on, as a prototype's canvas pans.
-   */
   const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
-  /**
-   * Where the open thread is written in, in page coordinates, as the page scrolls (draft-place with an id): beside its
-   * pin, or over its card in the margin (`rail`).
-   */
   const threadPlace = ref<{ id: string; rail: boolean; rect: Rect } | null>(null)
   watch(
     () => (popover.value?.type === "thread" ? popover.value.id : null),
@@ -79,10 +53,6 @@ export function useViewerAnnotations(options: {
     () => popover.value?.type === "new" && ["text", "area"].includes(popover.value.pending.kind),
     (placed) => !placed && (draftPlace.value = null),
   )
-  /**
-   * The comment whose thread the frame will open once it has scrolled to the pin (`awaitThread`). Escape, a tool, or
-   * another comment in the meantime clears it, so the late report doesn't open a thread the reader moved on from.
-   */
   let awaited: string | null = null
   let focusGeneration = 0
   const beginFocus = () => {
@@ -90,7 +60,6 @@ export function useViewerAnnotations(options: {
     return ++focusGeneration
   }
   const isFocusCurrent = (generation: number) => generation === focusGeneration
-  /** The number of the picture the frame takes for the area being commented on, if it takes one. */
   let awaitedShot: number | undefined
   let shotTaken = false
   let shotWaiters: (() => void)[] = []
@@ -98,22 +67,14 @@ export function useViewerAnnotations(options: {
     awaitedShot = undefined
     for (const resolve of shotWaiters.splice(0)) resolve()
   }
-  /** Drops the picture of the area that was being commented on, and stops waiting for one. */
   function dropShot() {
     settleShot()
     if (shotTaken) options.shot?.(null)
     shotTaken = false
   }
-  /** Resolves once the picture for the area being commented on is in, or failed, or after 10 s: a big page takes 5. */
   function waitForShot() {
     if (awaitedShot === undefined) return Promise.resolve()
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, 10_000)
-      shotWaiters.push(() => {
-        clearTimeout(timer)
-        resolve()
-      })
-    })
+    return Promise.race([promiseTimeout(10_000), new Promise<void>((resolve) => shotWaiters.push(resolve))])
   }
   const awaitThread = (id: string | null, generation?: number) => {
     if (generation !== undefined && generation !== focusGeneration) return false
@@ -122,24 +83,17 @@ export function useViewerAnnotations(options: {
   }
   const commenting = computed(() => drop.value.canComment && !editing.value && (options.enabled?.value ?? true))
 
-  /**
-   * Under Comment and Measure the frame lays a layer over the page that takes the pointer. Comment stays on after each
-   * comment, so a review drops one pin after another; Escape or Browse (V) gives the page its clicks back.
-   */
   const tool = ref<ViewerTool>("browse")
   const overlays = reactive<ViewerOverlays>({ rulers: false, xray: false, pins: true })
   const areaMode = computed(() => tool.value === "comment")
-  // Boards and files take general feedback; sites annotate captured screenshots through ViewerSite.
   const canDrawArea = computed(
     () => commenting.value && !lightbox.value && ["markdown", "image", "html", "app"].includes(drop.value.kind),
   )
-  // Opening Comments makes dragging available without replacing the plain-comment composer.
   const frameTool = computed<ViewerTool>(() =>
     canDrawArea.value && options.reviewOpen?.value && tool.value === "browse" && popover.value?.type !== "thread"
       ? "comment"
       : tool.value,
   )
-  /** Picks a tool, or puts the one on back to Browse. */
   function setTool(next: ViewerTool) {
     if (!(options.enabled?.value ?? true) && next !== "browse") return
     if ((next === "comment" || next === "mark") && !canDrawArea.value) return
@@ -153,7 +107,6 @@ export function useViewerAnnotations(options: {
   const toggleArea = () => setTool("comment")
   function toggleOverlay(name: keyof ViewerOverlays) {
     if (!(options.enabled?.value ?? true)) return
-    // Rulers measure any page in the frame, an image or a doc too; X-ray outlines an HTML page's or app's elements.
     if (name === "xray" && !inspectsPage.value) return
     overlays[name] = !overlays[name]
   }
@@ -168,17 +121,11 @@ export function useViewerAnnotations(options: {
     { flush: "sync" },
   )
   watch(canDrawArea, (value) => !value && ["comment", "mark"].includes(tool.value) && (tool.value = "browse"))
-  // A new comment that's sent, put away, or turned into a thread no longer wants the picture of its area.
   watch(
     () => popover.value?.type === "new",
     (writing) => !writing && dropShot(),
   )
 
-  /**
-   * The Marker freezes the page in the frame and takes strokes on it until Done sends them as one area comment with the
-   * snapshot (shared/plan-runtime.ts). `marks` counts the strokes so far; `finishing` holds while the frame draws them
-   * onto the snapshot.
-   */
   const pen = reactive<MarkPen>({ tip: "marker", color: "pink", sizes: { marker: 1, pen: 1, arrow: 1, text: 1 } })
   const penStyle = computed(() => ({
     tool: pen.tip,
@@ -188,7 +135,6 @@ export function useViewerAnnotations(options: {
   const marks = ref(0)
   const finishing = ref(false)
   watch(tool, (value) => value !== "mark" && (finishing.value = false))
-  /** Takes up the Marker with `tip`, or switches to it while marking. */
   function mark(tip: MarkTip = pen.tip) {
     pen.tip = tip
     if (tool.value !== "mark") setTool("mark")
@@ -197,8 +143,6 @@ export function useViewerAnnotations(options: {
     const sizes = MARK_TIPS[pen.tip].sizes
     pen.sizes[pen.tip] = Math.min(sizes.length - 1, Math.max(0, pen.sizes[pen.tip] + step))
   }
-  // The frame keeps the drawn rectangle while its comment is written, on the page or a zoomed screenshot; it drops it
-  // once the review dock closes. The mounted composer keeps its unsent text and files.
   const draftingArea = computed(
     () =>
       (options.reviewOpen?.value ?? true) &&
@@ -206,7 +150,6 @@ export function useViewerAnnotations(options: {
       ["area", "image"].includes(popover.value.pending.kind),
   )
 
-  /** Escape: close whatever is open, then put the tool down. */
   function dismiss() {
     const waiting = awaited !== null
     awaited = null
@@ -216,11 +159,9 @@ export function useViewerAnnotations(options: {
   }
 
   function receive(message: PointerMessage, frame: FrameBox) {
-    // Frame coordinates to page ones: the frame may be scaled down to fit a device's size.
     const x = (value: number) => frame.left + value * frame.scale
     const y = (value: number) => frame.top + value * frame.scale
     if (message.type === "marker" && message.focused && message.id !== awaited) return
-    // A pin, an area or an image picked meanwhile is the reader moving on.
     if (message.type === "marker" || message.type === "area" || message.type === "image") {
       awaited = null
       focusGeneration++
@@ -266,12 +207,10 @@ export function useViewerAnnotations(options: {
     if (message.type === "area") {
       dropShot()
       awaitedShot = commenting.value ? message.shot : undefined
-      // A Marker snapshot is one comment: the page unfreezes, and the strokes stay on it while it's written.
       const marked = tool.value === "mark"
       if (marked) tool.value = "browse"
       if (commenting.value) {
         const { kind = "area", selector, label, ox, oy, ow, oh, quote, ink } = message
-        // The comment written before kept its place; this one's comes from the frame right after.
         draftPlace.value = null
         popover.value = {
           type: "new",
@@ -291,7 +230,6 @@ export function useViewerAnnotations(options: {
         }
       }
     }
-    // Only for the comment it was taken for, while it's still being written.
     if (message.type === "area-shot" && message.shot === awaitedShot && popover.value?.type === "new") {
       const { image } = message
       if (image) {
@@ -311,7 +249,6 @@ export function useViewerAnnotations(options: {
     if (message.type === "key") pressed(message.key, message.tool)
   }
 
-  /** A toolbar key pressed while the page had focus. Apps may use these keys themselves, so only under a tool there. */
   function pressed(key: Extract<PointerMessage, { type: "key" }>["key"], under?: ViewerTool) {
     if (key === "Escape") {
       if (!options.reviewOpen?.value) return dismiss()
@@ -321,7 +258,6 @@ export function useViewerAnnotations(options: {
       beginFocus()
       return
     }
-    // Selected text in an app too: nothing typed reaches here, so the app wasn't using the key.
     if (key === "c" || key === "e") return commentOnSelection(key === "e")
     if (drop.value.kind === "app" && (under ?? "browse") === "browse") return
     if (key === "v") setTool("browse")
@@ -337,7 +273,6 @@ export function useViewerAnnotations(options: {
     if (key === "]" && tool.value === "mark") resize(1)
   }
 
-  /** `suggest`: the composer starts a suggested edit, its new words filled in with the selected ones. */
   function commentOnSelection(suggest = false) {
     if (!selection.value) return
     const { selector, quote, label, rect } = selection.value
@@ -360,7 +295,6 @@ export function useViewerAnnotations(options: {
     selection.value = null
   }
 
-  // Areas drawn over an image in the page anchor to that image, so the lightbox takes comments too.
   function pickImage(area: Area, x: number, y: number) {
     if (!lightbox.value || !commenting.value) return
     const { selector, alt, label, at, pdfPage, file } = lightbox.value
