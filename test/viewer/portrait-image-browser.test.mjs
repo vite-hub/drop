@@ -4,6 +4,7 @@ import { typesetStylesheet } from "comark-ui/client"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { renderMarkdownDocument } from "../../server/utils/markdown-document.ts"
+import { siteTile } from "../../shared/site-tile.ts"
 import { migrate } from "../cost/harness.mjs"
 
 migrate()
@@ -25,11 +26,18 @@ Mark.
 | ![Table portrait](${image}) |
 
 ![Sized portrait](${image}){width="400" height="1000"}
+
+![Thumbnail](${image}){width="80" height="200"}
+
+![Width-only thumbnail](${image}){width="80"}
+
+[the guide](https://vite.dev/guide/)
 `
   const document = await renderMarkdownDocument(async () => markdown, path, "portrait.md")
   assert.match(document, /<strong><img[^>]+alt="Bold portrait"/)
   assert.match(document, /<td><img[^>]+alt="Table portrait"/)
   assert.match(document, /<img(?=[^>]+alt="Sized portrait")(?=[^>]+width="400")(?=[^>]+height="1000")/)
+  assert.match(document, /<img(?=[^>]+class="cp-img")(?=[^>]+src="\/api\/favicons\/vite\.dev")/)
   const [localStyles, shell, zoom, mediumZoom] = await Promise.all(
     [
       "../../shared/typeset.css",
@@ -57,6 +65,9 @@ Mark.
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="1000"><rect width="400" height="1000"/></svg>',
       }),
     )
+    await page.route(`${origin}/api/favicons/vite.dev`, (route) =>
+      route.fulfill({ contentType: "image/svg+xml", body: siteTile("vite") }),
+    )
     await page.route(`${origin}/document-zoom.js`, (route) =>
       route.fulfill({ contentType: "text/javascript", body: zoom }),
     )
@@ -68,13 +79,24 @@ Mark.
     const screenshot = page.locator(".ca-frame img")
     assert.equal(await screenshot.evaluate((img) => getComputedStyle(img).maxHeight), "none")
 
-    for (const alt of ["Bold portrait", "Table portrait", "Sized portrait"]) {
+    for (const [alt, expected] of [
+      ["Bold portrait", [224, 560]],
+      ["Table portrait", [224, 560]],
+      ["Sized portrait", [224, 560]],
+      ["Thumbnail", [80, 200]],
+      ["Width-only thumbnail", [80, 200]],
+    ]) {
       const portrait = page.locator(`img[alt="${alt}"]`)
       await portrait.scrollIntoViewIfNeeded()
       await portrait.evaluate((img) => img.decode())
       const { width, height } = await portrait.boundingBox()
-      assert.deepEqual([width, height], [224, 560], alt)
+      assert.deepEqual([width, height], expected, alt)
     }
+
+    const favicon = page.locator('.cp-img[src="/api/favicons/vite.dev"]')
+    await favicon.evaluate((img) => img.decode())
+    const icon = await favicon.boundingBox()
+    assert.deepEqual([icon.width, icon.height], [14, 14])
 
     await page.getByRole("button", { name: "Zoom Sized portrait" }).click()
     const clone = page.locator(".medium-zoom-image--opened")

@@ -46,11 +46,27 @@
 }
 
 /* Remove with the typeset follow-up from onmax/comark-ui#478. Auto-size both axes so zoom uses a proportional box. */
-.typeset
-  :where(img:not([data-zoom], [data-zoom] *, .not-typeset, .not-typeset *, [data-not-typeset], [data-not-typeset] *)) {
-  width: auto;
-  height: auto;
-  max-height: min(70svh, 40rem);
+@layer comark.typeset {
+  .typeset
+    :where(
+      img:not(
+        .cp-img,
+        [data-zoom],
+        [data-zoom] *,
+        .not-typeset,
+        .not-typeset *,
+        [data-not-typeset],
+        [data-not-typeset] *
+      )
+    ) {
+    height: auto;
+    max-height: min(70svh, 40rem);
+
+    @supports (max-width: attr(width px, 100%)) {
+      width: auto;
+      max-width: min(100%, attr(width px, 100%));
+    }
+  }
 }
 
 .typeset img:not(a img):focus-visible {
