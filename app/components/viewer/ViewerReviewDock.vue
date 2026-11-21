@@ -18,7 +18,19 @@ const root = useTemplateRef<HTMLElement>("root")
 const panel = useTemplateRef<HTMLElement>("panel")
 const toolbar = useTemplateRef<HTMLElement>("toolbar")
 // Its top follows wrapped touch controls and the dock's safe-area offset, without counting an open comments panel.
-const { top } = useElementBounding(toolbar)
+const { top, update } = useElementBounding(toolbar)
+useMutationObserver(
+  () => globalThis.document?.documentElement,
+  (records) => {
+    if (
+      records.some(
+        ({ target }) => target instanceof Element && target.matches(":root > :is(vitehub-pill, vitehub-tools-off)"),
+      )
+    )
+      update()
+  },
+  { subtree: true, attributeFilter: ["edge"] },
+)
 function focusTrigger() {
   root.value?.querySelector<HTMLButtonElement>("[data-review-trigger]")?.focus({ preventScroll: true })
 }

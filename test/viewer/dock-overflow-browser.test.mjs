@@ -68,9 +68,10 @@ const entry = `
       const button = label => Vue.h("button", null, label)
       const fixture = new URLSearchParams(location.search)
       const hasCanvas = fixture.has("canvas")
+      const dock = Vue.ref(null)
       const hand = Vue.ref(fixture.has("hand"))
       const spacer = () => Vue.h("span", { "aria-hidden": true, class: "w-1 shrink-0 max-sm:hidden" })
-      return () => Vue.h(Dock, { open: false, heading: "none", overlay: true }, {
+      return () => [Vue.h(Dock, { ref: dock, open: false, heading: "none", overlay: true }, {
         toolbar: () => withPrompt ? [
           ...["Drop", "View", "Mark"].map(label => Vue.h("button", { style: { width: "44px" } }, label)),
           Vue.h(Comments, { on: false, count: 1, listOpen: false, canComment: true, canUseMode: true, pins: true, pinsShown: true }, {
@@ -102,7 +103,7 @@ const entry = `
             ],
           }, { tools: () => Vue.h(Toolbar, { tool: "browse", sizable: true, tools: ["measure"], views: ["rulers", "xray"] }) }),
         ],
-      })
+      }), Vue.h("output", { id: "dock-top", hidden: true }, dock.value?.top)]
     },
   })
   const passthrough = { setup: (_, { slots }) => () => slots.default?.() }
@@ -175,6 +176,29 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
     await browser.close()
   }
 }, 30_000)
+
+test("the phone canvas dock reports its top after the ViteHub mark changes edge", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 393, height: 852 }, hasTouch: true })
+    await openDock(page, "?canvas")
+    const toolbar = page.getByRole("group", { name: "Document tools" })
+    await toolbar.getByRole("button", { name: "Zoom, 100%", exact: true }).waitFor()
+    const raised = await toolbar.boundingBox()
+    assert.ok(raised)
+    for (const edge of ["bottom", "right", "bottom"]) {
+      await page.locator("vitehub-pill").evaluate((mark, edge) => mark.setAttribute("edge", edge), edge)
+      const bounds = await toolbar.boundingBox()
+      assert.ok(bounds)
+      assert.equal(bounds.y, raised.y + (edge === "right" ? 48 : 0))
+      assert.equal(bounds.width, raised.width)
+      assert.equal(bounds.height, raised.height)
+      await page.waitForFunction((top) => Number(document.querySelector("#dock-top").textContent) === top, bounds.y)
+    }
+  } finally {
+    await browser.close()
+  }
+})
 
 async function openDock(page, path = "") {
   await page.unroute("**/*")
