@@ -1,3 +1,4 @@
+import { getIP } from "better-auth/api"
 import { defineHandler, redirect } from "h3"
 import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
@@ -14,7 +15,13 @@ export default defineHandler(async (event) => {
   const page = `/signin?redirect=${encodeURIComponent(next)}`
   if (await identify(event)) return redirect(next, 302)
   if (authProxy().enabled) return redirect(page, 302)
-  await requireRateLimit(event, "sign-in-start", { key: clientAddress(event), limit: 10, window: "1m" })
+  const address = clientAddress(event)
+  const key = address
+    ? getIP(new Headers({ "x-forwarded-for": address }), {
+        advanced: { ipAddress: { ipAddressHeaders: ["x-forwarded-for"], ipv6Subnet: 64 } },
+      })
+    : null
+  await requireRateLimit(event, "sign-in-start", { key: key ?? undefined, limit: 10, window: "1m" })
   const choose = event.url.searchParams.has("choose")
   const response = await authFor(event)
     .api.signInSocial({

@@ -103,6 +103,14 @@ test("without a client IP header, views count by the runtime address, whatever h
   assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 2, agent: 0 })
 })
 
+test("anonymous views distinguish IPv6 addresses in the same /64", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  insertDrop("doc", { visibility: "shared" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "2001:db8:1:2::1" })
+  await visit("doc", { ...beacon, "x-forwarded-for": "2001:db8:1:2::2" })
+  assert.equal((await viewsOf("doc")).anonymous, 2)
+})
+
 test("anonymous visitors' ids last the day; the counts stay until the doc is deleted", async () => {
   vi.useFakeTimers({ toFake: ["Date"], now })
   insertDrop("doc", { visibility: "shared" })
