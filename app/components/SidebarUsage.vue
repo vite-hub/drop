@@ -77,7 +77,7 @@ const rows = computed(() => {
     <p v-if="near" class="text-pretty text-muted">
       {{ reached ? "Plan limit reached." : "Near your plan's limit." }}
       <ULink
-        class="whitespace-nowrap text-highlighted underline decoration-1 underline-offset-2 hover:decoration-2"
+        class="whitespace-nowrap text-highlighted underline decoration-(--ui-border-accented) underline-offset-4 transition-colors hover:decoration-(--ui-text-highlighted)"
         :to="usage.selfHostUrl"
         external
         >Deploy your own</ULink
