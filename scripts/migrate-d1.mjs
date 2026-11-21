@@ -1,18 +1,18 @@
 import { migrations } from "./migrations.mjs"
 import { pathToFileURL } from "node:url"
 
-export async function migrateD1() {
+export async function migrateD1(env = process.env) {
   const required = ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_D1_DATABASE_ID"]
   for (const name of required) {
-    if (!process.env[name]?.trim()) throw new Error(`${name} is required`)
+    if (!env[name]?.trim()) throw new Error(`${name} is required`)
   }
-  const account = encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID.trim())
-  const database = encodeURIComponent(process.env.CLOUDFLARE_D1_DATABASE_ID.trim())
+  const account = encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID.trim())
+  const database = encodeURIComponent(env.CLOUDFLARE_D1_DATABASE_ID.trim())
   const url = `https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${database}/query`
   async function query(sql) {
     const response = await fetch(url, {
       method: "POST",
-      headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN.trim()}`, "Content-Type": "application/json" },
       body: JSON.stringify({ sql }),
     })
     const payload = await response.json()

@@ -287,7 +287,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     })
   }
 
-  useRafFn(
+  const fit = useRafFn(
     () => api.scrollToContent(api.getSceneElements(), { fitToViewport: true, viewportZoomFactor: 0.95, maxZoom: 1 }),
     { once: true },
   )
@@ -335,6 +335,7 @@ function sync(ex: Excalidraw, api: Api, initial: BoardElement[], canEdit: boolea
     stop: () => {
       stopped = true
       window.removeEventListener("pagehide", flush)
+      fit.pause()
       poll.pause()
       imageTimer.stop()
       saveTimer.stop()

@@ -74,6 +74,7 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.mjs"],
     pool: "forks",
+    globalSetup: ["test/global-setup.mjs"],
     setupFiles: ["test/setup.ts"],
     restoreMocks: true,
   },

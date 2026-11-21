@@ -130,7 +130,7 @@ watch(
           <div class="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain"><slot name="panel" /></div>
         </section>
       </Transition>
-      <div class="grid max-w-full shrink-0 justify-items-center" :style="foldTo">
+      <div class="review-place grid max-w-full shrink-0 justify-items-center" :style="foldTo">
         <div
           ref="toolbar"
           role="group"
@@ -252,7 +252,7 @@ watch(
   }
 }
 
-:root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-toolbar {
+:root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-place {
   max-width: calc(100% - 6rem);
 }
 

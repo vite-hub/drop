@@ -31,10 +31,12 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     () => editing.value && refused.value === undefined && realtime.value?.status.value !== "connected",
   )
   const lookDelay = ref(5_000)
+  let lookGeneration = 0
   const look = useTimeoutFn(
     async () => {
-      await checkDraft()
-      if (!outOfReach.value) return
+      const generation = lookGeneration
+      await checkDraft(generation)
+      if (generation !== lookGeneration || !outOfReach.value) return
       lookDelay.value = 30_000
       look.start()
     },
@@ -42,18 +44,19 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     { immediate: false },
   )
   watch(outOfReach, (away) => {
+    lookGeneration++
     look.stop()
     lookDelay.value = 5_000
     if (away) look.start()
   })
-  async function checkDraft() {
+  async function checkDraft(generation: number) {
     const id = documentId.value
     const draft = id ? draftOf(id) : null
     if (!draft) return
     const head = await $fetch<DropDetail>(`/api/drops/${draft.id}`).catch((error: unknown) =>
       v.is(GoneSchema, error) ? null : undefined,
     )
-    if (documentId.value !== id || !outOfReach.value) return
+    if (generation !== lookGeneration || documentId.value !== id || !outOfReach.value) return
     if (head === undefined || (head && head.version === draft.version && head.canEdit)) return
     realtime.value?.provider.value?.disconnect()
     editor.value?.setEditable(false, false)
