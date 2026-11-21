@@ -400,7 +400,7 @@ watch(
     bottom: calc(3rem + max(1rem, env(safe-area-inset-bottom)));
   }
 
-  :root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-toolbar:has(:deep([data-review-canvas])) {
+  :root:has(> :is(vitehub-pill, vitehub-tools-off)[edge="bottom"]) .review-place:has(:deep([data-review-canvas])) {
     max-width: 100%;
   }
 
