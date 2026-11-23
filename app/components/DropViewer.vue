@@ -893,8 +893,7 @@ const readerId = computed(
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
+const prompt = () => promptMarkdown(drop.value, link.value, waiting.value)
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -2038,23 +2037,12 @@ watch(
                     :drop="drop.id"
                     :send="dropSend"
                   />
-                  <UTooltip
+                  <ViewerCopyPrompt
                     v-else-if="waiting.length && !lightbox && !commentMode"
-                    :text="`Copy a prompt with ${waiting.length === 1 ? 'the comment' : `the ${waiting.length} comments`} that wait for an answer, for your agent`"
-                  >
-                    <DropCopyButton
-                      aria-label="Copy prompt for your agent"
-                      class="[animation:pop-in_200ms_var(--ease-out)]"
-                      color="neutral"
-                      :disabled="loadingScreenshots"
-                      icon="i-mingcute-copy-2-line"
-                      size="xs"
-                      :value="prompt"
-                      variant="ghost"
-                    >
-                      <span class="hidden sm:inline">Copy prompt</span>
-                    </DropCopyButton>
-                  </UTooltip>
+                    :count="waiting.length"
+                    :signed-in="Boolean(me)"
+                    :value="prompt"
+                  />
                 </template>
               </ViewerCommentsSegment>
             </template>
