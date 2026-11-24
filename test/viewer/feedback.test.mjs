@@ -62,9 +62,12 @@ test("copied feedback says what a suggestion replaces the quote with, or that it
     [comment(1, "fifteen", "The count changed."), comment(2, ""), comment(3, null, "Plain")],
     1,
   )
-  assert.match(output, /1\. > twelve\n {3}Suggests replacing it with: fifteen\n {3}The count changed\. \(Ada\)/)
-  assert.match(output, /2\. > twelve\n {3}Suggests deleting it\.\n {3}\(no note\) \(Ada\)/)
-  assert.match(output, /3\. > twelve\n {3}Plain \(Ada\)/)
+  assert.match(
+    output,
+    /1\. \[text selector: `p`\]\n {3}> twelve\n {3}Suggests replacing it with: fifteen\n {3}The count changed\. \(Ada\)/,
+  )
+  assert.match(output, /2\. \[text selector: `p`\]\n {3}> twelve\n {3}Suggests deleting it\.\n {3}\(no note\) \(Ada\)/)
+  assert.match(output, /3\. \[text selector: `p`\]\n {3}> twelve\n {3}Plain \(Ada\)/)
 })
 
 const thread = (n, fields = {}) => ({

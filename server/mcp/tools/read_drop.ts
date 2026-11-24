@@ -19,10 +19,10 @@ import { type Handoff, openHandoff, publishingSession } from "../../utils/handof
 import { countView } from "../../utils/views"
 import { runtimeErrors } from "../../utils/runtime-errors"
 import { writtenBy } from "#shared/agents"
+import { formatElementReference } from "#shared/element-reference"
 import {
   answersLines,
   commentLine,
-  commentTarget,
   dropLine,
   imageUrls,
   inlineFiguresNote,
@@ -217,7 +217,7 @@ export default defineMcpTool({
         comments: shown.map((comment) => ({
           n: comment.n,
           kind: comment.kind,
-          target: commentTarget(comment),
+          target: formatElementReference(comment),
           ...(comment.suggestion === null ? {} : { suggestion: comment.suggestion }),
           ...(comment.at === null ? {} : { at: comment.at }),
           ...(comment.pdfPage === null ? {} : { pdfPage: comment.pdfPage }),

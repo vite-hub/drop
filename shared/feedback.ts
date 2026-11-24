@@ -1,17 +1,7 @@
 import type { DropComment, DropDetail } from "./types"
 import { suggestionLine } from "./suggestion"
 import { writtenBy } from "./agents"
-
-const pct = (n: number) => `${(n / 10).toFixed(0)}%`
-
-function target(comment: DropComment) {
-  if (comment.quote) return `> ${comment.quote}`
-  if (comment.kind === "page") return "The whole page"
-  const what = `${comment.kind === "image" ? "Image" : "Element"} \`${comment.selector}\``
-  return comment.ow || comment.oh
-    ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
-    : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
-}
+import { formatElementReference } from "./element-reference"
 
 const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
   item.attachments.length
@@ -22,7 +12,7 @@ const commentList = (comments: DropComment[], url: string, version: number) =>
   comments
     .map(
       (comment) =>
-        `${comment.n}. ${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`,
+        `${comment.n}. ${formatElementReference(comment).replace(/\n/g, "\n   ")}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`,
     )
     .join("\n")
 

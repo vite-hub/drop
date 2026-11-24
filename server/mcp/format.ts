@@ -1,3 +1,4 @@
+import { formatElementReference } from "#shared/element-reference"
 import { expiryLabel, type Lifetime } from "#shared/expiry"
 import { MAX_LISTED_PAGES } from "#shared/project-bundle"
 import { suggestionLine } from "#shared/suggestion"
@@ -58,25 +59,8 @@ export const viewsLine = (views: ReturnType<typeof mcpViews>) =>
 export const dropLine = (drop: McpDrop) =>
   `- ${drop.title} (${drop.kind === "folder" ? `folder, ${drop.items ?? 0} ${drop.items === 1 ? "item" : "items"}` : drop.href ? `link to ${drop.href}` : `${drop.kind} v${drop.version}`}${drop.teamFolder ? ", the team's" : ""}${drop.folder ? ` in ${drop.folder}` : ""}, ${drop.share}${drop.publicUntil ? ` until ${drop.publicUntil.slice(0, 10)}` : ""}${drop.sharedThrough ? ` through ${drop.sharedThrough}` : ""}${drop.owner ? `, by ${drop.owner}` : ""}${drop.waitingForReview ? " waiting for review" : ""}, ${drop.lifetime}, ${drop.status.toLowerCase()}) id=${drop.id} ${drop.url}${drop.fileUrl ? ` file=${drop.fileUrl}` : ""}`
 
-const pct = (n: number) => `${Math.round(n / 10)}%`
-
-export function commentTarget(
-  comment: Pick<DropComment, "kind" | "selector" | "quote" | "label" | "ox" | "oy" | "ow" | "oh">,
-) {
-  if (comment.kind === "page") return "[the whole page]"
-  const section = comment.selector?.match(/^#([a-z][\w-]*)/i)?.[1]
-  const within = section ? ` (in #${section})` : ""
-  if (comment.kind === "text") return `${comment.quote ? `> ${comment.quote}` : (comment.label ?? "")}${within}`
-  const where =
-    comment.ow || comment.oh
-      ? `the area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
-      : `the spot ${pct(comment.ox)} across, ${pct(comment.oy)} down`
-  const marked = comment.quote ? ` marking > ${comment.quote}` : ""
-  return `[${where} of ${comment.label ?? (comment.kind === "image" ? "an image" : "an element")}]${marked}${within}`
-}
-
 export const commentLine = (comment: DropComment, version: number, origin: string) =>
-  `${comment.n}. ${commentTarget(comment)}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${writtenBy(comment)}${comment.page ? `, ${comment.page}` : ""}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
+  `${comment.n}. ${formatElementReference(comment).replace(/\n/g, "\n   ")}${suggestionLine(comment.suggestion)}\n   ${comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${imageLine(comment, origin)}${replyLines(comment, origin)}`
 
 export const imageUrls = (item: Pick<DropComment, "attachments">, origin: string) =>
   item.attachments.map((file) => new URL(file.url, origin).href)
