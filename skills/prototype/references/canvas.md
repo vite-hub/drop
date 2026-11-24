@@ -18,6 +18,7 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 ```
 
 - Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
+- Live pages load as the camera reaches them, two at a time, and sleep (blank, with their name) after a few seconds far away, so a canvas of 20 previews doesn't run 20 apps at once.
 - Drop versions preserve the HTML and comments, not the live pages in the frames. To keep earlier rounds reviewable, give each round's `data-src` values deployment-specific URLs and keep those deployments accessible. A mutable branch URL always serves whatever is live there now, even when someone opens an older Drop version.
 - The frame keeps the reader's login when the URL is on the same site as Drop. A preview such as `https://pr123-demo.preview.example.com` inside Drop on `drop.example.com`, whose drops run on `drop-usercontent.example.com`, is all `example.com`, so its SameSite=Lax cookies flow. On another site those Lax cookies are left out, so the page usually loads signed out.
 - A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
@@ -39,21 +40,21 @@ const pages = [
 ]
 const attr = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
 const ids = new Set()
-const html = pages.map(([id, route]) => {
+const html = pages.map(([id, route, name = route, width = 1440, height = 900]) => {
   if (!/^v-[a-z0-9-]{1,198}$/.test(id) || ids.has(id)) {
     throw new Error(`Use a unique, short section ID: ${id}`)
   }
   ids.add(id)
-  const label = route.length > 200 ? `${route.slice(0, 199).toWellFormed()}…` : route
+  const label = name.length > 200 ? `${name.slice(0, 199).toWellFormed()}…` : name
   const src = new URL(route, base).href
-  return `<section id="${id}" data-variant="${attr(label)}" data-src="${attr(src)}" data-width="1440" data-height="900"></section>`
+  return `<section id="${id}" data-variant="${attr(label)}" data-src="${attr(src)}" data-width="${width}" data-height="${height}"></section>`
 }).join("\n")
 console.log(html)
 ```
 
-- Give each route its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`. If the app lives under a subpath (`https://preview.example.com/my-app/`), write routes without the leading `/` (`orders`), or `new URL` drops the subpath.
-- Drop accepts IDs and labels up to 200 characters. The snippet checks IDs and shortens only the display label, not the URL. If you have more than 100 items, split them across canvases.
-- For a phone size too, add a second item per route (`v-orders-mobile`, `data-width="390" data-height="844"`).
+- Give each item its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`. If the app lives under a subpath (`https://preview.example.com/my-app/`), use relative routes starting with `./` (such as `./orders`). A leading `/` drops the subpath.
+- Drop accepts IDs and labels up to 200 characters. The snippet checks IDs and shortens only the display label, not the URL. Supply a short, distinct label as the third entry when long routes would otherwise look alike. If you have more than 100 items, split them across canvases.
+- For desktop and phone sizes of the same route, give them different IDs and labels. For example, replace the `/orders` row with `["v-orders", "/orders", "/orders · desktop"]` and `["v-orders-mobile", "/orders", "/orders · mobile", 390, 844]`.
 - Use a host every reviewer can reach over https, such as a deployed preview; a `localhost` URL loads only on your machine.
 
 ## Flows: rows of screens with arrows
