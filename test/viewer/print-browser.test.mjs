@@ -236,3 +236,70 @@ test("Export as PDF still prints when the viewer never sends the files", async (
     await browser.close()
   }
 }, 40_000)
+
+test("Export as PDF draws every page of a doc's PDFs, the far ones included, before it prints", async () => {
+  const CV = "/f/00000000-0000-4000-8000-000000000003.pdf"
+  const html = planDocument(
+    "markdown",
+    "",
+    false,
+    `<h1>Plan</h1><figure class="drop-embed" data-drop-file="${CV}" data-kind="pdf" data-title="CV"><a class="drop-embed-link" href="${CV}">CV</a></figure>` +
+      `${FILLER.repeat(5)}<figure class="drop-embed" data-drop-embed="${LINK}" data-title="Deck"><a class="drop-embed-link" href="/d/${LINK}">Deck</a></figure>`,
+  )
+  const escaped = html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // Six pages for the attached PDF, four for the drop, each page after a pause.
+    await page.route("**/*", (route) =>
+      new URL(route.request().url()).hostname === "drop.test"
+        ? route.fulfill({
+            contentType: "text/html",
+            body: `<style>body{margin:0}iframe{border:0;width:100vw;height:700px;display:block}</style>
+            <iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+            <script>window.posts = [];
+              const pages = { ${JSON.stringify(CV)}: 6, ${JSON.stringify(LINK)}: 4 };
+              const answer = (source, message) => setTimeout(() => source.postMessage({ __drop: true, ...message }, "*"), 150);
+              addEventListener("message", (e) => {
+                if (!e.data?.__drop) return;
+                window.posts.push(e.data);
+                if (e.data.type === "embeds") for (const link of e.data.links)
+                  answer(e.source, { type: "embed-data", link, kind: "pdf", pages: pages[link], title: "Deck", href: "/d/" + link });
+                if (e.data.type === "embed-page")
+                  answer(e.source, { type: "embed-page-data", link: e.data.link, page: e.data.page, src: ${JSON.stringify(PNG)}, width: 1600, height: 2071, links: [], pins: [] });
+              });
+              window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
+          })
+        : route.abort(),
+    )
+    await page.goto("https://drop.test/")
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
+    const frame = page.frames()[1]
+    // While reading, only the pages near the screen are asked for.
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "embed-page"))
+    await page.waitForTimeout(500)
+    const read = await page.evaluate(() => window.posts.filter((m) => m.type === "embed-page").length)
+    assert.ok(read < 10, `${read} pages asked for while reading`)
+    await frame.evaluate(() => {
+      window.printed = []
+      addEventListener("beforeprint", () =>
+        window.printed.push(
+          Array.from(
+            document.querySelectorAll(".drop-embed"),
+            (box) => box.querySelectorAll(".drop-embed-page > img").length,
+          ),
+        ),
+      )
+    })
+    await page.evaluate(() => window.tell({ type: "print", title: "Plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 15_000 })
+    assert.deepEqual(await frame.evaluate(() => window.printed), [[6, 4]])
+    await page.emulateMedia({ media: "print" })
+    assert.equal(
+      await frame.evaluate(() => getComputedStyle(document.querySelector(".drop-embed-page")).breakInside),
+      "avoid",
+    )
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
