@@ -533,6 +533,112 @@ test("items open where data-x and data-y place them, a reader's move wins for th
   }
 })
 
+test("Ctrl+Z takes back a move or Reset layout, Ctrl+Shift+Z and Ctrl+Y redo it, saved as a drag is; a field keeps its undo", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(
+      page("").replaceAll("<section ", '<section data-width="800" data-height="500" '),
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/undo", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    const stored = () => tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/undo")))
+    // Waits until the saved layout has Three at y and Two at x, and returns which items count as moved.
+    const saved = async (three, two = 960) => {
+      await tab.waitForFunction(
+        ([three, two]) => {
+          const doc = JSON.parse(localStorage.getItem("drop-prototype-canvas:/undo"))
+          return doc.positions["v-three"][1] === three && doc.positions["v-two"][0] === two
+        },
+        [three, two],
+      )
+      return (await stored()).moved.sort()
+    }
+    await tab.goto("https://picker.test/undo")
+    assert.deepEqual(await saved(0), [])
+
+    await tab.locator('prototype-picker .handle[aria-label="Move Three"]').focus()
+    await tab.keyboard.press("Shift+ArrowDown")
+    assert.deepEqual(await saved(64), ["v-three"])
+    await tab.keyboard.press("Control+z")
+    assert.deepEqual(await saved(0), [])
+    await tab.keyboard.press("Control+Shift+z")
+    assert.deepEqual(await saved(64), ["v-three"])
+
+    // A drag by the handle is one step.
+    const handle = await tab.locator('prototype-picker .handle[aria-label="Move Two"]').boundingBox()
+    const zoom = await tab.evaluate(() =>
+      Number(document.getElementById("v-one").style.transform.match(/scale\(([\d.]+)\)/)[1]),
+    )
+    await tab.mouse.move(handle.x + 10, handle.y + 10)
+    await tab.mouse.down()
+    await tab.mouse.move(handle.x + 10 + 50 * zoom, handle.y + 10, { steps: 4 })
+    await tab.mouse.up()
+    assert.deepEqual(await saved(64, 1010), ["v-three", "v-two"])
+    await tab.keyboard.press("Control+z")
+    assert.deepEqual(await saved(64), ["v-three"])
+
+    // Reset layout is a step too, and Ctrl+Y does it again.
+    await tab.locator("prototype-picker .layout").click()
+    assert.deepEqual(await saved(0), [])
+    await tab.keyboard.press("Control+z")
+    assert.deepEqual(await saved(64), ["v-three"])
+    await tab.keyboard.press("Control+y")
+    assert.deepEqual(await saved(0), [])
+    await tab.keyboard.press("Control+z")
+    assert.deepEqual(await saved(64), ["v-three"])
+
+    // In a field, Ctrl+Z is the field's: the move stays.
+    await tab.locator("#v-one-input").fill("typed")
+    await tab.locator("#v-one-input").press("Control+z")
+    await tab.waitForTimeout(300)
+    assert.deepEqual((await stored()).positions["v-three"], [1920, 64])
+  } finally {
+    await browser.close()
+  }
+})
+
+test("items the page doesn't place wrap into rows with room between them, beside the authored ones", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    // Twelve items whose height comes from their content, and one placed by the author.
+    const sections = Array.from(
+      { length: 12 },
+      (_, n) =>
+        `<section id="v-${n}" data-variant="Page ${n}"><div style="height:${n === 5 ? 700 : 600}px"></div></section>`,
+    ).join("")
+    const html = injectRuntime(
+      `<!doctype html><html><body><section id="v-placed" data-variant="Placed" data-x="0" data-y="0" data-height="400"></section>${sections}</body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/rows", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/rows")
+    await tab.waitForFunction(() => {
+      const doc = JSON.parse(localStorage.getItem("drop-prototype-canvas:/rows") || "null")
+      return doc && doc.positions["v-11"][1] > 0
+    })
+    await tab.waitForTimeout(500)
+    const { positions } = await tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/rows")))
+    assert.deepEqual(positions["v-placed"], [0, 0], "the authored item keeps its data-x and data-y")
+    // Four 1280px items per row, 160px apart, right of the placed item; each row 240px below the tallest above it.
+    const rows = [0, 840, 1780]
+    for (let n = 0; n < 12; n++) assert.deepEqual(positions[`v-${n}`], [1440 * (1 + (n % 4)), rows[Math.floor(n / 4)]])
+    // The first fit leaves 64px of room on each side.
+    const edges = await tab.evaluate(() => {
+      const rects = [...document.querySelectorAll("body > [data-variant]")].map((el) => el.getBoundingClientRect())
+      return { left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)) }
+    })
+    assert.ok(Math.abs(edges.left - 64) < 1 && Math.abs(1000 - edges.right - 64) < 1, JSON.stringify(edges))
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the Hand tool pans from over an item, which gets no clicks, and Space does the same while held", async () => {
   const browser = await chromium.launch()
   try {
@@ -921,7 +1027,7 @@ test("live pages load as their items come near the screen, two at a time, and sl
     const sections = Array.from(
       { length: 12 },
       (_, n) =>
-        `<section id="v-${n}" data-variant="Page ${n}" data-src="/live/${n}" data-width="400" data-height="300"></section>`,
+        `<section id="v-${n}" data-variant="Page ${n}" data-src="/live/${n}" data-x="${n * 560}" data-y="0" data-width="400" data-height="300"></section>`,
     ).join("")
     const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
     // The first two attempts never answer; later navigations can load normally.
