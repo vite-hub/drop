@@ -1,34 +1,32 @@
 import type { DropComment, DropDetail } from "./types"
 import { suggestionLine } from "./suggestion"
 import { writtenBy } from "./agents"
-
-const pct = (n: number) => `${(n / 10).toFixed(0)}%`
-
-function target(comment: DropComment) {
-  if (comment.quote) return `> ${comment.quote}`
-  if (comment.kind === "page") return "The whole page"
-  const what = `${comment.kind === "image" ? "Image" : "Element"} \`${comment.selector}\``
-  return comment.ow || comment.oh
-    ? `${what}, area ${pct(comment.ox)}–${pct(comment.ox + comment.ow)} across, ${pct(comment.oy)}–${pct(comment.oy + comment.oh)} down`
-    : `${what} at ${pct(comment.ox)}, ${pct(comment.oy)}`
-}
+import { formatElementReference, formatSiteElementReference } from "./element-reference"
 
 const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
   item.attachments.length
     ? `\n${indent}Images: ${item.attachments.map((file) => new URL(file.url, url).href).join(" ")}`
     : ""
 
-const commentList = (comments: DropComment[], url: string, version: number) =>
-  comments
+const commentList = (comments: DropComment[], url: string, version: number, kind?: DropDetail["kind"]) => {
+  const reference = kind === "site" ? formatSiteElementReference : formatElementReference
+  return comments
     .map(
       (comment) =>
-        `${comment.n}. ${target(comment)}${comment.page ? ` (${comment.page})` : ""}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`,
+        `${comment.n}. ${reference(comment).replace(/\n/g, "\n   ")}${suggestionLine(comment.suggestion)}\n   ${(comment.body || (comment.suggestion == null ? "(no words, only the image)" : "(no note)")).replace(/\n/g, "\n   ")} (${writtenBy(comment)}${comment.version < version ? `, on v${comment.version}` : ""})${images(comment, url)}${comment.replies.map((reply) => `\n   ↳ ${writtenBy(reply)}: ${reply.body.replace(/\n/g, "\n     ")}${images(reply, url, "     ")}`).join("")}`,
     )
     .join("\n")
+}
 
-export function feedbackMarkdown(title: string, url: string, comments: DropComment[], version: number) {
+export function feedbackMarkdown(
+  title: string,
+  url: string,
+  comments: DropComment[],
+  version: number,
+  kind?: DropDetail["kind"],
+) {
   const open = comments.filter((comment) => !comment.resolved).sort((a, b) => a.n - b.n)
-  return `## Feedback on "${title}"\n\n${url}\n\n${commentList(open, url, version) || "No open comments."}\n\nDrop a new version that addresses these.`
+  return `## Feedback on "${title}"\n\n${url}\n\n${commentList(open, url, version, kind) || "No open comments."}\n\nDrop a new version that addresses these.`
 }
 
 type PromptDrop = Pick<DropDetail, "id" | "kind" | "title" | "isOwner">

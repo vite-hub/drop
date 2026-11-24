@@ -10,7 +10,8 @@
 //   the bottom-right corner shows the items and the screen: click it to jump, drag the screen's box to move.
 // - Focus: one item fills the page, the same element as on the canvas, so what you typed stays. ← and → step, 1–9
 //   jump, Esc or C go back to the canvas, centred on that item.
-// `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
+// `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live: it
+// loads once the item comes near the screen, two at a time, and sleeps (empty, its name shown) after a while far away.
 // In an item, a control with `data-go="<screen id>"` and `data-label` gets an arrow from it to that `[data-screen]`.
 // `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in a row to the right.
 // The page remembers the canvas camera and where the reader moved items (never content); Reset layout forgets the moves.
@@ -37,18 +38,28 @@
   const nameOf = (el) => el.dataset.variant || el.id;
   const several = variants.length > 1;
 
-  // A live page as an item: the URL fills its section in a frame. Same-site pages keep the reader's login.
+  // A live page as an item: the URL fills its section in a frame. Same-site pages keep the reader's login. The frame
+  // starts empty and gets its URL once the item comes near the screen (rest).
+  const lives = new Map();
   for (const el of variants) {
     if (!el.dataset.src || el.querySelector(":scope > iframe[data-prototype-src]")) continue;
     let url;
     try { url = new URL(el.dataset.src, location.href); } catch { continue; }
     if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+    const live = { url: url.href, frame: null, state: "asleep", timer: 0, slow: 0 };
+    lives.set(el, live);
+    blank(el, live);
+  }
+  // An empty frame holds the item's place. Each sleep makes a new one, so a page that goes leaves no history entry.
+  function blank(el, live) {
     const frame = document.createElement("iframe");
-    frame.src = url.href;
     frame.title = nameOf(el);
     frame.setAttribute("data-prototype-src", "");
     frame.style.cssText = "display:block;width:100%;height:100%;border:0;background:#fff";
-    el.append(frame);
+    if (live.frame) live.frame.replaceWith(frame);
+    else el.append(frame);
+    live.frame = frame;
+    el.setAttribute("data-prototype-asleep", "");
   }
 
   // A variant's own `display` (an id rule with grid, say) beats the hidden attribute's default style. In the canvas
@@ -56,6 +67,9 @@
   const css = document.createElement("style");
   css.textContent = `body > [data-variant][hidden] { display: none !important; }
     body > [data-variant][data-src] { padding: 0; }
+    body > [data-variant][data-prototype-asleep] { position: relative; }
+    body > [data-variant][data-prototype-asleep]::after { content: attr(data-variant); position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+      background: #f5f5f5; color: #737373; font: 500 14px/1.4 ui-sans-serif, system-ui, sans-serif; text-align: center; pointer-events: none; }
     html[data-prototype-layout="canvas"], html[data-prototype-layout="canvas"] body { overflow: hidden !important; overscroll-behavior: none !important; height: 100% !important; }
     html[data-prototype-layout="canvas"] body { margin: 0 !important; cursor: default; }
     html[data-prototype-layout="canvas"] body > [data-variant] { cursor: auto; }
@@ -272,6 +286,7 @@
       it.tag.classList.toggle("narrow", w < 160);
     }
     drawMap();
+    rest();
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
@@ -279,6 +294,49 @@
     document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
+  // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
+  // further away for SLEEP ms. The item in focus never sleeps (it's the only one near), nor the one being typed in, nor
+  // any while Drop's comment tools are on or a thread is open: a comment needs the page it was written on.
+  const NEAR = 600, LOADING = 2, SLEEP = 5000;
+  let commenting = false, threadOpen = false;
+  function near(it, v) {
+    if (mode !== "canvas") return mode === "focus" && it.i === current;
+    const b = box(it), x = cam.x + b.x * cam.z, y = cam.y + b.y * cam.z;
+    return x < v.w + NEAR && y < v.h + NEAR && x + b.w * cam.z > -NEAR && y + b.h * cam.z > -NEAR;
+  }
+  function rest() {
+    if (!lives.size) return;
+    const v = view();
+    let loading = [...lives.values()].filter((live) => live.state === "loading").length;
+    for (const it of items) {
+      const live = lives.get(it.el);
+      if (!live) continue;
+      if (near(it, v)) {
+        clearTimeout(live.timer); live.timer = 0;
+        if (live.state === "asleep" && loading < LOADING) { load(it, live); loading++; }
+      } else if (live.state !== "asleep" && !live.timer && !kept(it)) {
+        live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP);
+      }
+    }
+  }
+  function load(it, live) {
+    const frame = live.frame;
+    // A page that never reports its load frees its turn after a while.
+    const done = () => { clearTimeout(live.slow); if (live.frame === frame && live.state === "loading") { live.state = "awake"; rest(); } };
+    live.state = "loading";
+    frame.addEventListener("load", done, { once: true });
+    live.slow = setTimeout(done, 10000);
+    frame.src = live.url;
+    it.el.removeAttribute("data-prototype-asleep");
+  }
+  const kept = (it) => commenting || threadOpen || it.el.contains(document.activeElement);
+  function sleep(it, live) {
+    if (near(it, view()) || kept(it)) return;
+    clearTimeout(live.slow);
+    live.state = "asleep";
+    blank(it.el, live);
+    rest();
+  }
   // The fence. Each item gives the camera a box of places where the screen still shows KEEP px of it, or all of it
   // when it's smaller; the camera may stand in any of them, so the plane never pans into emptiness. A pan (`from` is
   // where it started) slides along the box it's in rather than jumping across an empty gap to another item's; a jump
@@ -494,6 +552,7 @@
     noteText.hidden = !it.el.dataset.note;
     try { localStorage.setItem(key, it.el.id); } catch {}
     hash(it.el.id);
+    rest();
     // Comment pins measure their anchors on resize, so they follow the item that just appeared.
     window.dispatchEvent(new Event("resize"));
     announce();
@@ -543,7 +602,9 @@
     if (e.source !== parent || !m || m.__drop !== true) return;
     if (m.type === "inset" && Number.isFinite(m.bottom)) {
       setDockBottom(Math.max(72, m.bottom + 4));
-    } else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
+    } else if (m.type === "tool" && typeof m.tool === "string") { commenting = m.tool !== "browse"; rest(); }
+    else if (m.type === "active") { threadOpen = typeof m.id === "string"; rest(); }
+    else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
   });
 
   $(".prev").onclick = () => toFocus(current - 1);

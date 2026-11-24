@@ -47,7 +47,7 @@ When the question is how someone moves through screens (an app's session, a chec
 
 Drop draws the arrows: mark each screen `data-screen` and give the button `data-go` with the id of the screen it leads to, and `data-label`. The markup and a row layout are in [references/canvas.md](references/canvas.md#flows-rows-of-screens-with-arrows).
 
-Canvas details (flows, URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page, has a popover, or animates.
+Canvas details (flows, URL items for live previews, every page of a preview, variants as routes in the real app, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page or an app route, has a popover, or animates.
 
 If you can open a browser, open the page and check every item renders and the console is clean.
 
@@ -59,7 +59,7 @@ Give the user that link first, then tell reviewers how to answer: the page opens
 
 ## 5. Read the round
 
-Call `read_drop`. Sort every open comment into its item: an anchor shows `in #v-…`, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
+Call `read_drop`. Sort every open comment into its item: the item's id shows as `#v-…` at the start of the selector, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
 
 For each item decide: keep, drop, change, or try another. Done when every open comment sits under an item or has a question waiting for an answer.
 
