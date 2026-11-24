@@ -466,7 +466,10 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   })
   const read = await call(readDrop, { id: doc.id })
   assert.equal(read.structuredContent.attachments.length, 1, "the screenshot belongs to the doc")
-  assert.match(read.structuredContent.comments[0].target, /area 10%–40% across, 20%–35% down/)
+  assert.equal(
+    read.structuredContent.comments[0].target,
+    '[img "before" selector: `img`]\nArea: 10%–40% across, 20%–35% down',
+  )
   assert.equal(read.structuredContent.versions[0].note, "PR evidence")
 
   const next = (
@@ -570,7 +573,7 @@ test("a comment on a video's frame keeps its second, and read_drop tells agents 
   )
   assert.match(
     read.content[0].text,
-    /\[the spot 40% across, 30% down of the frame at 0:12\]\n {3}The spinner never stops\./,
+    /\[the frame at 0:12 selector: `video`\]\n {3}Spot: 40% across, 30% down\n {3}The spinner never stops\./,
   )
 })
 
@@ -610,7 +613,10 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     read.structuredContent.comments.map((comment) => comment.pdfPage),
     [3, undefined],
   )
-  assert.match(read.content[0].text, /\[the area 30%–70% across, 12%–30% down of page 3\]\n {3}Caption this figure\./)
+  assert.match(
+    read.content[0].text,
+    /\[page 3 selector: `pdf`\]\n {3}Area: 30%–70% across, 12%–30% down\n {3}Caption this figure\./,
+  )
 })
 
 test("a Marker comment keeps its strokes for the page to draw, only on an area", async () => {
@@ -892,12 +898,12 @@ test("a comment inside an element with an id says which section it's in, so a pr
   )
 
   const { text } = (await call(readDrop, { id: page.id })).content[0]
-  assert.match(text, /1\. > Plan demand \(in #v-prism\)\n {3}Too quiet\./)
+  assert.match(text, /1\. \[text selector: `#v-prism > h1`\]\n {3}> Plan demand\n {3}Too quiet\./)
   assert.match(
     text,
-    /2\. \[the area 0%–100% across, 0%–50% down of section "Plan demand"\] \(in #v-glyphs\)\n {3}Keep this one\./,
+    /2\. \[section "Plan demand" selector: `#v-glyphs`\]\n {3}Area: 0%–100% across, 0%–50% down\n {3}Keep this one\./,
   )
-  assert.match(text, /3\. > Plan\n {3}No id above it\./)
+  assert.match(text, /3\. \[text selector: `body > p`\]\n {3}> Plan\n {3}No id above it\./)
 })
 
 test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {

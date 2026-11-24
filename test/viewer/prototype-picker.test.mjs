@@ -6,6 +6,12 @@ const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
 const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
 
 const PICKER = await readFile(new URL("../../skills/prototype/assets/picker.js", import.meta.url), "utf8")
+const liveItems = (count) =>
+  Array.from(
+    { length: count },
+    (_, index) =>
+      `<section id="v-${index}" data-variant="Page ${index}" data-src="/live/${index}" data-width="280" data-height="240"></section>`,
+  ).join("")
 const variants = (fields) => parseFrameMessage({ __drop: true, type: "variants", canvas: false, zoom: 100, ...fields })
 const one = (id) => ({ id, label: id, note: "" })
 
@@ -352,6 +358,176 @@ test("the canvas camera stops before the last item leaves the screen, and the mi
       ),
       0,
     )
+  } finally {
+    await browser.close()
+  }
+})
+
+test("adding an authored position replaces cached defaults but keeps explicit reader moves", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    let html = page("").replaceAll("<section ", '<section data-width="800" data-height="500" ')
+    await tab.route("https://picker.test/revisit", (route) =>
+      route.fulfill({ contentType: "text/html", body: injectRuntime(html, false, 0, true) }),
+    )
+    const positions = () =>
+      tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).positions)
+    await tab.goto("https://picker.test/revisit")
+    assert.deepEqual(await positions(), { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 0] })
+
+    await tab.locator('prototype-picker .handle[aria-label="Move Three"]').focus()
+    await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).moved.length === 1,
+    )
+    const moved = { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 64] }
+    assert.deepEqual(await positions(), moved)
+    await tab.reload()
+    assert.deepEqual(await positions(), moved)
+
+    await tab.locator('prototype-picker .handle[aria-label="Move Three"]').focus()
+    for (let step = 0; step < 7; step++) await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).positions["v-three"][1] === 512,
+    )
+    html = html.replace('id="v-one"', 'id="v-one" data-x="960" data-y="0"')
+    await tab.reload()
+    assert.deepEqual(await positions(), { "v-one": [960, 0], "v-two": [1920, 0], "v-three": [1920, 512] })
+  } finally {
+    await browser.close()
+  }
+})
+
+test("the minimap stays clear of the standalone controls when the toolbar wraps", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 750 } })
+    const html = injectRuntime(page(""), false, 0, true)
+    await tab.route("https://picker.test/wrapped", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/wrapped")
+    await tab.locator('prototype-picker .handle[aria-label="Move One"]').focus()
+    await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved.length === 1,
+    )
+    await tab.setViewportSize({ width: 393, height: 750 })
+    await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+
+    const bar = tab.locator("prototype-picker .bar")
+    const map = tab.locator("prototype-picker .map canvas")
+    const barBox = await bar.boundingBox()
+    const mapBox = await map.boundingBox()
+    assert.ok(mapBox.y + mapBox.height < barBox.y, "the full minimap is above the wrapped toolbar")
+    await map.click()
+    assert.deepEqual(
+      await tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved),
+      ["v-one"],
+    )
+    await bar.getByRole("button", { name: "Hand", exact: true }).click()
+    await bar.getByRole("button", { name: "Move", exact: true }).click()
+    await bar.getByRole("button", { name: "Reset layout", exact: true }).click()
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved.length === 0,
+    )
+  } finally {
+    await browser.close()
+  }
+})
+
+test("fitted controls stay clickable above the raised minimap on a phone", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 393, height: 750 } })
+    const html = injectRuntime(
+      `<!doctype html><html><body>
+        <section id="v-one" data-variant="One" data-width="160" data-height="620" data-x="0" data-y="0">one</section>
+        <section id="v-two" data-variant="Two" data-width="120" data-height="80" data-x="209" data-y="526">
+          <button style="margin: 20px">Continue</button>
+        </section>
+      </body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/fitted", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/fitted")
+    const bar = tab.locator("prototype-picker .bar")
+    const map = tab.locator("prototype-picker .map")
+    const button = tab.getByRole("button", { name: "Continue", exact: true })
+    for (const action of ["Fit", "Reset layout"]) {
+      await bar.getByRole("button", { name: action, exact: true }).click()
+      await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const itemBox = await tab.locator("#v-two").boundingBox()
+      const mapBox = await map.boundingBox()
+      assert.ok(itemBox.y + itemBox.height < mapBox.y, `the fitted item clears the minimap after ${action}`)
+      await button.click({ trial: true })
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+test("items open where data-x and data-y place them, a reader's move wins for that reader, and Reset layout goes back", async () => {
+  const browser = await chromium.launch()
+  try {
+    const html = injectRuntime(
+      page("")
+        .replaceAll("<section ", '<section data-width="800" data-height="500" ')
+        .replace('id="v-one"', 'id="v-one" data-x="0" data-y="0"')
+        .replace('id="v-two"', 'id="v-two" data-x="0" data-y="900"'),
+      false,
+      0,
+      true,
+    )
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    await tab.route("https://picker.test/authored", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    // A position saved before data-x existed, as every visit saves them all, doesn't hide the authored layout.
+    await tab.addInitScript(() => {
+      if (sessionStorage.getItem("seeded")) return
+      sessionStorage.setItem("seeded", "1")
+      localStorage.setItem(
+        "drop-prototype-canvas:/authored",
+        JSON.stringify({ v: 1, camera: null, positions: { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 0] } }),
+      )
+    })
+    // Each item's place on the plane, from its transform: screen = camera + plane × zoom.
+    const places = () =>
+      tab.evaluate(() => {
+        const at = (id) =>
+          document
+            .getElementById(id)
+            .style.transform.match(/[-\d.]+/g)
+            .map(Number)
+        const [x0, y0, z] = at("v-one")
+        return Object.fromEntries(
+          ["v-one", "v-two", "v-three"].map((id) => {
+            const [x, y] = at(id)
+            return [id, [Math.round((x - x0) / z), Math.round((y - y0) / z)]]
+          }),
+        )
+      })
+    const open = async () => {
+      await tab.goto("https://picker.test/authored")
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+    }
+    await open()
+    // Three has no data-x and was never moved, so it follows the placed items.
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+
+    // The reader moves Two with its handle's arrow keys; both Two and the untouched Three keep their positions.
+    await tab.locator('prototype-picker .handle[aria-label="Move Two"]').focus()
+    await tab.keyboard.press("Shift+ArrowRight")
+    await tab.waitForTimeout(300)
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [64, 900], "v-three": [960, 0] })
+
+    // Reset layout forgets every move.
+    await tab.locator("prototype-picker .layout").click()
+    await tab.waitForTimeout(300)
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
   } finally {
     await browser.close()
   }
@@ -737,3 +913,255 @@ test("a wheel gesture stays with what it started on: a list stops at its end, an
     await browser.close()
   }
 })
+
+test("live pages load as their items come near the screen, two at a time, and sleep after a while far away", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const sections = Array.from(
+      { length: 12 },
+      (_, n) =>
+        `<section id="v-${n}" data-variant="Page ${n}" data-src="/live/${n}" data-width="400" data-height="300"></section>`,
+    ).join("")
+    const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
+    // The first two attempts never answer; later navigations can load normally.
+    let holdFirstLoads = true
+    await tab.route("https://picker.test/**", (route) => {
+      const path = new URL(route.request().url()).pathname
+      if ((path === "/live/0" || path === "/live/1") && holdFirstLoads) return
+      return route.fulfill({
+        contentType: "text/html",
+        body: path === "/sleep" ? html : `<!doctype html><p>${path}</p>`,
+      })
+    })
+    // The camera at 100% on the first items, so the rest of the row lies far to the right.
+    await tab.addInitScript(() => {
+      if (self === top)
+        localStorage.setItem(
+          "drop-prototype-canvas:/sleep",
+          JSON.stringify({ v: 1, camera: { x: 48, y: 64, z: 1 }, positions: {} }),
+        )
+    })
+    await tab.clock.install()
+    await tab.goto("https://picker.test/sleep", { waitUntil: "domcontentloaded" })
+    const loaded = () =>
+      tab.evaluate(() =>
+        [...document.querySelectorAll("iframe[data-prototype-src]")]
+          .filter((f) => f.getAttribute("src"))
+          .map((f) => f.parentElement.id),
+      )
+    const asleep = (id) => tab.evaluate((id) => document.getElementById(id).hasAttribute("data-prototype-asleep"), id)
+    // Items 0–2 lie within 600px of the screen. Two load at once; the third waits for one of them.
+    await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 2, null, {
+      polling: 100,
+    })
+    await tab.clock.fastForward(11000)
+    assert.deepEqual(await loaded(), ["v-0", "v-1"])
+    // Two pages that never answer give up their turns after a while, stop loading, and wait until their items have
+    // left and come back; the third loads meanwhile. The one being typed in keeps loading until focus leaves it.
+    await tab.evaluate(() => document.getElementById("v-0").querySelector("iframe").focus())
+    await tab.clock.fastForward(5000)
+    await tab.waitForFunction(() => document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.deepEqual(await loaded(), ["v-0", "v-2"])
+    await tab.evaluate(() => document.activeElement.blur())
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.deepEqual(await loaded(), ["v-2"])
+    assert.equal(await asleep("v-0"), true)
+    holdFirstLoads = false
+    await tab.frameLocator("#v-2 iframe").getByText("/live/2").waitFor()
+    assert.deepEqual(await loaded(), ["v-2"])
+    assert.equal(await asleep("v-5"), true)
+
+    // Panning to the far end of the row: the loaded items stay until they've been far away for a while, and the one
+    // being typed in stays loaded until focus moves to another page.
+    await tab.evaluate(() => document.getElementById("v-2").querySelector("iframe").focus())
+    await tab.mouse.move(500, 600)
+    for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
+    await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.equal(await asleep("v-2"), false)
+    await tab.evaluate(() => document.getElementById("v-11").querySelector("iframe").focus())
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.equal(await asleep("v-2"), true)
+    assert.equal(
+      await tab.evaluate(() => getComputedStyle(document.getElementById("v-2"), "::after").content),
+      '"Page 2"',
+    )
+    assert.equal(await tab.evaluate(() => document.getElementById("v-2").getBoundingClientRect().height), 300)
+
+    // Coming back wakes it, and tries the page that never answered again.
+    for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
+    await tab.waitForFunction(
+      () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",
+      null,
+      { polling: 100 },
+    )
+    assert.equal(await asleep("v-0"), false)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+for (const reviewing of [false, true]) {
+  test(`unrelated stalled previews release their slots during ${reviewing ? "an open thread" : "Comment mode"}`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const tab = await browser.newPage({ viewport: { width: 1100, height: 700 } })
+      const host = `<iframe src="/canvas" style="width:1000px;height:600px;border:0"></iframe>`
+      const canvas = `<!doctype html><body>${liveItems(3)}
+        <script>self.__dropVariantBar = true; ${PICKER}</script>
+        <script>addEventListener("message", ({ data }) => { window.lastMessage = data; });</script>`
+      await tab.route("https://picker.test/**", (route) => {
+        const path = new URL(route.request().url()).pathname
+        if (path === "/live/0" || path === "/live/1") return
+        return route.fulfill({
+          contentType: "text/html",
+          body: path === "/" ? host : path === "/canvas" ? canvas : "Healthy",
+        })
+      })
+      await tab.clock.install()
+      await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+      const picker = tab.frameLocator("iframe")
+      await picker.locator("#v-1 iframe[src]").waitFor({ state: "attached" })
+      const frame = tab.frame({ url: "https://picker.test/canvas" })
+      const send = (messages) =>
+        tab.evaluate((messages) => {
+          for (const message of messages)
+            document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+        }, messages)
+      await send(
+        reviewing
+          ? [
+              { type: "markers", markers: [{ id: "thread", selector: "#v-0 > iframe" }] },
+              { type: "active", id: "thread" },
+            ]
+          : [{ type: "tool", tool: "comment" }],
+      )
+      await frame.waitForFunction((type) => window.lastMessage?.type === type, reviewing ? "active" : "tool", {
+        polling: 100,
+      })
+      assert.equal(await picker.locator("#v-2 iframe[src]").count(), 0)
+      await tab.clock.fastForward(16000)
+      await picker.frameLocator("#v-2 iframe").getByText("Healthy").waitFor()
+      assert.equal(await picker.locator("#v-1 [data-prototype-retry]").count(), 1)
+      assert.equal(await picker.locator("#v-0 iframe[src]").count(), reviewing ? 1 : 0)
+      if (reviewing) {
+        await send([{ type: "active", id: null }])
+        await frame.waitForFunction(
+          () => window.lastMessage?.type === "active" && window.lastMessage.id === null,
+          null,
+          { polling: 100 },
+        )
+        await tab.clock.fastForward(6000)
+        await picker.locator("#v-0 [data-prototype-retry]").waitFor()
+      }
+    } finally {
+      await browser.close()
+    }
+  })
+}
+
+test("a stalled single preview can retry in Focus without moving the camera", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage()
+    let attempts = 0
+    await tab.route("https://picker.test/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<!doctype html><body>${liveItems(1)}<script>${PICKER}</script>`,
+      }),
+    )
+    await tab.route("https://picker.test/live/0", (route) => {
+      if (++attempts === 1) return
+      return route.fulfill({ contentType: "text/html", body: "Recovered" })
+    })
+    await tab.clock.install()
+    const request = tab.waitForRequest("https://picker.test/live/0")
+    await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+    await request
+    await tab.clock.fastForward(16000)
+    const retry = tab.getByRole("button", { name: "Retry preview: Page 0" })
+    await retry.waitFor()
+    await tab.clock.fastForward(16000)
+    assert.equal(attempts, 1)
+    await retry.press("Enter")
+    await tab.frameLocator("#v-0 iframe").getByText("Recovered").waitFor()
+    assert.equal(attempts, 2)
+    assert.equal(await retry.count(), 0)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("Comments mode protects only the draft's live preview and leaves Retry clickable", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1100, height: 700 } })
+    const canvas = withVariantBar(injectRuntime(`<!doctype html><body>${liveItems(3)}</body>`, false, 0, true))
+    const viewer = `<iframe src="/canvas" style="width:1000px;height:600px;border:0"></iframe>
+      <script>window.posts = []; addEventListener("message", (event) => posts.push(event.data));</script>`
+    let attempts = 0
+    await tab.route("**/*", (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname !== "picker.test") return route.abort()
+      if (url.pathname === "/slow-image" || (url.pathname === "/live/1" && ++attempts === 1)) return
+      const body = {
+        "/": viewer,
+        "/canvas": canvas,
+        "/live/0": '<p>Still loading</p><img src="/slow-image">',
+        "/live/1": "Recovered",
+        "/live/2": "Healthy",
+      }[url.pathname]
+      return route.fulfill({ contentType: "text/html", body })
+    })
+    await tab.clock.install()
+    await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+    const picker = tab.frameLocator("iframe")
+    await picker.frameLocator("#v-0 iframe").getByText("Still loading").waitFor()
+    const send = (message) =>
+      tab.evaluate((message) => {
+        document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+      }, message)
+    await send({ type: "tool", tool: "comment", clickComments: true })
+    await tab.waitForFunction(() => posts.some((post) => post.type === "tool" && post.tool === "comment"))
+    const first = picker.locator("#v-0 iframe[src]")
+    const bounds = await first.boundingBox()
+    await tab.mouse.move(bounds.x + 25, bounds.y + 25)
+    await tab.mouse.down()
+    await tab.mouse.move(bounds.x + 75, bounds.y + 75, { steps: 3 })
+    await tab.mouse.up()
+    await tab.waitForFunction(() => posts.some((post) => post.type === "area" && post.selector?.startsWith("#v-0")))
+    const draft = picker.locator("drop-comments .draft [data-slot=comment-mark-area]")
+
+    await tab.clock.fastForward(16000)
+    await picker.frameLocator("#v-2 iframe").getByText("Healthy").waitFor()
+    assert.equal(await first.count(), 1, "the draft is still anchored to the loading iframe")
+    assert.equal(await draft.isVisible(), true)
+    const retry = picker.getByRole("button", { name: "Retry preview: Page 1" })
+    const button = await retry.boundingBox()
+    await tab.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
+    await picker.frameLocator("#v-1 iframe").getByText("Recovered").waitFor()
+    assert.equal(await tab.evaluate(() => posts.filter((post) => post.type === "area").length), 1)
+
+    await send({ type: "clear-area" })
+    await draft.waitFor({ state: "detached" })
+    await tab.clock.fastForward(6000)
+    await picker.getByRole("button", { name: "Retry preview: Page 0" }).waitFor()
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
