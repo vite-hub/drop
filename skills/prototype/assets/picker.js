@@ -12,7 +12,9 @@
 //   jump, Esc or C go back to the canvas, centred on that item.
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
 // In an item, a control with `data-go="<screen id>"` and `data-label` gets an arrow from it to that `[data-screen]`.
-// The page remembers the canvas camera and item positions (never content); the URL hash (#v-…) names the item in focus.
+// `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in a row to the right.
+// The page remembers the canvas camera and where the reader moved items (never content); Reset layout forgets the moves.
+// The URL hash (#v-…) names the item in focus.
 // Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
@@ -120,6 +122,7 @@
     <button class="cam in" aria-label="Zoom in" title="Zoom in (+)">+</button>
     <button class="cam fit" title="Fit all (Shift+1)">Fit</button>
     <button class="cam reset" title="Reset camera (0)">Reset</button>
+    <button class="cam layout" title="Put every item back where the page places it">Reset layout</button>
     <i class="cam sep"></i>
     <button class="cam move" aria-pressed="true" title="Move (V)">Move</button>
     <button class="cam hand" aria-pressed="false" title="Hand: drag anywhere to pan (H, or hold Space)">Hand</button>
@@ -141,9 +144,12 @@
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
+  const coord = (v) => { const n = v && v.trim() ? Number(v) : 0; return finite(n) ? n : null; };
+  const at = (el) => { const { x, y } = el.dataset; if (x == null && y == null) return null; const p = [coord(x), coord(y)]; return p.includes(null) ? null : p; };
   // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
   const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
-  const saved = { camera: null, positions: {} };
+  // `moved` names the items the reader moved; an item with data-x/data-y takes its saved position only then.
+  const saved = { camera: null, positions: {} }, moved = new Set();
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
@@ -151,12 +157,13 @@
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
       for (const [id, p] of Object.entries(doc.positions || {})) if (ids.has(id) && Array.isArray(p) && finite(p[0]) && finite(p[1])) saved.positions[id] = [p[0], p[1]];
+      if (Array.isArray(doc.moved)) for (const id of doc.moved) if (ids.has(id)) moved.add(id);
     }
   } catch {}
 
   const items = variants.map((el, i) => {
     const width = size(el.dataset.width, 120, 8000), height = size(el.dataset.height, 80, 8000), src = Boolean(el.querySelector(":scope > iframe[data-prototype-src]"));
-    const it = { el, i, name: nameOf(el), width, height, src, w: width || 1280, h: height || (src ? URL_HEIGHT : null), mw: 0, mh: 0, authored: el.getAttribute("style") };
+    const it = { el, i, name: nameOf(el), width, height, src, w: width || 1280, h: height || (src ? URL_HEIGHT : null), mw: 0, mh: 0, authored: el.getAttribute("style"), at: at(el) };
     const tag = document.createElement("div");
     tag.className = "tag";
     tag.innerHTML = `<button class="handle" aria-describedby="move-help"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="8" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="8" cy="12" r="1.4"/></svg></button><button class="name"></button><button class="open"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M7 1.5h3.5V5M5 10.5H1.5V7M10.5 1.5 7 5M1.5 10.5 5 7"/></svg></button><span class="done" role="status"></span><span class="tnote"></span>`;
@@ -206,19 +213,24 @@
     tags.append(tag);
     return it;
   });
-  // Saved positions first; new items go in the empty space to the right of the rest.
-  let right = -Infinity;
-  for (const it of items) {
-    const p = saved.positions[it.el.id];
-    if (p) { [it.x, it.y] = p; right = Math.max(right, it.x + it.w); }
+  // The reader's moves first, then the page's data-x/data-y, then saved positions; the rest go in the empty space to
+  // the right of them all.
+  const start = (it) => (it.at && !moved.has(it.el.id) ? null : saved.positions[it.el.id]) || it.at;
+  function arrange() {
+    let right = -Infinity;
+    for (const it of items) {
+      const p = start(it);
+      if (p) { [it.x, it.y] = p; right = Math.max(right, it.x + it.w); }
+    }
+    for (const it of items) {
+      if (start(it)) continue;
+      it.x = right === -Infinity ? 0 : right + GAP;
+      it.y = 0;
+      right = it.x + it.w;
+    }
   }
-  for (const it of items) {
-    if (saved.positions[it.el.id]) continue;
-    it.x = right === -Infinity ? 0 : right + GAP;
-    it.y = 0;
-    right = it.x + it.w;
-  }
-  const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); schedule(); };
+  arrange();
+  const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); moved.add(it.el.id); schedule(); };
 
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
@@ -357,7 +369,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, version };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moved], version };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
@@ -381,6 +393,8 @@
     bound(); schedule(); settle();
   }
   function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; fitted = null; bound(); schedule(); settle(); }
+  // Reset layout: forget this reader's moves, so every item stands where the page places it, and fit them all.
+  function relayout() { saved.positions = {}; moved.clear(); arrange(); fit(); }
   // Centres an item at the current zoom, or fits it when it's bigger than the screen.
   function reveal(it) {
     const v = view(), b = box(it);
@@ -498,6 +512,7 @@
     "zoom-out": () => mode === "canvas" && zoomCenter(1 / 1.25),
     fit: () => mode === "canvas" && fit(),
     reset: () => mode === "canvas" && reset(),
+    layout: () => mode === "canvas" && relayout(),
     move: () => pick("move"),
     hand: () => pick("hand"),
     // Space held while Drop's window has focus.
@@ -522,6 +537,7 @@
   $(".in").onclick = () => zoomCenter(1.25);
   $(".fit").onclick = () => fit();
   $(".reset").onclick = reset;
+  $(".layout").onclick = relayout;
   moveButton.onclick = () => pick("move");
   handButton.onclick = () => pick("hand");
   window.addEventListener("hashchange", () => { const i = find(location.hash.slice(1)); if (i >= 0) toFocus(i); });
@@ -607,7 +623,7 @@
     gesture.x = e.clientX; gesture.y = e.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 0) gesture.moved = true;
     if (gesture.kind === "pan") pan(dx, dy);
-    else place(gesture.it, gesture.it.x + dx / cam.z, gesture.it.y + dy / cam.z);
+    else if (dx || dy) place(gesture.it, gesture.it.x + dx / cam.z, gesture.it.y + dy / cam.z);
   }, true);
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) window.addEventListener(type, (e) => { if (gesture && e.pointerId === gesture.id) endGesture(); }, true);
   // After a pan or a move, the release doesn't click, copy, follow a link, or start middle-click autoscroll.

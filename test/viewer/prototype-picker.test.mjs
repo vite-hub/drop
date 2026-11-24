@@ -357,6 +357,71 @@ test("the canvas camera stops before the last item leaves the screen, and the mi
   }
 })
 
+test("items open where data-x and data-y place them, a reader's move wins for that reader, and Reset layout goes back", async () => {
+  const browser = await chromium.launch()
+  try {
+    const html = injectRuntime(
+      page("")
+        .replaceAll("<section ", '<section data-width="800" data-height="500" ')
+        .replace('id="v-one"', 'id="v-one" data-x="0" data-y="0"')
+        .replace('id="v-two"', 'id="v-two" data-x="0" data-y="900"'),
+      false,
+      0,
+      true,
+    )
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    await tab.route("https://picker.test/authored", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    // A position saved before data-x existed, as every visit saves them all, doesn't hide the authored layout.
+    await tab.addInitScript(() => {
+      if (sessionStorage.getItem("seeded")) return
+      sessionStorage.setItem("seeded", "1")
+      localStorage.setItem(
+        "drop-prototype-canvas:/authored",
+        JSON.stringify({ v: 1, camera: null, positions: { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 0] } }),
+      )
+    })
+    // Each item's place on the plane, from its transform: screen = camera + plane × zoom.
+    const places = () =>
+      tab.evaluate(() => {
+        const at = (id) =>
+          document
+            .getElementById(id)
+            .style.transform.match(/[-\d.]+/g)
+            .map(Number)
+        const [x0, y0, z] = at("v-one")
+        return Object.fromEntries(
+          ["v-one", "v-two", "v-three"].map((id) => {
+            const [x, y] = at(id)
+            return [id, [Math.round((x - x0) / z), Math.round((y - y0) / z)]]
+          }),
+        )
+      })
+    const open = async () => {
+      await tab.goto("https://picker.test/authored")
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+    }
+    await open()
+    // Three has no data-x, so it keeps where it was.
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [1920, 0] })
+
+    // The reader moves Two with its handle's arrow keys; it stays there on the next visit, the rest as authored.
+    await tab.locator('prototype-picker .handle[aria-label="Move Two"]').focus()
+    await tab.keyboard.press("Shift+ArrowRight")
+    await tab.waitForTimeout(300)
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [64, 900], "v-three": [1920, 0] })
+
+    // Reset layout forgets every move: Three joins the row to the right of the placed items.
+    await tab.locator("prototype-picker .layout").click()
+    await tab.waitForTimeout(300)
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the Hand tool pans from over an item, which gets no clicks, and Space does the same while held", async () => {
   const browser = await chromium.launch()
   try {
