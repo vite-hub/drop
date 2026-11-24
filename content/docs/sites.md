@@ -95,6 +95,10 @@ The comment carries a screenshot of what you saw, sticky headers and fixed butto
 
 The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the page's Content Security Policy blocks it, or blocks <code>[:origin]</code> in `connect-src`, comments go without screenshots, or not at all. Allow both on preview builds.
 
+## Measure {#measure}
+
+**Measure** in the toolbar, or :kbd[S], works as it does on docs and apps: point at an element for its size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. :kbd[Esc] unpicks, and a second :kbd[Esc] puts Measure down. It needs no connection to Drop, and the page hears no clicks while it's on. :kbd[S] stays the page's in a text field or when the page uses the key itself.
+
 ## Related links {#related}
 
 A doc can link to the site it covers, the way a pull request's before/after doc lists the pull request and its preview as its links (`resources` when an agent publishes it). On a page whose origin one of those links points to, the toolbar shows **Related links**. Press it for a menu with each such doc and its links, like the pull request. Links to the site itself and to Drop are left out.
