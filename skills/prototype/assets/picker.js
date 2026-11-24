@@ -304,6 +304,10 @@
   // the one being typed in, nor any while Drop's comment tools are on or a thread is open.
   const NEAR = 600, LOADING = 2, SLEEP = 5000, STALL = 15000;
   let commenting = false, openThread = null, markers = [];
+  let draftItem = null;
+  document.addEventListener("drop:area-draft", (event) => {
+    draftItem = event.detail instanceof Element ? event.detail.closest("[data-variant]") : null;
+  });
   function near(it, v) {
     if (mode !== "canvas") return mode === "focus" && it.i === current;
     const b = box(it), x = cam.x + b.x * cam.z, y = cam.y + b.y * cam.z;
@@ -333,14 +337,16 @@
     frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { clearTimeout(live.slow); live.state = "awake"; rest(); } }, { once: true });
     const stall = () => {
       if (live.frame !== frame || live.state !== "loading") return;
-      if (document.activeElement === frame || reviewedItem() === it.el) { live.slow = setTimeout(stall, SLEEP); return; }
+      if (document.activeElement === frame || draftItem === it.el || reviewedItem() === it.el) { live.slow = setTimeout(stall, SLEEP); return; }
       live.state = "stalled"; blank(it.el, live);
       const retry = document.createElement("button");
       retry.type = "button";
       retry.textContent = "Retry preview";
       retry.setAttribute("aria-label", "Retry preview: " + nameOf(it.el));
       retry.setAttribute("data-prototype-retry", "");
-      retry.addEventListener("click", () => { resetStall(it, live); rest(); });
+      const retryPreview = () => { if (live.retry === retry) { resetStall(it, live); rest(); } };
+      retry.addEventListener("click", retryPreview);
+      retry.addEventListener("drop:retry-preview", retryPreview);
       live.retry = retry;
       it.el.setAttribute("data-prototype-stalled", "");
       it.el.append(retry);
@@ -361,7 +367,7 @@
     if (typeof selector !== "string") return null;
     try { return document.querySelector(selector)?.closest("[data-variant]"); } catch { return null; }
   }
-  const kept = (it) => commenting || openThread !== null || it.el.contains(document.activeElement);
+  const kept = (it) => commenting || openThread !== null || draftItem === it.el || it.el.contains(document.activeElement);
   // Focus moving between two frames tells this page nothing, so a kept frame checks again later.
   function sleep(it, live) {
     if (near(it, view())) return;

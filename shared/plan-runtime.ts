@@ -1056,6 +1056,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The rectangle or spot a comment is being written on (finishArea), as a share of the element it's on.
   let drawn = null;
+  function setDrawn(next) {
+    drawn = next;
+    if (self.__dropPickerOn) document.dispatchEvent(new CustomEvent("drop:area-draft", { detail: next?.el || null }));
+  }
   /** Draws it where its element is now, in viewport pixels too; hidden while its element doesn't show. */
   function placeDrawn() {
     const r = drawn.el.getBoundingClientRect(), node = drawn.node;
@@ -1335,12 +1339,12 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     // Keep the drawn rectangle, or the clicked spot, on the page or the zoom while the comment is written; Drop clears it.
     // On the page it's kept as a share of what it's on, like a saved area, so it moves with that and not with the screen.
-    draft.innerHTML = ""; drawn = null;
-    if (zoom) zoomDraft(left, top, right, bottom);
+    draft.innerHTML = "";
+    if (zoom) { setDrawn(null); zoomDraft(left, top, right, bottom); }
     else {
       const node = right > left ? areaBox(draft, 0, 0, 0, 0) : draft.appendChild(Object.assign(document.createElement("div"), { className: "dp" }));
       const w = r.width || 1, h = r.height || 1;
-      drawn = { el: under, node, x: (left - r.left) / w, y: (top - r.top) / h, w: (right - left) / w, h: (bottom - top) / h };
+      setDrawn({ el: under, node, x: (left - r.left) / w, y: (top - r.top) / h, w: (right - left) / w, h: (bottom - top) / h });
       placeDrawn();
     }
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
@@ -1627,12 +1631,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       // In Comments mode a finger still scrolls and zooms the page: the browser takes the drag and cancels the pointer,
       // so only a tap comments. A mouse still drags out an area.
       if (tool === "comment" && clickComments) layer.style.touchAction = "pan-x pan-y pinch-zoom";
+      const retryAt = (x, y) => self.__dropPickerOn && elementAt(x, y).closest("button[data-prototype-retry]");
       let start = null, box = null;
       layer.onpointerdown = (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
         layer.setPointerCapture(e.pointerId);
-        start = { x: e.clientX, y: e.clientY };
+        start = { x: e.clientX, y: e.clientY, retry: tool === "comment" && retryAt(e.clientX, e.clientY) };
       };
       layer.onpointermove = (e) => {
         if (!start || tool !== "comment") { hovered = elementAt(e.clientX, e.clientY); return redraw(); }
@@ -1654,7 +1659,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (box) {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
-        } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
+        } else if (s.retry && s.retry === retryAt(e.clientX, e.clientY)) s.retry.dispatchEvent(new Event("drop:retry-preview"));
+        else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
         else if (clickComments) { const r = elementAt(e.clientX, e.clientY).getBoundingClientRect(); finishArea(r.left, r.top, r.right, r.bottom); }
         redraw();
       };
@@ -1882,7 +1888,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
     const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
-    draft.innerHTML = ""; drawn = null;
+    draft.innerHTML = ""; setDrawn(null);
     const kept = document.createElementNS(SVG, "svg");
     const onZoomed = host.hasAttribute("data-zoomed");
     kept.setAttribute("class", onZoomed ? "inkp zink" : "inkp");
@@ -2104,7 +2110,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } if (pendingFocus) focusMarker(pendingFocus); else render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; setDrawn(null); zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("vh-comment-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
@@ -2119,7 +2125,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "mark" && m.do === "undo") undoMark();
     if (m.type === "mark" && m.do === "done") finishMark();
     if (m.type === "view") setView(m);
-    if (m.type === "clear-area") { draft.innerHTML = ""; drawn = null; zoomDraft(); }
+    if (m.type === "clear-area") { draft.innerHTML = ""; setDrawn(null); zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") {
       document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px");
