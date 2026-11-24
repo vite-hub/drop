@@ -44,11 +44,11 @@ overrides:
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@c3cfab681ec677a47348f620634d9efdafed8f90
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@c3cfab681ec677a47348f620634d9efdafed8f90
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy and its patches apply to it.
-  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96
+  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
-  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda
+  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
   # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.

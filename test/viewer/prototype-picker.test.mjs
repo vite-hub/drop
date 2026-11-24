@@ -737,3 +737,85 @@ test("a wheel gesture stays with what it started on: a list stops at its end, an
     await browser.close()
   }
 })
+
+test("live pages load as their items come near the screen, two at a time, and sleep after a while far away", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const sections = Array.from(
+      { length: 12 },
+      (_, n) =>
+        `<section id="v-${n}" data-variant="Page ${n}" data-src="/live/${n}" data-width="400" data-height="300"></section>`,
+    ).join("")
+    const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
+    // Live pages answer only once let go, so the test sees which ones are loading.
+    const held = []
+    let hold = true
+    await tab.route("https://picker.test/**", (route) => {
+      const path = new URL(route.request().url()).pathname
+      const answer = () =>
+        route.fulfill({ contentType: "text/html", body: path === "/sleep" ? html : `<!doctype html><p>${path}</p>` })
+      if (hold && path.startsWith("/live/")) held.push(answer)
+      else return answer()
+    })
+    // The camera at 100% on the first items, so the rest of the row lies far to the right.
+    await tab.addInitScript(() => {
+      if (self === top)
+        localStorage.setItem(
+          "drop-prototype-canvas:/sleep",
+          JSON.stringify({ v: 1, camera: { x: 48, y: 64, z: 1 }, positions: {} }),
+        )
+    })
+    await tab.clock.install()
+    await tab.goto("https://picker.test/sleep")
+    const loaded = () =>
+      tab.evaluate(() =>
+        [...document.querySelectorAll("iframe[data-prototype-src]")]
+          .filter((f) => f.getAttribute("src"))
+          .map((f) => f.parentElement.id),
+      )
+    const asleep = (id) => tab.evaluate((id) => document.getElementById(id).hasAttribute("data-prototype-asleep"), id)
+    // Items 0–2 lie within 600px of the screen. Two load at once; the third waits for one of them.
+    await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 2, null, {
+      polling: 100,
+    })
+    await tab.waitForTimeout(200)
+    assert.deepEqual(await loaded(), ["v-0", "v-1"])
+    hold = false
+    for (const answer of held.splice(0)) await answer()
+    await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 3, null, {
+      polling: 100,
+    })
+    assert.deepEqual(await loaded(), ["v-0", "v-1", "v-2"])
+    assert.equal(await asleep("v-5"), true)
+
+    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while.
+    await tab.mouse.move(500, 600)
+    for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
+    await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.ok((await loaded()).includes("v-0"))
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.equal(await asleep("v-0"), true)
+    assert.equal(
+      await tab.evaluate(() => getComputedStyle(document.getElementById("v-0"), "::after").content),
+      '"Page 0"',
+    )
+    assert.equal(await tab.evaluate(() => document.getElementById("v-0").getBoundingClientRect().height), 300)
+
+    // Coming back wakes it.
+    for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
+    await tab.waitForFunction(
+      () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",
+      null,
+      { polling: 100 },
+    )
+    assert.equal(await asleep("v-0"), false)
+  } finally {
+    await browser.close()
+  }
+})

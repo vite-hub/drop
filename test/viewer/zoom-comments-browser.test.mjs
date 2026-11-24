@@ -27,9 +27,10 @@ Another note.
 :::
 `
 
-async function open(browser, html) {
+async function open(browser, html, image) {
   const escaped = planDocument("markdown", "", false, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
-  const page = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+  const page = await browser.newPage({ viewport: { width: 1000, height: 700 }, reducedMotion: "reduce" })
+  if (image) await page.route(image.url, (route) => route.fulfill({ contentType: "image/svg+xml", body: image.svg }))
   await page.route("https://drop.test/", (route) =>
     route.fulfill({
       contentType: "text/html",
@@ -66,6 +67,100 @@ const hostParent = (frame) =>
   frame.evaluate(
     () => [...document.querySelectorAll("drop-comments")].find((host) => host.style.zIndex).parentElement.localName,
   )
+
+test("table thumbnails preserve old pins and anchor new Marker ink to the source image", async () => {
+  const image = {
+    url: "https://drop.test/thumbnail.svg",
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="blue"/></svg>',
+  }
+  const table = `| Component name | Target hostname | Deployment stage | Approval status | Shot |
+| --- | --- | --- | --- | --- |
+| web | staging | canary | ready | ![Dashboard](${image.url}) |
+`
+  const { html } = await renderMarkdownCached("thumbnail-comments.md", async () => table)
+  assert.match(html, /<div\s+data-wide(?:\s|=)[^>]*>\s*<table/)
+  assert.match(html, /<img(?=[^>]+data-zoom-thumb)(?=[^>]+alt="Dashboard")/)
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, html, image)
+    const thumbnail = frame.locator('article > div[data-wide] > table img[data-zoom][alt="Dashboard"]')
+    await thumbnail.waitFor()
+    const legacy = "body > main > article > table > tbody > tr > td:nth-of-type(5) > img"
+    assert.equal(await frame.locator(legacy).count(), 0)
+    const marker = { n: 1, author: "A B", ox: 450, oy: 450, ow: 100, oh: 100 }
+    const showMarkers = (markers) => page.evaluate((markers) => send({ type: "markers", markers }), markers)
+    await page.evaluate(() => send({ type: "view", pins: true, style: "pin" }))
+    await showMarkers([
+      { ...marker, id: "legacy-image", kind: "image", selector: legacy, label: "Dashboard" },
+      { ...marker, id: "legacy-area", kind: "area", selector: legacy, label: 'img "Dashboard"' },
+    ])
+    for (const id of ["legacy-image", "legacy-area"]) {
+      await frame.locator(`[data-slot="comment-mark-pin"][data-id="${id}"]`).waitFor()
+    }
+
+    await thumbnail.press("Enter")
+    const dialog = frame.locator("dialog.cz-dialog")
+    const zoomed = dialog.locator('.cz-item img[alt="Dashboard"]')
+    await zoomed.waitFor()
+    await setTool(page, "mark")
+    const box = await zoomed.boundingBox()
+    const center = { x: box.x + box.width / 2, y: box.y + 2 }
+    await page.mouse.move(center.x - 25, center.y)
+    await page.mouse.down()
+    await page.mouse.move(center.x + 25, center.y, { steps: 10 })
+    await page.mouse.up()
+    await page.evaluate(() => send({ type: "mark", do: "done" }))
+    const area = await (
+      await page.waitForFunction(() => posts.find((message) => message.type === "area"), null, { timeout: 5000 })
+    ).jsonValue()
+    assert.ok(area.ink)
+    assert.ok(await thumbnail.evaluate((img, selector) => document.querySelector(selector) === img, area.selector))
+    assert.ok(Math.abs(area.ox + area.ow / 2 - 500) < 30)
+    assert.equal(area.oy, 0, "the padded stroke starts at the image edge")
+    assert.ok(area.oh > 0 && area.oh < 100)
+    await setTool(page, "browse")
+    await dialog.press("Escape")
+    await dialog.waitFor({ state: "detached" })
+    await showMarkers([{ ...marker, ...area, id: "new-ink", kind: "area" }])
+    const pin = frame.locator('[data-slot="comment-mark-pin"][data-id="new-ink"]')
+    await pin.waitFor()
+    await thumbnail.press("Enter")
+    await dialog.locator('[data-slot="comment-mark-pin"][data-id="new-ink"]').waitFor()
+    await dialog.press("Escape")
+    await dialog.waitFor({ state: "detached" })
+
+    await thumbnail.evaluate((img) => {
+      const wide = img.closest("[data-wide]")
+      const bare = wide.querySelector("table").cloneNode(true)
+      bare.querySelector("img").alt = "Other image"
+      const earlierWide = wide.cloneNode(true)
+      earlierWide.querySelector("img").alt = "Already wide"
+      wide.before(earlierWide)
+      wide.after(bare)
+    })
+    const indexed = legacy.replace(" > table >", " > table:nth-of-type(1) >")
+    assert.equal(await frame.locator(indexed).getAttribute("alt"), "Other image")
+    const showLegacy = (id) => showMarkers([{ ...marker, id, kind: "image", selector: indexed, label: "Dashboard" }])
+    await showLegacy("shifted")
+    await frame.locator('[data-slot="comment-mark-pin"][data-id="shifted"]').waitFor()
+    await frame.locator('img[alt="Already wide"]').evaluate((img) => (img.alt = "Dashboard"))
+    await showLegacy("ambiguous-wide")
+    const unplaced = (id) =>
+      page.waitForFunction((id) => posts.some((post) => post.type === "unplaced" && post.ids.includes(id)), id, {
+        timeout: 5000,
+      })
+    await unplaced("ambiguous-wide")
+    await frame
+      .locator('article > div[data-wide] img[alt="Dashboard"]')
+      .first()
+      .evaluate((img) => (img.alt = "Already wide"))
+    await frame.locator(indexed).evaluate((img) => (img.alt = "Dashboard"))
+    await showLegacy("ambiguous-bare")
+    await unplaced("ambiguous-bare")
+  } finally {
+    await browser.close()
+  }
+}, 60_000)
 
 for (const [name, engine] of [
   ["Chromium", chromium],
