@@ -45,7 +45,7 @@ The module reads `canvas` at build time, so its value has to be a plain object o
 
 Keep Nuxt's page meta scanning enabled to read `canvas` from `definePageMeta`. With `experimental.scanPageMeta: false`, Drop uses the route records without scanning page files.
 
-For `nuxt generate`, the manifest lists only pages whose concrete URLs were prerendered. Link to a sample URL from a crawled page or add it to `nitro.prerender.routes` (for example, `/orders/42`).
+For `nuxt generate`, the manifest lists only pages whose concrete URLs were prerendered. Link to a sample URL from a crawled page or add it to `nitro.prerender.routes` (for example, `/orders/42`). If different pages prerender to the same HTML file, the manifest omits the ambiguous entries.
 
 With `app.baseURL`, the file and its page paths both sit under that base: `/docs/__canvas.json`, and `/about` opens at `/docs/about`.
 

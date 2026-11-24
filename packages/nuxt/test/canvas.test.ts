@@ -123,16 +123,37 @@ it("normalizes trailing slashes only across prerenders with the same owner", () 
   const withoutSlash = { path: "/items/:id", file: "item.vue" }
   const withSlash = { path: "/items/:id/", file: "item-with-slash.vue" }
   const strictOwner = canvasRouteOwner(rootDir, [withoutSlash, withSlash], { strict: true })
-  const slashlessPrerender = canvasPrerenderedPage(["/items/43"], strictOwner)
-  const slashPrerender = canvasPrerenderedPage(["/items/43/"], strictOwner)
+  const fileName = "/items/43/index.html"
+  const slashless = { route: "/items/43", fileName }
+  const slashed = { route: "/items/43/", fileName }
+  const slashlessPrerender = canvasPrerenderedPage([slashless], strictOwner)
+  const slashPrerender = canvasPrerenderedPage([slashed], strictOwner)
   expect(slashlessPrerender("/items/43", withoutSlash)).toBe(true)
   expect(slashlessPrerender("/items/43/", withSlash)).toBe(false)
   expect(slashPrerender("/items/43/", withSlash)).toBe(true)
   expect(slashPrerender("/items/43", withoutSlash)).toBe(false)
 
   const looseOwner = canvasRouteOwner(rootDir, [withoutSlash])
-  const loosePrerender = canvasPrerenderedPage(["/items/43/"], looseOwner)
+  const loosePrerender = canvasPrerenderedPage([slashed, slashless], looseOwner)
   expect(loosePrerender("/items/43", withoutSlash)).toBe(true)
+})
+
+it("omits ambiguous Nitro 2 HTML writes shared by different strict routes", () => {
+  const rootDir = fileURLToPath(new URL("..", import.meta.url))
+  const withoutSlash = { path: "/items/:id", file: "item.vue" }
+  const withSlash = { path: "/items/:id/", file: "item-with-slash.vue" }
+  const owner = canvasRouteOwner(rootDir, [withoutSlash, withSlash], { strict: true })
+  const slashless = { route: "/items/43", fileName: "/items/43/index.html" }
+  const slashed = { route: "/items/43/", fileName: "items/43/index.html" }
+  const independent = { route: "/items/44", fileName: "/items/44/index.html" }
+  const sharedOutput = canvasPrerenderedPage([slashless, slashed, independent], owner)
+  expect(sharedOutput(slashless.route, withoutSlash)).toBe(false)
+  expect(sharedOutput(slashed.route, withSlash)).toBe(false)
+  expect(sharedOutput(independent.route, withoutSlash)).toBe(true)
+
+  const separateOutputs = canvasPrerenderedPage([{ ...slashless, fileName: "/items/43.html" }, slashed], owner)
+  expect(separateOutputs(slashless.route, withoutSlash)).toBe(true)
+  expect(separateOutputs(slashed.route, withSlash)).toBe(true)
 })
 
 describe("canvasPageURL", () => {

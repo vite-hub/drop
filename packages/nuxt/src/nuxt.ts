@@ -120,16 +120,10 @@ function serveCanvasManifest(nuxt: Nuxt) {
     }
     nitro.hooks.hook(
       "prerender:done",
-      ({ prerenderedRoutes }: { prerenderedRoutes: { route: string; fileName?: string; contentType?: string }[] }) => {
-        const htmlPaths = prerenderedRoutes
-          .filter(
-            (entry) =>
-              entry.fileName?.endsWith(".html") && (!entry.contentType || entry.contentType.includes("text/html")),
-          )
-          .map((entry) => entry.route)
+      ({ prerenderedRoutes }: { prerenderedRoutes: Parameters<typeof canvasPrerenderedPage>[0] }) => {
         const isRendered = routes.length
           ? canvasPrerenderedPage(
-              htmlPaths,
+              prerenderedRoutes,
               canvasRouteOwner(nuxt.options.rootDir, routes, nuxt.options.router.options),
             )
           : undefined

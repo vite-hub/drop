@@ -1,5 +1,5 @@
 import { createRequire } from "node:module"
-import { join } from "node:path"
+import { join, posix } from "node:path"
 
 export interface CanvasPageMeta {
   params?: Record<string, string>
@@ -112,14 +112,34 @@ function prerenderKey(path: string): string {
   return path.replace(/\/$/, "") || "/"
 }
 
-export function canvasPrerenderedPage(paths: string[], owner: ReturnType<typeof canvasRouteOwner>) {
+interface PrerenderedRoute {
+  route: string
+  fileName?: string
+  contentType?: string
+}
+
+export function canvasPrerenderedPage(entries: PrerenderedRoute[], owner: ReturnType<typeof canvasRouteOwner>) {
+  const files = new Map<string, { route: ResolvedRoute | undefined; key: string; html: boolean } | null>()
+  for (const entry of entries) {
+    if (!entry.fileName) continue
+    const filename = posix.normalize(`/${entry.fileName}`)
+    if (!filename.endsWith(".html")) continue
+    const route = owner(encodeURI(entry.route))
+    const key = prerenderKey(entry.route)
+    const html = !entry.contentType || entry.contentType.includes("text/html")
+    const previous = files.get(filename)
+    if (previous === undefined) files.set(filename, { route, key, html })
+    else if (previous && (previous.route !== route || previous.key !== key || previous.html !== html)) {
+      files.set(filename, null)
+    }
+  }
+
   const rendered = new Map<ResolvedRoute, Set<string>>()
-  for (const path of paths) {
-    const route = owner(encodeURI(path))
-    if (!route) continue
-    let keys = rendered.get(route)
-    if (!keys) rendered.set(route, (keys = new Set()))
-    keys.add(prerenderKey(path))
+  for (const file of files.values()) {
+    if (!file?.html || !file.route) continue
+    let keys = rendered.get(file.route)
+    if (!keys) rendered.set(file.route, (keys = new Set()))
+    keys.add(file.key)
   }
   return (url: string, route: ResolvedRoute) =>
     owner(url) === route && rendered.get(route)?.has(prerenderKey(decodeURI(url))) === true
