@@ -781,41 +781,46 @@ test("live pages load as their items come near the screen, two at a time, and sl
     })
     await tab.waitForTimeout(200)
     assert.deepEqual(await loaded(), ["v-0", "v-1"])
-    hold = false
-    for (const answer of held.splice(0)) await answer()
-    await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 3, null, {
+    // Two pages that never answer give up their turns after a while, stop loading, and wait until their items have
+    // left and come back; the third loads meanwhile.
+    await tab.clock.fastForward(16000)
+    await tab.waitForFunction(() => document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.deepEqual(await loaded(), ["v-0", "v-1", "v-2"])
+    assert.deepEqual(await loaded(), ["v-2"])
+    assert.equal(await asleep("v-0"), true)
+    hold = false
+    for (const answer of held.splice(0)) await answer()
+    await tab.waitForTimeout(200)
+    assert.deepEqual(await loaded(), ["v-2"])
     assert.equal(await asleep("v-5"), true)
 
-    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while, and the
-    // one being typed in stays loaded until focus moves to another page.
-    await tab.evaluate(() => document.getElementById("v-0").querySelector("iframe").focus())
+    // Panning to the far end of the row: the loaded items stay until they've been far away for a while, and the one
+    // being typed in stays loaded until focus moves to another page.
+    await tab.evaluate(() => document.getElementById("v-2").querySelector("iframe").focus())
     await tab.mouse.move(500, 600)
     for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
     await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.ok((await loaded()).includes("v-0"))
     await tab.clock.fastForward(6000)
-    await tab.waitForFunction(() => !document.getElementById("v-1").querySelector("iframe").getAttribute("src"), null, {
+    await tab.waitForFunction(() => !document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.equal(await asleep("v-0"), false)
+    assert.equal(await asleep("v-2"), false)
     await tab.evaluate(() => document.getElementById("v-11").querySelector("iframe").focus())
     await tab.clock.fastForward(6000)
-    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
+    await tab.waitForFunction(() => !document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.equal(await asleep("v-0"), true)
+    assert.equal(await asleep("v-2"), true)
     assert.equal(
-      await tab.evaluate(() => getComputedStyle(document.getElementById("v-0"), "::after").content),
-      '"Page 0"',
+      await tab.evaluate(() => getComputedStyle(document.getElementById("v-2"), "::after").content),
+      '"Page 2"',
     )
-    assert.equal(await tab.evaluate(() => document.getElementById("v-0").getBoundingClientRect().height), 300)
+    assert.equal(await tab.evaluate(() => document.getElementById("v-2").getBoundingClientRect().height), 300)
 
-    // Coming back wakes it.
+    // Coming back wakes it, and tries the page that never answered again.
     for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
     await tab.waitForFunction(
       () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",

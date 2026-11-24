@@ -44,7 +44,7 @@
     let url;
     try { url = new URL(el.dataset.src, location.href); } catch { continue; }
     if (url.protocol !== "https:" && url.protocol !== "http:") continue;
-    const live = { url: url.href, frame: null, state: "asleep", timer: 0 };
+    const live = { url: url.href, frame: null, state: "asleep", timer: 0, slow: 0 };
     lives.set(el, live);
     blank(el, live);
   }
@@ -264,9 +264,10 @@
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
-  // further away for SLEEP ms. The item in focus never sleeps (it's the only one near), nor the one being typed in, nor
+  // further away for SLEEP ms. A page still loading after STALL ms is stopped and tried again only once its item has
+  // left and come back near. The item in focus never sleeps (it's the only one near), nor the one being typed in, nor
   // any while Drop's comment tools are on or a thread is open: a comment needs the page it was written on.
-  const NEAR = 600, LOADING = 2, SLEEP = 5000;
+  const NEAR = 600, LOADING = 2, SLEEP = 5000, STALL = 15000;
   let commenting = false, threadOpen = false;
   function near(it, v) {
     if (mode !== "canvas") return mode === "focus" && it.i === current;
@@ -283,16 +284,19 @@
       if (near(it, v)) {
         clearTimeout(live.timer); live.timer = 0;
         if (live.state === "asleep" && loading < LOADING) { load(it, live); loading++; }
-      } else if (live.state !== "asleep" && !live.timer) {
+      } else if (live.state === "stalled") live.state = "asleep";
+      else if (live.state !== "asleep" && !live.timer) {
         live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP);
       }
     }
   }
   function load(it, live) {
     const frame = live.frame;
-    // The turn ends with the frame's load, which an error page fires too, or with its sleep.
+    // The turn ends with the frame's load, which an error page fires too, with its sleep, or after STALL ms, when a new
+    // empty frame takes its place and so stops the navigation.
     live.state = "loading";
-    frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { live.state = "awake"; rest(); } }, { once: true });
+    frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { clearTimeout(live.slow); live.state = "awake"; rest(); } }, { once: true });
+    live.slow = setTimeout(() => { if (live.frame === frame && live.state === "loading") { live.state = "stalled"; blank(it.el, live); rest(); } }, STALL);
     frame.src = live.url;
     it.el.removeAttribute("data-prototype-asleep");
   }
@@ -301,6 +305,7 @@
   function sleep(it, live) {
     if (near(it, view())) return;
     if (kept(it)) { live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP); return; }
+    clearTimeout(live.slow);
     live.state = "asleep";
     blank(it.el, live);
     rest();
