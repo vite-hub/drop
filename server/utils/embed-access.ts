@@ -67,9 +67,8 @@ async function scan(docs: DropRow[], who: Identity, event?: H3Event, skippedDocs
     for (const link of links) {
       const target = targets.get(link)
       const named = { id: doc.id, title: doc.title }
-      if (!target || !permissions(target, who).view) found.push({ doc: named, link, title: null })
-      else if (!approvals.every((approval) => readable(approval(target))))
-        found.push({ doc: named, link, title: target.title })
+      if (target && approvals.every((approval) => readable(approval(target)))) continue
+      found.push({ doc: named, link, title: target && permissions(target, who).view ? target.title : null })
     }
   const docsLeft = skippedDocs + Math.max(0, docs.length - MAX_DOCS)
   return { embeds: found, unchecked: docsLeft || skippedLinks ? { docs: docsLeft, embeds: skippedLinks } : null }
@@ -159,5 +158,9 @@ export const embedWarnings = ({ embeds, unchecked, failed }: EmbedCheck) => [
 const EMBED_WARNINGS_LEAD =
   'People with the public link can\'t open these embedded drops: they see "This drop is private, expired, or deleted" in their place.'
 
+const UNCHECKED_EMBEDS_LEAD = "Drop couldn't check every embed for people with the public link:"
+
 export const embedSection = (warnings: string[]) =>
-  warnings.length ? `\n\n${EMBED_WARNINGS_LEAD}\n${warnings.map((warning) => `- ${warning}`).join("\n")}` : ""
+  warnings.length
+    ? `\n\n${warnings.some((warning) => warning.startsWith("drop/embed-private")) ? EMBED_WARNINGS_LEAD : UNCHECKED_EMBEDS_LEAD}\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
+    : ""

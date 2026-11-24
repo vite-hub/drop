@@ -201,6 +201,8 @@ test("a check that fails after the change is saved reports the change and says t
       (opened.warnings ?? []).some((line) => line.startsWith("drop/embed-unchecked")),
       (opened.warnings ?? []).join("\n"),
     )
+    assert.ok(!opened.text.includes(LEAD), "an incomplete check doesn't claim the embeds are broken")
+    assert.match(opened.text, /couldn't check every embed/)
   } finally {
     state.blob.get = get
   }
@@ -287,4 +289,28 @@ test("a folder with more docs than the check reads checks the newest and says ho
   assert.match(warnings[0], /"Newest demo"/)
   const [line] = partial(opened)
   assert.match(line ?? "", /3 docs/, (opened.warnings ?? []).join("\n"))
+})
+
+test("a team owner sharing a folder doesn't warn about a member's held drop that the member's approval opens", async () => {
+  state.teams = true
+  state.shareApproval = true
+  sql
+    .prepare(
+      "INSERT INTO user (id, name, email) VALUES ('lead', 'Lead', 'lead@example.com'), ('m1', 'Member One', 'm1@example.com')",
+    )
+    .run()
+  insertDrop("f4k8m2q6w9zd", {
+    ...held,
+    owner_id: "lead",
+    kind: "folder",
+    title: "Team plans",
+    blob_key: null,
+    team_folder: 1,
+  })
+  insertDrop("s2d7k4n8q3wx", { ...held, owner_id: "m1", title: "Member demo" })
+  insertDrop("d1x5m8q2k7wz", { ...held, owner_id: "m1", parent_id: "f4k8m2q6w9zd" })
+  objects.set("d1x5m8q2k7wz.md", { body: new Blob([embedding("s2d7k4n8q3wx")]), uploadedAt: new Date() })
+  const lead = { ...who, userId: "lead", name: "Lead", email: "lead@example.com", actorName: "Lead" }
+  const { embeds } = await openedEmbeds("f4k8m2q6w9zd", lead, event("/api/drops/f4k8m2q6w9zd"))
+  assert.deepEqual(embeds, [])
 })
