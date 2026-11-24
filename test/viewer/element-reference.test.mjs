@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { formatElementReference, siteReviewElement } from "../../shared/element-reference.ts"
+import { formatElementReference, formatSiteElementReference } from "../../shared/element-reference.ts"
 
 const comment = (fields) => ({
   kind: "area",
@@ -49,22 +49,26 @@ test("a site comment from review.js points at its element, not at its screenshot
     page: "/meetups",
   })
   assert.equal(
-    formatElementReference(siteReviewElement(onShot)),
-    '[button "RSVP" selector: `main > button`]\nSpot: 40% across, 30% down\nPage: /meetups',
+    formatSiteElementReference(onShot),
+    '[button "RSVP" selector: `main > button`]\nSpot: 40% across, 30% down the screenshot\nPage: /meetups',
   )
 })
 
 test("a site screenshot with no element keeps its area and page but names no selector", () => {
   const blank = comment({ kind: "image", selector: "body > img", ox: 100, oy: 200, ow: 300, oh: 150, page: "/" })
   assert.equal(
-    formatElementReference(siteReviewElement(blank)),
-    "[an image]\nArea: 10%–40% across, 20%–35% down\nPage: /",
+    formatSiteElementReference(blank),
+    "[an image]\nArea: 10%–40% across, 20%–35% down the screenshot\nPage: /",
+  )
+  assert.equal(
+    formatSiteElementReference(comment({ selector: "body", page: "https://example.com/" })),
+    "[an element]\nSpot: 0% across, 0% down the viewport\nURL: https://example.com/",
   )
 })
 
 test("a comment left in Drop's viewer on a site keeps its own selector and quote", () => {
   const anchored = comment({ kind: "text", selector: "main > p", label: "p", quote: "twelve" })
-  assert.equal(siteReviewElement(anchored), anchored)
+  assert.equal(formatSiteElementReference(anchored), formatElementReference(anchored))
   const onScreenshot = comment({ kind: "image", selector: "body > img", ox: 10, oy: 10 })
-  assert.equal(siteReviewElement(onScreenshot), onScreenshot)
+  assert.equal(formatSiteElementReference(onScreenshot), formatElementReference(onScreenshot))
 })
