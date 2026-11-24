@@ -40,8 +40,7 @@ const layout = ref(0)
 
 onMounted(async () => {
   try {
-    const [lib, worker] = await Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")])
-    lib.GlobalWorkerOptions.workerSrc = worker.default
+    const lib = await pdfjs()
     const { EventBus, PDFLinkService, PDFViewer, LinkTarget } = await import("pdfjs-dist/web/pdf_viewer.mjs")
     if (lifecycle.signal.aborted || !container.value || !viewerElement.value) return
     bus = new EventBus()
@@ -65,7 +64,7 @@ onMounted(async () => {
       scale.value = next
       void nextTick(() => layout.value++)
     })
-    task = lib.getDocument({ url: props.src, wasmUrl: "/vendor/pdfjs/wasm/" })
+    task = lib.getDocument({ url: props.src, wasmUrl: PDF_WASM_URL })
     pdf = await task.promise
     if (lifecycle.signal.aborted) return
     pages.value = pdf.numPages
@@ -121,13 +120,7 @@ async function pageAt(page = current.value): Promise<PdfPage | null> {
   if (!pdf || !viewer || failed.value || lifecycle.signal.aborted) return null
   go(page)
   await nextTick()
-  const proxy = await pdf.getPage(page)
-  const base = proxy.getViewport({ scale: 1 })
-  const viewport = proxy.getViewport({ scale: Math.min(4, 2000 / Math.max(base.width, base.height)) })
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.round(viewport.width)
-  canvas.height = Math.round(viewport.height)
-  await proxy.render({ canvas, viewport }).promise
+  const canvas = await drawPage(pdf, page, { longest: 2000 })
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((png) => (png ? resolve(png) : reject(new Error("The page couldn't be drawn."))), "image/png"),
   )
