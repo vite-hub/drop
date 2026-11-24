@@ -41,6 +41,8 @@ definePageMeta({ canvas: { params: { id: "42" } } })
 </script>
 ```
 
-The module reads `canvas` at build time, so its value has to be a plain object or `false`, not a variable.
+The module reads `canvas` at build time, so its value has to be a plain object or `false`, not a variable. Set `canvas: false` on a page whose `redirect` is a function: Nuxt only runs it at runtime, so the list can't tell the page redirects.
+
+With `app.baseURL`, the file and its page paths both sit under that base: `/docs/__canvas.json`, and `/about` opens at `/docs/about`.
 
 Works with Nuxt 4 and later.

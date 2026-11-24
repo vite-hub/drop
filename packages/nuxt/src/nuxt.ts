@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { addPlugin, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
+import { addPlugin, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
 import { canvasManifest } from "./canvas.ts"
@@ -20,12 +20,6 @@ export interface DropModuleOptions {
 }
 
 export type { CanvasPageMeta, DropPublicConfig }
-
-declare module "#app" {
-  interface PageMeta {
-    canvas?: false | CanvasPageMeta
-  }
-}
 
 type DropModuleSetupResult = false | void | { timings?: { setup?: number; [key: string]: number | undefined } }
 
@@ -51,6 +45,18 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
     }
     nuxt.options.runtimeConfig.public.drop = drop
     addPlugin({ src: resolver.resolve("./runtime/review.client"), mode: "client" })
+    addTypeTemplate({
+      filename: "types/drop-canvas.d.ts",
+      getContents: () =>
+        [
+          'declare module "nuxt/app" {',
+          "  interface PageMeta {",
+          "    canvas?: false | { params?: Record<string, string> }",
+          "  }",
+          "}",
+          "export {}",
+        ].join("\n"),
+    })
 
     if (!(options.preview ?? process.env.DROP_PREVIEW === "1")) return
     serveCanvasManifest(nuxt)

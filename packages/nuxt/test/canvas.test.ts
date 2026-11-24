@@ -29,11 +29,25 @@ describe("canvasManifest", () => {
     })
   })
 
-  it("leaves out pages with canvas: false and redirects", () => {
+  it("keeps a param that shares its segment with text", () => {
+    expect(
+      canvasManifest([
+        {
+          path: "/products/:product()_details",
+          name: "products-product_details",
+          meta: { canvas: { params: { product: "42" } } },
+        },
+      ]).pages,
+    ).toEqual([{ path: "/products/:product()_details", name: "products-product_details", params: { product: "42" } }])
+  })
+
+  it("leaves out pages with canvas: false, redirects and Nuxt's route rule redirects", () => {
     expect(
       canvasManifest([
         { path: "/admin", name: "admin", meta: { canvas: false }, children: [{ path: "users", name: "admin-users" }] },
         { path: "/old", name: "old", redirect: "/" },
+        { path: "/legacy/:pathMatch(.*)", _sync: true },
+        { path: "/moved", _sync: true },
       ]).pages,
     ).toEqual([{ path: "/admin/users", name: "admin-users" }])
   })

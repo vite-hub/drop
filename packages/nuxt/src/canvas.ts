@@ -16,6 +16,7 @@ interface ResolvedRoute {
   path: string
   name?: string
   redirect?: unknown
+  _sync?: boolean
   meta?: { canvas?: false | CanvasPageMeta }
   children?: ResolvedRoute[]
 }
@@ -23,6 +24,7 @@ interface ResolvedRoute {
 export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
   const pages: CanvasPage[] = []
   const visit = (route: ResolvedRoute, parent: string) => {
+    if (route._sync) return
     const path = joinPath(parent, route.path)
     const children = route.children ?? []
     const hasIndex = children.some((child) => child.path === "")
@@ -44,5 +46,5 @@ export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
 
 function joinPath(parent: string, path: string): string {
   const joined = path.startsWith("/") ? path : `${parent.replace(/\/$/, "")}/${path}`
-  return joined.replace(/\(\)/g, "").replace(/\/$/, "") || "/"
+  return joined.replace(/\(\)(?=\/|$)/g, "").replace(/\/$/, "") || "/"
 }
