@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { addPlugin, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
-import { canvasManifest, canvasPageURL, routeRuleRedirects } from "./canvas.ts"
+import { canvasManifest, canvasPageURL, canvasRouteOwner, routeRuleRedirects } from "./canvas.ts"
 
 import type { Nuxt } from "@nuxt/schema"
 
@@ -90,19 +90,16 @@ function serveCanvasManifest(nuxt: Nuxt) {
 
   const writeManifest = (
     output: string,
-    routes: NonNullable<NonNullable<Nuxt["apps"]["default"]>["pages"]>,
-    include: (url: string | undefined) => boolean,
+    routes: Parameters<typeof canvasManifest>[0],
+    include: (url: string | undefined, route: (typeof routes)[number]) => boolean,
   ) => {
     if (!routes.length) {
       rmSync(join(output, filename), { force: true })
       return
     }
-    const { pages } = canvasManifest(routes)
+    const manifest = canvasManifest(routes, (page, route) => include(canvasPageURL(page), route))
     mkdirSync(output, { recursive: true })
-    writeFileSync(
-      join(output, filename),
-      JSON.stringify({ pages: pages.filter((page) => include(canvasPageURL(page))) }),
-    )
+    writeFileSync(join(output, filename), JSON.stringify(manifest))
   }
 
   if (nuxt.options.dev) {
@@ -136,8 +133,9 @@ function serveCanvasManifest(nuxt: Nuxt) {
             )
             .map((entry) => prerenderKey(entry.route)),
         )
-        writeManifest(nitro.options.output.publicDir, routes, (url) =>
-          Boolean(url && rendered.has(prerenderKey(decodeURI(url))) && !redirects(url)),
+        const owner = routes.length ? canvasRouteOwner(nuxt.options.rootDir, routes) : undefined
+        writeManifest(nitro.options.output.publicDir, routes, (url, route) =>
+          Boolean(url && rendered.has(prerenderKey(decodeURI(url))) && owner?.(url) === route && !redirects(url)),
         )
       },
     )

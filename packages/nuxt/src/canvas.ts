@@ -1,3 +1,6 @@
+import { createRequire } from "node:module"
+import { join } from "node:path"
+
 export interface CanvasPageMeta {
   params?: Record<string, string>
 }
@@ -15,6 +18,8 @@ interface CanvasManifest {
 interface ResolvedRoute {
   path: string
   name?: string
+  file?: string
+  alias?: string | string[]
   redirect?: unknown
   _sync?: boolean
   meta?: { canvas?: false | CanvasPageMeta }
@@ -27,7 +32,10 @@ function isCatchAll(pattern: string | undefined): boolean {
   return pattern === ".*" || pattern === "[^/]*"
 }
 
-export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
+export function canvasManifest(
+  routes: ResolvedRoute[],
+  include: (page: CanvasPage, route: ResolvedRoute) => boolean = () => true,
+): CanvasManifest {
   const pages: CanvasPage[] = []
   const visit = (route: ResolvedRoute, parent: string) => {
     if (route._sync) return
@@ -51,13 +59,48 @@ export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
         }
         if (route.name) page.name = route.name
         if (params) page.params = params
-        pages.push(page)
+        if (include(page, route)) pages.push(page)
       }
     }
     for (const child of children) visit(child, path)
   }
   for (const route of routes) visit(route, "")
   return { pages }
+}
+
+interface MatcherRoute {
+  path: string
+  name?: string
+  alias?: string | string[]
+  redirect?: unknown
+  component?: object
+  meta: { source: ResolvedRoute }
+  children?: MatcherRoute[]
+}
+
+interface VueRouterMatcherAPI {
+  createRouterMatcher(
+    this: void,
+    routes: MatcherRoute[],
+    options: { strict?: boolean; sensitive?: boolean },
+  ): { resolve(location: { path: string }, current: { path?: string }): { matched: MatcherRoute[] } }
+}
+
+export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[]) {
+  const requireFromApp = createRequire(join(rootDir, "package.json"))
+  const requireFromNuxt = createRequire(requireFromApp.resolve("nuxt/package.json"))
+  const router: VueRouterMatcherAPI = requireFromNuxt("vue-router")
+  const toMatcherRoute = (route: ResolvedRoute): MatcherRoute => ({
+    path: route.path,
+    name: route.name,
+    ...(route.alias ? { alias: route.alias } : {}),
+    redirect: route.redirect,
+    component: route.file ? {} : undefined,
+    meta: { source: route },
+    children: route.children?.map(toMatcherRoute),
+  })
+  const matcher = router.createRouterMatcher(routes.map(toMatcherRoute), {})
+  return (url: string) => matcher.resolve({ path: url }, {}).matched.at(-1)?.meta.source
 }
 
 function joinPath(parent: string, path: string): string {

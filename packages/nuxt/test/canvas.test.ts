@@ -1,6 +1,8 @@
+import { fileURLToPath } from "node:url"
+
 import { describe, expect, it } from "vitest"
 
-import { canvasManifest, canvasPageURL, routeRuleRedirects } from "../src/canvas.ts"
+import { canvasManifest, canvasPageURL, canvasRouteOwner, routeRuleRedirects } from "../src/canvas.ts"
 
 describe("canvasManifest", () => {
   it("lists every page, children included, with their full paths", () => {
@@ -73,6 +75,17 @@ describe("canvasManifest", () => {
       { path: "/docs/:path(.*)*", name: "docs-path", params: { path: "intro" } },
     ])
   })
+})
+
+it("only assigns a concrete URL to the route Vue Router would open", () => {
+  const index = { path: "/", file: "index.vue" }
+  const language = { path: "/:lang?", file: "[[lang]].vue" }
+  const blog = { path: "/blog/:slug?", file: "blog/[[slug]].vue" }
+  const owner = canvasRouteOwner(fileURLToPath(new URL("..", import.meta.url)), [language, blog, index])
+
+  expect(owner(canvasPageURL(language)!)).toBe(index)
+  expect(owner(canvasPageURL({ ...language, params: { lang: "en" } })!)).toBe(language)
+  expect(owner(canvasPageURL(blog)!)).toBe(blog)
 })
 
 describe("canvasPageURL", () => {

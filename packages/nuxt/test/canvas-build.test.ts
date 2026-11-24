@@ -31,12 +31,19 @@ async function buildFixture(
       app: { baseURL: "/preview/" },
       experimental: { scanPageMeta: ${options.scan ? '"after-resolve"' : "false"}, typedPages: false },
       routeRules: { "/legacy": { redirect: "/" }, "/moved": { redirect: "/" } },
-      ${mode === "generate" ? 'nitro: { prerender: { routes: ["/blog", "/items/43/"] } },' : ""}
+      ${mode === "generate" ? 'nitro: { prerender: { routes: ["/blog", "/items/43/", "/en", "/localized/en"] } },' : ""}
     })`,
     )
     const page = "<template><div>Fixture page</div></template>"
     if (options.pages !== false) {
       await write("app/pages/index.vue", page)
+      if (mode === "generate") {
+        await write("app/pages/[[lang]].vue", "<template><div>Optional language page</div></template>")
+        await write(
+          "app/pages/localized/[[lang]].vue",
+          `<script setup>definePageMeta({ canvas: { params: { lang: 'en' } } })</script>${page}`,
+        )
+      }
       await write("app/pages/blog/[[slug]].vue", page)
       await write("app/pages/legacy.vue", page)
       await write("app/pages/docs/[...slug]/edit.vue", page)
@@ -85,9 +92,16 @@ it("does not publish a manifest for an empty pages app", async () => {
 it("publishes only generated static targets, with no fallback required", async () => {
   await buildFixture("generate", { scan: true }, async (read) => {
     const { pages } = JSON.parse(await read("__canvas.json"))
+    expect(await read("index.html")).not.toContain("Optional language page")
+    expect(await read("en/index.html")).toContain("Optional language page")
     expect(await read("blog/index.html")).toContain("Fixture page")
     expect(await read("items/43/index.html")).toContain("Fixture page")
-    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual(["/", "/blog/:slug?", "/items/:id"])
+    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual([
+      "/",
+      "/blog/:slug?",
+      "/items/:id",
+      "/localized/:lang?",
+    ])
     await expect(read("orders/42/index.html")).rejects.toMatchObject({ code: "ENOENT" })
   })
 }, 30_000)
