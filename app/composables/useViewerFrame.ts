@@ -2,7 +2,8 @@ import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
-import type { DropComment, DropDetail } from "#shared/types"
+import { addRuntimeErrors } from "#shared/runtime-errors"
+import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { Presence } from "~/composables/usePresence"
@@ -54,6 +55,7 @@ export function useViewerFrame(options: {
   palette?: () => void
   toggleZen?: () => void
   escape?: () => boolean
+  errors?: Ref<DropRuntimeError[]>
 }) {
   const {
     drop,
@@ -175,14 +177,17 @@ export function useViewerFrame(options: {
   const unplaced = ref(new Set<string>())
 
   let runtimeReports: RuntimeReport[] = []
-  const flushRuntimeReports = useDebounceFn(() => {
+  const flushRuntimeReports = useDebounceFn(async () => {
     const errors = runtimeReports.splice(0, 20)
     runtimeReports = []
-    if (errors.length)
-      $fetch(`/api/drops/${drop.value.id}/errors`, {
-        method: "POST",
-        body: { version: drop.value.version, errors },
-      }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: drop.value.id }))
+    if (!errors.length) return
+    const { id, version } = drop.value
+    const stored = await $fetch(`/api/drops/${id}/errors`, { method: "POST", body: { version, errors } }).then(
+      () => true,
+      (error: unknown) => reportClientError("runtime-errors", error, { drop: id }),
+    )
+    if (stored && options.errors && drop.value.id === id && drop.value.version === version)
+      options.errors.value = addRuntimeErrors(options.errors.value, errors, Date.now())
   }, 2000)
 
   const embedLinks = computed(() => {

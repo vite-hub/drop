@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML })) {
+function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML }), errors) {
   const drop = ref({ id: "doc", kind, content: "", html: RENDERED })
   const sent = []
   const request = vi.fn(fetch)
@@ -79,10 +79,37 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
         draftingArea: ref(null),
         popover: ref(null),
       },
+      errors,
     }),
   )
   return { drop, sent, request, receive }
 }
+
+test("an error the open page reports joins the viewer's list once Drop stores it, for that version only", async () => {
+  const errors = ref([])
+  let stored
+  const { drop, receive, request } = viewer("html", () => new Promise((resolve) => (stored = resolve)), errors)
+  drop.value = { ...drop.value, version: 2, trashedAt: null }
+  const boom = { type: "runtime-error", kind: "error", message: "TypeError: x", source: "https://example.com/a.js:1:2" }
+  for (let i = 0; i < 2; i++) {
+    receive(boom)
+    assert.equal(errors.value[0]?.count ?? 0, i, "nothing new shows before Drop stores it")
+    stored()
+    await vi.waitFor(() => assert.equal(errors.value[0]?.count, i + 1))
+  }
+  assert.deepEqual(request.mock.calls[0], [
+    "/api/drops/doc/errors",
+    { method: "POST", body: { version: 2, errors: [{ kind: "error", message: "TypeError: x", source: boom.source }] } },
+  ])
+  receive({ ...boom, message: "Late" })
+  drop.value = { ...drop.value, version: 3 }
+  stored()
+  await nextTick()
+  assert.deepEqual(
+    errors.value.map((error) => error.message),
+    ["TypeError: x"],
+  )
+})
 
 for (const kind of ["html", "app"])
   test(`${kind} frames cannot fetch another drop's source or title through the embed bridge`, async () => {

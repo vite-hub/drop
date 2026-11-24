@@ -17,7 +17,15 @@ import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
+import type {
+  DropComment,
+  DropKind,
+  DropRuntimeError,
+  DropSummary,
+  DropVersion,
+  RelatedDrop,
+  SiteReviewItem,
+} from "#shared/types"
 import {
   AvatarStack,
   CommentSelectionBar,
@@ -475,6 +483,12 @@ watch(zen, (on) => on && (detailsOpen.value = false))
 const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
+const pageErrors = ref<DropRuntimeError[]>([])
+watch(
+  () => drop.value.errors,
+  (errors) => (pageErrors.value = errors ?? []),
+  { immediate: true },
+)
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const { bottom: frameBottom } = useElementBounding(frame)
 const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unplaced, openPath, picker, whenHeld } =
@@ -525,6 +539,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     palette: usePaletteOpener(),
     toggleZen,
     escape: leaveZen,
+    errors: pageErrors,
   })
 const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
 function canvasTool(command: "move" | "hand") {
@@ -884,7 +899,6 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
-const pageErrors = computed(() => drop.value.errors ?? [])
 const feedback = () =>
   feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version, pageErrors.value)
 const readerId = computed(
@@ -896,6 +910,7 @@ const readerId = computed(
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
 const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, pageErrors.value.length)
+const errorsOnly = computed(() => pageErrors.value.length > 0 && !waiting.value.length)
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -2033,7 +2048,7 @@ watch(
               >
                 <template #tools>
                   <ViewerCommentSend
-                    v-if="canSend"
+                    v-if="canSend && !errorsOnly"
                     v-show="!lightbox && !commentMode"
                     :comments="publishedComments"
                     :drop="drop.id"
