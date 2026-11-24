@@ -293,10 +293,15 @@
   function load(it, live) {
     const frame = live.frame;
     // The turn ends with the frame's load, which an error page fires too, with its sleep, or after STALL ms, when a new
-    // empty frame takes its place and so stops the navigation.
+    // empty frame takes its place and so stops the navigation. A kept frame (someone typing in it) checks again later.
     live.state = "loading";
     frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { clearTimeout(live.slow); live.state = "awake"; rest(); } }, { once: true });
-    live.slow = setTimeout(() => { if (live.frame === frame && live.state === "loading") { live.state = "stalled"; blank(it.el, live); rest(); } }, STALL);
+    const stall = () => {
+      if (live.frame !== frame || live.state !== "loading") return;
+      if (kept(it)) { live.slow = setTimeout(stall, SLEEP); return; }
+      live.state = "stalled"; blank(it.el, live); rest();
+    };
+    live.slow = setTimeout(stall, STALL);
     frame.src = live.url;
     it.el.removeAttribute("data-prototype-asleep");
   }

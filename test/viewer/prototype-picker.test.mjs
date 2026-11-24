@@ -782,9 +782,16 @@ test("live pages load as their items come near the screen, two at a time, and sl
     await tab.waitForTimeout(200)
     assert.deepEqual(await loaded(), ["v-0", "v-1"])
     // Two pages that never answer give up their turns after a while, stop loading, and wait until their items have
-    // left and come back; the third loads meanwhile.
+    // left and come back; the third loads meanwhile. The one being typed in keeps loading until focus leaves it.
+    await tab.evaluate(() => document.getElementById("v-0").querySelector("iframe").focus())
     await tab.clock.fastForward(16000)
     await tab.waitForFunction(() => document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.deepEqual(await loaded(), ["v-0", "v-2"])
+    await tab.evaluate(() => document.activeElement.blur())
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
     assert.deepEqual(await loaded(), ["v-2"])
