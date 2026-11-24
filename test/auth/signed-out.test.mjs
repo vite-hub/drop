@@ -83,6 +83,8 @@ test("a 401 while still signed in, from another origin, or while /api/me fails, 
   let me = () => ({ id: "member" })
   const view = page({ "/api/drops/abc": () => 401, "/api/me": () => me() })
   await $fetch("/api/drops/abc").catch(() => {})
+  await settle()
+  assert.equal(view.meCalls(), 1)
   await fetch("https://other.example.com/api/drops/abc")
   await settle()
   assert.equal(view.meCalls(), 1)
