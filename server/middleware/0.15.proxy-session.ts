@@ -13,7 +13,7 @@ export default defineHandler(async (event) => {
     event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
   const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return
-  if (path !== "/signin/start") return withoutToken(event)
+  if (path !== "/signin/start" || sentPath(event) !== path) return withoutToken(event)
   if (!(await isProxyMember(token)))
     throw new HTTPError({
       status: 403,
@@ -28,6 +28,10 @@ export default defineHandler(async (event) => {
 
   withoutToken(event, event.context.dropSessionCookies)
 })
+
+function sentPath(event: H3Event) {
+  return event.runtime?.node?.req.url?.split("?")[0] ?? event.url.pathname
+}
 
 function withoutToken(event: H3Event, cookies?: string[]) {
   const headers = new Headers(event.req.headers)

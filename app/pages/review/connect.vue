@@ -71,6 +71,7 @@ onMounted(async () => {
   try {
     sites.value = (await reviewSites(origin.value)).sites
   } catch (cause) {
+    if (!me.value && statusOf(cause) === 401) return void (state.value = "signin")
     reportClientError("review-sites", cause)
     error.value = errorText(cause, "Couldn't look up this site's review.")
     state.value = "error"

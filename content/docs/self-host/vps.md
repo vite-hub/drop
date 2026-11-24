@@ -86,8 +86,8 @@ extra:
 Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`, and run oauth2-proxy with:
 
 ```sh
---provider=github --github-org=your-org --scope="user:email read:org"
---set-xauthrequest=true --pass-access-token=true
+--provider=github --github-org=your-org --email-domain="*" --scope="user:email read:org"
+--set-xauthrequest=true --pass-access-token=true --reverse-proxy=true
 --cookie-name=__Host-drop-auth --cookie-secure=true
 ```
 
@@ -101,6 +101,7 @@ location /oauth2/ {
 }
 
 location = /oauth2/auth {
+  internal;
   proxy_pass http://127.0.0.1:4180;
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-Proto $scheme;
@@ -110,7 +111,7 @@ location = /oauth2/auth {
 
 location = /signin/start {
   auth_request /oauth2/auth;
-  error_page 401 =403 /oauth2/sign_in?rd=$scheme://$host$request_uri;
+  error_page 401 =403 /oauth2/sign_in?rd=$request_uri;
   auth_request_set $token $upstream_http_x_auth_request_access_token;
   proxy_set_header X-Auth-Request-Access-Token $token;
   proxy_pass http://127.0.0.1:3000;
@@ -120,7 +121,9 @@ location = /signin/start {
 }
 ```
 
-With ingress-nginx, the same split is two Ingresses for one host: one sends `/signin/start` (`pathType: Exact`) to Drop with the annotations below, and the other sends `/oauth2` to oauth2-proxy and `/` to Drop with none.
+Add `proxy_set_header X-Auth-Request-Access-Token "";` to the location that proxies to Drop, so only `/signin/start` carries the token.
+
+With ingress-nginx, the same split takes three Ingresses for one host, since an Ingress reaches only Services in its own namespace. In Drop's namespace, one sends `/signin/start` (`pathType: Exact`) to Drop with the annotations below, and one sends `/` to Drop with none. In oauth2-proxy's namespace, the third sends `/oauth2` to oauth2-proxy.
 
 ```yaml
 nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.auth.svc.cluster.local:4180/oauth2/auth

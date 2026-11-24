@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { signInPath } from "#shared/sign-in"
+
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
 const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn, ready: sessionKnown } = useUserSession($auth)
+const { data: method } = useSignInMethod()
 const mounted = useMounted()
 const ready = computed(() => mounted.value && sessionKnown.value)
 
@@ -44,6 +47,8 @@ async function signInWithGitHub() {
   pending.value = "github"
   error.value = ""
   try {
+    if (method.value?.proxy)
+      return void (await navigateTo(signInPath(route.fullPath, { proxy: true }), { external: true }))
     const { error: failure } = await signIn.social({ provider: "github", callbackURL: "/drops" })
     if (failure) throw answerError(failure.message || "Couldn't start GitHub sign-in.", failure.status)
   } catch (cause) {

@@ -48,7 +48,7 @@ test.skipIf(!origin || !database || !githubToken)(
       )
       assert.equal(
         (await request("/signin/start", { headers: { "x-auth-request-access-token": "invalid-token" } })).status,
-        403,
+        401,
       )
       assert.equal((await request("/api/auth/sign-in/social", { body: { provider: "github" } })).status, 404)
       const login = await request("/signin/start?redirect=%2Fdrops", { proxy: true })

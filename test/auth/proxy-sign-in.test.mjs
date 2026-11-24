@@ -500,6 +500,15 @@ test("the forwarded header signs nobody in outside /signin/start", async () => {
     assert.equal(event.req.headers.get("x-auth-request-access-token"), null, path)
     assert.equal(event.context.dropSessionCookies, undefined, path)
   }
+  // nginx routes `/signin\start` past its guarded location, and Node's URL parser then reads it as /signin/start.
+  const request = new Request("https://drop.example/signin/start", {
+    headers: { "x-auth-request-access-token": "test-forged" },
+  })
+  request.runtime = { name: "node", node: { req: { url: "/signin\\start" } } }
+  const event = new H3Event(request)
+  await proxySession(event)
+  assert.equal(event.req.headers.get("x-auth-request-access-token"), null)
+  assert.equal(event.context.dropSessionCookies, undefined)
   assert.equal(fetch.mock.calls.length, 0, "Drop never asks GitHub about a header outside sign-in")
   assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
 })
