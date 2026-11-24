@@ -68,7 +68,7 @@
   shadow.innerHTML = `<style>
     :host { all: initial; }
     .bar { position: fixed; z-index: 2147483000; bottom: 16px; left: calc((100vw - var(--drop-inset, 0px)) / 2); transform: translateX(-50%);
-      display: flex; align-items: center; gap: 2px; max-width: calc(100vw - var(--drop-inset, 0px) - 32px); padding: 4px;
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; max-width: calc(100vw - var(--drop-inset, 0px) - 32px); padding: 4px;
       border: 1px solid rgb(255 255 255 / .12); border-radius: 12px; background: rgb(17 17 17 / .92); color: #fafafa;
       font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: blur(8px); }
     button { all: unset; box-sizing: border-box; height: 28px; padding: 0 10px; border-radius: 8px; color: #a3a3a3; cursor: pointer; white-space: nowrap; }
@@ -148,7 +148,7 @@
   const at = (el) => { const { x, y } = el.dataset; if (x == null && y == null) return null; const p = [coord(x), coord(y)]; return p.includes(null) ? null : p; };
   // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
   const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
-  // `moved` names the items the reader moved; an item with data-x/data-y takes its saved position only then.
+  // `moved` names the items the reader moved; only those take their saved position. A save from before the list moved none.
   const saved = { camera: null, positions: {} }, moved = new Set();
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
@@ -213,9 +213,8 @@
     tags.append(tag);
     return it;
   });
-  // The reader's moves first, then the page's data-x/data-y, then saved positions; the rest go in the empty space to
-  // the right of them all.
-  const start = (it) => (it.at && !moved.has(it.el.id) ? null : saved.positions[it.el.id]) || it.at;
+  // The reader's moves first, then the page's data-x/data-y; the rest go in the empty space to the right of them all.
+  const start = (it) => (moved.has(it.el.id) && saved.positions[it.el.id]) || it.at;
   function arrange() {
     let right = -Infinity;
     for (const it of items) {

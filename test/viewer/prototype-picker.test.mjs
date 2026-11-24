@@ -401,17 +401,17 @@ test("items open where data-x and data-y place them, a reader's move wins for th
       await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
     }
     await open()
-    // Three has no data-x, so it keeps where it was.
-    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [1920, 0] })
+    // Three has no data-x and was never moved, so it follows the placed items.
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
 
-    // The reader moves Two with its handle's arrow keys; it stays there on the next visit, the rest as authored.
+    // The reader moves Two with its handle's arrow keys; it stays there on the next visit, and Three follows it.
     await tab.locator('prototype-picker .handle[aria-label="Move Two"]').focus()
     await tab.keyboard.press("Shift+ArrowRight")
     await tab.waitForTimeout(300)
     await open()
-    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [64, 900], "v-three": [1920, 0] })
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [64, 900], "v-three": [1024, 0] })
 
-    // Reset layout forgets every move: Three joins the row to the right of the placed items.
+    // Reset layout forgets every move.
     await tab.locator("prototype-picker .layout").click()
     await tab.waitForTimeout(300)
     assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
