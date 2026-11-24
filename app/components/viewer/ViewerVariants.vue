@@ -82,6 +82,7 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
     { label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbds: ["−"], onSelect: () => emit("command", "zoom-out") },
     { label: "Zoom to fit", kbds: ["shift", "1"], onSelect: () => emit("command", "fit") },
     { label: "Zoom to 100%", kbds: ["0"], onSelect: () => emit("command", "reset") },
+    { label: "Reset layout", onSelect: () => emit("command", "layout") },
   ],
   [
     {

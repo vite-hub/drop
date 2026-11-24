@@ -357,6 +357,176 @@ test("the canvas camera stops before the last item leaves the screen, and the mi
   }
 })
 
+test("adding an authored position replaces cached defaults but keeps explicit reader moves", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    let html = page("").replaceAll("<section ", '<section data-width="800" data-height="500" ')
+    await tab.route("https://picker.test/revisit", (route) =>
+      route.fulfill({ contentType: "text/html", body: injectRuntime(html, false, 0, true) }),
+    )
+    const positions = () =>
+      tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).positions)
+    await tab.goto("https://picker.test/revisit")
+    assert.deepEqual(await positions(), { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 0] })
+
+    await tab.locator('prototype-picker .handle[aria-label="Move Three"]').focus()
+    await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).moved.length === 1,
+    )
+    const moved = { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 64] }
+    assert.deepEqual(await positions(), moved)
+    await tab.reload()
+    assert.deepEqual(await positions(), moved)
+
+    await tab.locator('prototype-picker .handle[aria-label="Move Three"]').focus()
+    for (let step = 0; step < 7; step++) await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/revisit")).positions["v-three"][1] === 512,
+    )
+    html = html.replace('id="v-one"', 'id="v-one" data-x="960" data-y="0"')
+    await tab.reload()
+    assert.deepEqual(await positions(), { "v-one": [960, 0], "v-two": [1920, 0], "v-three": [1920, 512] })
+  } finally {
+    await browser.close()
+  }
+})
+
+test("the minimap stays clear of the standalone controls when the toolbar wraps", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 750 } })
+    const html = injectRuntime(page(""), false, 0, true)
+    await tab.route("https://picker.test/wrapped", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/wrapped")
+    await tab.locator('prototype-picker .handle[aria-label="Move One"]').focus()
+    await tab.keyboard.press("Shift+ArrowDown")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved.length === 1,
+    )
+    await tab.setViewportSize({ width: 393, height: 750 })
+    await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+
+    const bar = tab.locator("prototype-picker .bar")
+    const map = tab.locator("prototype-picker .map canvas")
+    const barBox = await bar.boundingBox()
+    const mapBox = await map.boundingBox()
+    assert.ok(mapBox.y + mapBox.height < barBox.y, "the full minimap is above the wrapped toolbar")
+    await map.click()
+    assert.deepEqual(
+      await tab.evaluate(() => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved),
+      ["v-one"],
+    )
+    await bar.getByRole("button", { name: "Hand", exact: true }).click()
+    await bar.getByRole("button", { name: "Move", exact: true }).click()
+    await bar.getByRole("button", { name: "Reset layout", exact: true }).click()
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/wrapped")).moved.length === 0,
+    )
+  } finally {
+    await browser.close()
+  }
+})
+
+test("fitted controls stay clickable above the raised minimap on a phone", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 393, height: 750 } })
+    const html = injectRuntime(
+      `<!doctype html><html><body>
+        <section id="v-one" data-variant="One" data-width="160" data-height="620" data-x="0" data-y="0">one</section>
+        <section id="v-two" data-variant="Two" data-width="120" data-height="80" data-x="209" data-y="526">
+          <button style="margin: 20px">Continue</button>
+        </section>
+      </body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/fitted", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/fitted")
+    const bar = tab.locator("prototype-picker .bar")
+    const map = tab.locator("prototype-picker .map")
+    const button = tab.getByRole("button", { name: "Continue", exact: true })
+    for (const action of ["Fit", "Reset layout"]) {
+      await bar.getByRole("button", { name: action, exact: true }).click()
+      await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const itemBox = await tab.locator("#v-two").boundingBox()
+      const mapBox = await map.boundingBox()
+      assert.ok(itemBox.y + itemBox.height < mapBox.y, `the fitted item clears the minimap after ${action}`)
+      await button.click({ trial: true })
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+test("items open where data-x and data-y place them, a reader's move wins for that reader, and Reset layout goes back", async () => {
+  const browser = await chromium.launch()
+  try {
+    const html = injectRuntime(
+      page("")
+        .replaceAll("<section ", '<section data-width="800" data-height="500" ')
+        .replace('id="v-one"', 'id="v-one" data-x="0" data-y="0"')
+        .replace('id="v-two"', 'id="v-two" data-x="0" data-y="900"'),
+      false,
+      0,
+      true,
+    )
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    await tab.route("https://picker.test/authored", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    // A position saved before data-x existed, as every visit saves them all, doesn't hide the authored layout.
+    await tab.addInitScript(() => {
+      if (sessionStorage.getItem("seeded")) return
+      sessionStorage.setItem("seeded", "1")
+      localStorage.setItem(
+        "drop-prototype-canvas:/authored",
+        JSON.stringify({ v: 1, camera: null, positions: { "v-one": [0, 0], "v-two": [960, 0], "v-three": [1920, 0] } }),
+      )
+    })
+    // Each item's place on the plane, from its transform: screen = camera + plane × zoom.
+    const places = () =>
+      tab.evaluate(() => {
+        const at = (id) =>
+          document
+            .getElementById(id)
+            .style.transform.match(/[-\d.]+/g)
+            .map(Number)
+        const [x0, y0, z] = at("v-one")
+        return Object.fromEntries(
+          ["v-one", "v-two", "v-three"].map((id) => {
+            const [x, y] = at(id)
+            return [id, [Math.round((x - x0) / z), Math.round((y - y0) / z)]]
+          }),
+        )
+      })
+    const open = async () => {
+      await tab.goto("https://picker.test/authored")
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+    }
+    await open()
+    // Three has no data-x and was never moved, so it follows the placed items.
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+
+    // The reader moves Two with its handle's arrow keys; both Two and the untouched Three keep their positions.
+    await tab.locator('prototype-picker .handle[aria-label="Move Two"]').focus()
+    await tab.keyboard.press("Shift+ArrowRight")
+    await tab.waitForTimeout(300)
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [64, 900], "v-three": [960, 0] })
+
+    // Reset layout forgets every move.
+    await tab.locator("prototype-picker .layout").click()
+    await tab.waitForTimeout(300)
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+    await open()
+    assert.deepEqual(await places(), { "v-one": [0, 0], "v-two": [0, 900], "v-three": [960, 0] })
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the Hand tool pans from over an item, which gets no clicks, and Space does the same while held", async () => {
   const browser = await chromium.launch()
   try {
