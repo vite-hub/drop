@@ -1,6 +1,7 @@
 import PAGE_PILL from "vite-hub/page/pill.js?raw"
 import DROP_MARK from "./drop-mark.svg?raw"
 import { ELEMENT_NAMING, INK, KEY_SCROLL, PALETTE_KEY } from "./plan-runtime"
+import { MEASURE, MEASURE_CSS, measureColors } from "./measure"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
 import { CAPTURE } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
@@ -25,6 +26,7 @@ const STYLE =
 .icon:hover { color: var(--fg); }
 .count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--soft); font: 500 11px/18px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
 .draw { position: fixed; inset: 0; cursor: crosshair; touch-action: none; background: rgb(0 0 0 / .04); }
+.gauge { position: fixed; inset: 0; cursor: default; touch-action: none; }
 .hint { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 4px 16px rgb(0 0 0 / .12); white-space: nowrap; }
 .box { position: fixed; border: 2px solid var(--mark); border-radius: 4px; background: color-mix(in oklab, var(--mark) 16%, transparent); pointer-events: none; }
 .mark { position: fixed; border: 1.5px dashed var(--mark); border-radius: 4px; pointer-events: none; }
@@ -145,6 +147,9 @@ const ICONS = {
   pen: svg(`<path d="M180 36l40 40L92 204l-52 12 12-52z"/>`),
   arrow: svg(`<path d="M60 196 192 64"/><path d="M96 64h96v96"/>`),
   text: svg(`<path d="M56 72V56h144v16"/><path d="M128 56v144"/><path d="M100 200h56"/>`),
+  measure: svg(
+    `<rect x="24" y="84" width="208" height="88" rx="8"/><path d="M64 84v32M104 84v20M144 84v32M184 84v20"/>`,
+  ),
   link: svg(
     `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
   ),
@@ -182,9 +187,10 @@ const TOOLS =
 
 const MARKUP = `<div class="ui">
 <div class="pins"></div>
+<div class="gauge" hidden></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows, or label it">${ICONS.marker}Highlight</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows, or label it">${ICONS.marker}Highlight</button><button type="button" data-act="measure" aria-pressed="false" aria-keyshortcuts="S" title="Measure an element, and the space from it to another (S)">${ICONS.measure}Measure</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
 <div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
@@ -196,6 +202,11 @@ ${TOOLS}
 <nav class="links" id="related-links" aria-label="Related links" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
+
+const GAUGE_STYLE =
+  `:host { --measure-card: 240px; ${measureColors(false)} }
+@media (prefers-color-scheme: dark) { :host { ${measureColors(true)} } }
+` + MEASURE_CSS
 
 export const REVIEW_SCRIPT = String.raw`(() => {
   // A bookmarklet adds this script with a plain script element, where currentScript works too.
@@ -230,6 +241,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const copyButton = $("[data-act=copy]", bar), peopleButton = $("[data-act=people]", bar);
   const showResolved = $("[data-act=resolved]", list), showOutdated = $("[data-act=outdated]", list), awayToggle = $(".away-toggle", list);
   const tools = $(".tools"), paint = $(".paint"), inked = $(".inked"), ink = $(".ink", inked);
+  const gauge = $(".gauge"), measureButton = $("[data-act=measure]", bar);
 
   const related = $(".related"), relatedButton = $("button", related), links = $(".links");
 
@@ -538,7 +550,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const item = focusN !== null && threads.find((t) => t.n === focusN);
     const focused = item && placed.find(([shown]) => shown === item);
     const at = focused ? focused[1] : item && pointOf(item);
-    pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden;
+    pinLayer.hidden = !pinsShown || !draw.hidden || !paint.hidden || !gauge.hidden;
     if (!inked.hidden) inked.style.translate = inkAt.x - scrollX + "px " + (inkAt.y - scrollY) + "px";
     const groups = [];
     for (const [shown, at] of placed) {
@@ -917,6 +929,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
   function cancel() {
     closeRelated();
+    if (!gauge.hidden) measure(false);
     const wasOpen = !draw.hidden || !pop.hidden;
     draw.hidden = true; box.hidden = true; pop.hidden = true; pill.hidden = bar.hidden = false;
     paint.hidden = true; tools.hidden = true; inked.hidden = true; ink.textContent = "";
@@ -950,7 +963,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     let target;
     if (point) {
       // A click comments on the element under it; the screenshot's box is a small square around the spot.
-      target = document.elementsFromPoint(point.x, point.y).find((node) => node !== host && node !== document.documentElement) || document.body;
+      target = elementAt(point.x, point.y);
       const half = 20, left = Math.max(0, Math.min(point.x - half, innerWidth - 2 * half)), top = Math.max(0, Math.min(point.y - half, innerHeight - 2 * half));
       r = { left, top, right: left + 2 * half, bottom: top + 2 * half, width: 2 * half, height: 2 * half };
     } else {
@@ -1124,7 +1137,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       return;
     }
     if (e.key !== "Escape" || busy || e.isComposing) return;
-    if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
+    if (!gauge.hidden) { e.preventDefault(); e.stopPropagation(); unpickOrStop(); }
+    else if (!draw.hidden || !pop.hidden) { e.preventDefault(); e.stopPropagation(); cancel(); }
     else if (!thread.hidden) { e.stopPropagation(); closeThread(); }
     else if (!list.hidden) { e.stopPropagation(); list.hidden = true; }
     else if (!links.hidden || relatedOpening) {
@@ -1134,6 +1148,115 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       closeRelated();
     }
   }, true);
+
+  // ---- Measure: an element's size, box, type and colors, and the space from a picked one to another ----
+
+  // The page's element under a point, past the toolbar.
+  const elementAt = (x, y) => document.elementsFromPoint(x, y).find((node) => node !== host && node !== document.documentElement) || document.body;
+  ${MEASURE}
+  // Its drawings are in a shadow root of their own inside the toolbar's, since both name a .card. The card keeps its size
+  // in pixels: in rem it would follow the site's root font size.
+  const gaugeRoot = gauge.attachShadow({ mode: "closed" });
+  gaugeRoot.innerHTML = "<style>" + ${JSON.stringify(GAUGE_STYLE)} + "</style><div class=\"fx\"></div>";
+  const gaugeFx = gaugeRoot.querySelector(".fx"), gaugeTool = measureTool(gaugeFx, () => 0);
+  // The layer over the page takes the pointer while Measure is on, so the page hears no hover or click.
+  let gaugePicked = null, gaugePoint = null, gaugeFrame = 0;
+  function drawGauge() {
+    gaugeFrame = 0;
+    gaugeFx.textContent = "";
+    if (gaugePicked && !gaugePicked.isConnected) gaugePicked = null;
+    const gaugeOver = gaugePoint && root.elementFromPoint(gaugePoint.x, gaugePoint.y) === gauge
+      ? elementAt(gaugePoint.x, gaugePoint.y) : null;
+    if (!gauge.hidden) gaugeTool.draw(gaugePicked, gaugeOver !== gaugePicked ? gaugeOver : null);
+  }
+  const redrawGauge = () => { if (!gaugeFrame) gaugeFrame = requestAnimationFrame(drawGauge); };
+  const siteInTopLayer = () => document.fullscreenElement || document.querySelector(":is(:popover-open, :modal)");
+  const topLayerNotice = () => say("Close the site's popover, dialog, or fullscreen view to use Measure.");
+  const sitePointers = new Set();
+  function measure(on) {
+    if (on) {
+      if (sitePointers.size) return;
+      if (busy) return say("Sending your comment…");
+      if (siteInTopLayer()) return topLayerNotice();
+      cancel(); closeThread(); list.hidden = true;
+    }
+    gauge.hidden = !on;
+    gaugePicked = gaugePoint = null;
+    measureButton.setAttribute("aria-pressed", String(on));
+    redrawGauge();
+    layout();
+  }
+  // Esc unpicks the picked element first, as in Drop, then puts Measure down.
+  function unpickOrStop() {
+    if (gaugePicked) { gaugePicked = null; redrawGauge(); }
+    else measure(false);
+  }
+  gauge.addEventListener("pointermove", (e) => { gaugePoint = { x: e.clientX, y: e.clientY }; redrawGauge(); });
+  gauge.addEventListener("pointerleave", () => { gaugePoint = null; redrawGauge(); });
+  gauge.addEventListener("pointerdown", (e) => { if (e.button === 0) e.preventDefault(); });
+  gauge.addEventListener("click", (e) => {
+    const el = elementAt(e.clientX, e.clientY);
+    gaugePicked = gaugePicked === el ? null : el;
+    redrawGauge();
+  });
+  // The drawings are where the elements are now: the page scrolls under the layer, a box inside it too.
+  addEventListener("scroll", () => { if (!gauge.hidden) redrawGauge(); }, { capture: true, passive: true });
+  addEventListener("resize", () => { if (!gauge.hidden) redrawGauge(); });
+  function stopForTopLayer() {
+    measure(false);
+    topLayerNotice();
+  }
+  for (const type of ["toggle", "fullscreenchange"])
+    document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, true);
+  const releaseSitePointer = (event) => { if (event.isTrusted) sitePointers.delete(event.pointerId); };
+  addEventListener("pointercancel", releaseSitePointer, true);
+  for (const type of ["pointermove", "lostpointercapture"]) {
+    addEventListener(type, (event) => {
+      if (!event.buttons) releaseSitePointer(event);
+    }, true);
+  }
+  for (const type of ["pointerdown", "pointerup", "click"]) {
+    addEventListener(type, (event) => {
+      if (!event.isTrusted) return;
+      if (type === "pointerup" || type === "pointerdown") releaseSitePointer(event);
+      if (event.composedPath().includes(host)) return;
+      if (gauge.hidden) {
+        if (type === "pointerdown") sitePointers.add(event.pointerId);
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (type !== "click") return;
+      if (siteInTopLayer()) stopForTopLayer();
+      else if (event.detail) {
+        const hit = document.elementFromPoint(event.clientX, event.clientY);
+        if (hit && hit !== host && event.composedPath().includes(hit)) {
+          measure(false);
+          say("A site element is covering Measure. Close it and try again.");
+        }
+      }
+    }, { capture: true, passive: false });
+  }
+  measureButton.addEventListener("click", () => measure(gauge.hidden));
+  // Site fields can be inside closed shadow roots, so only use S on the bare page or in Drop's own controls.
+  const typing = (node) => Boolean(node) && (node.isContentEditable || /^(input|textarea|select)$/.test(node.localName));
+  const canMeasureFromKey = () => paint.hidden && draw.hidden && pop.hidden;
+  function measureKey(event) {
+    if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "s") return;
+    if (!canMeasureFromKey() || (gauge.hidden && sitePointers.size)) return;
+    if (event.currentTarget === host) {
+      if (!root.activeElement || typing(root.activeElement)) return;
+      event.preventDefault();
+      measure(gauge.hidden);
+      return;
+    }
+    if (event.target !== document.documentElement && (event.target !== document.body || document.body.matches(":focus-within"))) return;
+    const on = gauge.hidden;
+    setTimeout(() => {
+      if (!event.defaultPrevented && canMeasureFromKey() && gauge.hidden === on) measure(on);
+    }, 0);
+  }
+  addEventListener("keydown", measureKey);
 
   ${CAPTURE}
   // Each comment's screenshot; cancel() stops the one still being drawn for a comment that's gone.
@@ -1504,6 +1627,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   addEventListener("keydown", paletteToDrop);
   // The toolbar's own fields stop their keys at its element (below), so they pass ⌘K on from there.
   host.addEventListener("keydown", paletteToDrop);
+  host.addEventListener("keydown", measureKey);
   addEventListener("message", (e) => {
     const m = e.data;
     if (e.source !== parent || e.origin !== drop || !m || m.__drop !== true) return;
