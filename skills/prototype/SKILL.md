@@ -46,7 +46,7 @@ When the question is how someone moves through screens (an app's session, a chec
 
 Drop draws the arrows: mark each screen `data-screen` and give the button `data-go` with the id of the screen it leads to, and `data-label`. The markup and a row layout are in [references/canvas.md](references/canvas.md#flows-rows-of-screens-with-arrows).
 
-Canvas details (flows, URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page, has a popover, or animates.
+Canvas details (flows, URL items for live previews, every page of a preview, variants as routes in the real app, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page or an app route, has a popover, or animates.
 
 If you can open a browser, open the page and check every item renders and the console is clean.
 
