@@ -81,7 +81,7 @@ extra:
 
 ## Reuse GitHub oauth2-proxy {#auth-proxy}
 
-**The proxy guards sign-in, and Drop guards the rest.** Put oauth2-proxy in front of `/signin/start` only. There it forwards the person's GitHub token, and Drop turns it into its own 30-day session. Every other path goes straight to Drop. Without a session it answers 401, except where a drop's share, a review token, an upload ticket or an MCP token lets the request in. Public links, MCP, uploads and [site review](/docs/sites) need no list of exempt paths, and an expired proxy cookie can't break a page that is already open.
+**The proxy guards sign-in, and Drop guards the rest.** Put oauth2-proxy in front of `/signin/start` only. There it forwards the person's GitHub token, and Drop turns it into its own 30-day session. Every other path goes straight to Drop. Without a session it answers 401, except where a drop's share, a review token, an upload ticket or an MCP token lets the request in. Public links, MCP, uploads and [site review](/docs/sites) need no list of exempt paths, and an expired proxy cookie can't break a page that is already open. If the proxy used to keep the whole host private, check which drops have public links before you switch: those links now open without it.
 
 Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`, and run oauth2-proxy with:
 
@@ -98,6 +98,7 @@ location /oauth2/ {
   proxy_pass http://127.0.0.1:4180;
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Auth-Request-Redirect $request_uri;
 }
 
 location = /oauth2/auth {
@@ -111,7 +112,7 @@ location = /oauth2/auth {
 
 location = /signin/start {
   auth_request /oauth2/auth;
-  error_page 401 =403 /oauth2/sign_in?rd=$request_uri;
+  error_page 401 =403 /oauth2/sign_in;
   auth_request_set $token $upstream_http_x_auth_request_access_token;
   proxy_set_header X-Auth-Request-Access-Token $token;
   proxy_pass http://127.0.0.1:3000;
@@ -135,7 +136,7 @@ nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-Access-Token
 
 Drop checks membership again with the stored token every five minutes, and a failed check denies access. When a Drop session ends, Drop's sign-in goes through oauth2-proxy again.
 
-If sign-in fails, check the response from `/signin/start`. A 401 means GitHub rejected the token. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` tell these apart without including credentials.
+If sign-in fails, check the response from `/signin/start`. A 401 means GitHub rejected the token. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` tells these apart without including credentials.
 
 The [ViteHub Console](/docs/self-host#github) calls `POST /_vitehub/rpc` from its own server with a signature, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
 
