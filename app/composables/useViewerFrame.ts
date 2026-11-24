@@ -339,6 +339,7 @@ export function useViewerFrame(options: {
       case "area-shot":
       case "marker":
       case "marks":
+      case "mark-retry":
       case "draft-place":
       case "page-click":
         annotations.receive(message, box)

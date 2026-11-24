@@ -641,7 +641,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The zoomed screenshot under a point: an area drawn on it is a comment on the image, like the ones Drop's lightbox takes.
   function shotAt(x, y) {
     if (!zoom) return null;
-    return Array.from(zoom.content.querySelectorAll("img")).find((img) => {
+    const images = zoom.content.matches("img") ? [zoom.content] : Array.from(zoom.content.querySelectorAll("img"));
+    return images.find((img) => {
       const r = img.getBoundingClientRect();
       return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     }) || null;

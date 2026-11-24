@@ -27,7 +27,19 @@ export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
 
 type PointerMessage = Extract<
   FrameMessage,
-  { type: "selection" | "image" | "area" | "area-shot" | "marker" | "key" | "marks" | "draft-place" | "page-click" }
+  {
+    type:
+      | "selection"
+      | "image"
+      | "area"
+      | "area-shot"
+      | "marker"
+      | "key"
+      | "marks"
+      | "mark-retry"
+      | "draft-place"
+      | "page-click"
+  }
 >
 
 export function useViewerAnnotations(options: {
