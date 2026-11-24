@@ -472,7 +472,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   pageStyle.textContent = MARKS_CSS + ":root{--vh-ui-comment-ink:" + (THEMED ? "var(--foreground)" : "#808080") + "}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
     // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
     // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
-    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
+    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}" +
+    // A prototype canvas's Hand (EVENT_HOLD): the tools' layer lets the pointer through to the picker, which shows grab.
+    "html[data-prototype-hand] drop-comments{pointer-events:none!important}";
   // comark-comments' speech bubble, in a given color.
   const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
@@ -2214,7 +2216,9 @@ const EVENT_HOLD = String.raw`(() => {
   Object.defineProperty(self, "__dropHold", { value: (fn) => { hold = typeof fn === "function" ? fn : null; } });
   const POINTER = ["pointerdown", "pointerup", "pointermove", "pointerover", "pointerout", "pointerenter", "pointerleave", "pointercancel", "gotpointercapture", "lostpointercapture",
     "mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave", "click", "dblclick", "auxclick", "contextmenu", "focus", "blur", "focusin", "focusout"];
-  const stop = (e) => { if (!hold) return; e.stopImmediatePropagation(); hold(e); };
+  // While a prototype canvas's Hand is up (Space held, or a pan under way), its picker takes the pointer, so Space and a
+  // drag pan under the comment tools too.
+  const stop = (e) => { if (!hold || document.documentElement.hasAttribute("data-prototype-hand")) return; e.stopImmediatePropagation(); hold(e); };
   for (const type of POINTER) addEventListener(type, stop, true);
   // Passive, so scrolling never waits on them; Drop's layer takes pointer events, not these.
   for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) addEventListener(type, stop, { capture: true, passive: true });

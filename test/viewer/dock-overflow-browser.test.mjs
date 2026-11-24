@@ -105,11 +105,11 @@ const entry = `
             spacer(),
             Vue.h(Variants, {
               state: { canvas: true, zoom: 100, tool: hand.value ? "hand" : "move", current: 0, variants: [{ id: "v-first", label: "First" }] },
-              onCommand: command => { if (command === "move") hand.value = false },
+              onCommand: command => { (window.commands ??= []).push(command); if (command === "move") hand.value = false },
             }),
             spacer(),
             Vue.h(Toolbar, { tool: "browse", sizable: false, tools: ["mark"], views: [] }),
-            Vue.h(Comments, { on: false, count: params.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: params.has("pins"), pinsShown: false }),
+            Vue.h(Comments, { on: false, count: params.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: params.has("pins"), pinsShown: false, onToggle: () => { window.toggles = (window.toggles ?? 0) + 1 } }),
             spacer(),
             Vue.h("button", { "aria-label": "Share drop", class: "inline-flex shrink-0 items-center" }, [Vue.h("span", { class: "iconify" }), Vue.h("span", { class: "review-share-label" }, "Share")]),
           ] : []),
@@ -196,6 +196,43 @@ test("collapsed prototype tools stay on one row with full phone touch targets", 
     await browser.close()
   }
 }, 30_000)
+
+test("on the canvas, Space on a clicked Comments button holds the Hand; on one reached with Tab it presses it", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 600 }, reducedMotion: "reduce" })
+    await openDock(page, "?canvas")
+    const comments = page
+      .getByRole("group", { name: "Document tools" })
+      .getByRole("button", { name: "Comments", exact: true })
+    await comments.click()
+    assert.equal(await page.evaluate(() => window.toggles), 1)
+    assert.equal(await comments.evaluate((button) => button === document.activeElement), true)
+    await page.keyboard.down(" ")
+    await page.keyboard.down(" ")
+    await page.keyboard.up(" ")
+    assert.deepEqual(await page.evaluate(() => window.commands), ["hold", "release"])
+    assert.equal(await page.evaluate(() => window.toggles), 1, "Space didn't press Comments")
+
+    // Put back by Drop, as after a comment is sent, it still holds the Hand.
+    await comments.evaluate((button) => button.blur())
+    await page.keyboard.press("Enter")
+    await comments.focus()
+    await page.keyboard.press(" ")
+    assert.deepEqual(await page.evaluate(() => window.commands), ["hold", "release", "hold", "release"])
+    assert.equal(await page.evaluate(() => window.toggles), 1)
+
+    // Reached with Tab, Space presses it.
+    await comments.evaluate((button) => button.blur())
+    for (let i = 0; i < 20 && !(await comments.evaluate((button) => button === document.activeElement)); i++)
+      await page.keyboard.press("Tab")
+    await page.keyboard.press(" ")
+    assert.equal(await page.evaluate(() => window.toggles), 2)
+    assert.deepEqual(await page.evaluate(() => window.commands), ["hold", "release", "hold", "release"])
+  } finally {
+    await browser.close()
+  }
+})
 
 test("the phone canvas dock reports its top as a bottom ViteHub mark appears, moves, or disappears", async () => {
   const browser = await chromium.launch()
