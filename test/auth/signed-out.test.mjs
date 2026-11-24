@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { createFetch } from "ofetch"
+import { $fetch as ofetch } from "ofetch"
 import { afterEach, test } from "vite-plus/test"
 
 // Load the real Nuxt plugin with only Nuxt's registration helper supplied.
@@ -18,66 +18,68 @@ afterEach(() => {
   for (const name of Object.keys(saved)) delete saved[name]
 })
 
-/** Runs the plugin on a page whose server answers each path in `routes` with that status. */
-async function page(routes, { signedIn = true } = {}) {
+/** Runs the plugin on a page whose server answers each path in `routes` with a status, or with JSON for /api/me. */
+function page(routes, { signedIn = true } = {}) {
   const me = { value: signedIn ? { id: "member" } : null }
   const toasts = []
   const navigations = []
+  let meCalls = 0
   stub("location", new URL("/drops", origin))
   stub("keys", { me: "me" })
   stub("useNuxtData", () => ({ data: me }))
   stub("useToast", () => ({ add: (toast) => toasts.push(toast) }))
   stub("useRouter", () => ({ currentRoute: { value: { fullPath: "/d/abc?v=2" } } }))
   stub("navigateTo", (to) => navigations.push(to))
-  let meCalls = 0
-  stub("refreshNuxtData", async () => {
-    meCalls++
-    me.value = routes["/api/me"]()
+  stub("fetch", async (request) => {
+    const { pathname } = new URL(request instanceof Request ? request.url : request, origin)
+    const answer = pathname in routes ? routes[pathname]() : 404
+    if (pathname === "/api/me") meCalls++
+    if (typeof answer === "number") return new Response(null, { status: answer })
+    // /api/me answers nobody with an empty text 200, which ofetch reads as "".
+    if (answer === null) return new Response("")
+    return Response.json(answer)
   })
-  stub(
-    "$fetch",
-    createFetch({
-      fetch: async (url) => {
-        const { pathname } = new URL(url, origin)
-        const status = routes[pathname]?.() ?? 404
-        return new Response(status === 401 ? '{"statusCode":401}' : "{}", {
-          status,
-          headers: { "content-type": "application/json" },
-        })
-      },
-    }),
-  )
+  // Nuxt 5's client $fetch is this same instance, created at import and calling globalThis.fetch per request.
+  stub("$fetch", ofetch.create({ baseURL: origin }))
   plugin()
-  return { toasts, navigations, meCalls: () => meCalls }
+  return { me, toasts, navigations, meCalls: () => meCalls }
 }
 
+const settle = () => new Promise((resolve) => setTimeout(resolve, 20))
+
 test("a 401 after the session ends offers sign-in once, back to the same page", async () => {
-  const view = await page({ "/api/drops/abc": () => 401, "/api/me": () => null })
+  const view = page({ "/api/drops/abc": () => 401, "/api/me": () => null })
   await Promise.all([
     $fetch("/api/drops/abc", { method: "PATCH" }).catch(() => {}),
     $fetch("/api/drops/abc", { method: "PATCH" }).catch(() => {}),
   ])
-  await new Promise((resolve) => setTimeout(resolve))
+  await settle()
   assert.equal(view.meCalls(), 1)
+  assert.equal(view.me.value, null)
   assert.equal(view.toasts.length, 1)
   assert.equal(view.toasts[0].title, "You're signed out")
   view.toasts[0].actions[0].onClick()
   assert.deepEqual(view.navigations, [{ path: "/signin", query: { redirect: "/d/abc?v=2" } }])
 })
 
-test("a 401 while still signed in, or from another origin, shows nothing", async () => {
-  const view = await page({ "/api/drops/abc": () => 401, "/api/me": () => ({ id: "member" }) })
+test("a 401 while still signed in, from another origin, or while /api/me fails, shows nothing", async () => {
+  let me = () => ({ id: "member" })
+  const view = page({ "/api/drops/abc": () => 401, "/api/me": () => me() })
   await $fetch("/api/drops/abc").catch(() => {})
-  await $fetch("https://other.example.com/api/drops/abc").catch(() => {})
-  await new Promise((resolve) => setTimeout(resolve))
-  assert.equal(view.meCalls(), 1)
+  await fetch("https://other.example.com/api/drops/abc")
+  await settle()
+  me = () => 503
+  await $fetch("/api/drops/abc").catch(() => {})
+  await settle()
+  assert.ok(view.meCalls() >= 2)
+  assert.deepEqual(view.me.value, { id: "member" })
   assert.equal(view.toasts.length, 0)
 })
 
 test("a signed-out visitor's 401 shows nothing", async () => {
-  const view = await page({ "/api/drops/abc": () => 401, "/api/me": () => null }, { signedIn: false })
+  const view = page({ "/api/drops/abc": () => 401, "/api/me": () => null }, { signedIn: false })
   await $fetch("/api/drops/abc").catch(() => {})
-  await new Promise((resolve) => setTimeout(resolve))
+  await settle()
   assert.equal(view.meCalls(), 0)
   assert.equal(view.toasts.length, 0)
 })
