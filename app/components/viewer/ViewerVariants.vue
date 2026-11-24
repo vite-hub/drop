@@ -31,8 +31,6 @@ useEventListener("hashchange", () => {
   if (at >= 0) emit("command", "show", at)
 })
 
-// A button keeps focus after a click, or when Drop puts it back, as on Comments: Space still holds the Hand then. One
-// reached with Tab or the arrow keys takes Space as a press.
 let navigating = false
 let clicked: EventTarget | null = null
 useEventListener("keydown", (event: KeyboardEvent) => (navigating = /^(Tab|Arrow)/.test(event.key)), { capture: true })
@@ -67,7 +65,6 @@ const release = () => {
 }
 useEventListener("keyup", (event: KeyboardEvent) => {
   if (event.key !== " " || !holding) return
-  // The button that kept focus isn't pressed by the Space that held the Hand.
   event.preventDefault()
   release()
 })
