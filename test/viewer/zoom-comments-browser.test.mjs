@@ -29,7 +29,7 @@ Another note.
 
 async function open(browser, html, image) {
   const escaped = planDocument("markdown", "", false, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
-  const page = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+  const page = await browser.newPage({ viewport: { width: 1000, height: 700 }, reducedMotion: "reduce" })
   if (image) await page.route(image.url, (route) => route.fulfill({ contentType: "image/svg+xml", body: image.svg }))
   await page.route("https://drop.test/", (route) =>
     route.fulfill({
@@ -104,17 +104,20 @@ test("table thumbnails preserve old pins and anchor new Marker ink to the source
     await zoomed.waitFor()
     await setTool(page, "mark")
     const box = await zoomed.boundingBox()
-    const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+    const center = { x: box.x + box.width / 2, y: box.y + 2 }
     await page.mouse.move(center.x - 25, center.y)
     await page.mouse.down()
     await page.mouse.move(center.x + 25, center.y, { steps: 10 })
     await page.mouse.up()
     await page.evaluate(() => send({ type: "mark", do: "done" }))
-    const area = await (await page.waitForFunction(() => posts.find((message) => message.type === "area"))).jsonValue()
+    const area = await (
+      await page.waitForFunction(() => posts.find((message) => message.type === "area"), null, { timeout: 5000 })
+    ).jsonValue()
     assert.ok(area.ink)
     assert.ok(await thumbnail.evaluate((img, selector) => document.querySelector(selector) === img, area.selector))
     assert.ok(Math.abs(area.ox + area.ow / 2 - 500) < 30)
-    assert.ok(Math.abs(area.oy + area.oh / 2 - 500) < 30)
+    assert.equal(area.oy, 0, "the padded stroke starts at the image edge")
+    assert.ok(area.oh > 0 && area.oh < 100)
     await setTool(page, "browse")
     await dialog.press("Escape")
     await dialog.waitFor({ state: "detached" })
@@ -123,6 +126,37 @@ test("table thumbnails preserve old pins and anchor new Marker ink to the source
     await pin.waitFor()
     await thumbnail.press("Enter")
     await dialog.locator('[data-slot="comment-mark-pin"][data-id="new-ink"]').waitFor()
+    await dialog.press("Escape")
+    await dialog.waitFor({ state: "detached" })
+
+    await thumbnail.evaluate((img) => {
+      const wide = img.closest("[data-wide]")
+      const bare = wide.querySelector("table").cloneNode(true)
+      bare.querySelector("img").alt = "Other image"
+      const earlierWide = wide.cloneNode(true)
+      earlierWide.querySelector("img").alt = "Already wide"
+      wide.before(earlierWide)
+      wide.after(bare)
+    })
+    const indexed = legacy.replace(" > table >", " > table:nth-of-type(1) >")
+    assert.equal(await frame.locator(indexed).getAttribute("alt"), "Other image")
+    const showLegacy = (id) => showMarkers([{ ...marker, id, kind: "image", selector: indexed, label: "Dashboard" }])
+    await showLegacy("shifted")
+    await frame.locator('[data-slot="comment-mark-pin"][data-id="shifted"]').waitFor()
+    await frame.locator('img[alt="Already wide"]').evaluate((img) => (img.alt = "Dashboard"))
+    await showLegacy("ambiguous-wide")
+    const unplaced = (id) =>
+      page.waitForFunction((id) => posts.some((post) => post.type === "unplaced" && post.ids.includes(id)), id, {
+        timeout: 5000,
+      })
+    await unplaced("ambiguous-wide")
+    await frame
+      .locator('article > div[data-wide] img[alt="Dashboard"]')
+      .first()
+      .evaluate((img) => (img.alt = "Already wide"))
+    await frame.locator(indexed).evaluate((img) => (img.alt = "Dashboard"))
+    await showLegacy("ambiguous-bare")
+    await unplaced("ambiguous-bare")
   } finally {
     await browser.close()
   }

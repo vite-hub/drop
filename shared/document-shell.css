@@ -253,6 +253,16 @@ p.render-error {
 /* The preview pin encodes the folded column count and prose position in data-stack. Give that track, not the
    individual prose cells, a minimum on screen where the wrapper can scroll. In print it would clip columns. */
 @media screen {
+  [data-drop-rail="open"]
+    .typeset
+    > div[data-wide][data-prose][data-cols]:not([data-fold])
+    > table:has([data-zoom-thumb])
+    > *
+    > tr
+    > :not([data-short], :has([data-zoom-thumb])) {
+    min-width: 12em;
+  }
+
   :is(.typeset, .typeset > .cr) > div[data-stack] {
     --drop-prose-track: minmax(12em, 1fr);
 

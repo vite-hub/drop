@@ -22,13 +22,14 @@ When the page reads them, Drop injects its theme as CSS custom properties on :ro
 Readers comment by selecting text, or with the Comment tool by clicking an element or drawing a rectangle over any part of the page; clicks stay your page's own. Prefer real text, lists, and tables over text baked into images.
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`
 
-export const ELEMENT_NAMING = String.raw`function pathOf(el) {
+export const ELEMENT_NAMING = String.raw`function pathOf(el, article) {
     const parts = [];
     while (el && el.nodeType === 1 && el !== document.documentElement && parts.length < 10) {
       let part = el.tagName.toLowerCase();
       if (el.id && /^[a-z][\w-]*$/i.test(el.id)) { parts.unshift("#" + el.id); break; }
       const same = el.parentElement ? Array.from(el.parentElement.children).filter((c) => c.tagName === el.tagName) : [];
-      if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
+      if (part === "table" && article && el.parentElement === article) part += ":nth-child(" + (same.indexOf(el) + 1) + " of table)";
+      else if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
       parts.unshift(part);
       el = el.parentElement;
     }
@@ -654,7 +655,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     [top, bottom] = [top, bottom].map((y) => Math.min(r.bottom, Math.max(r.top, y)));
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     if (right > left || bottom > top) zoomDraft(left, top, right, bottom); else zoomDraft();
-    post({ type: "area", kind: "image", selector: pathOf(img), label: img.getAttribute("alt") || "image", ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
+    post({ type: "area", kind: "image", selector: pathOf(img, article), label: img.getAttribute("alt") || "image", ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
   }
   /**
    * Whether an element still is what a comment from an earlier version pointed at. The selector is a position in the
@@ -666,18 +667,31 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   }
 
   function elementForMarker(marker) {
-    const exact = query(marker?.selector);
-    if (exact && (!marker.earlier || sameAnchor(exact, marker))) return exact;
-    if (!article || !marker?.selector) return null;
-    const legacy = /^(.*\barticle) > table(?::nth-of-type\((\d+)\))?( > .+)?$/.exec(marker.selector);
-    if (!legacy) return null;
+    if (!marker) return null;
+    const exact = query(marker.selector);
+    const wrapper = "div:is([data-wide], [data-fit]):has(> table)";
+    const legacy = article && /^(.*\barticle) > table(?::nth-of-type\((\d+)\))?( > .+)?$/.exec(marker.selector || "");
+    if (!legacy || query(legacy[1]) !== article || !article.querySelector(":scope > " + wrapper)) {
+      return exact && (!marker.earlier || sameAnchor(exact, marker)) ? exact : null;
+    }
     const [, parent, index, tail = ""] = legacy;
-    const position = index ? ":nth-child(" + index + " of table, div[data-wide]:has(> table))" : "";
-    try {
-      const matches = Array.from(document.querySelectorAll(parent + " > div[data-wide]" + position + " > table" + tail))
-        .filter((el) => article.contains(el) && sameAnchor(el, marker));
-      return matches.length === 1 ? matches[0] : null;
-    } catch { return null; }
+    if (!marker.label) return null;
+    const siblings = Array.from(article.children);
+    const tables = siblings.filter((entry) => entry.matches("table, " + wrapper));
+    const bareCount = tables.filter((entry) => entry.localName === "table").length;
+    const ordinal = index ? Number(index) : 1;
+    const matches = [];
+    let bareBefore = 0;
+    tables.forEach((table, position) => {
+      const bare = table.localName === "table";
+      const firstPossible = bareBefore + 1;
+      if (bare) bareBefore++;
+      if (ordinal < firstPossible || ordinal > position + 1 || (!index && bareCount > Number(bare))) return;
+      const prefix = parent + " > " + table.localName + ":nth-child(" + (siblings.indexOf(table) + 1) + ")";
+      const candidate = query(prefix + (bare ? "" : " > table") + tail);
+      if (candidate && sameAnchor(candidate, marker)) matches.push(candidate);
+    });
+    return matches.length === 1 ? matches[0] : null;
   }
 
   /**
@@ -921,20 +935,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (!el) { unplaced.push(m.id); continue; }
         if (!shown.includes(m)) continue;
         resized.observe(el);
-        const r = el.getBoundingClientRect();
+        const copy = zoom && zoomMarks && copyOf(el);
+        if (zoom && (!copy || !shows(copy))) continue;
         // A hidden anchor keeps a pin, without its area, on what stands in for it until it shows again.
-        if (!shows(el)) {
-          const stand = !zoom && standIn(el);
+        if (!zoom && !shows(el)) {
+          const stand = standIn(el);
           if (!stand) continue;
           // Side by side when several wait on the same element, so each can be clicked.
           pinOnStand(m, stand);
           continue;
         }
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
-        const copy = zoom && zoomMarks && copyOf(el);
-        if (zoom && !copy) continue;
+        const r = (copy || el).getBoundingClientRect();
         const beside = copy && asideMarks && zoom.aside.contains(copy);
-        const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
+        const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(r) : inLayer(r);
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
         if (m.ow || m.oh) {
@@ -1274,7 +1288,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
     const r = img.getBoundingClientRect();
-    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img), label: labelOf(img), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img, article), label: labelOf(img), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }, true);
 
   /**
@@ -1331,7 +1345,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
     // Every comment on the page keeps a picture of its box, so whoever reads it later (an agent too) sees what it's about.
     const n = zoom ? undefined : ++shots;
-    post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
+    post({ type: "area", selector: pathOf(el, article), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
     placeDraft();
     if (n !== undefined) {
       const around = under.closest(TRANSIENT);
@@ -1859,10 +1873,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     [top, bottom] = [Math.max(0, top), Math.min(innerHeight, bottom)];
     // The layer steps aside, so the hit tests reach the page under it.
     layer.style.pointerEvents = "none";
-    const under = anchorFor(left, top, right, bottom, host), quote = markedText(list);
+    const under = shotAt((left + right) / 2, (top + bottom) / 2) || anchorFor(left, top, right, bottom, host), quote = markedText(list);
     layer.style.pointerEvents = "";
     const anchor = zoom ? originalOf(under) : under;
-    if (!anchor) { finishing = false; return; }
+    if (!anchor) { finishing = false; post({ type: "mark-retry" }); return; }
     const r = under.getBoundingClientRect();
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
@@ -1883,7 +1897,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (session !== markSession || tool !== "mark") return;
     finishing = false;
     const n = ++shots;
-    post({ type: "area", selector: pathOf(anchor), label: labelOf(anchor), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
+    post({ type: "area", selector: pathOf(anchor, article), label: labelOf(anchor), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
     post({ type: "area-shot", shot: n, image: marked });
   }
 

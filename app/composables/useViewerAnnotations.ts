@@ -191,6 +191,7 @@ export function useViewerAnnotations(options: {
       lightbox.value = { src: message.src, alt: message.alt, selector: message.selector, label: message.label, from }
     }
     if (message.type === "marks") marks.value = message.count
+    if (message.type === "mark-retry") finishing.value = false
     if (message.type === "page-click") options.onPageClick?.()
     if (message.type === "draft-place") {
       const rect = {

@@ -80,6 +80,7 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("area-shot"), shot: v.number(), image: v.nullable(v.blob()) }),
   v.object({ type: v.literal("tool"), tool: v.picklist(["browse", "comment", "measure", "mark"]) }),
   v.object({ type: v.literal("marks"), count: v.pipe(v.number(), v.integer(), v.minValue(0)) }),
+  v.object({ type: v.literal("mark-retry") }),
   v.object({
     type: v.literal("marker"),
     id: v.string(),
