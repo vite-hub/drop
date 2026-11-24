@@ -12,6 +12,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
+import { siteReviewElement } from "#shared/element-reference"
 import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
@@ -884,7 +885,13 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
-const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
+const feedback = () =>
+  feedbackMarkdown(
+    drop.value.title,
+    link.value,
+    drop.value.kind === "site" ? comments.value.map(siteReviewElement) : comments.value,
+    drop.value.version,
+  )
 const readerId = computed(
   () =>
     me.value?.id ??

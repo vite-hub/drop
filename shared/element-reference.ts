@@ -22,3 +22,11 @@ export function formatElementReference(comment: Pointed) {
   if (comment.page) lines.push(`${/^https?:\/\//.test(comment.page) ? "URL" : "Page"}: ${comment.page}`)
   return lines.join("\n")
 }
+
+/** A review.js comment on a site keeps the element's selector in label and its description in quote; selector is the screenshot or `body`. */
+export const siteReviewElement = <T extends Pointed>(comment: T): T => ({
+  ...comment,
+  selector: comment.label ?? comment.selector,
+  label: comment.quote,
+  quote: null,
+})

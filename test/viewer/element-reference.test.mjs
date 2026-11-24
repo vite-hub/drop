@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { formatElementReference } from "../../shared/element-reference.ts"
+import { formatElementReference, siteReviewElement } from "../../shared/element-reference.ts"
 
 const comment = (fields) => ({
   kind: "area",
@@ -36,4 +36,20 @@ test("an element reference gives the element, its selector, where in it, and the
     "[an image selector: `img`]\nSpot: 40% across, 30% down\nPage: /about",
   )
   assert.equal(formatElementReference(comment({ kind: "page" })), "[the whole page]")
+})
+
+test("a site comment from review.js points at its element, not at its screenshot", () => {
+  const onShot = comment({
+    kind: "image",
+    selector: "body > img",
+    label: "main > button",
+    quote: 'button "RSVP"',
+    ox: 400,
+    oy: 300,
+    page: "/meetups",
+  })
+  assert.equal(
+    formatElementReference(siteReviewElement(onShot)),
+    '[button "RSVP" selector: `main > button`]\nSpot: 40% across, 30% down\nPage: /meetups',
+  )
 })
