@@ -59,7 +59,7 @@ function withCookies(event) {
 function connect(token) {
   return proxySession(
     new H3Event(
-      new Request("https://drop.example/review/connect?origin=https://preview.example", {
+      new Request("https://drop.example/signin/start?redirect=%2Freview%2Fconnect", {
         headers: { "x-auth-request-access-token": token },
       }),
     ),
@@ -242,7 +242,7 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
   assert.equal(session.user.emailVerified, true)
   state.auth = instance
   const event = new H3Event(
-    new Request("https://drop.example/review/connect", {
+    new Request("https://drop.example/signin/start", {
       headers: { "x-auth-request-access-token": "test-hooks-refreshed" },
     }),
   )
@@ -290,14 +290,16 @@ test("proxy sign-in works when the request's headers are immutable, as on Deno",
       throw new TypeError("immutable")
     }
   }
-  const request = new Request("https://drop.example/api/auth/get-session")
+  const request = new Request("https://drop.example/signin/start")
   Object.defineProperty(request, "headers", {
     value: new ImmutableHeaders({ "x-auth-request-access-token": "test-immutable" }),
     configurable: true,
   })
   const event = new H3Event(request)
   await proxySession(event)
-  const response = await auth().handler(event.req)
+  const response = await auth().handler(
+    new Request("https://drop.example/api/auth/get-session", { headers: event.req.headers }),
+  )
   const session = await response.json()
   assert.equal(session?.user.email, "maxi@example.com", "The same request sees the new session")
   const cookies = [...event.context.dropSessionCookies, ...response.headers.getSetCookie()]
@@ -331,7 +333,7 @@ test("request session reads write the GitHub account only when its token rotates
     state.auth = auth()
     state.authApi = auth().api
     const event = new H3Event(
-      new Request("https://drop.example/api/me", {
+      new Request("https://drop.example/signin/start", {
         headers: { cookie, "x-auth-request-access-token": token },
       }),
     )
@@ -401,7 +403,9 @@ test("overlapping first proxy requests through separate auth instances provision
     { length: 2 },
     () =>
       new H3Event(
-        new Request("https://drop.example/api/me", { headers: { "x-auth-request-access-token": "test-overlap" } }),
+        new Request("https://drop.example/signin/start", {
+          headers: { "x-auth-request-access-token": "test-overlap" },
+        }),
       ),
   )
   await roundTrips(() => Promise.all(events.map((event) => proxySession(event))))
@@ -462,7 +466,7 @@ test("without proxy mode, the forwarded header signs nobody in", async () => {
   const instance = auth()
   state.auth = instance
   const event = new H3Event(
-    new Request("https://drop.example/review/connect", {
+    new Request("https://drop.example/signin/start", {
       headers: { "x-auth-request-access-token": "test-proxy-off" },
     }),
   )
@@ -473,5 +477,38 @@ test("without proxy mode, the forwarded header signs nobody in", async () => {
   assert.equal(response.headers.getSetCookie().length, 0)
   assert.equal(fetch.mock.calls.length, 0, "Drop never asks GitHub about an untrusted header")
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 0)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
+})
+
+// The proxy only guards /signin/start, so on any other path the header may come from the client itself.
+test("the forwarded header signs nobody in outside /signin/start", async () => {
+  github()
+  state.auth = auth()
+  for (const path of [
+    "/api/drops",
+    "/api/me",
+    "/api/auth/get-session",
+    "/d/abc",
+    "/review/connect",
+    "/signin",
+    "/api/sign-in",
+  ]) {
+    const event = new H3Event(
+      new Request(`https://drop.example${path}`, { headers: { "x-auth-request-access-token": "test-forged" } }),
+    )
+    await proxySession(event)
+    assert.equal(event.req.headers.get("x-auth-request-access-token"), null, path)
+    assert.equal(event.context.dropSessionCookies, undefined, path)
+  }
+  // nginx routes `/signin\start` past its guarded location, and Node's URL parser then reads it as /signin/start.
+  const request = new Request("https://drop.example/signin/start", {
+    headers: { "x-auth-request-access-token": "test-forged" },
+  })
+  request.runtime = { name: "node", node: { req: { url: "/signin\\start" } } }
+  const event = new H3Event(request)
+  await proxySession(event)
+  assert.equal(event.req.headers.get("x-auth-request-access-token"), null)
+  assert.equal(event.context.dropSessionCookies, undefined)
+  assert.equal(fetch.mock.calls.length, 0, "Drop never asks GitHub about a header outside sign-in")
   assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
 })

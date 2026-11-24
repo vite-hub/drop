@@ -81,21 +81,74 @@ extra:
 
 ## Reuse GitHub oauth2-proxy {#auth-proxy}
 
-Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`.
+**The proxy guards sign-in, and Drop guards the rest.** Put oauth2-proxy in front of `/signin/start` only. There it forwards the person's GitHub token, and Drop turns it into its own 30-day session. Every other path goes straight to Drop. Without a session it answers 401, except where a drop's share, a review token, an upload ticket or an MCP token lets the request in. Public links, MCP, uploads and [site review](/docs/sites) need no list of exempt paths, and an expired proxy cookie can't break a page that is already open. If the proxy used to keep the whole host private, check which drops have public links before you switch: those links now open without it.
 
-Configure oauth2-proxy with `--provider=github`, `--scope=user:email read:org`, `--github-org=your-org`, `--set-xauthrequest=true`, and `--pass-access-token=true`. Forward `X-Auth-Request-Access-Token` from its auth response to Drop. Drop checks that token against GitHub, maps its numeric user id, and creates its normal session. Do not forward client-supplied identity headers.
+Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Set the same public callback URL in the GitHub OAuth app and in oauth2-proxy, replacing `drop.example.com` with your Drop hostname:
 
-Use a Secure, host-only proxy cookie with `Path=/`, such as `__Host-drop-auth`, and set `DROP_AUTH_PROXY_COOKIE` to the same name for logout. Keep the Drop backend accessible only through your proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
+```sh
+--provider=github --github-org=your-org --email-domain="*" --scope="user:email read:org"
+--set-xauthrequest=true --pass-access-token=true --reverse-proxy=true
+--redirect-url=https://drop.example.com/oauth2/callback
+--cookie-name=__Host-drop-auth --cookie-secure=true
+```
 
-Browser pages and shared links can require proxy authentication. Exempt `/oauth2`, `/.well-known`, `/mcp`, `/api/mcp`, and Drop's `/api/auth/oauth2` and `/api/auth/jwks` routes from the proxy's browser redirect. MCP clients authenticate with Drop's own OAuth tokens; Drop checks organization membership for their content access too. Exempt `/api/uploads/` as well: the upload URLs `publish` hands out carry a sealed ticket instead of a sign-in, and agents send them with `curl -T`. Exempt `/api/favicons/`, `/agents/`, and the exact path `/favicon.ico` too. A Markdown doc renders in a sandboxed frame whose requests carry no sign-in. It loads public images from those routes: site icons for its links, the publishing agent's logo, and the Drop logo for related drops. For [site review](/docs/sites), exempt `/review.js`, `/api/review/related`, `/api/review/comments` and the paths under it (resolving and replies), `/api/review/images/`, and, for who's here, `/review-presence.js`, `/api/review/presence`, and the WebSocket path `/_vitehub/realtime/presence/`. The toolbar asks `/api/review/related` whether a doc links to the site before connecting. Its other requests send a review token or a presence ticket, not a sign-in, so a proxy redirect breaks their CORS preflight and their WebSocket.
+Set `DROP_AUTH_PROXY_COOKIE=__Host-drop-auth` so signing out of Drop clears it too. With nginx and oauth2-proxy on port 4180, add this `map` in nginx's `http` block. It keeps the full original sign-in URL for the internal fallback, but leaves the header unset for direct requests to `/oauth2/`, so their normal return targets still work.
 
-Successful membership checks expire after five minutes. Failed checks deny access. A token without `read:org` or organization access may require reauthorization.
+```nginx
+map $request_uri $drop_auth_return {
+  default "";
+  ~^/signin/start(\?|$) $request_uri;
+}
+```
 
-When upgrading from an older Drop, keep `/api/_vitehub/realtime/presence/` exempt from the browser redirect too, so cached presence clients can still reconnect over WebSocket.
+Add these locations next to the [one that proxies to Drop](#proxy):
 
-If a browser cannot connect a site review, check the response from `/review/connect`. A 401 means GitHub rejected the token; open `/signin` to sign in again. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means verification failed because GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` and `data.githubStatus` distinguish these cases without including credentials. Sign-in and sign-out stay available when a proxy token fails verification.
+```nginx
+location /oauth2/ {
+  proxy_pass http://127.0.0.1:4180;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Auth-Request-Redirect $drop_auth_return;
+}
 
-Exempt `POST /_vitehub/rpc` from the proxy too: the [ViteHub Console](/docs/self-host#github) calls it from its own server with a signature, not a sign-in, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
+location = /oauth2/auth {
+  internal;
+  proxy_pass http://127.0.0.1:4180;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_pass_request_body off;
+  proxy_set_header Content-Length "";
+}
+
+location = /signin/start {
+  auth_request /oauth2/auth;
+  error_page 401 = /oauth2/sign_in;
+  auth_request_set $token $upstream_http_x_auth_request_access_token;
+  proxy_set_header X-Auth-Request-Access-Token $token;
+  proxy_pass http://127.0.0.1:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header X-Forwarded-For $remote_addr;
+}
+```
+
+Add `proxy_set_header X-Auth-Request-Access-Token "";` to the location that proxies to Drop, so only `/signin/start` carries the token.
+
+With ingress-nginx, the same split takes three Ingresses for one host, since an Ingress reaches only Services in its own namespace. In Drop's namespace, one sends `/signin/start` (`pathType: Exact`) to Drop with the annotations below, and one sends `/` to Drop with none. In oauth2-proxy's namespace, the third sends `/oauth2` to oauth2-proxy.
+
+```yaml
+nginx.ingress.kubernetes.io/auth-url: http://oauth2-proxy.auth.svc.cluster.local:4180/oauth2/auth
+nginx.ingress.kubernetes.io/auth-signin: https://$host/oauth2/start?rd=$escaped_request_uri
+nginx.ingress.kubernetes.io/auth-response-headers: X-Auth-Request-Access-Token
+```
+
+**Drop reads the token only on `/signin/start`.** It drops `X-Auth-Request-Access-Token` from every other request without asking GitHub, since there a client could have sent it. On `/signin/start` the proxy overwrites it, so keep Drop reachable only through the proxy. Leave the `DROP_CONTENT_ORIGIN` hostname out of oauth2-proxy: it serves no drop content itself.
+
+Drop checks membership again with the stored token every five minutes, and a failed check denies access. When a Drop session ends, Drop's sign-in goes through oauth2-proxy again.
+
+If sign-in fails, check the response from `/signin/start`. A 401 means GitHub rejected the token. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` tells these apart without including credentials.
+
+The [ViteHub Console](/docs/self-host#github) calls `POST /_vitehub/rpc` from its own server with a signature, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
 
 ## Keep an existing D1 database {#d1}
 
