@@ -12,7 +12,7 @@ const nuxtCLI = fileURLToPath(new URL("./bin/nuxt.mjs", import.meta.resolve("nux
 
 async function buildFixture(
   mode: "build" | "generate",
-  options: { scan: boolean; pages?: boolean },
+  options: { scan: boolean; pages?: boolean; strict?: boolean },
   verify: (readOutput: (path: string) => Promise<string>) => Promise<void>,
 ) {
   const root = await mkdtemp(join(packageDir, ".canvas-build-"))
@@ -33,8 +33,10 @@ async function buildFixture(
       routeRules: { "/legacy": { redirect: "/" }, "/moved": { redirect: "/" } },
       ${
         mode === "generate"
-          ? `router: { options: { sensitive: true } },
-      nitro: { prerender: { routes: ["/blog", "/items/43/", "/en", "/localized/en", "/docs/title"] } },`
+          ? `router: { options: { sensitive: true, strict: ${options.strict ?? false} } },
+      nitro: { prerender: { routes: ${JSON.stringify(
+        options.strict ? ["/about/"] : ["/blog", "/items/43/", "/en", "/localized/en", "/docs/title"],
+      )} } },`
           : ""
       }
     })`,
@@ -42,6 +44,12 @@ async function buildFixture(
     const page = "<template><div>Fixture page</div></template>"
     if (options.pages !== false) {
       await write("app/pages/index.vue", page)
+      if (options.strict) {
+        await write(
+          "app/pages/about.vue",
+          `<script setup>definePageMeta({ path: '/about/' })</script><template><div>Strict about page</div></template>`,
+        )
+      }
       if (mode === "generate") {
         await write("app/pages/[[lang]].vue", "<template><div>Optional language page</div></template>")
         await write("app/pages/docs/TITLE.vue", "<template><div>Uppercase docs page</div></template>")
@@ -106,14 +114,24 @@ it("publishes only generated static targets, with no fallback required", async (
     expect(await read("en/index.html")).toContain("Optional language page")
     expect(await read("blog/index.html")).toContain("Fixture page")
     expect(await read("docs/title/index.html")).toContain("Dynamic docs page")
+    expect(await read("docs/TITLE/index.html")).toContain("Uppercase docs page")
     expect(await read("items/43/index.html")).toContain("Fixture page")
     expect(pages.map((page: { path: string }) => page.path).sort()).toEqual([
       "/",
       "/blog/:slug?",
       "/docs/:slug?",
+      "/docs/TITLE",
       "/items/:id",
       "/localized/:lang?",
     ])
     await expect(read("orders/42/index.html")).rejects.toMatchObject({ code: "ENOENT" })
+  })
+}, 30_000)
+
+it("publishes prerendered routes with a required trailing slash", async () => {
+  await buildFixture("generate", { scan: true, strict: true }, async (read) => {
+    expect(await read("about/index.html")).toContain("Strict about page")
+    const { pages } = JSON.parse(await read("__canvas.json"))
+    expect(pages).toContainEqual({ path: "/about/", name: "about" })
   })
 }, 30_000)

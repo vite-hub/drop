@@ -100,6 +100,18 @@ it("matches canvas route owners with the app's path matching options", () => {
   expect(owner("/docs/title/")).toBeUndefined()
 })
 
+it("preserves the trailing slash of strict routes and their index children", () => {
+  const about = { path: "/about/", file: "about.vue" }
+  const index = { path: "", file: "docs/index.vue" }
+  const guide = { path: ":topic()/", file: "docs/[topic].vue", meta: { canvas: { params: { topic: "intro" } } } }
+  const routes = [about, { path: "/docs/", children: [index, guide] }]
+  const owner = canvasRouteOwner(fileURLToPath(new URL("..", import.meta.url)), routes, { strict: true })
+  const { pages } = canvasManifest(routes, (page, route) => owner(canvasPageURL(page)!) === route)
+
+  expect(pages.map((page) => page.path)).toEqual(["/about/", "/docs/", "/docs/:topic/"])
+  expect(pages.map(canvasPageURL)).toEqual(["/about/", "/docs/", "/docs/intro/"])
+})
+
 describe("canvasPageURL", () => {
   it("requires mandatory parameters and encodes sample values as path segments", () => {
     expect(canvasPageURL({ path: "/:team/:product()_details", params: { product: "x" } })).toBeUndefined()

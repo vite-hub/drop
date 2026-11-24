@@ -109,8 +109,9 @@ export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[], optio
 }
 
 function joinPath(parent: string, path: string): string {
-  const joined = path.startsWith("/") ? path : `${parent.replace(/\/$/, "")}/${path}`
-  return joined.replace(/\/$/, "") || "/"
+  if (path.startsWith("/")) return path
+  if (!path) return parent || "/"
+  return `${parent}${parent.endsWith("/") ? "" : "/"}${path}`
 }
 
 function encodeLiteral(text: string): string {
