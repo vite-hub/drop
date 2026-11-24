@@ -10,8 +10,8 @@ const ATTACHED = "/f/11111111-1111-4111-8111-111111111111.pdf"
 const UNLISTED = "/f/22222222-2222-4222-8222-222222222222.pdf"
 const RENDERED =
   `<figure class="drop-embed" data-drop-embed="${LINK}" data-title="Steps"></figure>` +
-  `<figure class="drop-embed" data-drop-file="${ATTACHED}" data-kind="pdf" data-title="CV"></figure>` +
-  `<figure class="drop-embed" data-drop-file="${UNLISTED}" data-kind="pdf" data-title="Old CV"></figure>`
+  `<figure class="drop-embed" data-drop-src="${ATTACHED}" data-kind="pdf" data-title="CV"></figure>` +
+  `<figure class="drop-embed" data-drop-src="${UNLISTED}" data-kind="pdf" data-title="Old CV"></figure>`
 const PRIVATE_HTML = "<!doctype html><html><body>Private source</body></html>"
 const PAGE = { src: "data:image/png;base64,iVBORw0KGgo=", width: 1600, height: 2071 }
 const PAGE_LINKS = [{ x: 118, y: 91, w: 327, h: 25, href: "https://example.com/" }]
@@ -53,8 +53,9 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
       ready: ref(true),
       deferred: ref(false),
       inline: (html) => html,
+      // The doc's PDF boxes on this Drop: the first is among the 10 it shows, the second past them.
       pdfs: ref([ATTACHED]),
-      pdfsLeftOut: ref([UNLISTED]),
+      pdfOf: (src) => src,
     }),
     useDocEmbeds,
     useDebounceFn: (fn) => debounce(fn),
@@ -340,6 +341,43 @@ test("an answer still on its way when the frame reloads is dropped, and the relo
     pdfs.map(({ src }) => src),
     ["https://drop.example.com/f/v2.pdf"],
   )
+})
+
+test("a page on its way when the doc is pinned still arrives, since the frame that asked for it stays", async () => {
+  const { state, fetch } = versioned()
+  let release
+  state.held = new Promise((resolve) => (release = resolve))
+  const { drop, receive, sent } = viewer("markdown", fetch)
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  // Pinning or unpinning replaces the doc's detail with a copy (useDrops), at the same version.
+  drop.value = { ...drop.value, pinned: true }
+  await nextTick()
+  release()
+  await vi.waitFor(() => assert.equal(sent.length, 1))
+  assert.equal(sent[0].type, "embed-page-data")
+  assert.equal(sent[0].page, 1)
+})
+
+test("pages still queued when the frame reloads are neither opened nor drawn", async () => {
+  const { receive, sent, drawn, pdfs } = viewer("markdown", reader(DROPS.pdf))
+  let finish
+  const first = new Promise((resolve) => (finish = resolve))
+  vi.stubGlobal("renderPage", async (_pdf, page) => {
+    drawn.push(page)
+    if (page === 1) await first
+    return { ...PAGE, page }
+  })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.deepEqual(drawn, [1]))
+  receive({ type: "embed-page", link: LINK, page: 2 })
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  receive({ type: "ready" })
+  finish()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.deepEqual(drawn, [1], "page 2 waited behind page 1 and was for the frame that went")
+  assert.deepEqual(sent, [])
+  assert.equal(pdfs.length, 1)
 })
 
 test("a new version of the doc closes the PDFs it had open", async () => {

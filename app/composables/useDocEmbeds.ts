@@ -8,6 +8,7 @@ import type { DropComment, DropDetail } from "#shared/types"
 const UNREACHABLE = "This drop is private, expired, or deleted, so it can't show here."
 const PAST_CAP = `Only the first ${MAX_PDFS} attached PDFs show inside a doc; open it: `
 const OPEN_PDFS = 4
+const STALE = new Error("The doc's frame asking for this has gone")
 
 const readBlob = (url: string) => $fetch<Blob>(url, { responseType: "blob" })
 const close = (pdf: PDFDocumentProxy) => pdf.loadingTask.destroy()
@@ -16,7 +17,7 @@ type Read = { data: EmbedData; src?: string }
 
 export function useDocEmbeds(
   drop: Ref<DropDetail>,
-  attached: { pdfs: Ref<string[]>; pdfsLeftOut: Ref<string[]> },
+  attached: { pdfs: Ref<string[]>; pdfOf: (src: string) => string | undefined },
   dark: Ref<boolean>,
 ) {
   const boxes = computed(() => {
@@ -26,18 +27,20 @@ export function useDocEmbeds(
     if (!template) return titles
     template.innerHTML = drop.value.html ?? ""
     for (const box of template.content.querySelectorAll("figure.drop-embed")) {
-      const link = box.getAttribute("data-drop-embed") ?? box.getAttribute("data-drop-file")
-      const file = link && !box.hasAttribute("data-drop-embed")
-      if (link && (!file || attached.pdfs.value.includes(link) || attached.pdfsLeftOut.value.includes(link)))
-        titles.set(link, box.getAttribute("data-title") || "PDF")
+      const src = box.getAttribute("data-drop-src")
+      const link = box.getAttribute("data-drop-embed") ?? (src && attached.pdfOf(src))
+      if (link) titles.set(link, box.getAttribute("data-title") || "PDF")
     }
     return titles
   })
 
   const pdfs = new Map<string, PDFDocumentProxy>()
+  let generation = 0
   let queue: Promise<unknown> = Promise.resolve()
   function withPdf<T>(src: string, use: (pdf: PDFDocumentProxy) => Promise<T>): Promise<T> {
+    const asked = generation
     const turn = queue.then(async () => {
+      if (asked !== generation) throw STALE
       let pdf = pdfs.get(src)
       pdfs.delete(src)
       pdf ??= await openPdf(src)
@@ -52,7 +55,6 @@ export function useDocEmbeds(
     queue = turn.catch(() => {})
     return turn
   }
-  let generation = 0
   const answers = new Map<string, Promise<Read>>()
   const threads = new Map<string, Promise<DropComment[]>>()
   const drawn = new Set<string>()
@@ -70,7 +72,7 @@ export function useDocEmbeds(
       return Promise.allSettled(open.map(close))
     })
   }
-  watch(() => [drop.value.id, drop.value.version], forget)
+  watch([() => drop.value.id, () => drop.value.version], forget)
   onScopeDispose(forget)
 
   async function pdfData(src: string, title: string, href: string): Promise<Read> {
@@ -82,7 +84,7 @@ export function useDocEmbeds(
       const title = boxes.value.get(link) ?? "PDF"
       if (!attached.pdfs.value.includes(link)) return { data: { error: PAST_CAP, href: link } }
       return pdfData(link, title, link).catch((error: unknown) => {
-        reportClientError("doc-embed", error, { source: link })
+        if (error !== STALE) reportClientError("doc-embed", error, { source: link })
         return { data: { error: `“${title}” couldn't load here.` } }
       })
     }
@@ -97,7 +99,7 @@ export function useDocEmbeds(
       if (found.kind === "file" && found.url && isPdf(found.filename))
         return await pdfData(found.url, found.title, `/d/${link}`)
     } catch (error) {
-      reportClientError("doc-embed", error, { drop: link })
+      if (error !== STALE) reportClientError("doc-embed", error, { drop: link })
       return { data: { error: `“${found.title}” couldn't load here.` } }
     }
     return {
@@ -160,6 +162,7 @@ export function useDocEmbeds(
       ])
       if (shown(link)) send({ type: "embed-page-data", link, page: at, ...image, links, pins })
     } catch (error) {
+      if (error === STALE) return
       reportClientError("doc-embed-page", error, { drop: link })
       if (shown(link)) send({ type: "embed-page-data", link, page: at, error: `Page ${at} couldn't be drawn.` })
     }

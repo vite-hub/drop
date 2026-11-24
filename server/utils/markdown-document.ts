@@ -205,13 +205,12 @@ function dropBox(link: string, height: unknown, title: string) {
   )
 }
 
-const PDF_FILE = /^(?:https?:\/\/[^/\s]+)?(\/f\/[0-9a-f-]{36}\.pdf)(?:\?raw)?$/i
+const PDF_FILE = /^(?:https?:\/\/[^/\s]+)?\/f\/[0-9a-f-]{36}\.pdf(?:\?raw)?$/i
 
 function pdfImage(node: MarkdownNode | undefined) {
   if (!Array.isArray(node) || node[0] !== "img") return
   const src = textValue(node[1].src)
-  const path = src?.match(PDF_FILE)?.[1]
-  return src && path ? { src, path, alt: textValue(node[1].alt)?.trim() || "PDF" } : undefined
+  return src && PDF_FILE.test(src) ? { src, alt: textValue(node[1].alt)?.trim() || "PDF" } : undefined
 }
 
 function boxAttachedPdfs(nodes: MarkdownNode[]): void {
@@ -234,7 +233,7 @@ const renderPdfBox: NodeHandler = ([, attrs]) => {
   const src = textValue(attrs.src) ?? ""
   const title = textValue(attrs.alt) ?? "PDF"
   return (
-    `<figure class="drop-embed" data-drop-file="${escapeHtml(textValue(attrs.path) ?? "")}" data-kind="pdf" data-title="${escapeHtml(title)}">` +
+    `<figure class="drop-embed" data-drop-src="${escapeHtml(src)}" data-kind="pdf" data-title="${escapeHtml(title)}">` +
     `<a class="drop-embed-link" href="${escapeHtml(src)}">${escapeHtml(title)}</a></figure>`
   )
 }

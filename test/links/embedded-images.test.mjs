@@ -3,6 +3,7 @@ import { test } from "vite-plus/test"
 import {
   deferImages,
   deferMedia,
+  deferPdfs,
   embeddedImagePaths,
   embeddedMediaPaths,
   embeddedPdfPaths,
@@ -89,19 +90,30 @@ test("a Markdown doc's videos and audio wait in the frame without a source; othe
   assert.match(deferred, /<video src="https:\/\/example.com\/x.mp4" controls>/)
 })
 
-test("a doc's PDFs on this Drop come first, then its other attached PDFs, up to 10, and other files aren't", () => {
-  const markdown = `![CV](https://drop.example.com/f/${a}.pdf)\n![](/f/${b}.pdf?raw)\n![](https://other.example.com/f/${c}.pdf)\n![](/f/${c}.png)`
-  assert.deepEqual(embeddedPdfPaths([markdown], "drop.example.com", [`/f/${c}.pdf`, `/f/${c}.mov`]), [
-    `/f/${a}.pdf`,
-    `/f/${b}.pdf`,
-    `/f/${c}.pdf`,
-  ])
-  assert.deepEqual(embeddedImagePaths([markdown], "drop.example.com"), [`/f/${c}.png`])
+// A PDF box as server/utils/markdown-document.ts renders `![title](src)` alone on a line.
+const box = (src, title = "PDF") =>
+  `<figure class="drop-embed" data-drop-src="${src}" data-kind="pdf" data-title="${title}"><a class="drop-embed-link" href="${src}">${title}</a></figure>`
+
+test("a doc shows the pages of its first 10 PDF boxes on this Drop; links to PDFs and other files don't count", () => {
   const ids = Array.from({ length: 12 }, (_, i) => `${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`)
-  assert.equal(embeddedPdfPaths([ids.map((id) => `![](/f/${id}.pdf)`).join("\n")], "x").length, 10)
-  // Twelve attached PDFs, of which the doc shows the last two: those two are among the 10.
-  const attached = ids.map((id) => `/f/${id}.pdf`)
-  const shown = embeddedPdfPaths([`![](${attached[10]})\n![](${attached[11]})`], "x", attached)
-  assert.deepEqual(shown.slice(0, 2), [attached[10], attached[11]])
-  assert.equal(shown.length, 10)
+  // Ten references to PDFs as plain links, then the one PDF the doc shows: a CV under a cover letter.
+  const references = ids.slice(0, 10).map((id) => `<p><a href="/f/${id}.pdf">Reference</a></p>`)
+  const html = `${references.join("")}${box(`/f/${a}.pdf?raw`, "CV")}<p><img src="/f/${c}.png"></p>`
+  assert.deepEqual(embeddedPdfPaths(html, "drop.example.com"), [`/f/${a}.pdf`])
+
+  const boxes = ids.map((id, i) => box(i % 2 ? `https://drop.example.com/f/${id}.pdf` : `/f/${id}.pdf`)).join("")
+  assert.deepEqual(
+    embeddedPdfPaths(boxes + box(`/f/${ids[0]}.pdf`), "drop.example.com"),
+    ids.slice(0, 10).map((id) => `/f/${id}.pdf`),
+  )
+})
+
+test("a PDF box on another Drop stays its link, and one on this Drop is handed its file", () => {
+  const html = box(`https://drop.example.com/f/${a}.pdf`, "CV") + box(`https://other.example.com/f/${b}.pdf`, "Deck")
+  assert.deepEqual(embeddedPdfPaths(html, "drop.example.com"), [`/f/${a}.pdf`])
+  assert.equal(
+    deferPdfs(html, "drop.example.com"),
+    `<figure class="drop-embed" data-drop-src="https://drop.example.com/f/${a}.pdf" data-drop-file="/f/${a}.pdf" data-kind="pdf" data-title="CV"><a class="drop-embed-link" href="https://drop.example.com/f/${a}.pdf">CV</a></figure>` +
+      box(`https://other.example.com/f/${b}.pdf`, "Deck"),
+  )
 })

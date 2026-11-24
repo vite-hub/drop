@@ -38,7 +38,7 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
    over them and its drop's comments as pins, which open the drop. The pins and areas are ViewerPdf's: the pin's sharp
    corner on the spot, resolved ones greyed. The pins stay out of a printed doc, and so do the box's background and
    border, which would show as a band where a page prints narrower than the paper. */
-.drop-embed-page { position: relative; aspect-ratio: 1000 / 1414; background: var(--background); }
+.drop-embed-page { position: relative; aspect-ratio: var(--drop-page-ratio, 1000 / 1414); background: var(--background); }
 .drop-embed-page + .drop-embed-page { border-top: 1px solid var(--border); }
 .typeset .drop-embed-page img { display: block; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border-radius: 0; }
 .drop-embed-pdf-link { position: absolute; border-radius: 2px; }
@@ -53,7 +53,9 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
 .drop-embed-caption { padding: .5rem .75rem; border-top: 1px solid var(--border); font-size: .8125rem; color: var(--muted-foreground); }
 .drop-embed[data-kind="image"] img { display: block; margin: 0 auto; }
 .drop-embed[data-kind="video"] video { display: block; width: 100%; height: auto; }
-@media print { .typeset :is(.drop-embed-pin, .drop-embed-area, .drop-embed-caption) { display: none; } .drop-embed-page { break-inside: avoid; } .drop-embed[data-kind="pdf"], .drop-embed-page { border: 0; background: none; } }
+/* A printed PDF page fits on one sheet with room for main's padding (3.5rem above, 6rem below), so the doc's first and
+   last sheets hold one too: a page taller than that prints narrower. */
+@media print { .typeset :is(.drop-embed-pin, .drop-embed-area, .drop-embed-caption) { display: none; } .drop-embed-page { break-inside: avoid; width: min(100%, (100vh - 9.5rem) * var(--drop-page-ratio, 1000 / 1414)); margin-inline: auto; } .drop-embed[data-kind="pdf"], .drop-embed-page { border: 0; background: none; } }
 /* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
@@ -208,14 +210,17 @@ const EMBEDS_SCRIPT = String.raw`(() => {
     p.textContent = text;
     return p;
   };
-  // A drop opens in the viewer, or with a modifier key in a new tab as any link; an attached PDF opens as its file.
+  // A drop opens in the viewer for a signed-in reader (the viewer's "view" says who reads), or with a modifier key in a
+  // new tab as any link. A reader who isn't signed in follows the link to the drop's public page, as any /d/ link in a
+  // doc opens. An attached PDF opens as its file.
+  let signedIn = false;
   const opener = (link, href, text) => {
     const a = document.createElement("a");
     a.href = href;
     if (text) a.textContent = text;
     if (link.startsWith("/f/")) { a.target = "_blank"; a.rel = "noopener noreferrer"; return a; }
     a.addEventListener("click", (e) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      if (!signedIn || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
       post({ type: "doc-open", id: link });
     });
@@ -261,7 +266,7 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   }
 
   function showPage(page, pdf, link, m) {
-    page.style.aspectRatio = m.width + " / " + m.height;
+    page.style.setProperty("--drop-page-ratio", m.width + " / " + m.height);
     const image = document.createElement("img");
     image.src = m.src;
     image.width = m.width;
@@ -295,6 +300,7 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
+    if (m.type === "view") { signedIn = !!m.me; return; }
     if (m.type === "embed-page-data") {
       const pdf = pdfs.get(m.link);
       const drawn = String(m.src).startsWith("data:image/");

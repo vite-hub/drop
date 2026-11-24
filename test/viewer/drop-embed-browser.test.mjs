@@ -4,6 +4,7 @@ import { chromium } from "playwright"
 import { beforeEach, test } from "vite-plus/test"
 import { PREVIEW_SANDBOX } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
+import { deferPdfs } from "../../shared/embedded-images.ts"
 import { embedDocument } from "../../shared/plan-runtime.ts"
 import { migrate, reset } from "../cost/harness.mjs"
 
@@ -95,7 +96,10 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     async () =>
       `# Doc\n\n![CV](${CV})\n\n${embed(PDF)}${embed(IMAGE)}${embed(VIDEO)}${embed(LONG)}${embed(HUGE)}![Letter](${CV_PAST_CAP})\n`,
   )
-  const srcdoc = planDocument("markdown", "", false, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+  // The doc's PDF boxes on this Drop get their file, as DropViewer sends the doc (useAttachmentData).
+  const srcdoc = planDocument("markdown", "", false, deferPdfs(html, "drop.test"))
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
   // The viewer's answers (useDocEmbeds): the PDFs' page counts, the image as a data: URL, the video's bytes, and each
   // page as an image 1600 pixels wide with a link and, on the PDF drop's first page, two comments.
   const answers = {
@@ -237,6 +241,20 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
         [[700, 300], "0.55", "2px", "2px"],
       ],
     })
+    // A reader who isn't signed in follows the pin to the drop's public page in a new tab, as any /d/ link in a doc
+    // opens; a signed-in reader, whom the viewer names, opens the drop in the viewer.
+    await page.context().route("https://drop.test/d/**", (route) => route.fulfill({ body: "The drop's public page" }))
+    const [opened] = await Promise.all([
+      page.context().waitForEvent("page"),
+      pdf.evaluate((figure) => figure.querySelector(".drop-embed-pin").click()),
+    ])
+    await opened.waitForLoadState()
+    assert.equal(opened.url(), `https://drop.test/d/${PDF}`)
+    assert.equal((await page.evaluate(() => posts)).filter((m) => m.type === "doc-open").length, 0)
+    await page.evaluate(() =>
+      frames[0].postMessage({ __drop: true, type: "view", me: { name: "Ada", image: null } }, "*"),
+    )
+    await page.waitForTimeout(100)
     await pdf.evaluate((figure) => figure.querySelector(".drop-embed-pin").click())
     await page.waitForFunction(() => posts.some((m) => m.type === "doc-open"))
     assert.deepEqual(

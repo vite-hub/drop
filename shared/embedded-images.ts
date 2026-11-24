@@ -6,18 +6,12 @@ const PDF_FILE = /\.pdf$/i
 const MAX_IMAGES = 60
 export const MAX_PDFS = 10
 
-function embeddedPaths(
-  file: RegExp,
-  sources: string[],
-  host: string,
-  attachments: string[],
-  max = MAX_IMAGES,
-): string[] {
+function embeddedPaths(file: RegExp, sources: string[], host: string, attachments: string[]): string[] {
   const paths = new Set(attachments)
   for (const [link, path] of sources.join("\n").matchAll(FILE_LINK)) {
     if (path && file.test(path) && (!link.startsWith("http") || new URL(link).host === host)) paths.add(path)
   }
-  return [...paths].slice(0, max)
+  return [...paths].slice(0, MAX_IMAGES)
 }
 
 export const embeddedImagePaths = (sources: string[], host: string, attachments: string[] = []) =>
@@ -31,18 +25,27 @@ export const embeddedMediaPaths = (sources: string[], host: string, attachments:
     attachments.filter((path) => MEDIA_FILE.test(path)),
   )
 
-function pdfPaths(sources: string[], host: string, attachments: string[]) {
-  const shown = embeddedPaths(PDF_FILE, sources, host, [], Infinity)
-  return [...new Set([...shown, ...attachments.filter((path) => PDF_FILE.test(path))])]
+const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")
+
+export function localPdf(src: string, host: string) {
+  const [link, path] = src.match(ONE_FILE_LINK) ?? []
+  if (!link || !path || !PDF_FILE.test(path)) return
+  return link.startsWith("http") && new URL(link).host !== host ? undefined : path
 }
 
-export const embeddedPdfPaths = (sources: string[], host: string, attachments: string[] = []) =>
-  pdfPaths(sources, host, attachments).slice(0, MAX_PDFS)
+const PDF_BOX = /<figure\b[^>]*?\sdata-drop-src="([^"]*)"/gi
 
-export const pdfsPastCap = (sources: string[], host: string, attachments: string[] = []) =>
-  pdfPaths(sources, host, attachments).slice(MAX_PDFS)
+export const embeddedPdfPaths = (html: string, host: string) =>
+  [...new Set(Array.from(html.matchAll(PDF_BOX), ([, src = ""]) => localPdf(src, host)))]
+    .filter((path) => path !== undefined)
+    .slice(0, MAX_PDFS)
 
-const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")
+export const deferPdfs = (html: string, host: string) =>
+  html.replace(PDF_BOX, (tag, src: string) => {
+    const path = localPdf(src, host)
+    return path ? `${tag} data-drop-file="${path}"` : tag
+  })
+
 const PENDING_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
 export function deferImages(html: string, paths: string[]) {
