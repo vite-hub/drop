@@ -36,6 +36,43 @@ One self-contained HTML page. Each item is a `<section>` directly inside `<body>
 - Drop listens for keys on the page too: Esc closes what Drop has open, and C, E and single letters pick its tools. When an item uses one of those keys itself, such as Esc to close its own menu, call `event.preventDefault()` in that handler so Drop leaves the key alone.
 - Put everything visible inside a section. Draw no switcher, bar, or picker of your own, and paste no picker script: Drop runs its own on every page with `data-variant` items.
 
+### One frame for every item
+
+Paste this shell as the page's first `<style>`, before any item's own styles. It gives every item the same font, size, leading, background, padding and colors, so two items differ only in the idea they try:
+
+```html
+<style>
+  :root {
+    color-scheme: light;
+    --prototype-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --prototype-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --prototype-bg: #fff; --prototype-surface: #fafafa; --prototype-fg: #171717; --prototype-muted: #737373;
+    --prototype-line: rgb(0 0 0 / .08); --prototype-accent: #2563eb;
+    --prototype-radius: 8px; --prototype-pad: 32px;
+  }
+  :root[data-theme="dark"], body > [data-variant][data-theme="dark"] {
+    color-scheme: dark;
+    --prototype-bg: #171717; --prototype-surface: #1f1f1f; --prototype-fg: #fafafa; --prototype-muted: #a3a3a3;
+    --prototype-line: #2a2a2a; --prototype-accent: #60a5fa;
+  }
+  body > [data-variant] {
+    box-sizing: border-box; padding: var(--prototype-pad);
+    background: var(--prototype-bg); color: var(--prototype-fg);
+    font: 16px/1.5 var(--prototype-font); font-synthesis: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  body > [data-variant] * { box-sizing: border-box; }
+  body > [data-variant] :is(h1, h2, h3, h4) { line-height: 1.15; text-wrap: balance; }
+  body > [data-variant] :is(button, input, select, textarea) { font: inherit; color: inherit; }
+</style>
+```
+
+- **For a real product**, set the tokens in `:root` to its font, colors and radius, once. Keep the defaults only when there is no product yet.
+- **Item styles use the tokens** (`var(--prototype-line)`, `var(--prototype-muted)`), never a raw hex, so the whole page changes in one place.
+- **An item overrides a token only when its direction is about that property**, scoped to its id: `#v-hero-editorial { --prototype-font: Georgia, serif; }`. A whole-page item with its own header sets `--prototype-pad: 0`.
+- **Dark mode**: `data-theme="dark"` on `<html>` turns every item dark; on one section, it shows that item's dark version beside the light ones.
+- Live items (`data-src`) draw their own page; Drop removes their padding.
+
 ### A flow: rows of screens with arrows
 
 When the question is how someone moves through screens (an app's session, a checkout), show it as one item that holds the screens in rows, next to one live item to try it:
