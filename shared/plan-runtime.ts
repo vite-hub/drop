@@ -2079,6 +2079,26 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (printedDark) { document.documentElement.classList.add("dark"); document.documentElement.classList.remove("light"); }
   });
 
+  // Export as PDF waits for what a doc loads late, so the PDF has it. A doc script that fills the page only near the
+  // screen (DEFERRED_FILES_SCRIPT and EMBEDS_SCRIPT in shared/documents.ts) listens for "drop:print" on document and
+  // passes event.detail.waitUntil a promise that settles once its part is on the page. Then the images decode and the
+  // dialog opens, after 20 s at most whatever is still missing. The reader's own Ctrl+P can't wait.
+  let printing = false;
+  const exportPdf = async (title) => {
+    if (printing) return;
+    printing = true;
+    const waits = [];
+    document.dispatchEvent(new CustomEvent("drop:print", { detail: { waitUntil: (promise) => { waits.push(promise); } } }));
+    const decoded = Promise.allSettled(waits).then(() => Promise.allSettled([...document.images].map((image) => {
+      image.loading = "eager";
+      return image.decode();
+    })));
+    await Promise.race([decoded, new Promise((resolve) => setTimeout(resolve, 20000))]);
+    printing = false;
+    if (typeof title === "string" && title) document.title = title;
+    print();
+  };
+
   // The Marker holds the page still.
   ${KEY_SCROLL}
   const keyScroll = keyScroller(() => tool === "mark");
@@ -2134,7 +2154,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     }
     // Export as PDF: the browser's print dialog for this document alone, under the drop's title (the PDF's file name).
     // Only Markdown frames may open it (previewSandbox in app/utils/feedback.ts); elsewhere the browser ignores it.
-    if (m.type === "print") { if (typeof m.title === "string" && m.title) document.title = m.title; print(); }
+    if (m.type === "print") void exportPdf(m.title);
     // How wide a Markdown doc's text runs (DOC_WIDTHS in shared/documents.ts).
     if (m.type === "width" && typeof m.column === "string") { document.documentElement.style.setProperty("--drop-column", m.column); render(); }
     // A root class hides the outline in Zen and tells comark-outline to recalculate its placement.

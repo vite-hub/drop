@@ -133,6 +133,8 @@ Docs and apps show a toolbar under the page. **Comments** and the Marker sit in 
 
 **Zen** under the **+**, or :kbd[Z], is for reading: a Markdown doc loses its outline, and the toolbar folds to a small handle with Drop's mark, a count of open comments, and a dot for each person here. Press the handle to show the toolbar while you need it. Comments, editing, the Marker, and Share bring it back on their own. Press **Zen** or :kbd[Z] again, or :kbd[Esc] once nothing else is open, to leave. Drop remembers it in this browser, for every drop.
 
+**Export as PDF**, in a Markdown doc's header or the :kbd[⌘K] palette, opens your browser's print dialog for the doc alone, in light colors and without comment pins. It first loads the images, videos, and embedded drops further down the page, so the PDF has them. Your browser's own Print (:kbd[⌘P]) can't wait for them and prints only what has loaded.
+
 ### Marker {#marker}
 
 The Marker draws on a snapshot of the page and sends it as one comment. Press :kbd[B] while you point at what you want to mark: the page freezes as it is, an open tooltip or menu included, and the toolbar turns into the Marker's tools.

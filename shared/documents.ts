@@ -37,21 +37,35 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   const waiting = document.querySelectorAll("img[data-drop-image], [data-drop-media]");
   if (!waiting.length) return;
   const asked = new Set();
-  // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
-  const near = new IntersectionObserver((entries) => {
+  const arrived = new Set();
+  const ask = (elements) => {
     const paths = [];
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      near.unobserve(entry.target);
-      const path = entry.target.dataset.dropImage || entry.target.dataset.dropMedia;
+    for (const element of elements) {
+      near.unobserve(element);
+      const path = element.dataset.dropImage || element.dataset.dropMedia;
       if (path && !asked.has(path)) { asked.add(path); paths.push(path); }
     }
     if (paths.length) parent.postMessage({ __drop: true, type: "files", paths }, "*");
+  };
+  // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
+  const near = new IntersectionObserver((entries) => {
+    ask(entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target));
   }, { root: document, rootMargin: "150% 0px" });
   waiting.forEach((element) => near.observe(element));
+  // Export as PDF (plan-runtime) asks for the rest and prints once every file asked for is here.
+  let onArrive = () => {};
+  document.addEventListener("drop:print", (e) => {
+    ask(waiting);
+    e.detail.waitUntil(new Promise((resolve) => {
+      onArrive = () => { if ([...asked].every((path) => arrived.has(path))) resolve(); };
+      onArrive();
+    }));
+  });
   addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent || m.type !== "file-data") return;
+    arrived.add(m.path);
+    onArrive();
     if (m.data instanceof Blob) {
       let url;
       for (const media of document.querySelectorAll("[data-drop-media]")) {
@@ -74,17 +88,30 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   const boxes = document.querySelectorAll("[data-drop-embed]");
   if (!boxes.length) return;
   const asked = new Set();
-  const near = new IntersectionObserver((entries) => {
+  const arrived = new Set();
+  const ask = (elements) => {
     const links = [];
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      near.unobserve(entry.target);
-      const link = entry.target.dataset.dropEmbed;
+    for (const box of elements) {
+      near.unobserve(box);
+      const link = box.dataset.dropEmbed;
       if (link && !asked.has(link)) { asked.add(link); links.push(link); }
     }
     if (links.length) parent.postMessage({ __drop: true, type: "embeds", links }, "*");
+  };
+  const near = new IntersectionObserver((entries) => {
+    ask(entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target));
   }, { root: document, rootMargin: "150% 0px" });
   boxes.forEach((box) => near.observe(box));
+  // Export as PDF (plan-runtime) asks for the rest and prints once every box asked for shows its drop or why it can't.
+  let onArrive = () => {};
+  document.addEventListener("drop:print", (e) => {
+    ask(document.querySelectorAll("[data-drop-embed]"));
+    e.detail.waitUntil(new Promise((resolve) => {
+      onArrive = () => { if ([...asked].every((link) => arrived.has(link))) resolve(); };
+      onArrive();
+    }));
+  });
+  const arrive = (link) => { arrived.add(link); onArrive(); };
   addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent || m.type !== "embed-data") return;
@@ -96,6 +123,7 @@ const EMBEDS_SCRIPT = String.raw`(() => {
         note.className = "drop-embed-note";
         note.textContent = String(m.error || "This drop can't show here.");
         box.replaceChildren(note);
+        arrive(m.link);
         continue;
       }
       const frame = document.createElement("iframe");
@@ -103,6 +131,7 @@ const EMBEDS_SCRIPT = String.raw`(() => {
       frame.setAttribute("referrerpolicy", "no-referrer");
       frame.title = box.dataset.title || "Embedded drop";
       frame.srcdoc = m.html;
+      frame.addEventListener("load", () => arrive(m.link), { once: true });
       box.replaceChildren(frame);
     }
   });
