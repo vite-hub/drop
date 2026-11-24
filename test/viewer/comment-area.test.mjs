@@ -15,6 +15,7 @@ import {
 } from "vue"
 import { createInjectionState, useFileDialog } from "@vueuse/core"
 import { useViewerAnnotations } from "../../app/composables/useViewerAnnotations.ts"
+import { useViewerFrame } from "../../app/composables/useViewerFrame.ts"
 import { useImagePicks } from "../../app/composables/useImagePicks.ts"
 import { MARK_COLORS, MARK_TIPS } from "../../shared/utils/marker.ts"
 
@@ -76,6 +77,50 @@ test("entering a prototype canvas clears inspection and blocks toolbar and frame
   assert.equal(state.overlays.xray, true)
 })
 const frame = { left: 0, top: 0, scale: 1 }
+
+test("a frame Marker retry releases Done without leaving Marker mode or losing strokes", () => {
+  const annotations = viewer()
+  let receive
+  const globals = {
+    useCopy: () => ({ copy: () => {} }),
+    useColorMode: () => ref("light"),
+    useMounted: () => ref(false),
+    useBase64: () => ({ base64: ref("") }),
+    useAttachmentData: () => ({}),
+    useDebounceFn: (fn) => fn,
+    useEventListener: () => {},
+    useViewerQuiz: () => ({ receive: () => {} }),
+    useDropFrame: (_frame, _origin, handler) => {
+      receive = handler
+      return { ready: ref(false), send: () => {} }
+    },
+  }
+  for (const [name, value] of Object.entries(globals)) vi.stubGlobal(name, value)
+  try {
+    scopes.at(-1).run(() =>
+      useViewerFrame({
+        drop: annotations.drop,
+        frame: ref(null),
+        app: { files: ref({}), pages: ref([]), page: ref(""), location: ref("/") },
+        pinned: ref([]),
+        inset: ref(0),
+        bottom: ref(0),
+        width: ref("readable"),
+        annotations,
+      }),
+    )
+    annotations.setTool("mark")
+    receive({ type: "marks", count: 1 }, frame)
+    annotations.finishing.value = true
+    receive({ type: "mark-retry" }, frame)
+    assert.equal(annotations.finishing.value, false)
+    assert.equal(annotations.frameTool.value, "mark")
+    assert.equal(annotations.marks.value, 1)
+  } finally {
+    for (const name of Object.keys(globals)) vi.stubGlobal(name, undefined)
+  }
+})
+
 const area = {
   type: "area",
   selector: "body",

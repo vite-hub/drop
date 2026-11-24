@@ -36,7 +36,7 @@ Mark.
 
 | Photo |
 | --- |
-| ![Table portrait](${image}) |
+| ![Table portrait](${image}){link="https://vite.dev/guide/"} |
 
 ![Sized portrait](${image}){width="400" height="1000"}
 
@@ -48,7 +48,7 @@ Mark.
 `
   const document = await renderMarkdownDocument(async () => markdown, path, "portrait.md")
   assert.match(document, /<strong><img[^>]+alt="Bold portrait"/)
-  assert.match(document, /<td><img[^>]+alt="Table portrait"/)
+  assert.match(document, /<td><img(?=[^>]+alt="Table portrait")(?=[^>]+data-zoom-thumb)(?=[^>]+loading="lazy")/)
   assert.match(document, /<img(?=[^>]+alt="Sized portrait")(?=[^>]+width="400")(?=[^>]+height="1000")/)
   assert.match(document, /<img(?=[^>]+class="cp-img")(?=[^>]+src="\/api\/favicons\/vite\.dev")/)
   const [localStyles, shell, zoom, mediumZoom] = await Promise.all(
@@ -94,7 +94,8 @@ Mark.
 
     for (const [alt, expected] of [
       ["Bold portrait", [224, 560]],
-      ["Table portrait", [224, 560]],
+      // A thumbnail: comark-zoom gives an image in a table cell with no size written a 3:2 box.
+      ["Table portrait", [96, 64]],
       ["Sized portrait", [224, 560]],
       ["Thumbnail", [80, 200]],
       ["Width-only thumbnail", [80, 200]],
@@ -110,6 +111,18 @@ Mark.
     await favicon.evaluate((img) => img.decode())
     const icon = await favicon.boundingBox()
     assert.deepEqual([icon.width, icon.height], [14, 14])
+
+    const thumbnail = page.locator('img[alt="Table portrait"]')
+    assert.equal(await thumbnail.getAttribute("role"), null)
+    await thumbnail.click()
+    const dialog = page.locator(".cz-dialog")
+    await dialog.waitFor()
+    assert.equal(await page.locator(".medium-zoom-image--opened").count(), 0)
+    assert.equal(await dialog.locator(".cz-link").getAttribute("href"), "https://vite.dev/guide/")
+    const zoomed = await dialog.locator('img[alt="Table portrait"]').boundingBox()
+    assert.ok(zoomed.height > 64 * 4)
+    await page.keyboard.press("Escape")
+    await dialog.waitFor({ state: "detached" })
 
     await page.getByRole("button", { name: "Zoom Sized portrait" }).click()
     const clone = page.locator(".medium-zoom-image--opened")
