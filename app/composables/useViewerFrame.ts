@@ -184,13 +184,12 @@ export function useViewerFrame(options: {
     if (stored && options.errors && drop.value.id === id && drop.value.version === version)
       options.errors.value = stored.errors
   }
-  // One POST at a time, so each reply's stored list already holds the batches sent before it.
-  let runtimeSending = Promise.resolve()
+  let runtimeReportQueue = Promise.resolve()
   function sendRuntimeReports() {
     const batch = runtimeReports
     runtimeReports = null
-    if (batch) runtimeSending = runtimeSending.then(() => postRuntimeReports(batch))
-    return runtimeSending
+    if (batch) runtimeReportQueue = runtimeReportQueue.then(() => postRuntimeReports(batch))
+    return runtimeReportQueue
   }
   const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 

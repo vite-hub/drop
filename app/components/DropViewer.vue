@@ -899,8 +899,18 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
+const feedbackLink = useShareUrl(drop, () =>
+  pageErrors.value.length && drop.value.kind === "html" ? drop.value.version : undefined,
+)
 const feedback = () =>
-  feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version, pageErrors.value)
+  feedbackMarkdown(
+    drop.value.title,
+    feedbackLink.value,
+    comments.value,
+    drop.value.version,
+    drop.value.kind,
+    pageErrors.value,
+  )
 const readerId = computed(
   () =>
     me.value?.id ??
@@ -909,8 +919,7 @@ const readerId = computed(
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, pageErrors.value.length)
-const errorsOnly = computed(() => pageErrors.value.length > 0 && !waiting.value.length)
+const prompt = () => promptMarkdown(drop.value, feedbackLink.value, waiting.value, pageErrors.value.length)
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -2048,14 +2057,14 @@ watch(
               >
                 <template #tools>
                   <ViewerCommentSend
-                    v-if="canSend && !errorsOnly"
+                    v-if="canSend"
                     v-show="!lightbox && !commentMode"
                     :comments="publishedComments"
                     :drop="drop.id"
                     :send="dropSend"
                   />
                   <ViewerCopyPrompt
-                    v-else-if="(waiting.length || pageErrors.length) && !lightbox && !commentMode"
+                    v-if="(pageErrors.length || (!canSend && waiting.length)) && !lightbox && !commentMode"
                     :count="waiting.length"
                     :errors="pageErrors.length"
                     :signed-in="Boolean(me)"
