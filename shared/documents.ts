@@ -38,6 +38,8 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   if (!waiting.length) return;
   const asked = new Set();
   const arrived = new Set();
+  // Videos with their file but no frame yet: one without a poster prints blank until its first frame draws.
+  const loading = new Set();
   const ask = (elements) => {
     const paths = [];
     for (const element of elements) {
@@ -45,39 +47,54 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
       const path = element.dataset.dropImage || element.dataset.dropMedia;
       if (path && !asked.has(path)) { asked.add(path); paths.push(path); }
     }
-    if (paths.length) parent.postMessage({ __drop: true, type: "files", paths }, "*");
+    // The viewer takes at most 100 paths a message (shared/frame-messages.ts).
+    for (let i = 0; i < paths.length; i += 100) parent.postMessage({ __drop: true, type: "files", paths: paths.slice(i, i + 100) }, "*");
   };
   // The document as root: a sandboxed frame is cross-origin, and browsers ignore rootMargin on its implicit root.
   const near = new IntersectionObserver((entries) => {
     ask(entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target));
   }, { root: document, rootMargin: "150% 0px" });
   waiting.forEach((element) => near.observe(element));
-  // Export as PDF (plan-runtime) asks for the rest and prints once every file asked for is here.
+  // Export as PDF (plan-runtime) asks for the rest and prints once every file asked for is here and every video shows a frame.
   let onArrive = () => {};
   document.addEventListener("drop:print", (e) => {
     ask(waiting);
     e.detail.waitUntil(new Promise((resolve) => {
       onArrive = () => {
         e.detail.progress();
-        if ([...asked].every((path) => arrived.has(path))) resolve();
+        if (!loading.size && [...asked].every((path) => arrived.has(path))) resolve();
       };
       onArrive();
     }));
   });
+  const firstFrame = (media) => {
+    if (media.tagName !== "VIDEO" || media.poster || media.readyState >= 2 || media.error) return;
+    loading.add(media);
+    const done = () => {
+      media.removeEventListener("loadeddata", done);
+      media.removeEventListener("error", done);
+      loading.delete(media);
+      onArrive();
+    };
+    media.addEventListener("loadeddata", done);
+    media.addEventListener("error", done);
+  };
   addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent || m.type !== "file-data") return;
     arrived.add(m.path);
-    onArrive();
     if (m.data instanceof Blob) {
       let url;
       for (const media of document.querySelectorAll("[data-drop-media]")) {
         if (media.dataset.dropMedia !== m.path) continue;
         media.src = url ||= URL.createObjectURL(m.data);
         media.removeAttribute("data-drop-media");
+        firstFrame(media);
       }
+      onArrive();
       return;
     }
+    onArrive();
     if (!String(m.data).startsWith("data:image/")) return;
     for (const image of document.querySelectorAll("img[data-drop-image]")) {
       if (image.dataset.dropImage !== m.path) continue;
@@ -92,6 +109,8 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   if (!boxes.length) return;
   const asked = new Set();
   const arrived = new Set();
+  // Frames still loading: a link embedded twice is fetched once and fills every box, and each copy loads on its own.
+  const loading = new Set();
   const ask = (elements) => {
     const links = [];
     for (const box of elements) {
@@ -99,7 +118,8 @@ const EMBEDS_SCRIPT = String.raw`(() => {
       const link = box.dataset.dropEmbed;
       if (link && !asked.has(link)) { asked.add(link); links.push(link); }
     }
-    if (links.length) parent.postMessage({ __drop: true, type: "embeds", links }, "*");
+    // The viewer takes at most 20 links a message (shared/frame-messages.ts).
+    for (let i = 0; i < links.length; i += 20) parent.postMessage({ __drop: true, type: "embeds", links: links.slice(i, i + 20) }, "*");
   };
   const near = new IntersectionObserver((entries) => {
     ask(entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target));
@@ -112,12 +132,11 @@ const EMBEDS_SCRIPT = String.raw`(() => {
     e.detail.waitUntil(new Promise((resolve) => {
       onArrive = () => {
         e.detail.progress();
-        if ([...asked].every((link) => arrived.has(link))) resolve();
+        if (!loading.size && [...asked].every((link) => arrived.has(link))) resolve();
       };
       onArrive();
     }));
   });
-  const arrive = (link) => { arrived.add(link); onArrive(); };
   addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent || m.type !== "embed-data") return;
@@ -129,7 +148,6 @@ const EMBEDS_SCRIPT = String.raw`(() => {
         note.className = "drop-embed-note";
         note.textContent = String(m.error || "This drop can't show here.");
         box.replaceChildren(note);
-        arrive(m.link);
         continue;
       }
       const frame = document.createElement("iframe");
@@ -137,9 +155,12 @@ const EMBEDS_SCRIPT = String.raw`(() => {
       frame.setAttribute("referrerpolicy", "no-referrer");
       frame.title = box.dataset.title || "Embedded drop";
       frame.srcdoc = m.html;
-      frame.addEventListener("load", () => arrive(m.link), { once: true });
+      loading.add(frame);
+      frame.addEventListener("load", () => { loading.delete(frame); onArrive(); }, { once: true });
       box.replaceChildren(frame);
     }
+    arrived.add(m.link);
+    onArrive();
   });
 })()`
 
