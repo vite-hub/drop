@@ -176,22 +176,21 @@ export function useViewerFrame(options: {
   const unplaced = ref(new Set<string>())
 
   let runtimeReports: { id: string; version: number; errors: RuntimeReport[] } | null = null
-  // A reply older than one already applied is skipped, so a late reply can't drop an error.
-  let runtimeSends = 0
-  let runtimeApplied = 0
-  async function sendRuntimeReports() {
-    if (!runtimeReports) return
-    const { id, version, errors } = runtimeReports
-    runtimeReports = null
-    const sent = ++runtimeSends
+  async function postRuntimeReports({ id, version, errors }: { id: string; version: number; errors: RuntimeReport[] }) {
     const stored = await $fetch<{ errors: DropRuntimeError[] } | undefined>(`/api/drops/${id}/errors`, {
       method: "POST",
       body: { version, errors: errors.slice(0, 20) },
     }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: id }))
-    if (stored && sent > runtimeApplied && options.errors && drop.value.id === id && drop.value.version === version) {
-      runtimeApplied = sent
+    if (stored && options.errors && drop.value.id === id && drop.value.version === version)
       options.errors.value = stored.errors
-    }
+  }
+  // One POST at a time, so each reply's stored list already holds the batches sent before it.
+  let runtimeSending = Promise.resolve()
+  function sendRuntimeReports() {
+    const batch = runtimeReports
+    runtimeReports = null
+    if (batch) runtimeSending = runtimeSending.then(() => postRuntimeReports(batch))
+    return runtimeSending
   }
   const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
