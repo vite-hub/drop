@@ -4,7 +4,7 @@ const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const MEDIA_FILE = /\.(?:mp4|webm|mov|m4v|mp3|wav|ogg|m4a)$/i
 const PDF_FILE = /\.pdf$/i
 const MAX_IMAGES = 60
-const MAX_PDFS = 10
+export const MAX_PDFS = 10
 
 function embeddedPaths(
   file: RegExp,
@@ -31,14 +31,16 @@ export const embeddedMediaPaths = (sources: string[], host: string, attachments:
     attachments.filter((path) => MEDIA_FILE.test(path)),
   )
 
+function pdfPaths(sources: string[], host: string, attachments: string[]) {
+  const shown = embeddedPaths(PDF_FILE, sources, host, [], Infinity)
+  return [...new Set([...shown, ...attachments.filter((path) => PDF_FILE.test(path))])]
+}
+
 export const embeddedPdfPaths = (sources: string[], host: string, attachments: string[] = []) =>
-  embeddedPaths(
-    PDF_FILE,
-    sources,
-    host,
-    attachments.filter((path) => PDF_FILE.test(path)),
-    MAX_PDFS,
-  )
+  pdfPaths(sources, host, attachments).slice(0, MAX_PDFS)
+
+export const pdfsPastCap = (sources: string[], host: string, attachments: string[] = []) =>
+  pdfPaths(sources, host, attachments).slice(MAX_PDFS)
 
 const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")
 const PENDING_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"

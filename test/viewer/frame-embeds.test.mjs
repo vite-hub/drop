@@ -54,6 +54,7 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
       deferred: ref(false),
       inline: (html) => html,
       pdfs: ref([ATTACHED]),
+      pdfsLeftOut: ref([UNLISTED]),
     }),
     useDocEmbeds,
     useDebounceFn: (fn) => debounce(fn),
@@ -220,7 +221,7 @@ test("a doc's box answers with a PDF's page count, an image, or a video, and say
   assert.deepEqual(answers.private, { error: "This drop is private, expired, or deleted, so it can't show here." })
 })
 
-test("a PDF drop's page comes drawn, with its links and its open comments on that page as pins", async () => {
+test("a PDF drop's page comes drawn, with its links and its comments on that page as pins, resolved ones marked", async () => {
   const comment = (n, fields) => ({ n, pdfPage: 2, ox: 100, oy: 200, ow: 0, oh: 0, resolved: false, ...fields })
   const comments = [
     comment(1),
@@ -241,6 +242,7 @@ test("a PDF drop's page comes drawn, with its links and its open comments on tha
     pins: [
       { n: 1, x: 100, y: 200 },
       { n: 2, x: 100, y: 200, w: 300, h: 50 },
+      { n: 3, x: 100, y: 200, resolved: true },
     ],
   })
   // One read of the drop, its comments and its file, with the reader's session.
@@ -248,20 +250,104 @@ test("a PDF drop's page comes drawn, with its links and its open comments on tha
   assert.equal(pdfs.length, 1)
 })
 
-test("a PDF attached to the doc answers by its path, with no pins; one the doc doesn't list is ignored", async () => {
+test("a PDF attached to the doc answers by its path, with no pins; one past the cap says so and links it", async () => {
   const { receive, request, sent, pdfs } = viewer("markdown")
   receive({ type: "embeds", links: [UNLISTED, ATTACHED, "/f/33333333-3333-4333-8333-333333333333.pdf"] })
   receive({ type: "embed-page", link: UNLISTED, page: 1 })
-  await vi.waitFor(() => assert.equal(sent.length, 1))
-  assert.deepEqual(sent[0], { type: "embed-data", link: ATTACHED, kind: "pdf", pages: 2, title: "CV", href: ATTACHED })
-  receive({ type: "embed-page", link: ATTACHED, page: 1 })
   await vi.waitFor(() => assert.equal(sent.length, 2))
-  assert.deepEqual(sent[1], { type: "embed-page-data", link: ATTACHED, ...PAGE, page: 1, links: PAGE_LINKS, pins: [] })
+  assert.deepEqual(
+    sent.find((message) => message.link === UNLISTED),
+    {
+      type: "embed-data",
+      link: UNLISTED,
+      error: "Only the first 10 attached PDFs show inside a doc; open it: ",
+      href: UNLISTED,
+    },
+  )
+  assert.deepEqual(
+    sent.find((message) => message.link === ATTACHED),
+    { type: "embed-data", link: ATTACHED, kind: "pdf", pages: 2, title: "CV", href: ATTACHED },
+  )
+  receive({ type: "embed-page", link: ATTACHED, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 3))
+  assert.deepEqual(sent[2], { type: "embed-page-data", link: ATTACHED, ...PAGE, page: 1, links: PAGE_LINKS, pins: [] })
   assert.deepEqual(request.mock.calls, [])
   assert.deepEqual(
     pdfs.map(({ src }) => src),
     [ATTACHED],
   )
+})
+
+// A PDF drop whose file the test swaps, as a new version of it does, and whose detail can be held on its way.
+function versioned() {
+  const state = { url: "https://drop.example.com/f/v1.pdf", held: Promise.resolve() }
+  const fetch = async (url) => {
+    if (url === `/api/drops/${LINK}`) {
+      const found = { ...DROPS.pdf, url: state.url }
+      await state.held
+      return found
+    }
+    if (url === `/api/drops/${LINK}/comments`) return []
+    throw new Error(url)
+  }
+  return { state, fetch }
+}
+
+test("after a new version of an embedded PDF drop, the reloaded doc draws its pages from the new file", async () => {
+  const { state, fetch } = versioned()
+  const { receive, sent, pdfs } = viewer("markdown", fetch)
+  receive({ type: "embeds", links: [LINK] })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 2))
+  state.url = "https://drop.example.com/f/v2.pdf"
+  // The frame reloads (theme, width, zen, a new version of the doc) and asks again.
+  receive({ type: "ready" })
+  receive({ type: "embeds", links: [LINK] })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 4))
+  assert.deepEqual(
+    pdfs.map(({ src }) => src),
+    ["https://drop.example.com/f/v1.pdf", "https://drop.example.com/f/v2.pdf"],
+  )
+  assert.equal(sent[3].type, "embed-page-data")
+})
+
+test("an answer still on its way when the frame reloads is dropped, and the reloaded frame gets its own", async () => {
+  const { state, fetch } = versioned()
+  let release
+  state.held = new Promise((resolve) => (release = resolve))
+  const { receive, sent, pdfs } = viewer("markdown", fetch)
+  receive({ type: "embeds", links: [LINK] })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  state.url = "https://drop.example.com/f/v2.pdf"
+  state.held = Promise.resolve()
+  receive({ type: "ready" })
+  receive({ type: "embeds", links: [LINK] })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 2))
+  release()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.equal(sent.length, 2)
+  assert.deepEqual(
+    sent.map(({ type, href }) => [type, href]),
+    [
+      ["embed-data", `/d/${LINK}`],
+      ["embed-page-data", undefined],
+    ],
+  )
+  assert.deepEqual(
+    pdfs.map(({ src }) => src),
+    ["https://drop.example.com/f/v2.pdf"],
+  )
+})
+
+test("a new version of the doc closes the PDFs it had open", async () => {
+  const { drop, receive, sent, pdfs } = viewer("markdown", reader(DROPS.pdf))
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 1))
+  drop.value = { ...drop.value, version: 2 }
+  await vi.waitFor(() => assert.equal(pdfs[0].loadingTask.destroy.mock.calls.length, 1))
 })
 
 test("a PDF of 42 pages draws its page 42, and the viewer closes its PDFs when the drop changes", async () => {

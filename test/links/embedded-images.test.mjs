@@ -89,14 +89,19 @@ test("a Markdown doc's videos and audio wait in the frame without a source; othe
   assert.match(deferred, /<video src="https:\/\/example.com\/x.mp4" controls>/)
 })
 
-test("a doc's PDFs on this Drop are handed in after its attached PDFs, up to 10, and other files aren't", () => {
+test("a doc's PDFs on this Drop come first, then its other attached PDFs, up to 10, and other files aren't", () => {
   const markdown = `![CV](https://drop.example.com/f/${a}.pdf)\n![](/f/${b}.pdf?raw)\n![](https://other.example.com/f/${c}.pdf)\n![](/f/${c}.png)`
   assert.deepEqual(embeddedPdfPaths([markdown], "drop.example.com", [`/f/${c}.pdf`, `/f/${c}.mov`]), [
-    `/f/${c}.pdf`,
     `/f/${a}.pdf`,
     `/f/${b}.pdf`,
+    `/f/${c}.pdf`,
   ])
   assert.deepEqual(embeddedImagePaths([markdown], "drop.example.com"), [`/f/${c}.png`])
   const ids = Array.from({ length: 12 }, (_, i) => `${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`)
   assert.equal(embeddedPdfPaths([ids.map((id) => `![](/f/${id}.pdf)`).join("\n")], "x").length, 10)
+  // Twelve attached PDFs, of which the doc shows the last two: those two are among the 10.
+  const attached = ids.map((id) => `/f/${id}.pdf`)
+  const shown = embeddedPdfPaths([`![](${attached[10]})\n![](${attached[11]})`], "x", attached)
+  assert.deepEqual(shown.slice(0, 2), [attached[10], attached[11]])
+  assert.equal(shown.length, 10)
 })

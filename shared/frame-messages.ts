@@ -149,13 +149,13 @@ export const FrameMessage = v.variant("type", [
 
 export const EMBED_PAGES = 500
 export type EmbedLink = { x: number; y: number; w: number; h: number; href: string }
-export type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number }
+export type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number; resolved?: true }
 export type EmbedData =
   | { kind: "html"; html: string }
   | { kind: "pdf"; pages: number; title: string; href: string }
   | { kind: "image"; src: string }
   | { kind: "video"; data: Blob; mime: string }
-  | { error: string }
+  | { error: string; href?: string }
 type EmbedPage = {
   page: number
   src: string

@@ -5,6 +5,7 @@ import {
   embeddedMediaPaths,
   embeddedPdfPaths,
   FILE_LINK,
+  pdfsPastCap,
 } from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
 
@@ -42,13 +43,16 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
       (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
     ),
   )
-  const pdfs = computed(() =>
-    embeddedPdfPaths(
-      [drop.value.content ?? "", drop.value.html ?? ""],
-      host,
-      (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
-    ),
-  )
+  const pdfsOf = (pick: typeof embeddedPdfPaths) =>
+    computed(() =>
+      pick(
+        [drop.value.content ?? "", drop.value.html ?? ""],
+        host,
+        (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
+      ),
+    )
+  const pdfs = pdfsOf(embeddedPdfPaths)
+  const pdfsLeftOut = pdfsOf(pdfsPastCap)
   const fetchImage = cached((path) => readBlob(path).then(blobDataUrl))
   const fetchMedia = cached(readBlob)
   const deferred = computed(() => drop.value.kind === "markdown")
@@ -81,5 +85,5 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
       : media.value.includes(path) || pdfs.value.includes(path)
         ? fetchMedia(path)
         : Promise.resolve(null)
-  return { ready: computed(() => data.value !== null), deferred, inline, defer, load, pdfs }
+  return { ready: computed(() => data.value !== null), deferred, inline, defer, load, pdfs, pdfsLeftOut }
 }

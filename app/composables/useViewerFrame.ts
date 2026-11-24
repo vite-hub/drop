@@ -194,7 +194,7 @@ export function useViewerFrame(options: {
   }
   const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
-  const embeds = useDocEmbeds(drop, attached.pdfs, dark)
+  const embeds = useDocEmbeds(drop, attached, dark)
 
   const reading = new Map<string, string[]>()
 

@@ -35,18 +35,25 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
 .drop-embed:is([data-kind="pdf"], [data-kind="image"], [data-kind="video"]) > .drop-embed-link { display: block; padding: 1rem; text-align: center; }
 .drop-embed-note { margin: 0; padding: 1rem; color: var(--muted-foreground); font-size: .875rem; text-align: center; }
 /* A PDF's pages, one after another at the doc's width (an A4 page's room until the page arrives), with its web links
-   over them and its drop's open comments as pins, which open the drop. The pins stay out of a printed doc. */
+   over them and its drop's comments as pins, which open the drop. The pins and areas are ViewerPdf's: the pin's sharp
+   corner on the spot, resolved ones greyed. The pins stay out of a printed doc, and so do the box's background and
+   border, which would show as a band where a page prints narrower than the paper. */
 .drop-embed-page { position: relative; aspect-ratio: 1000 / 1414; background: var(--background); }
 .drop-embed-page + .drop-embed-page { border-top: 1px solid var(--border); }
 .typeset .drop-embed-page img { display: block; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border-radius: 0; }
 .drop-embed-pdf-link { position: absolute; border-radius: 2px; }
 .drop-embed-pdf-link:hover { background: color-mix(in oklab, var(--foreground) 8%, transparent); }
-.drop-embed-area { position: absolute; border: 1.5px solid color-mix(in oklab, var(--foreground) 22%, transparent); border-radius: 3px; pointer-events: none; }
-.typeset .drop-embed-pin { position: absolute; translate: -50% -50%; display: grid; place-items: center; min-width: 1.375rem; height: 1.375rem; padding: 0 .3rem; box-sizing: border-box; border-radius: 999px; background: var(--foreground); color: var(--background); font-size: .6875rem; font-weight: 600; line-height: 1; text-decoration: none; box-shadow: 0 1px 3px rgb(0 0 0 / .25); }
+.drop-embed-area { position: absolute; z-index: 4; box-sizing: border-box; border: 2px solid var(--primary); border-radius: 2px; background: color-mix(in srgb, var(--primary) 8%, transparent); pointer-events: none; }
+.typeset .drop-embed-pin { position: absolute; z-index: 5; box-sizing: border-box; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 2px 11px 11px 11px; background: var(--primary); color: var(--primary-foreground); font: 600 10px/22px var(--font-sans); font-variant-numeric: tabular-nums; text-align: center; text-decoration: none; box-shadow: 0 1px 4px rgb(0 0 0 / .25), 0 0 0 2px var(--background); transition: scale 150ms cubic-bezier(.23, 1, .32, 1); transform-origin: top left; }
+.typeset .drop-embed-pin:hover { scale: 1.1; }
+.typeset .drop-embed-pin:active { scale: .96; }
+.typeset .drop-embed-pin:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+.typeset :is(.drop-embed-pin, .drop-embed-area).done { opacity: .55; filter: grayscale(1); }
+@media (prefers-reduced-motion: reduce) { .typeset .drop-embed-pin { transition: none; } }
 .drop-embed-caption { padding: .5rem .75rem; border-top: 1px solid var(--border); font-size: .8125rem; color: var(--muted-foreground); }
 .drop-embed[data-kind="image"] img { display: block; margin: 0 auto; }
 .drop-embed[data-kind="video"] video { display: block; width: 100%; height: auto; }
-@media print { .typeset :is(.drop-embed-pin, .drop-embed-area, .drop-embed-caption) { display: none; } .drop-embed-page { break-inside: avoid; } }
+@media print { .typeset :is(.drop-embed-pin, .drop-embed-area, .drop-embed-caption) { display: none; } .drop-embed-page { break-inside: avoid; } .drop-embed[data-kind="pdf"], .drop-embed-page { border: 0; background: none; } }
 /* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }
 `
@@ -116,6 +123,10 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   let printing = false;
   let onArrive = () => {};
   const arrive = (link) => { arrived.add(link); onArrive(); };
+  // A video's bytes play from an object URL, let go once its box shows something else or the doc goes.
+  const videoUrls = new Map();
+  const letGo = (box) => { if (videoUrls.has(box)) { URL.revokeObjectURL(videoUrls.get(box)); videoUrls.delete(box); } };
+  addEventListener("pagehide", () => { for (const box of [...videoUrls.keys()]) letGo(box); });
   const ask = (elements) => {
     const links = [];
     for (const box of elements) {
@@ -243,12 +254,12 @@ const EMBEDS_SCRIPT = String.raw`(() => {
     for (const pin of Array.isArray(m.pins) ? m.pins : []) {
       if (pin.w && pin.h) {
         const area = at(document.createElement("span"), pin.x, pin.y, pin.w, pin.h);
-        area.className = "drop-embed-area";
+        area.className = "drop-embed-area" + (pin.resolved ? " done" : "");
         parts.push(area);
       }
       const dot = at(opener(link, pdf.href, String(pin.n)), pin.x, pin.y);
-      dot.className = "drop-embed-pin";
-      dot.setAttribute("aria-label", "Comment #" + pin.n + " on page " + m.page + ", open " + pdf.title + " to read it");
+      dot.className = "drop-embed-pin" + (pin.resolved ? " done" : "");
+      dot.setAttribute("aria-label", "Comment #" + pin.n + (pin.resolved ? ", resolved," : "") + " on page " + m.page + ", open " + pdf.title + " to read it");
       parts.push(dot);
     }
     page.replaceChildren(...parts);
@@ -275,6 +286,7 @@ const EMBEDS_SCRIPT = String.raw`(() => {
     for (const box of boxes) {
       if (linkOf.get(box) !== m.link || !box.isConnected) continue;
       box.removeAttribute("data-drop-embed");
+      letGo(box);
       const title = box.dataset.title || "Embedded drop";
       if (m.kind === "pdf") { showPdf(box, m.link, m); continue; }
       if (m.kind === "image" && String(m.src).startsWith("data:image/")) {
@@ -291,15 +303,21 @@ const EMBEDS_SCRIPT = String.raw`(() => {
         const video = document.createElement("video");
         video.controls = true;
         video.playsInline = true;
-        video.preload = "metadata";
-        video.src = URL.createObjectURL(m.data);
+        // Its first frame, so a printed doc shows it.
+        video.preload = "auto";
+        video.addEventListener("loadeddata", () => arrive(m.link), { once: true });
+        video.addEventListener("error", () => arrive(m.link), { once: true });
+        const url = URL.createObjectURL(m.data);
+        videoUrls.set(box, url);
+        video.src = url;
         box.dataset.kind = "video";
         box.replaceChildren(video);
-        arrive(m.link);
         continue;
       }
       if (typeof m.html !== "string") {
-        box.replaceChildren(note(String(m.error || "This drop can't show here.")));
+        const why = note(String(m.error || "This drop can't show here."));
+        if (typeof m.href === "string") why.append(opener(m.link, m.href, box.dataset.title || m.href));
+        box.replaceChildren(why);
         arrive(m.link);
         continue;
       }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { PREVIEW_SANDBOX, previewSandbox } from "../../app/utils/feedback.ts"
@@ -318,6 +319,26 @@ test("Export as PDF draws every page of a doc's PDFs, all 42 of a long one, and 
     assert.equal(posts.length, 48)
     assert.equal(new Set(posts).size, 48)
     await page.emulateMedia({ media: "print" })
+    // Only the page images print: no box background or border to band a Letter page on A4. Drop's colors from disk,
+    // since `vp test` leaves THEME_CSS empty.
+    const theme = await readFile(new URL("../../shared/theme.css", import.meta.url), "utf8")
+    await frame.evaluate((css) => {
+      const style = document.createElement("style")
+      style.textContent = css
+      document.head.prepend(style)
+    }, theme)
+    assert.deepEqual(
+      await frame.evaluate(() =>
+        [".drop-embed", ".drop-embed-page"].map((selector) => {
+          const style = getComputedStyle(document.querySelector(selector))
+          return [style.backgroundColor, style.borderTopWidth, style.backgroundImage]
+        }),
+      ),
+      [
+        ["rgba(0, 0, 0, 0)", "0px", "none"],
+        ["rgba(0, 0, 0, 0)", "0px", "none"],
+      ],
+    )
     assert.equal(
       await frame.evaluate(() => getComputedStyle(document.querySelector(".drop-embed-page")).breakInside),
       "avoid",
@@ -345,3 +366,61 @@ test("Export as PDF prints right after a page the viewer couldn't draw, which sa
     await browser.close()
   }
 }, 40_000)
+
+test("Export as PDF waits for an embedded video's first frame", async () => {
+  const VIDEO = "mp4vmp4vmp4v"
+  const html = planDocument(
+    "markdown",
+    "",
+    false,
+    `<h1>Plan</h1>${FILLER.repeat(5)}<figure class="drop-embed" data-drop-embed="${VIDEO}" data-title="Demo"><a class="drop-embed-link" href="/d/${VIDEO}">Demo</a></figure>`,
+  )
+  const escaped = html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // A tenth of a second of silent 8 kHz WAV, which a video element plays.
+    await page.route("**/*", (route) =>
+      new URL(route.request().url()).hostname === "drop.test"
+        ? route.fulfill({
+            contentType: "text/html",
+            body: `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+            <script>window.posts = [];
+              const wav = () => {
+                const samples = 800, view = new DataView(new ArrayBuffer(44 + samples));
+                const text = (at, value) => [...value].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+                text(0, "RIFF"); view.setUint32(4, 36 + samples, true); text(8, "WAVEfmt ");
+                view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+                view.setUint32(24, 8000, true); view.setUint32(28, 8000, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+                text(36, "data"); view.setUint32(40, samples, true);
+                for (let i = 0; i < samples; i++) view.setUint8(44 + i, 128);
+                return new Blob([view.buffer], { type: "audio/wav" });
+              };
+              addEventListener("message", (e) => {
+                if (!e.data?.__drop) return;
+                window.posts.push(e.data);
+                if (e.data.type === "embeds") for (const link of e.data.links)
+                  e.source.postMessage({ __drop: true, type: "embed-data", link, kind: "video", data: wav(), mime: "video/mp4" }, "*");
+              });
+              window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
+          })
+        : route.abort(),
+    )
+    await page.goto("https://drop.test/")
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
+    const frame = page.frames()[1]
+    await frame.evaluate(() => {
+      window.printed = []
+      addEventListener("beforeprint", () => {
+        const video = document.querySelector(".drop-embed video")
+        window.printed.push(video ? video.readyState : -1)
+      })
+    })
+    await page.evaluate(() => window.tell({ type: "print", title: "Plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    const [readyState] = await frame.evaluate(() => window.printed)
+    assert.ok(readyState >= 2, `printed at readyState ${readyState}`)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

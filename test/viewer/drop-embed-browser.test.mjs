@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { chromium } from "playwright"
 import { beforeEach, test } from "vite-plus/test"
 import { PREVIEW_SANDBOX } from "../../app/utils/feedback.ts"
@@ -83,6 +84,7 @@ const HUGE = "pdfhpdfhpdfh"
 const IMAGE = "png2png2png2"
 const VIDEO = "mp4vmp4vmp4v"
 const CV = "/f/11111111-1111-4111-8111-111111111111.pdf"
+const CV_PAST_CAP = "/f/22222222-2222-4222-8222-222222222222.pdf"
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
@@ -90,7 +92,8 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
   const embed = (link) => `::embed{url="https://drop.vitehub.dev/d/${link}"}\n::\n\n`
   const { html } = await renderMarkdownCached(
     "embed-kinds-browser.md",
-    async () => `# Doc\n\n![CV](${CV})\n\n${embed(PDF)}${embed(IMAGE)}${embed(VIDEO)}${embed(LONG)}${embed(HUGE)}`,
+    async () =>
+      `# Doc\n\n![CV](${CV})\n\n${embed(PDF)}${embed(IMAGE)}${embed(VIDEO)}${embed(LONG)}${embed(HUGE)}![Letter](${CV_PAST_CAP})\n`,
   )
   const srcdoc = planDocument("markdown", "", false, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   // The viewer's answers (useDocEmbeds): the PDFs' page counts, the image as a data: URL, the video's bytes, and each
@@ -101,6 +104,7 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     [LONG]: { kind: "pdf", pages: 42, title: "Handbook", href: `/d/${LONG}` },
     [HUGE]: { kind: "pdf", pages: 640, title: "Archive", href: `/d/${HUGE}` },
     [IMAGE]: { kind: "image", src: PNG },
+    [CV_PAST_CAP]: { error: "Only the first 10 attached PDFs show inside a doc; open it: ", href: CV_PAST_CAP },
   }
   const browser = await chromium.launch()
   try {
@@ -122,7 +126,7 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
                 if (m.type === "embed-page") reply({
                   type: "embed-page-data", link: m.link, page: m.page, src: ${JSON.stringify(PNG)}, width: 1600, height: 2071,
                   links: [{ x: 118, y: 91, w: 327, h: 25, href: "https://example.com/" }],
-                  pins: m.link === "${PDF}" && m.page === 1 ? [{ n: 1, x: 500, y: 500 }, { n: 2, x: 100, y: 200, w: 300, h: 50 }] : [],
+                  pins: m.link === "${PDF}" && m.page === 1 ? [{ n: 1, x: 500, y: 500 }, { n: 2, x: 100, y: 200, w: 300, h: 50 }, { n: 3, x: 700, y: 300, w: 100, h: 100, resolved: true }] : [],
                 });
               });</script>`,
           })
@@ -132,7 +136,7 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     const doc = page.frames()[1]
     // The boxes in the doc's order (a filled drop box no longer says its link).
     const box = (link) =>
-      `article > figure.drop-embed:nth-of-type(${[CV, PDF, IMAGE, VIDEO, LONG, HUGE].indexOf(link) + 1})`
+      `article > figure.drop-embed:nth-of-type(${[CV, PDF, IMAGE, VIDEO, LONG, HUGE, CV_PAST_CAP].indexOf(link) + 1})`
     const pdf = await doc.waitForSelector(`${box(PDF)}:has(img[alt="Deck, page 2"])`, { timeout: 5000 })
 
     assert.deepEqual(
@@ -189,20 +193,49 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
       rel: "noopener noreferrer",
       rect: [118, 91, 327, 25],
     })
-    // Its comments: numbered pins, one with its area, that open the PDF's drop in the viewer.
-    const pins = await pdf.evaluate((figure) => ({
-      pins: Array.from(figure.querySelectorAll(".drop-embed-pin"), (pin) => [
-        pin.textContent,
-        pin.getAttribute("href"),
-      ]),
-      areas: figure.querySelectorAll(".drop-embed-area").length,
-    }))
+    // Its comments as ViewerPdf draws them: numbered pins with their sharp corner on the spot, areas outlined, resolved
+    // ones greyed, each opening the PDF's drop in the viewer. Drop's colors from disk, since `vp test` leaves THEME_CSS
+    // empty.
+    const theme = await readFile(new URL("../../shared/theme.css", import.meta.url), "utf8")
+    await doc.evaluate((css) => {
+      const style = document.createElement("style")
+      style.textContent = css
+      document.head.prepend(style)
+    }, theme)
+    const pins = await pdf.evaluate((figure) => {
+      const page = figure.querySelector(".drop-embed-page").getBoundingClientRect()
+      const at = (r) => [
+        Math.round(((r.left - page.left) / page.width) * 1000),
+        Math.round(((r.top - page.top) / page.height) * 1000),
+      ]
+      const looks = (element) => {
+        const style = getComputedStyle(element)
+        return [style.opacity, style.borderTopWidth, style.borderTopLeftRadius]
+      }
+      return {
+        pins: Array.from(figure.querySelectorAll(".drop-embed-pin"), (pin) => [
+          pin.textContent,
+          pin.getAttribute("href"),
+          at(pin.getBoundingClientRect()),
+          ...looks(pin),
+          pin.getBoundingClientRect().height,
+        ]),
+        areas: Array.from(figure.querySelectorAll(".drop-embed-area"), (area) => [
+          at(area.getBoundingClientRect()),
+          ...looks(area),
+        ]),
+      }
+    })
     assert.deepEqual(pins, {
       pins: [
-        ["1", `/d/${PDF}`],
-        ["2", `/d/${PDF}`],
+        ["1", `/d/${PDF}`, [500, 500], "1", "0px", "2px", 22],
+        ["2", `/d/${PDF}`, [100, 200], "1", "0px", "2px", 22],
+        ["3", `/d/${PDF}`, [700, 300], "0.55", "0px", "2px", 22],
       ],
-      areas: 1,
+      areas: [
+        [[100, 200], "1", "2px", "2px"],
+        [[700, 300], "0.55", "2px", "2px"],
+      ],
     })
     await pdf.evaluate((figure) => figure.querySelector(".drop-embed-pin").click())
     await page.waitForFunction(() => posts.some((m) => m.type === "doc-open"))
@@ -231,7 +264,24 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     const image = await doc.waitForSelector(`${box(IMAGE)}[data-kind="image"] > img`)
     assert.equal(await image.getAttribute("src"), PNG)
     const video = await doc.waitForSelector(`${box(VIDEO)}[data-kind="video"] > video`)
+    const first = await video.evaluate((element) => element.src)
     assert.match(await video.evaluate((element) => `${element.controls} ${element.src}`), /^true blob:/)
+    // Its bytes are let go once the box shows something else.
+    await page.evaluate((link) => {
+      frames[0].postMessage({ __drop: true, type: "embed-data", link, error: "Gone." }, "*")
+    }, VIDEO)
+    await doc.waitForFunction((selector) => !document.querySelector(selector), `${box(VIDEO)} > video`)
+    assert.equal(
+      await doc.evaluate(
+        (url) =>
+          fetch(url).then(
+            () => "read",
+            () => "revoked",
+          ),
+        first,
+      ),
+      "revoked",
+    )
 
     // Every page of a long PDF has its place, asked for once as it nears the screen.
     const long = await doc.waitForSelector(`${box(LONG)}[data-kind="pdf"]`)
@@ -266,6 +316,15 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
       ]),
       [500, "The doc shows the first 500 of 640 pages. Open Archive for the rest.", `/d/${HUGE}`],
     )
+
+    // An attached PDF past the cap says so and links its file.
+    await doc.$eval(box(CV_PAST_CAP), (figure) => figure.scrollIntoView())
+    const past = await doc.waitForSelector(`${box(CV_PAST_CAP)} .drop-embed-note a`)
+    assert.deepEqual(await past.evaluate((a) => [a.parentElement.textContent, a.getAttribute("href"), a.target]), [
+      "Only the first 10 attached PDFs show inside a doc; open it: Letter",
+      CV_PAST_CAP,
+      "_blank",
+    ])
   } finally {
     await browser.close()
   }
