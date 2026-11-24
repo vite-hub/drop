@@ -1,6 +1,14 @@
-import { addPlugin, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+
+import { addPlugin, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
+import { canvasManifest, canvasPageURL, canvasPrerenderedPage, canvasRouteOwner, routeRuleRedirects } from "./canvas.ts"
+
+import type { Nuxt } from "@nuxt/schema"
+
+import type { CanvasPageMeta } from "./canvas.ts"
 import type { DropPublicConfig } from "./runtime/script.ts"
 
 export interface DropModuleOptions {
@@ -11,7 +19,7 @@ export interface DropModuleOptions {
   preview?: boolean
 }
 
-export type { DropPublicConfig }
+export type { CanvasPageMeta, DropPublicConfig }
 
 type DropModuleSetupResult = false | void | { timings?: { setup?: number; [key: string]: number | undefined } }
 
@@ -37,8 +45,21 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
     }
     nuxt.options.runtimeConfig.public.drop = drop
     addPlugin({ src: resolver.resolve("./runtime/review.client"), mode: "client" })
+    addTypeTemplate({
+      filename: "types/drop-canvas.d.ts",
+      getContents: () =>
+        [
+          'declare module "nuxt/app" {',
+          "  interface PageMeta {",
+          "    canvas?: false | { params?: Record<string, string> }",
+          "  }",
+          "}",
+          "export {}",
+        ].join("\n"),
+    })
 
     if (!(options.preview ?? process.env.DROP_PREVIEW === "1")) return
+    serveCanvasManifest(nuxt)
     const content = buildMetaContent(await readForgeBuild(nuxt.options.rootDir))
     if (!content) {
       useLogger("@vite-hub/drop").warn(
@@ -49,5 +70,69 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
     nuxt.options.app.head.meta = [...(nuxt.options.app.head.meta ?? []), { name: buildMetaName, content }]
   },
 })
+
+function serveCanvasManifest(nuxt: Nuxt) {
+  const dir = join(nuxt.options.buildDir, "drop-canvas")
+  const filename = "__canvas.json"
+  const keys = nuxt.options.experimental.extraPageMetaExtractionKeys
+  if (!keys.includes("canvas")) keys.push("canvas")
+  if (nuxt.options.experimental.scanPageMeta === false) {
+    useLogger("@vite-hub/drop").warn(
+      "Page meta scanning is disabled. The canvas manifest cannot read canvas options from definePageMeta.",
+    )
+  }
+  rmSync(dir, { recursive: true, force: true })
+  nuxt.options.nitro.publicAssets = [...(nuxt.options.nitro.publicAssets ?? []), { dir, maxAge: 0 }]
+
+  const writeManifest = (
+    output: string,
+    routes: Parameters<typeof canvasManifest>[0],
+    include: (url: string | undefined, route: (typeof routes)[number]) => boolean,
+  ) => {
+    if (!routes.length) {
+      rmSync(join(output, filename), { force: true })
+      return
+    }
+    const manifest = canvasManifest(routes, (page, route) => include(canvasPageURL(page), route))
+    mkdirSync(output, { recursive: true })
+    writeFileSync(join(output, filename), JSON.stringify(manifest))
+  }
+
+  if (nuxt.options.dev) {
+    nuxt.hook("app:templatesGenerated", (app) => {
+      writeManifest(dir, app.pages ?? [], (url) => !url || !routeRuleRedirects(nuxt.options.routeRules, url))
+    })
+    return
+  }
+
+  nuxt.hook("nitro:build:before", (nitro) => {
+    const routes = nuxt.apps.default?.pages ?? []
+    const redirects = (url: string) => {
+      const rules = nitro.routing?.routeRules
+      if (!rules?.matchAll) return routeRuleRedirects(nitro.options.routeRules, url)
+      const base = (nitro.options.baseURL ?? "/").replace(/\/$/, "")
+      const matches: { redirect?: unknown }[] = rules.matchAll("GET", `${base}${url}`)
+      return matches.some((rule) => rule.redirect)
+    }
+    if (!nitro.options.static) {
+      writeManifest(dir, routes, (url) => !url || !redirects(url))
+      return
+    }
+    nitro.hooks.hook(
+      "prerender:done",
+      ({ prerenderedRoutes }: { prerenderedRoutes: Parameters<typeof canvasPrerenderedPage>[0] }) => {
+        const isRendered = routes.length
+          ? canvasPrerenderedPage(
+              prerenderedRoutes,
+              canvasRouteOwner(nuxt.options.rootDir, routes, nuxt.options.router.options),
+            )
+          : undefined
+        writeManifest(nitro.options.output.publicDir, routes, (url, route) =>
+          Boolean(url && isRendered?.(url, route) && !redirects(url)),
+        )
+      },
+    )
+  })
+}
 
 export default dropModule
