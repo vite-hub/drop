@@ -1,16 +1,15 @@
 import type { AgentMetadata } from "../../../shared/agent.ts"
 import { sql } from "drizzle-orm"
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
-import { ACTOR_KINDS, DROP_KINDS, type DropResource, VIEWER_KINDS } from "../../../shared/types.ts"
+import {
+  ACTOR_KINDS,
+  DROP_KINDS,
+  type DropResource,
+  type DropRuntimeError,
+  VIEWER_KINDS,
+} from "../../../shared/types.ts"
 
-export interface DropRuntimeError {
-  kind: "error" | "rejection" | "console" | "load"
-  message: string
-  source?: string
-  page?: string
-  count: number
-  lastAt: number
-}
+export type { DropRuntimeError }
 
 export const drops = sqliteTable(
   "drops",

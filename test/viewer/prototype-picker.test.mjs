@@ -977,12 +977,20 @@ test("live pages load as their items come near the screen, two at a time, and sl
     assert.deepEqual(await loaded(), ["v-2"])
     assert.equal(await asleep("v-5"), true)
 
+    const panTo = async (id, left = 300) => {
+      const currentLeft = await tab.locator(`#${id}`).evaluate((item) => item.getBoundingClientRect().left)
+      await tab.mouse.wheel(currentLeft - left, 0)
+    }
     // Panning to the far end of the row: the loaded items stay until they've been far away for a while, and the one
     // being typed in stays loaded until focus moves to another page.
     await tab.evaluate(() => document.getElementById("v-2").querySelector("iframe").focus())
     await tab.mouse.move(500, 600)
-    for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
+    await panTo("v-6")
     await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    await panTo("v-11")
+    await tab.waitForFunction(() => document.getElementById("v-11").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
     await tab.clock.fastForward(6000)
@@ -1003,7 +1011,7 @@ test("live pages load as their items come near the screen, two at a time, and sl
     assert.equal(await tab.evaluate(() => document.getElementById("v-2").getBoundingClientRect().height), 300)
 
     // Coming back wakes it, and tries the page that never answered again.
-    for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
+    await panTo("v-0", 48)
     await tab.waitForFunction(
       () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",
       null,

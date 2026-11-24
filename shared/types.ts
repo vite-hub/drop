@@ -109,6 +109,15 @@ export interface DropAttachment {
   url: string
 }
 
+export interface DropRuntimeError {
+  kind: "error" | "rejection" | "console" | "load"
+  message: string
+  source?: string
+  page?: string
+  count: number
+  lastAt: number
+}
+
 export interface DropDetail extends DropSummary {
   siteScreenshot?: boolean
   lifetimeFixed?: boolean
@@ -135,6 +144,7 @@ export interface DropDetail extends DropSummary {
   resources?: DropResource[]
   quiz?: DropQuiz
   install?: SkillInstall
+  errors?: DropRuntimeError[]
 }
 
 export interface SkillInstall {

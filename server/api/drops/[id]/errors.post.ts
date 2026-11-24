@@ -25,7 +25,7 @@ export default defineValidatedHandler({
       window: "1m",
     })
     const { version, errors } = await event.req.json()
-    if (version === drop.version) await recordRuntimeErrors(drop.id, version, errors)
-    return noContent()
+    const stored = version === drop.version ? await recordRuntimeErrors(drop.id, version, errors) : undefined
+    return stored ? { errors: stored } : noContent()
   },
 })

@@ -1069,6 +1069,38 @@ test("read_drop shows the errors people's browsers reported for the current app 
     read.content[0].text,
     /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/,
   )
+  const { default: detailGet } = await import("../../server/api/drops/[id].get.ts")
+  const detail = () => {
+    const request = event(`/api/drops/${app.id}`)
+    request.context.params = { id: app.id }
+    return detailGet(request)
+  }
+  assert.deepEqual(
+    (await detail()).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 2]],
+    "the viewer gets the same errors, for Copy feedback and Copy prompt",
+  )
+  const { default: errorsPost } = await import("../../server/api/drops/[id]/errors.post.ts")
+  const post = (version) => {
+    const request = new H3Event(
+      new Request(`https://drop.example/api/drops/${app.id}/errors`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ version, errors: [report] }),
+      }),
+    )
+    request.context.params = { id: app.id }
+    return errorsPost(request)
+  }
+  assert.deepEqual(
+    (await post(1)).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 3]],
+    "the page gets back the list Drop stored",
+  )
+  assert.equal((await post(0)).status, 204, "a report for another version stores nothing")
+  state.who = { ...who, userId: "other" }
+  await assert.rejects(detail(), { status: 404 }, "someone who can't read the drop doesn't see its errors")
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
   const newReport = { ...report, message: "Only in v2" }
@@ -1077,6 +1109,23 @@ test("read_drop shows the errors people's browsers reported for the current app 
   assert.deepEqual(
     latest.map(({ message, count }) => [message, count]),
     [["Only in v2", 1]],
+  )
+})
+
+test("read_drop retrieves the errors referenced by a pinned HTML feedback link", async () => {
+  const { recordRuntimeErrors } = await import("../../server/utils/runtime-errors.ts")
+  const page = (await call(publish, { html: "<p>First</p>", note: "v1", lifetime: "review" })).structuredContent
+  const report = { kind: "error", message: "Only in v1" }
+  await recordRuntimeErrors(page.id, 1, [report])
+  const next = await call(publish, { previous: page.id, html: "<p>Fixed</p>", note: "v2" })
+  assert.equal(next.structuredContent.version, 2)
+  assert.deepEqual((await call(readDrop, { id: page.id })).structuredContent.errors, [])
+  const pinned = await call(readDrop, { id: `${page.url}?v=1` })
+  assert.notEqual(pinned.isError, true, pinned.message)
+  assert.equal(pinned.structuredContent.version, 1)
+  assert.deepEqual(
+    pinned.structuredContent.errors.map(({ message }) => message),
+    [report.message],
   )
 })
 
