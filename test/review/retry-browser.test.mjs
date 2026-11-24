@@ -33,6 +33,7 @@ async function open(browser, { saved = [], hideUntilPost = false } = {}) {
     down: false,
     loseAnswer: false,
     rejectPost: false,
+    respondToPost: null,
     onRejectedPost: null,
     posts: 0,
     saved,
@@ -78,6 +79,7 @@ async function open(browser, { saved = [], hideUntilPost = false } = {}) {
           .match(/\{"body".*?\}(?=\r\n)/)[0],
       )
       drop.requestIds.push(data.requestId)
+      if (drop.respondToPost) return drop.respondToPost(route)
       if (drop.rejectPost) {
         drop.rejectPost = false
         drop.onRejectedPost?.()
@@ -118,6 +120,40 @@ async function comment(page, ui, words) {
   await ui.getByRole("textbox", { name: "Comment" }).fill(words)
   await ui.getByRole("button", { name: "Send" }).click()
 }
+
+test("Measure cannot clear the area of a pending comment that needs to be sent again", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { drop, page, ui } = await open(browser)
+    const arrived = Promise.withResolvers()
+    const failure = Promise.withResolvers()
+    drop.respondToPost = async (route) => {
+      arrived.resolve()
+      await failure.promise
+      return route.fulfill({ status: 400, json: { message: "Please try again" }, headers: CORS })
+    }
+    await comment(page, ui, "Keep this area")
+    await arrived.promise
+    const measure = ui.getByRole("button", { name: "Measure" })
+    try {
+      await page.keyboard.press("s")
+      await ui.getByText("Sending your comment…").waitFor({ timeout: 2000 })
+      assert.equal(await measure.getAttribute("aria-pressed"), "false")
+      await measure.click()
+      assert.equal(await measure.getAttribute("aria-pressed"), "false")
+    } finally {
+      failure.resolve()
+    }
+    await ui.getByText("Please try again").waitFor()
+    drop.respondToPost = null
+    await ui.getByRole("button", { name: "Send", exact: true }).click()
+    await ui.getByText("Sent as #3.").waitFor()
+    assert.equal(drop.posts, 2)
+    assert.equal(drop.saved[0].body, "Keep this area")
+  } finally {
+    await browser.close()
+  }
+})
 
 test("a comment sent while Drop is down goes through once Drop is back", async () => {
   const browser = await chromium.launch()

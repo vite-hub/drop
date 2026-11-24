@@ -97,7 +97,7 @@ The screenshot loads `modern-screenshot` from esm\.sh on the first box. If the p
 
 ## Measure {#measure}
 
-**Measure** in the toolbar, or :kbd[S], works as it does on docs and apps: point at an element for its size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. :kbd[Esc] unpicks, and a second :kbd[Esc] puts Measure down. It needs no connection to Drop, and the page hears no clicks while it's on. :kbd[S] stays the page's in a text field or when the page uses the key itself.
+**Measure** in the toolbar works as it does on docs and apps: point at an element for its size, padding, and margin, with its font, colors, gap, and corners. Click one to pick it, then point at another to see the distance between them. :kbd[Esc] unpicks, and a second :kbd[Esc] puts Measure down. It needs no connection to Drop and intercepts clicks on the page. Close any native site popover, modal dialog, or fullscreen view before measuring. You can also toggle Measure with :kbd[S] when the page itself or a Drop toolbar button has focus, unless the site handles the key.
 
 ## Related links {#related}
 

@@ -1160,19 +1160,26 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   gaugeRoot.innerHTML = "<style>" + ${JSON.stringify(GAUGE_STYLE)} + "</style><div class=\"fx\"></div>";
   const gaugeFx = gaugeRoot.querySelector(".fx"), gaugeTool = measureTool(gaugeFx, () => 0);
   // The layer over the page takes the pointer while Measure is on, so the page hears no hover or click.
-  let gaugePicked = null, gaugeOver = null, gaugeFrame = 0;
+  let gaugePicked = null, gaugePoint = null, gaugeFrame = 0;
   function drawGauge() {
     gaugeFrame = 0;
     gaugeFx.textContent = "";
     if (gaugePicked && !gaugePicked.isConnected) gaugePicked = null;
-    if (gaugeOver && !gaugeOver.isConnected) gaugeOver = null;
+    const gaugeOver = gaugePoint && root.elementFromPoint(gaugePoint.x, gaugePoint.y) === gauge
+      ? elementAt(gaugePoint.x, gaugePoint.y) : null;
     if (!gauge.hidden) gaugeTool.draw(gaugePicked, gaugeOver !== gaugePicked ? gaugeOver : null);
   }
   const redrawGauge = () => { if (!gaugeFrame) gaugeFrame = requestAnimationFrame(drawGauge); };
+  const siteInTopLayer = () => document.fullscreenElement || document.querySelector(":is(:popover-open, :modal)");
+  const topLayerNotice = () => say("Close the site's popover, dialog, or fullscreen view to use Measure.");
   function measure(on) {
-    if (on) { cancel(); closeThread(); list.hidden = true; }
+    if (on) {
+      if (busy) return say("Sending your comment…");
+      if (siteInTopLayer()) return topLayerNotice();
+      cancel(); closeThread(); list.hidden = true;
+    }
     gauge.hidden = !on;
-    gaugePicked = gaugeOver = null;
+    gaugePicked = gaugePoint = null;
     measureButton.setAttribute("aria-pressed", String(on));
     redrawGauge();
     layout();
@@ -1182,8 +1189,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (gaugePicked) { gaugePicked = null; redrawGauge(); }
     else measure(false);
   }
-  gauge.addEventListener("pointermove", (e) => { gaugeOver = elementAt(e.clientX, e.clientY); redrawGauge(); });
-  gauge.addEventListener("pointerleave", () => { gaugeOver = null; redrawGauge(); });
+  gauge.addEventListener("pointermove", (e) => { gaugePoint = { x: e.clientX, y: e.clientY }; redrawGauge(); });
+  gauge.addEventListener("pointerleave", () => { gaugePoint = null; redrawGauge(); });
   gauge.addEventListener("pointerdown", (e) => { if (e.button === 0) e.preventDefault(); });
   gauge.addEventListener("click", (e) => {
     const el = elementAt(e.clientX, e.clientY);
@@ -1193,14 +1200,38 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // The drawings are where the elements are now: the page scrolls under the layer, a box inside it too.
   addEventListener("scroll", () => { if (!gauge.hidden) redrawGauge(); }, { capture: true, passive: true });
   addEventListener("resize", () => { if (!gauge.hidden) redrawGauge(); });
+  function stopForTopLayer() {
+    measure(false);
+    topLayerNotice();
+  }
+  for (const type of ["toggle", "fullscreenchange"])
+    document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, true);
+  for (const type of ["pointerdown", "pointerup", "click"]) {
+    addEventListener(type, (event) => {
+      if (gauge.hidden || !event.isTrusted || event.composedPath().includes(host)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (type === "click") stopForTopLayer();
+    }, { capture: true, passive: false });
+  }
   measureButton.addEventListener("click", () => measure(gauge.hidden));
-  // S turns Measure on and off, as in Drop, unless the page takes the key: a field being typed in, or its own shortcut.
+  // Site fields can be inside closed shadow roots, so only use S on the bare page or in Drop's own controls.
   const typing = (node) => Boolean(node) && (node.isContentEditable || /^(input|textarea|select)$/.test(node.localName));
-  function measureKey(e) {
-    if (e.defaultPrevented || e.isComposing || e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.key.toLowerCase() !== "s") return;
-    if (!paint.hidden || !draw.hidden || !pop.hidden || typing(e.composedPath()[0]) || typing(root.activeElement)) return;
-    e.preventDefault();
-    measure(gauge.hidden);
+  const canMeasureFromKey = () => paint.hidden && draw.hidden && pop.hidden;
+  function measureKey(event) {
+    if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "s") return;
+    if (!canMeasureFromKey()) return;
+    if (event.currentTarget === host) {
+      if (!root.activeElement || typing(root.activeElement)) return;
+      event.preventDefault();
+      measure(gauge.hidden);
+      return;
+    }
+    if (event.target !== document.documentElement && (event.target !== document.body || document.body.matches(":focus-within"))) return;
+    const on = gauge.hidden;
+    setTimeout(() => {
+      if (!event.defaultPrevented && canMeasureFromKey() && gauge.hidden === on) measure(on);
+    }, 0);
   }
   addEventListener("keydown", measureKey);
 

@@ -114,7 +114,7 @@ test(
       await context.addInitScript(() => {
         const { value: attach } = Object.getOwnPropertyDescriptor(Element.prototype, "attachShadow")
         Element.prototype.attachShadow = function (init) {
-          return Reflect.apply(attach, this, [{ ...init, mode: "open" }])
+          return Reflect.apply(attach, this, [this.id === "closed-editor" ? init : { ...init, mode: "open" }])
         }
       })
       await context.route("**/*", (route) => {
@@ -123,8 +123,15 @@ test(
           return route.fulfill({
             contentType: "text/html; charset=utf-8",
             body: `<!doctype html><html><head>${SITE_CSS}</head><body>${BOXES}<input id="q" style="position:absolute;left:40px;top:300px">
-            <script>window.clicks = 0; document.addEventListener("click", () => clicks++)</script>
-            <script src="${DROP}/review.js"></script></body></html>`,
+            <div id="closed-editor"></div>
+            <section id="menu" popover="manual"><button>Do something</button></section>
+            <script>window.clicks = 0; document.addEventListener("click", () => clicks++);
+            window.editor = document.querySelector("#closed-editor").attachShadow({mode: "closed"});
+            editor.innerHTML = "<input>";</script>
+            <script src="${DROP}/review.js"></script>
+            <script>window.siteOwnsS = true; addEventListener("keydown", (event) => {
+              if (siteOwnsS && event.key === "s") event.preventDefault();
+            });</script></body></html>`,
           })
         if (url.origin === DROP && url.pathname === "/review.js")
           return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
@@ -140,7 +147,20 @@ test(
           `(${read})(document.querySelector("drop-review").shadowRoot.querySelector(".gauge").shadowRoot.querySelector(".fx"))`,
         )
       const pressed = () => button.getAttribute("aria-pressed")
+      const shortcut = async () => {
+        await page.keyboard.press("s")
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      }
 
+      await shortcut()
+      assert.equal(await pressed(), "false", "a later window listener can reserve S")
+      await page.evaluate(() => {
+        siteOwnsS = false
+        editor.querySelector("input").focus()
+      })
+      await shortcut()
+      assert.equal(await pressed(), "false")
+      assert.equal(await page.evaluate(() => editor.querySelector("input").value), "s")
       // S in the site's own field is the field's.
       await page.locator("#q").click()
       await page.keyboard.type("s")
@@ -149,7 +169,16 @@ test(
       await page.locator("#q").blur()
       await page.evaluate(() => (clicks = 0))
 
-      await page.keyboard.press("s")
+      await page.locator("#menu").evaluate((menu) => menu.showPopover())
+      await shortcut()
+      assert.equal(await pressed(), "false", "Measure cannot intercept a native popover")
+      await button.click()
+      assert.equal(await pressed(), "false")
+      assert.equal(await page.locator("#menu").evaluate((menu) => menu.matches(":popover-open")), true)
+      await page.locator("#menu").evaluate((menu) => menu.hidePopover())
+      await button.blur()
+
+      await shortcut()
       assert.equal(await pressed(), "true")
       const result = await measure(page, gaugeFx)
       assert.deepEqual({ hovered: shape(result.hovered), picked: shape(result.picked) }, EXPECTED)
@@ -157,15 +186,36 @@ test(
       assert.deepEqual(result.picked.card, { width: 240, font: "11px", display: "block", row: "flex" })
       assert.equal(await page.evaluate(() => clicks), 0, "the site hears no click under Measure")
 
+      await page.evaluate(() => {
+        document.body.style.height = "200vh"
+        document.body.insertAdjacentHTML(
+          "beforeend",
+          '<div id="c" style="position:absolute;left:340px;top:160px;width:120px;height:50px">Three</div>',
+        )
+      })
+      await page.mouse.wheel(0, 100)
+      const drawings = `(${read})(document.querySelector("drop-review").shadowRoot.querySelector(".gauge").shadowRoot.querySelector(".fx"))`
+      await page.waitForFunction(`${drawings}.tags.includes("100")`)
+      assert.equal((await gaugeFx()).title, "div#a", "scrolling keeps the original pick, but rechecks the hover")
+
       // Esc unpicks, then puts Measure down; the button turns it on again.
       await page.keyboard.press("Escape")
       await page.waitForTimeout(50)
       assert.equal((await gaugeFx()).outlines, 1)
+      assert.equal((await gaugeFx()).title, "div#c")
       await page.keyboard.press("Escape")
       assert.equal(await pressed(), "false")
-      assert.equal(await page.evaluate(() => document.elementFromPoint(140, 90).id), "a")
+      assert.equal(await page.evaluate(() => document.elementFromPoint(360, 85).id), "c")
       await button.click()
       assert.equal(await pressed(), "true")
+      await page.locator("#menu").evaluate((menu) => menu.showPopover())
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector("drop-review")
+            .shadowRoot.querySelector("[data-act=measure]")
+            .getAttribute("aria-pressed") === "false",
+      )
       await context.close()
     } finally {
       await browser.close()
