@@ -18,6 +18,7 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 ```
 
 - Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
+- Drop versions preserve the HTML and comments, not the live pages in the frames. To keep earlier rounds reviewable, give each round's `data-src` values deployment-specific URLs and keep those deployments accessible. A mutable branch URL always serves whatever is live there now, even when someone opens an older Drop version.
 - The frame keeps the reader's login when the URL is on the same site as Drop. A preview such as `https://pr123-demo.preview.example.com` inside Drop on `drop.example.com`, whose drops run on `drop-usercontent.example.com`, is all `example.com`, so its SameSite=Lax cookies flow. On another site the page loads signed out, or not at all if the browser blocks its cookies.
 - A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
 - Wheel and clicks over a live page go to that page. Pan from empty space, with Space + drag, or with the Hand tool.
@@ -26,17 +27,22 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 
 To review a whole running app, publish one item per route. Take the routes from the app itself: if it serves a route list, use it; otherwise read its router or `pages/` directory. Give a route with a parameter a real value (`/orders/42`, not `/orders/:id`).
 
+Run this snippet in Node.js:
+
 ```js
-const base = "https://pr123-demo.preview.example.com"
+const base = "https://deploy-a1b2c3.preview.example.com"
 const routes = ["/", "/orders", "/orders/42", "/settings"]
-const id = (route) => "v-" + (route.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "home")
-const html = routes.map((route) =>
-  `<section id="${id(route)}" data-variant="${route}" data-src="${base}${route}" data-width="1440" data-height="900"></section>`,
-).join("\n")
+const sizes = [{ name: "desktop", width: 1440, height: 900 }]
+const id = (route, size) => `v-${size}-${Buffer.from(route, "utf8").toString("hex")}`
+const attr = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
+const html = routes.flatMap((route) => sizes.map(({ name, width, height }) =>
+  `<section id="${id(route, name)}" data-variant="${attr(`${route} · ${name}`)}" data-src="${attr(base + route)}" data-width="${width}" data-height="${height}"></section>`,
+)).join("\n")
+console.log(html)
 ```
 
-- Build each `id` from the route, not the host, so the next round's preview URL keeps comments pinned and items in place.
-- For a phone size too, add a second item per route (`${id(route)}-mobile`, `data-width="390" data-height="844"`).
+- Keep each `id` tied to the full, case-sensitive route and size name, not the host or the route's position in the list. This keeps focus links, saved positions, and comment anchors tied to the same item when you update the preview URL.
+- For a phone size too, add `{ name: "mobile", width: 390, height: 844 }` to `sizes`.
 - Use a host every reviewer can reach over https, such as a deployed preview; a `localhost` URL loads only on your machine.
 
 ## Flows: rows of screens with arrows
@@ -77,13 +83,13 @@ pages/proto/pricing/slider.vue   → /proto/pricing/slider
 ```
 
 ```html
-<section id="v-pricing-tiers" data-variant="Pricing · tiers" data-src="https://pr123-demo.preview.example.com/proto/pricing/tiers" data-width="1280" data-height="900"></section>
-<section id="v-pricing-slider" data-variant="Pricing · slider" data-src="https://pr123-demo.preview.example.com/proto/pricing/slider" data-width="1280" data-height="900"></section>
+<section id="v-pricing-tiers" data-variant="Pricing · tiers" data-src="https://deploy-a1b2c3.preview.example.com/proto/pricing/tiers" data-width="1280" data-height="900"></section>
+<section id="v-pricing-slider" data-variant="Pricing · slider" data-src="https://deploy-a1b2c3.preview.example.com/proto/pricing/slider" data-width="1280" data-height="900"></section>
 ```
 
 - Keep the fixed parts in one shared component or layout, so only the part in question differs between routes.
-- A round is a redeploy of the branch, then `publish` with `previous`; the sections stay the same.
-- Delete the `proto/` routes once a variant is chosen, and port the winner into the real page.
+- For the next round, deploy the branch, keep the section IDs, update `data-src` to the new deployment's URLs, and `publish` with `previous`.
+- Once a variant is chosen, port the winner into the real page and remove the `proto/` routes from the app branch. Keep the old deployments serving those routes for as long as reviewers need the corresponding rounds.
 
 ## Hold open what reviewers comment on
 
