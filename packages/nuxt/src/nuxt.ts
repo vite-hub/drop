@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { addPlugin, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
-import { canvasManifest } from "./canvas.ts"
+import { canvasManifest, canvasPageURL, routeRuleRedirects } from "./canvas.ts"
 
 import type { Nuxt } from "@nuxt/schema"
 
@@ -73,12 +73,70 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
 
 function serveCanvasManifest(nuxt: Nuxt) {
   const dir = join(nuxt.options.buildDir, "drop-canvas")
+  const filename = "__canvas.json"
+  const keys = nuxt.options.experimental.extraPageMetaExtractionKeys
+  if (!keys.includes("canvas")) keys.push("canvas")
+  if (nuxt.options.experimental.scanPageMeta === false) {
+    useLogger("@vite-hub/drop").warn(
+      "Page meta scanning is disabled. The canvas manifest cannot read canvas options from definePageMeta.",
+    )
+  }
   rmSync(dir, { recursive: true, force: true })
-  nuxt.options.experimental.extraPageMetaExtractionKeys.push("canvas")
   nuxt.options.nitro.publicAssets = [...(nuxt.options.nitro.publicAssets ?? []), { dir, maxAge: 0 }]
-  nuxt.hook("pages:resolved", (pages) => {
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, "__canvas.json"), JSON.stringify(canvasManifest(pages)))
+
+  const writeManifest = (
+    output: string,
+    routes: NonNullable<NonNullable<Nuxt["apps"]["default"]>["pages"]>,
+    include: (url: string | undefined) => boolean,
+  ) => {
+    if (!routes.length) {
+      rmSync(join(output, filename), { force: true })
+      return
+    }
+    const { pages } = canvasManifest(routes)
+    mkdirSync(output, { recursive: true })
+    writeFileSync(
+      join(output, filename),
+      JSON.stringify({ pages: pages.filter((page) => include(canvasPageURL(page))) }),
+    )
+  }
+
+  if (nuxt.options.dev) {
+    nuxt.hook("app:templatesGenerated", (app) => {
+      writeManifest(dir, app.pages ?? [], (url) => !url || !routeRuleRedirects(nuxt.options.routeRules, url))
+    })
+    return
+  }
+
+  nuxt.hook("nitro:build:before", (nitro) => {
+    const routes = nuxt.apps.default?.pages ?? []
+    const redirects = (url: string) => {
+      const rules = nitro.routing?.routeRules
+      if (!rules?.matchAll) return routeRuleRedirects(nitro.options.routeRules, url)
+      const base = (nitro.options.baseURL ?? "/").replace(/\/$/, "")
+      const matches: { redirect?: unknown }[] = rules.matchAll("GET", `${base}${url}`)
+      return matches.some((rule) => rule.redirect)
+    }
+    if (!nitro.options.static) {
+      writeManifest(dir, routes, (url) => !url || !redirects(url))
+      return
+    }
+    nitro.hooks.hook(
+      "prerender:done",
+      ({ prerenderedRoutes }: { prerenderedRoutes: { route: string; fileName?: string; contentType?: string }[] }) => {
+        const rendered = new Set(
+          prerenderedRoutes
+            .filter(
+              (entry) =>
+                entry.fileName?.endsWith(".html") && (!entry.contentType || entry.contentType.includes("text/html")),
+            )
+            .map((entry) => entry.route),
+        )
+        writeManifest(nitro.options.output.publicDir, routes, (url) =>
+          Boolean(url && rendered.has(decodeURI(url)) && !redirects(url)),
+        )
+      },
+    )
   })
 }
 

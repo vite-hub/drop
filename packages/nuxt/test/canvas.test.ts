@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { canvasManifest } from "../src/canvas.ts"
+import { canvasManifest, canvasPageURL, routeRuleRedirects } from "../src/canvas.ts"
 
 describe("canvasManifest", () => {
   it("lists every page, children included, with their full paths", () => {
@@ -41,6 +41,12 @@ describe("canvasManifest", () => {
     ).toEqual([{ path: "/products/:product()_details", name: "products-product_details", params: { product: "42" } }])
   })
 
+  it("preserves literal parentheses", () => {
+    expect(canvasManifest([{ path: "/help()/faq()", name: "faq" }]).pages).toEqual([
+      { path: "/help()/faq()", name: "faq" },
+    ])
+  })
+
   it("leaves out pages with canvas: false, redirects and Nuxt's route rule redirects", () => {
     expect(
       canvasManifest([
@@ -56,8 +62,35 @@ describe("canvasManifest", () => {
     expect(
       canvasManifest([
         { path: "/:slug(.*)*", name: "slug" },
+        { path: "/:empty(.*)*", meta: { canvas: { params: {} } } },
+        { path: "/:wrong(.*)*", meta: { canvas: { params: { other: "intro" } } } },
+        { path: "/:slug([^/]*)*/edit", name: "edit" },
+        { path: "/:slug([^/]*)*/view", name: "view", meta: { canvas: { params: { slug: "intro" } } } },
         { path: "/docs/:path(.*)*", name: "docs-path", meta: { canvas: { params: { path: "intro" } } } },
       ]).pages,
-    ).toEqual([{ path: "/docs/:path(.*)*", name: "docs-path", params: { path: "intro" } }])
+    ).toEqual([
+      { path: "/:slug([^/]*)*/view", name: "view", params: { slug: "intro" } },
+      { path: "/docs/:path(.*)*", name: "docs-path", params: { path: "intro" } },
+    ])
+  })
+})
+
+describe("canvasPageURL", () => {
+  it("requires every parameter and encodes sample values as path segments", () => {
+    expect(canvasPageURL({ path: "/:team/:product()_details", params: { product: "x" } })).toBeUndefined()
+    expect(canvasPageURL({ path: "/:team/:product()_details", params: { team: "a/b", product: "? #" } })).toBe(
+      "/a%2Fb/%3F%20%23_details",
+    )
+  })
+})
+
+describe("Nitro 2 route rules", () => {
+  it("finds exact and wildcard redirects without treating literal pages as redirects", () => {
+    const rules = { "/legacy": { redirect: "/" }, "/old/**": { redirect: "/" }, "/orders/*": { redirect: "/" } }
+    expect(routeRuleRedirects(rules, "/legacy")).toBe(true)
+    expect(routeRuleRedirects(rules, "/legacy/child")).toBe(false)
+    expect(routeRuleRedirects(rules, "/old/sub/page")).toBe(true)
+    expect(routeRuleRedirects(rules, "/orders/42")).toBe(true)
+    expect(routeRuleRedirects(rules, "/orders/42/edit")).toBe(false)
   })
 })

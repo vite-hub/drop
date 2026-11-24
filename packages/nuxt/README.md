@@ -43,6 +43,10 @@ definePageMeta({ canvas: { params: { id: "42" } } })
 
 The module reads `canvas` at build time, so its value has to be a plain object or `false`, not a variable. Set `canvas: false` on a page whose `redirect` is a function: Nuxt only runs it at runtime, so the list can't tell the page redirects.
 
+Keep Nuxt's page meta scanning enabled to read `canvas` from `definePageMeta`. With `experimental.scanPageMeta: false`, Drop uses the route records without scanning page files.
+
+For `nuxt generate`, the manifest lists only pages whose concrete URLs were prerendered. Link to a sample URL from a crawled page or add it to `nitro.prerender.routes` (for example, `/orders/42`).
+
 With `app.baseURL`, the file and its page paths both sit under that base: `/docs/__canvas.json`, and `/about` opens at `/docs/about`.
 
 Works with Nuxt 4 and later.
