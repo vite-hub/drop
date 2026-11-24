@@ -371,8 +371,8 @@ const pinBubbleStyle = computed(() => {
   const height = bubbleHeight.value || Math.min(448, windowHeight.value * 0.6)
   const inWindow = (top: number) => Math.max(56, Math.min(top, windowHeight.value - 12 - height))
   if (spot?.rail) {
-    const width = Math.min(Math.max(THREAD_WIDTH, rect.right - rect.left), windowWidth.value - 24)
-    const left = Math.max(12, Math.min(rect.right - width, windowWidth.value - 12 - width))
+    const width = Math.min(rect.right - rect.left, windowWidth.value - 24)
+    const left = Math.max(12, Math.min(rect.left, windowWidth.value - 12 - width))
     return { width: `${width}px`, left: `${left}px`, top: `${inWindow(rect.top)}px`, transformOrigin: "100% 0" }
   }
   const width = Math.min(pinDraft.value ? PIN_BUBBLE_WIDTH : THREAD_WIDTH, windowWidth.value - 24)
