@@ -136,3 +136,14 @@ test("the Updated row brings the date script to a box without a date, once, and 
     assert.equal(merged.match(/<style data-comark-time>/g)?.length, 1, `${name}: comark-time's styles once`)
   }
 })
+
+test("a heading that opens with a link chip reads as its own words in the outline, not the chip's styles", async () => {
+  const source = `# Plan\n\n## Batch 1\n\n### [#42](${PR}) column layouts: pushed\n\nText.\n`
+  const { html } = await renderMarkdownCached("outline-chip.md", async () => source)
+  const rail = html.slice(html.indexOf('<nav class="cto cto-rail"'))
+  const entries = [...rail.slice(0, rail.indexOf("</nav>")).matchAll(/<a href="#[^"]+">([^<]*)<\/a>/g)].map(
+    ([, text]) => text,
+  )
+  assert.match(html, /<h3[^>]*>\s*<style data-comark-chips>/, "the chip puts its styles inside the heading")
+  assert.deepEqual(entries, ["Batch 1", "#42 column layouts: pushed"])
+})
