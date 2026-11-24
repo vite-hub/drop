@@ -20,13 +20,26 @@ afterEach(() => {
 
 /** Runs the plugin on a page whose server answers each path in `routes` with a status, or with JSON for /api/me. */
 function page(routes, { signedIn = true } = {}) {
-  const me = { value: signedIn ? { id: "member" } : null }
+  // Like Nuxt's useNuxtData: the fetched value, else the one hydrated from the server payload.
+  const state = { async: null, payload: signedIn ? { id: "member" } : null }
+  const me = {
+    get value() {
+      return state.async ?? state.payload
+    },
+    set value(value) {
+      state.async = value
+    },
+  }
   const toasts = []
   const navigations = []
   let meCalls = 0
   stub("location", new URL("/drops", origin))
   stub("keys", { me: "me" })
   stub("useNuxtData", () => ({ data: me }))
+  stub("clearNuxtData", () => {
+    state.async = null
+    state.payload = null
+  })
   stub("useToast", () => ({ add: (toast) => toasts.push(toast) }))
   stub("useRouter", () => ({ currentRoute: { value: { fullPath: "/d/abc?v=2" } } }))
   stub("navigateTo", (to) => navigations.push(to))
@@ -60,6 +73,10 @@ test("a 401 after the session ends offers sign-in once, back to the same page", 
   assert.equal(view.toasts[0].title, "You're signed out")
   view.toasts[0].actions[0].onClick()
   assert.deepEqual(view.navigations, [{ path: "/signin", query: { redirect: "/d/abc?v=2" } }])
+  await $fetch("/api/drops/abc").catch(() => {})
+  await settle()
+  assert.equal(view.meCalls(), 1)
+  assert.equal(view.toasts.length, 1)
 })
 
 test("a 401 while still signed in, from another origin, or while /api/me fails, shows nothing", async () => {
@@ -68,10 +85,12 @@ test("a 401 while still signed in, from another origin, or while /api/me fails, 
   await $fetch("/api/drops/abc").catch(() => {})
   await fetch("https://other.example.com/api/drops/abc")
   await settle()
+  assert.equal(view.meCalls(), 1)
   me = () => 503
   await $fetch("/api/drops/abc").catch(() => {})
   await settle()
-  assert.ok(view.meCalls() >= 2)
+  // ofetch retries the 503, so /api/me is asked more than once.
+  assert.ok(view.meCalls() > 1)
   assert.deepEqual(view.me.value, { id: "member" })
   assert.equal(view.toasts.length, 0)
 })

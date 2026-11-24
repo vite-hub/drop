@@ -11,7 +11,7 @@ export default defineNuxtPlugin(() => {
       () => undefined,
     )
     if (who !== null) return
-    me.value = null
+    clearNuxtData(keys.me)
     toast.add({
       id: "signed-out",
       title: "You're signed out",
