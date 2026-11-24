@@ -13,8 +13,9 @@
 // `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live: it
 // loads once the item comes near the screen, two at a time, and sleeps (empty, its name shown) after a while far away.
 // In an item, a control with `data-go="<screen id>"` and `data-label` gets an arrow from it to that `[data-screen]`.
-// `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in a row to the right.
-// The page remembers the canvas camera and where the reader moved items (never content); Reset layout forgets the moves.
+// `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in rows to the right,
+// a new row once one passes 5600px. The page remembers the canvas camera and where the reader moved items (never
+// content); Reset layout forgets the moves. ⌘Z or Ctrl+Z takes back a move or a Reset layout, ⇧⌘Z or Ctrl+Y redoes it.
 // The URL hash (#v-…) names the item in focus.
 // Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
@@ -158,7 +159,7 @@
   $(".count").textContent = variants.length + " items";
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
-  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
+  const GAP = 160, ROW = 5600, ROW_GAP = 240, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
@@ -166,17 +167,23 @@
   const at = (el) => { const { x, y } = el.dataset; if (x == null && y == null) return null; const p = [coord(x), coord(y)]; return p.includes(null) ? null : p; };
   // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
   const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
-  // `moved` separates reader moves from cached defaults so an authored layout can replace the defaults.
-  const saved = { camera: null, positions: {}, authored: false }, moved = new Set();
+  const saved = { camera: null };
+  let legacy = null, moves = new Map();
+  const hasAuthored = variants.some((el) => at(el) !== null);
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
-      saved.authored = doc.authored === true;
       const c = (doc.version ?? null) === version ? doc.camera : null;
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
-      for (const [id, p] of Object.entries(doc.positions || {})) if (ids.has(id) && Array.isArray(p) && finite(p[0]) && finite(p[1])) saved.positions[id] = [p[0], p[1]];
-      if (Array.isArray(doc.moved)) for (const id of doc.moved) if (ids.has(id)) moved.add(id);
+      const moved = new Set(Array.isArray(doc.moved) ? doc.moved : []), positions = new Map();
+      for (const [id, p] of Object.entries(doc.positions || {})) {
+        if (!ids.has(id) || !Array.isArray(p) || !finite(p[0]) || !finite(p[1])) continue;
+        positions.set(id, [p[0], p[1]]);
+        if (moved.has(id)) moves.set(id, [p[0], p[1]]);
+      }
+      const oneRow = doc.rows !== true && positions.size && [...positions].every(([id, p]) => moved.has(id) || p[1] === 0);
+      if (!hasAuthored && doc.authored !== true && oneRow) legacy = positions;
     }
   } catch {}
 
@@ -218,7 +225,7 @@
       e.preventDefault();
       handle.focus();
       try { handle.setPointerCapture(e.pointerId); } catch {}
-      gesture = { kind: "move", id: e.pointerId, it, x: e.clientX, y: e.clientY, moved: false };
+      gesture = { kind: "move", id: e.pointerId, it, x: e.clientX, y: e.clientY, moved: false, before: snap() };
     });
     handle.addEventListener("keydown", (e) => {
       const step = e.shiftKey ? 64 : 8;
@@ -226,6 +233,8 @@
       if (!d) return;
       e.preventDefault();
       e.stopPropagation();
+      if (gesture?.kind === "move") return;
+      record(snap());
       place(it, it.x + d[0], it.y + d[1]);
       settle();
     });
@@ -233,27 +242,45 @@
     return it;
   });
   // Keep legacy positions on unauthored canvases. Otherwise lay out the page before applying reader moves.
-  const hasAuthored = items.some((it) => it.at !== null);
-  const start = (it) => it.at || (!hasAuthored && !saved.authored && saved.positions[it.el.id]);
+  const start = (it) => it.at || legacy?.get(it.el.id);
   function arrange() {
     let right = -Infinity;
     for (const it of items) {
       const p = start(it);
       if (p) { [it.x, it.y] = p; right = Math.max(right, it.x + it.w); }
     }
+    // The rest follow in rows, each as tall as its tallest item; heights are known once measured.
+    const left = right === -Infinity ? 0 : right + GAP;
+    let x = left, y = 0, tall = 0;
     for (const it of items) {
       if (start(it)) continue;
-      it.x = right === -Infinity ? 0 : right + GAP;
-      it.y = 0;
-      right = it.x + it.w;
+      if (!legacy && x > left && x + it.w > left + ROW) { x = left; y += tall + ROW_GAP; tall = 0; }
+      it.x = x; it.y = y;
+      x += it.w + GAP; tall = Math.max(tall, it.mh || it.h || 0);
     }
     for (const it of items) {
-      const position = saved.positions[it.el.id];
-      if (position && moved.has(it.el.id)) [it.x, it.y] = position;
+      const position = moves.get(it.el.id);
+      if (position) [it.x, it.y] = position;
     }
   }
   arrange();
-  const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); moved.add(it.el.id); schedule(); };
+  const place = (it, x, y) => {
+    it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT);
+    moves.set(it.el.id, [it.x, it.y]);
+    fitted = null; schedule();
+  };
+  // Undo and redo: each step keeps the layout from before a move or a Reset layout, and goes back saved as a drag is.
+  const undos = [], redos = [];
+  const snap = () => ({ moves: new Map(moves), legacy });
+  const record = (before) => { undos.push(before); if (undos.length > 100) undos.shift(); redos.length = 0; };
+  function rewind(from, to) {
+    const s = from.pop();
+    if (!s) return false;
+    to.push(snap());
+    ({ moves, legacy } = s);
+    updateArrangement();
+    return true;
+  }
 
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
@@ -486,7 +513,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moved], authored: hasAuthored, version };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moves.keys()], authored: hasAuthored, version, rows: !legacy };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
@@ -499,7 +526,7 @@
   const box = (it) => ({ x: it.x, y: it.y, w: it.mw || it.w, h: it.mh || it.h || 1 });
   // Fits the given items between the top labels and the bottom bar, at 100% or less.
   function fit(list = items) {
-    const v = view(), top = 56, bottom = dockBottom, side = 32, b = extent(list);
+    const v = view(), top = 56, bottom = dockBottom, side = 64, b = extent(list);
     if (!b) return;
     fitted = list;
     const { x0, y0, x1, y1 } = b;
@@ -511,7 +538,11 @@
   }
   function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; fitted = null; bound(); schedule(); settle(); }
   // Reset layout: forget this reader's moves, so every item stands where the page places it, and fit them all.
-  function relayout() { saved.positions = {}; moved.clear(); arrange(); fit(); }
+  function relayout() {
+    if (gesture?.kind === "move") return;
+    if (moves.size || legacy) record(snap());
+    legacy = null; moves.clear(); arrange(); fit();
+  }
   // Centres an item at the current zoom, or fits it when it's bigger than the screen.
   function reveal(it) {
     const v = view(), b = box(it);
@@ -521,8 +552,22 @@
     cam.y = Math.max(56, (v.h - dockBottom - b.h * cam.z) / 2) - b.y * cam.z;
     bound(); schedule(); settle();
   }
+  function measure() {
+    let changed = false;
+    for (const it of items) {
+      const width = it.el.offsetWidth, height = it.el.offsetHeight;
+      if (width && width !== it.mw) { it.mw = width; changed = true; }
+      if (height && height !== it.mh) { it.mh = height; changed = true; }
+    }
+    return changed;
+  }
+  function updateArrangement() {
+    arrange();
+    if (fitted) fit(fitted);
+    else { bound(); schedule(); settle(); }
+  }
   const sizes = new ResizeObserver(() => {
-    for (const it of items) { if (it.el.offsetWidth) it.mw = it.el.offsetWidth; if (it.el.offsetHeight) it.mh = it.el.offsetHeight; }
+    if (mode === "canvas" && measure() && gesture?.kind !== "move") updateArrangement();
   });
 
   // Every switch starts from the author's own style attribute, so nothing from the other mode lingers.
@@ -542,6 +587,7 @@
       if (it.h) set(it.el, [["height", it.h + "px"], ["overflow", it.src ? "hidden" : "auto"]]);
       sizes.observe(it.el);
     }
+    measure(); arrange();
     scrollTo(0, 0);
     tags.classList.add("on");
     bar.classList.add("canvas");
@@ -549,7 +595,7 @@
     schedule();
     // Coming back from focus centres that item; the first visit fits everything, unless a camera is saved.
     const go = () => requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (mode !== "canvas") return;
+      if (mode !== "canvas" || gesture?.kind === "move") return;
       if (from) reveal(from);
       else if (!saved.camera && !touched) fit();
       else { bound(); schedule(); }
@@ -665,6 +711,12 @@
   const digit = (e) => /^[1-9]$/.test(e.key) && Number(e.key) <= variants.length;
   window.addEventListener("keydown", (e) => {
     const t = e.target;
+    // ⌘Z or Ctrl+Z takes back the last move, ⇧⌘Z or Ctrl+Y redoes it. A field keeps its own undo, and Drop's Marker its own.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && mode === "canvas" && !e.defaultPrevented && !commenting && !typing(e.composedPath()[0])) {
+      const k = e.key.toLowerCase(), again = k === "y" ? e.ctrlKey && !e.metaKey : k === "z" && e.shiftKey;
+      if ((k === "z" || again) && (gesture?.kind === "move" || (again ? rewind(redos, undos) : rewind(undos, redos)))) e.preventDefault();
+      return;
+    }
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || typing(t) || !several) return;
     // With text selected, C is Drop's: it comments on the selection.
     if ((e.key === "c" || e.key === "C") && !String(getSelection() || "")) { if (mode === "canvas") toFocus(Math.max(current, 0)); else toCanvas(); e.preventDefault(); return; }
@@ -721,9 +773,12 @@
   function endGesture() {
     if (!gesture) return;
     if (gesture.moved) suppressUntil = performance.now() + 400;
+    const moving = gesture.kind === "move";
+    if (moving && gesture.moved) record(gesture.before);
     gesture = null;
     hand();
-    settle();
+    if (moving && mode === "canvas") updateArrangement();
+    else settle();
   }
   window.addEventListener("pointerdown", (e) => {
     if (mode !== "canvas" || gesture) return;
