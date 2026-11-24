@@ -35,7 +35,7 @@ async function buildFixture(
         mode === "generate"
           ? `router: { options: { sensitive: true, strict: ${options.strict ?? false} } },
       nitro: { prerender: { routes: ${JSON.stringify(
-        options.strict ? ["/about/"] : ["/blog", "/items/43/", "/en", "/localized/en", "/docs/title"],
+        options.strict ? ["/about/", "/items/43"] : ["/blog", "/items/43/", "/en", "/localized/en", "/docs/title"],
       )} } },`
           : ""
       }
@@ -48,6 +48,10 @@ async function buildFixture(
         await write(
           "app/pages/about.vue",
           `<script setup>definePageMeta({ path: '/about/' })</script><template><div>Strict about page</div></template>`,
+        )
+        await write(
+          "app/pages/items/with-slash.vue",
+          `<script setup>definePageMeta({ path: '/items/:id/', canvas: { params: { id: '43' } } })</script><template><div>Strict trailing-slash page</div></template>`,
         )
       }
       if (mode === "generate") {
@@ -128,10 +132,15 @@ it("publishes only generated static targets, with no fallback required", async (
   })
 }, 30_000)
 
-it("publishes prerendered routes with a required trailing slash", async () => {
+it("publishes only the strict route that owns the prerendered HTML", async () => {
   await buildFixture("generate", { scan: true, strict: true }, async (read) => {
     expect(await read("about/index.html")).toContain("Strict about page")
+    const item = await read("items/43/index.html")
+    expect(item).toContain("Fixture page")
+    expect(item).not.toContain("Strict trailing-slash page")
     const { pages } = JSON.parse(await read("__canvas.json"))
     expect(pages).toContainEqual({ path: "/about/", name: "about" })
+    expect(pages).toContainEqual({ path: "/items/:id", name: "items-id", params: { id: "43" } })
+    expect(pages).not.toContainEqual(expect.objectContaining({ path: "/items/:id/" }))
   })
 }, 30_000)

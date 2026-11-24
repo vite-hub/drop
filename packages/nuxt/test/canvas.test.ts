@@ -2,7 +2,13 @@ import { fileURLToPath } from "node:url"
 
 import { describe, expect, it } from "vitest"
 
-import { canvasManifest, canvasPageURL, canvasRouteOwner, routeRuleRedirects } from "../src/canvas.ts"
+import {
+  canvasManifest,
+  canvasPageURL,
+  canvasPrerenderedPage,
+  canvasRouteOwner,
+  routeRuleRedirects,
+} from "../src/canvas.ts"
 
 describe("canvasManifest", () => {
   it("lists every page, children included, with their full paths", () => {
@@ -110,6 +116,23 @@ it("preserves the trailing slash of strict routes and their index children", () 
 
   expect(pages.map((page) => page.path)).toEqual(["/about/", "/docs/", "/docs/:topic/"])
   expect(pages.map(canvasPageURL)).toEqual(["/about/", "/docs/", "/docs/intro/"])
+})
+
+it("normalizes trailing slashes only across prerenders with the same owner", () => {
+  const rootDir = fileURLToPath(new URL("..", import.meta.url))
+  const withoutSlash = { path: "/items/:id", file: "item.vue" }
+  const withSlash = { path: "/items/:id/", file: "item-with-slash.vue" }
+  const strictOwner = canvasRouteOwner(rootDir, [withoutSlash, withSlash], { strict: true })
+  const slashlessPrerender = canvasPrerenderedPage(["/items/43"], strictOwner)
+  const slashPrerender = canvasPrerenderedPage(["/items/43/"], strictOwner)
+  expect(slashlessPrerender("/items/43", withoutSlash)).toBe(true)
+  expect(slashlessPrerender("/items/43/", withSlash)).toBe(false)
+  expect(slashPrerender("/items/43/", withSlash)).toBe(true)
+  expect(slashPrerender("/items/43", withoutSlash)).toBe(false)
+
+  const looseOwner = canvasRouteOwner(rootDir, [withoutSlash])
+  const loosePrerender = canvasPrerenderedPage(["/items/43/"], looseOwner)
+  expect(loosePrerender("/items/43", withoutSlash)).toBe(true)
 })
 
 describe("canvasPageURL", () => {

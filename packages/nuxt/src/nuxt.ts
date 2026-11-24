@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { addPlugin, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
-import { canvasManifest, canvasPageURL, canvasRouteOwner, routeRuleRedirects } from "./canvas.ts"
+import { canvasManifest, canvasPageURL, canvasPrerenderedPage, canvasRouteOwner, routeRuleRedirects } from "./canvas.ts"
 
 import type { Nuxt } from "@nuxt/schema"
 
@@ -71,10 +71,6 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
   },
 })
 
-function prerenderKey(path: string): string {
-  return path.replace(/\/$/, "") || "/"
-}
-
 function serveCanvasManifest(nuxt: Nuxt) {
   const dir = join(nuxt.options.buildDir, "drop-canvas")
   const filename = "__canvas.json"
@@ -125,19 +121,20 @@ function serveCanvasManifest(nuxt: Nuxt) {
     nitro.hooks.hook(
       "prerender:done",
       ({ prerenderedRoutes }: { prerenderedRoutes: { route: string; fileName?: string; contentType?: string }[] }) => {
-        const rendered = new Set(
-          prerenderedRoutes
-            .filter(
-              (entry) =>
-                entry.fileName?.endsWith(".html") && (!entry.contentType || entry.contentType.includes("text/html")),
+        const htmlPaths = prerenderedRoutes
+          .filter(
+            (entry) =>
+              entry.fileName?.endsWith(".html") && (!entry.contentType || entry.contentType.includes("text/html")),
+          )
+          .map((entry) => entry.route)
+        const isRendered = routes.length
+          ? canvasPrerenderedPage(
+              htmlPaths,
+              canvasRouteOwner(nuxt.options.rootDir, routes, nuxt.options.router.options),
             )
-            .map((entry) => prerenderKey(entry.route)),
-        )
-        const owner = routes.length
-          ? canvasRouteOwner(nuxt.options.rootDir, routes, nuxt.options.router.options)
           : undefined
         writeManifest(nitro.options.output.publicDir, routes, (url, route) =>
-          Boolean(url && rendered.has(prerenderKey(decodeURI(url))) && owner?.(url) === route && !redirects(url)),
+          Boolean(url && isRendered?.(url, route) && !redirects(url)),
         )
       },
     )

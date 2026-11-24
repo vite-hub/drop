@@ -108,6 +108,23 @@ export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[], optio
   return (url: string) => matcher.resolve({ path: url }, {}).matched.at(-1)?.meta.source
 }
 
+function prerenderKey(path: string): string {
+  return path.replace(/\/$/, "") || "/"
+}
+
+export function canvasPrerenderedPage(paths: string[], owner: ReturnType<typeof canvasRouteOwner>) {
+  const rendered = new Map<ResolvedRoute, Set<string>>()
+  for (const path of paths) {
+    const route = owner(encodeURI(path))
+    if (!route) continue
+    let keys = rendered.get(route)
+    if (!keys) rendered.set(route, (keys = new Set()))
+    keys.add(prerenderKey(path))
+  }
+  return (url: string, route: ResolvedRoute) =>
+    owner(url) === route && rendered.get(route)?.has(prerenderKey(decodeURI(url))) === true
+}
+
 function joinPath(parent: string, path: string): string {
   if (path.startsWith("/")) return path
   if (!path) return parent || "/"
