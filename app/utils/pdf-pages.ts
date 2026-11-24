@@ -37,9 +37,9 @@ export async function drawPage(
   return canvas
 }
 
-export async function renderPage(pdf: PDFDocumentProxy, n: number, { width = 1600 } = {}) {
+export async function renderPage(pdf: PDFDocumentProxy, n: number, { width = 1240 } = {}) {
   const canvas = await drawPage(pdf, n, { width })
-  const page = { src: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height }
+  const page = { src: canvas.toDataURL("image/jpeg", 0.85), width: canvas.width, height: canvas.height }
   canvas.width = canvas.height = 0
   return page
 }

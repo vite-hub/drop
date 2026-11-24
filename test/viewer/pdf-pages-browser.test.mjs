@@ -17,7 +17,7 @@ writeFileSync(`${root}main.js`, `import * as pages from "/@fs${pdfPages}"\nObjec
 const fixture = readFileSync(new URL("./fixtures/links.pdf", import.meta.url))
 
 test(
-  "a PDF's pages draw as images about 1600 pixels wide, with their web links in per-mille",
+  "a PDF's pages draw as JPEG images 1240 pixels wide, A4 at 150 dpi, with their web links in per-mille",
   { timeout: 60_000 },
   async () => {
     const server = await createServer({
@@ -42,7 +42,7 @@ test(
         await image.decode()
         const result = {
           pages: pdf.numPages,
-          first: { width: first.width, height: first.height, png: first.src.startsWith("data:image/png;base64,") },
+          first: { width: first.width, height: first.height, jpeg: first.src.startsWith("data:image/jpeg;base64,") },
           decoded: { width: image.naturalWidth, height: image.naturalHeight },
           small: await renderPage(pdf, 2, { width: 400 }).then(({ width, height }) => ({ width, height })),
           links: [await pageLinks(pdf, 1), await pageLinks(pdf, 2)],
@@ -51,8 +51,8 @@ test(
         return result
       })
       assert.equal(result.pages, 2)
-      assert.deepEqual(result.first, { width: 1600, height: 2071, png: true })
-      assert.deepEqual(result.decoded, { width: 1600, height: 2071 })
+      assert.deepEqual(result.first, { width: 1240, height: 1605, jpeg: true })
+      assert.deepEqual(result.decoded, { width: 1240, height: 1605 })
       assert.deepEqual(result.small, { width: 400, height: 518 })
       // 72/612, (792 - 720)/792, 200/612 and 20/792 of the page.
       assert.deepEqual(result.links, [[{ x: 118, y: 91, w: 327, h: 25, href: "https://example.com/" }], []])

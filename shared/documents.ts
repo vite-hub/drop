@@ -259,10 +259,16 @@ const EMBEDS_SCRIPT = String.raw`(() => {
     if (!m || !m.__drop || e.source !== parent) return;
     if (m.type === "embed-page-data") {
       const pdf = pdfs.get(m.link);
-      if (!pdf || pdf.done.has(m.page) || !String(m.src).startsWith("data:image/")) return;
-      for (const [page, [link, n]] of pageOf) if (link === m.link && n === m.page) showPage(page, pdf, link, m);
+      const drawn = String(m.src).startsWith("data:image/");
+      if (!pdf || pdf.done.has(m.page) || (!drawn && typeof m.error !== "string")) return;
+      for (const [page, [link, n]] of pageOf) {
+        if (link !== m.link || n !== m.page) continue;
+        if (drawn) showPage(page, pdf, link, m);
+        else { page.style.aspectRatio = "auto"; page.replaceChildren(note("Page " + m.page + " couldn't be drawn.")); }
+      }
       pdf.done.add(m.page);
       if (pdf.done.size >= pdf.count) arrive(m.link);
+      else onArrive();
       return;
     }
     if (m.type !== "embed-data") return;

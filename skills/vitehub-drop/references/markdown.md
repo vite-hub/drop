@@ -143,7 +143,7 @@ A PDF that is part of the doc, such as a CV under a cover letter, goes in as a f
 ![Curriculum vitae](/f/0b6f3c2e-8d4a-4c1e-9f7b-2a5d6e8c1f40.pdf)
 ```
 
-Drop shows its pages in the doc, in order, at the doc's width, with their links still working; the alt text names it where the pages can't show. Like an embedded screenshot, the PDF then belongs to the doc and lives and goes to the Trash with it. Inside a line of text, the same image is a link to the PDF. A PDF that should stay its own drop, with its own comments and lifetime, is embedded by its link instead: `::embed{url="<its /d/ link>"}`.
+Drop shows its pages in the doc, in order, at the doc's width, with their links still working; the alt text names it where the pages can't show. A doc shows the first 500 pages of a PDF, embedded or attached, and links the rest. Like an embedded screenshot, the PDF then belongs to the doc and lives and goes to the Trash with it. Inside a line of text, the same image is a link to the PDF. A PDF that should stay its own drop, with its own comments and lifetime, is embedded by its link instead: `::embed{url="<its /d/ link>"}`.
 
 ## Front matter
 

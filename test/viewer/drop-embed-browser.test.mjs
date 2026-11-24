@@ -79,6 +79,7 @@ test("a drop's box asks the viewer for its drop and runs it in a sandbox of its 
 
 const PDF = "pdf2pdf2pdf2"
 const LONG = "pdf9pdf9pdf9"
+const HUGE = "pdfhpdfhpdfh"
 const IMAGE = "png2png2png2"
 const VIDEO = "mp4vmp4vmp4v"
 const CV = "/f/11111111-1111-4111-8111-111111111111.pdf"
@@ -89,7 +90,7 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
   const embed = (link) => `::embed{url="https://drop.vitehub.dev/d/${link}"}\n::\n\n`
   const { html } = await renderMarkdownCached(
     "embed-kinds-browser.md",
-    async () => `# Doc\n\n![CV](${CV})\n\n${embed(PDF)}${embed(IMAGE)}${embed(VIDEO)}${embed(LONG)}`,
+    async () => `# Doc\n\n![CV](${CV})\n\n${embed(PDF)}${embed(IMAGE)}${embed(VIDEO)}${embed(LONG)}${embed(HUGE)}`,
   )
   const srcdoc = planDocument("markdown", "", false, html).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   // The viewer's answers (useDocEmbeds): the PDFs' page counts, the image as a data: URL, the video's bytes, and each
@@ -98,6 +99,7 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     [CV]: { kind: "pdf", pages: 1, title: "CV", href: CV },
     [PDF]: { kind: "pdf", pages: 2, title: "Deck", href: `/d/${PDF}` },
     [LONG]: { kind: "pdf", pages: 42, title: "Handbook", href: `/d/${LONG}` },
+    [HUGE]: { kind: "pdf", pages: 640, title: "Archive", href: `/d/${HUGE}` },
     [IMAGE]: { kind: "image", src: PNG },
   }
   const browser = await chromium.launch()
@@ -129,7 +131,8 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     await page.goto("https://drop.test/")
     const doc = page.frames()[1]
     // The boxes in the doc's order (a filled drop box no longer says its link).
-    const box = (link) => `article > figure.drop-embed:nth-of-type(${[CV, PDF, IMAGE, VIDEO, LONG].indexOf(link) + 1})`
+    const box = (link) =>
+      `article > figure.drop-embed:nth-of-type(${[CV, PDF, IMAGE, VIDEO, LONG, HUGE].indexOf(link) + 1})`
     const pdf = await doc.waitForSelector(`${box(PDF)}:has(img[alt="Deck, page 2"])`, { timeout: 5000 })
 
     assert.deepEqual(
@@ -230,24 +233,38 @@ test("a PDF, image or video drop and an attached PDF show in the doc's flow, the
     const video = await doc.waitForSelector(`${box(VIDEO)}[data-kind="video"] > video`)
     assert.match(await video.evaluate((element) => `${element.controls} ${element.src}`), /^true blob:/)
 
-    // Past 30 pages, a note sends the reader to the PDF for the rest; no page past 30 is asked for.
+    // Every page of a long PDF has its place, asked for once as it nears the screen.
     const long = await doc.waitForSelector(`${box(LONG)}[data-kind="pdf"]`)
     assert.deepEqual(
       await long.evaluate((figure) => [
         figure.querySelectorAll(".drop-embed-page").length,
-        figure.querySelector(".drop-embed-note").textContent,
-        figure.querySelector(".drop-embed-note a").getAttribute("href"),
+        figure.querySelectorAll(".drop-embed-note").length,
       ]),
-      [30, "The doc shows the first 30 of 42 pages. Open Handbook for the rest.", `/d/${LONG}`],
+      [42, 0],
     )
     await long.evaluate((figure) => figure.querySelector(".drop-embed-page:last-of-type").scrollIntoView())
     await page.waitForFunction(
-      (link) => posts.some((m) => m.type === "embed-page" && m.link === link && m.page === 30),
+      (link) => posts.some((m) => m.type === "embed-page" && m.link === link && m.page === 42),
       LONG,
     )
-    assert.equal(
-      Math.max(...(await page.evaluate(() => posts.filter((m) => m.type === "embed-page").map((m) => m.page)))),
-      30,
+    await long.evaluate((figure) => figure.querySelector(".drop-embed-page").scrollIntoView())
+    await long.evaluate((figure) => figure.querySelector(".drop-embed-page:last-of-type").scrollIntoView())
+    await page.waitForTimeout(300)
+    const asked = await page.evaluate(() =>
+      posts.filter((m) => m.type === "embed-page").map((m) => `${m.link} ${m.page}`),
+    )
+    assert.equal(asked.length, new Set(asked).size)
+
+    // Past 500 pages, a note sends the reader to the PDF for the rest.
+    await doc.$eval(box(HUGE), (figure) => figure.scrollIntoView())
+    const huge = await doc.waitForSelector(`${box(HUGE)}[data-kind="pdf"]`)
+    assert.deepEqual(
+      await huge.evaluate((figure) => [
+        figure.querySelectorAll(".drop-embed-page").length,
+        figure.querySelector(".drop-embed-note").textContent,
+        figure.querySelector(".drop-embed-note a").getAttribute("href"),
+      ]),
+      [500, "The doc shows the first 500 of 640 pages. Open Archive for the rest.", `/d/${HUGE}`],
     )
   } finally {
     await browser.close()

@@ -147,7 +147,7 @@ export const FrameMessage = v.variant("type", [
   ),
 ])
 
-export const EMBED_PAGES = 30
+export const EMBED_PAGES = 500
 export type EmbedLink = { x: number; y: number; w: number; h: number; href: string }
 export type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number }
 export type EmbedData =
@@ -167,6 +167,7 @@ type EmbedPage = {
 export type EmbedMessage =
   | ({ type: "embed-data"; link: string } & EmbedData)
   | ({ type: "embed-page-data"; link: string } & EmbedPage)
+  | { type: "embed-page-data"; link: string; page: number; error: string }
 
 const QuizMessage = v.variant("type", [
   v.object({

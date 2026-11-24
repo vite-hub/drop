@@ -295,6 +295,7 @@ export function useViewerFrame(options: {
         frameTool.value = message.tool
         return
       case "ready":
+        embeds.reloaded()
         variants.value = null
         frameTool.value = "browse"
         if (options.variantBar) send({ type: "picker", do: "sync" })

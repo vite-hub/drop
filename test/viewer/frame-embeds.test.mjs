@@ -36,6 +36,7 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
   const sent = []
   const request = vi.fn(fetch)
   const pdfs = []
+  const drawn = []
   let receive
   for (const [name, value] of Object.entries({
     computed,
@@ -69,7 +70,11 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
       pdfs.push(pdf)
       return pdf
     },
-    renderPage: async (_pdf, page) => ({ ...PAGE, page }),
+    renderPage: async (pdf, page) => {
+      drawn.push(page)
+      if (pdf.src.includes("broken")) throw new Error("Invalid page content")
+      return { ...PAGE, page }
+    },
     pageLinks: async () => PAGE_LINKS,
     blobDataUrl: async (blob) => `data:${blob.type};base64,${Buffer.from(await blob.text()).toString("base64")}`,
     // The browser parses the trusted rendered HTML in an inert template, never the frame's requested links.
@@ -117,7 +122,7 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
       errors,
     }),
   )
-  return { drop, sent, request, receive, pdfs }
+  return { drop, sent, request, receive, pdfs, drawn }
 }
 
 test("an error the open page reports is sent for the version that threw it, and the viewer shows what Drop stored", async () => {
@@ -226,8 +231,7 @@ test("a PDF drop's page comes drawn, with its links and its open comments on tha
   ]
   const { receive, request, sent, pdfs } = viewer("markdown", reader(DROPS.pdf, comments))
   receive({ type: "embed-page", link: LINK, page: 2 })
-  receive({ type: "embed-page", link: LINK, page: 9 })
-  await vi.waitFor(() => assert.equal(sent.length, 2))
+  await vi.waitFor(() => assert.equal(sent.length, 1))
   assert.deepEqual(sent[0], {
     type: "embed-page-data",
     link: LINK,
@@ -239,8 +243,6 @@ test("a PDF drop's page comes drawn, with its links and its open comments on tha
       { n: 2, x: 100, y: 200, w: 300, h: 50 },
     ],
   })
-  // Past the last page, the last page.
-  assert.equal(sent[1].page, 2)
   // One read of the drop, its comments and its file, with the reader's session.
   assert.deepEqual(request.mock.calls.map(([url]) => url).sort(), [`/api/drops/${LINK}`, `/api/drops/${LINK}/comments`])
   assert.equal(pdfs.length, 1)
@@ -262,16 +264,41 @@ test("a PDF attached to the doc answers by its path, with no pins; one the doc d
   )
 })
 
-test("a PDF of 42 pages draws no further than page 30, and the viewer closes its PDFs when the drop changes", async () => {
+test("a PDF of 42 pages draws its page 42, and the viewer closes its PDFs when the drop changes", async () => {
   const { drop, receive, sent, pdfs } = viewer(
     "markdown",
     reader({ ...DROPS.pdf, url: "https://drop.example.com/f/long.pdf" }),
   )
-  receive({ type: "embed-page", link: LINK, page: 31 })
+  // Past the last page, the last page, already on its way.
+  receive({ type: "embed-page", link: LINK, page: 42 })
+  receive({ type: "embed-page", link: LINK, page: 43 })
   await vi.waitFor(() => assert.equal(sent.length, 1))
-  assert.equal(sent[0].page, 30)
+  assert.equal(sent[0].page, 42)
   drop.value = { id: "next", kind: "markdown", content: "", html: "" }
   await vi.waitFor(() => assert.equal(pdfs[0].loadingTask.destroy.mock.calls.length, 1))
+})
+
+test("a page asked for again is drawn once, until the doc loads again", async () => {
+  const { receive, sent, drawn } = viewer("markdown", reader(DROPS.pdf))
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 1))
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  assert.deepEqual(drawn, [1])
+  assert.equal(sent.length, 1)
+  // A new document in the frame (a new version, a reload) has none of the pages.
+  receive({ type: "ready" })
+  receive({ type: "embed-page", link: LINK, page: 1 })
+  await vi.waitFor(() => assert.equal(sent.length, 2))
+  assert.deepEqual(drawn, [1, 1])
+})
+
+test("a page the viewer can't draw answers with why, so the doc stops waiting for it", async () => {
+  const { receive, sent } = viewer("markdown", reader({ ...DROPS.pdf, url: "https://drop.example.com/f/broken.pdf" }))
+  receive({ type: "embed-page", link: LINK, page: 2 })
+  await vi.waitFor(() => assert.equal(sent.length, 1))
+  assert.deepEqual(sent[0], { type: "embed-page-data", link: LINK, page: 2, error: "Page 2 couldn't be drawn." })
 })
 
 test("a pending embed cannot deliver its source after the viewer changes to an HTML drop", async () => {

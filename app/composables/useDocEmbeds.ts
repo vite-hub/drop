@@ -46,7 +46,9 @@ export function useDocEmbeds(drop: Ref<DropDetail>, attachedPdfs: Ref<string[]>,
   const sources = new Map<string, string>()
   const answers = new Map<string, Promise<EmbedData>>()
   const threads = new Map<string, Promise<DropComment[]>>()
+  const drawn = new Set<string>()
   function forget() {
+    drawn.clear()
     answers.clear()
     sources.clear()
     threads.clear()
@@ -126,6 +128,9 @@ export function useDocEmbeds(drop: Ref<DropDetail>, attachedPdfs: Ref<string[]>,
     const data = await described(link)
     if (!("kind" in data) || data.kind !== "pdf") return
     const at = Math.min(Math.max(1, n), Math.min(data.pages, EMBED_PAGES))
+    const key = `${at} ${link}`
+    if (drawn.has(key)) return
+    drawn.add(key)
     try {
       const [[image, links], pins] = await Promise.all([
         withPdf(link, sources.get(link) ?? link, (pdf) => Promise.all([renderPage(pdf, at), pageLinks(pdf, at)])),
@@ -134,6 +139,7 @@ export function useDocEmbeds(drop: Ref<DropDetail>, attachedPdfs: Ref<string[]>,
       if (shown(link)) send({ type: "embed-page-data", link, page: at, ...image, links, pins })
     } catch (error) {
       reportClientError("doc-embed-page", error, { drop: link })
+      if (shown(link)) send({ type: "embed-page-data", link, page: at, error: `Page ${at} couldn't be drawn.` })
     }
   }
   return {
@@ -141,5 +147,6 @@ export function useDocEmbeds(drop: Ref<DropDetail>, attachedPdfs: Ref<string[]>,
       for (const link of links) void sendEmbed(link, send)
     },
     page: (link: string, n: number, send: (message: EmbedMessage) => void) => void sendPage(link, n, send),
+    reloaded: () => drawn.clear(),
   }
 }
