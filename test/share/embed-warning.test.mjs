@@ -150,3 +150,52 @@ test("making a doc or its folder public warns about embeds its readers can't ope
   assert.notEqual(moved.id, inside.id)
   assert.equal(embedWarnings(await call(updateTool, { id: moved.id, folder: folder.id })).length, 1)
 })
+
+test("a public doc that isn't waiting for review warns about a held drop of the same owner", async () => {
+  state.shareApproval = true
+  const held = await target("Held demo", { share: "public" })
+  const plan = await doc(embedding(held.id), { share: "public" })
+  sql.prepare("UPDATE drops SET share_review = NULL WHERE id = ?").run(plan.id)
+  const folder = await call(createFolderTool, { title: "Plans", lifetime: "review" })
+  const moved = await call(updateTool, { id: plan.id, folder: folder.id })
+  assert.equal(embedWarnings(moved).length, 1, "the doc's readers get 403 until the owner's shares are approved")
+})
+
+test("an embed of a drop that no longer exists warns", async () => {
+  const plan = await doc(embedding("k7f2q9m4x8wd"), { share: "public" })
+  const [warning, ...more] = (plan.warnings ?? []).filter((line) => line.startsWith("drop/embed-missing"))
+  assert.equal(more.length, 0)
+  assert.ok(warning.includes("/d/k7f2q9m4x8wd"), warning)
+  assert.match(warning, /no longer exists; readers see a note/)
+})
+
+const partial = (result) => (result.warnings ?? []).filter((line) => line.startsWith("drop/embed-partial"))
+
+test("a doc with more embeds than the check reads says how many it skipped", async () => {
+  const hidden = []
+  for (let index = 0; index < 22; index++) hidden.push(await target(`Hidden ${index}`))
+  const markdown = `# Plan\n\n${hidden.map(({ id }) => `::drop{link=${id}}\n::\n`).join("\n")}`
+  const plan = await doc(markdown, { share: "public" })
+  assert.equal(embedWarnings(plan).length, 20)
+  const [line, ...more] = partial(plan)
+  assert.equal(more.length, 0)
+  assert.match(line, /2 embeds/, line)
+  assert.ok(plan.text.includes(line), plan.text)
+})
+
+test("a folder with more docs than the check reads checks the newest and says how many it skipped", async () => {
+  const folder = await call(createFolderTool, { title: "Plans", lifetime: "review" })
+  const oldest = await target("Oldest demo")
+  const newest = await target("Newest demo")
+  const first = await doc(`# First plan\n\n::drop{link=${oldest.id}}\n::\n`, { folder: folder.id })
+  sql.prepare("UPDATE drops SET updated_at = updated_at - 60000 WHERE id = ?").run(first.id)
+  for (let index = 0; index < 51; index++) await doc(`# Plan ${index}\n\nNo embeds.\n`, { folder: folder.id })
+  const last = await doc(`# Last plan\n\n::drop{link=${newest.id}}\n::\n`, { folder: folder.id })
+  sql.prepare("UPDATE drops SET updated_at = updated_at + 60000 WHERE id = ?").run(last.id)
+  const opened = await call(updateTool, { id: folder.id, share: "public" })
+  const warnings = embedWarnings(opened)
+  assert.equal(warnings.length, 1, warnings.join("\n"))
+  assert.match(warnings[0], /"Newest demo"/)
+  const [line] = partial(opened)
+  assert.match(line ?? "", /3 docs/, (opened.warnings ?? []).join("\n"))
+})

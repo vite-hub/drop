@@ -1,7 +1,8 @@
 import { promiseTimeout } from "@vueuse/core"
 import * as v from "valibot"
 import { draftOf } from "#shared/draft-paths"
-import type { DropDetail, DropSummary, PrivateEmbed, Viewer } from "#shared/types"
+import type { DropDetail, DropSummary, Viewer } from "#shared/types"
+import type { EmbedCheck } from "~/utils/private-embeds"
 import type { LiveRoom } from "~/composables/live-room"
 
 const PublishedSchema = v.object({ id: v.string(), version: v.number(), name: v.string() })
@@ -175,7 +176,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
     publishing.value = true
     try {
       await realtime.value?.save()
-      const next = await $fetch<DropSummary & { unchanged?: boolean; privateEmbeds?: PrivateEmbed[] }>(
+      const next = await $fetch<DropSummary & EmbedCheck & { unchanged?: boolean }>(
         `/api/drops/${drop.value.id}/versions`,
         {
           method: "POST",
@@ -193,7 +194,7 @@ export function useLiveEditor(drop: Ref<DropDetail>, options: { publicView: bool
         name: me.value?.name ?? "Someone",
       } satisfies Published)
       notify.done(`Published v${next.version}`)
-      notify.privateEmbeds(next.privateEmbeds)
+      notify.privateEmbeds(next)
       await refreshNuxtData([keys.drops, keys.tree, keys.pinned, keys.usage])
       await promiseTimeout(300)
       close()

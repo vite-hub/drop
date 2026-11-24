@@ -13,7 +13,7 @@ import { requireIdentity } from "../../utils/identity"
 import { isAttachment } from "../../utils/nodes"
 import { resourceList, ResourcesInput, saveResources } from "../../utils/resources"
 import { MAX_RESOURCE_URL } from "#shared/resources"
-import { embedSection, embedWarning } from "../../utils/embed-access"
+import { embedSection, embedWarnings } from "../../utils/embed-access"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
 
 export default defineMcpTool({
@@ -130,7 +130,10 @@ export default defineMcpTool({
     const updated = mcpDrop(changed ?? toSummary(drop), event.url.origin, drop)
     if (links) await saveResources(drop, links)
     const resolved = resolves?.length ? await resolveComments(drop, resolves, who) : []
-    const warnings = (changed?.privateEmbeds ?? []).map(embedWarning)
+    const warnings = embedWarnings({
+      embeds: changed?.privateEmbeds ?? [],
+      unchecked: changed?.uncheckedEmbeds ?? null,
+    })
     const result = { ...updated, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
     return {
       content: [

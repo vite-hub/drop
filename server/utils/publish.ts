@@ -21,7 +21,7 @@ import {
   toSummary,
 } from "./drops"
 import { updateDrop } from "./drop-update"
-import { embedSection, embedWarning, privateEmbeds } from "./embed-access"
+import { embedSection, embedWarnings, privateEmbeds } from "./embed-access"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { problemLine } from "./markdown-document"
@@ -433,7 +433,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
-  const embeds = (await privateEmbeds([fresh], who, event)).map(embedWarning)
+  const embeds = embedWarnings(await privateEmbeds([fresh], who, event))
   const result = {
     ...drop,
     ...(pages.length ? { pages: pages.slice(0, MAX_LISTED_PAGES) } : {}),

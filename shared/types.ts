@@ -122,6 +122,12 @@ export interface PrivateEmbed {
   doc: { id: string; title: string }
   link: string
   title: string | null
+  missing?: boolean
+}
+
+export interface UncheckedEmbeds {
+  docs: number
+  embeds: number
 }
 
 export interface DropDetail extends DropSummary {

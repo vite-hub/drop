@@ -7,7 +7,7 @@ import { isPublic, type Share } from "#shared/share"
 import { slugify } from "#shared/links"
 import { drops } from "../databases/default/index"
 import { type DropRow, findDrop, lifetimeFields, permissions, restoreDrop, toSummary, trashDrop } from "./drops"
-import { openedEmbeds } from "./embed-access"
+import { embedResponse, openedEmbeds } from "./embed-access"
 import { expiryPolicy, renewDrop } from "./expiry"
 import { MAX_FOLDER_DESCRIPTION, moveNode } from "./folders"
 import type { Identity } from "./identity"
@@ -100,12 +100,12 @@ export async function updateDrop(found: DropRow, who: Identity, body: DropChange
   const summary = toSummary({ ...drop, ...title, ...renewed, ...trashed }, undefined, days)
   const embeds =
     (body.share !== undefined || body.folder !== undefined) && body.trashed !== true
-      ? await openedEmbeds(drop.id, who, event)
-      : []
+      ? embedResponse(await openedEmbeds(drop.id, who, event))
+      : {}
   return {
     ...summary,
     ...(drop.kind === "folder" ? { items: (await itemCounts([drop.id])).get(drop.id) ?? 0 } : {}),
-    ...(embeds.length ? { privateEmbeds: embeds } : {}),
+    ...embeds,
   }
 }
 
