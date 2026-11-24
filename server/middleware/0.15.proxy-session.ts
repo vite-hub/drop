@@ -13,7 +13,6 @@ export default defineHandler(async (event) => {
     event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
   const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return
-  // The proxy only has to guard sign-in. Elsewhere a client could send the header itself, so Drop's session decides.
   if (path !== "/signin/start") return withoutToken(event)
   if (!(await isProxyMember(token)))
     throw new HTTPError({
