@@ -1,5 +1,5 @@
-// comark-zoom zooms its own blocks ([data-zoom]): Mermaid diagrams and annotated screenshots.
-const visuals = [...document.querySelectorAll(".typeset img:not(a img, [data-zoom] img)")]
+// comark-zoom zooms its own blocks ([data-zoom]): Mermaid diagrams, annotated screenshots, and thumbnails in tables.
+const visuals = [...document.querySelectorAll(".typeset img:not(a img, [data-zoom], [data-zoom] img)")]
 const zoom = window.mediumZoom(visuals, {
   background: "#fff",
   margin: 24,
