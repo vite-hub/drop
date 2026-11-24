@@ -53,3 +53,16 @@ test("a site comment from review.js points at its element, not at its screenshot
     '[button "RSVP" selector: `main > button`]\nSpot: 40% across, 30% down\nPage: /meetups',
   )
 })
+
+test("a site screenshot with no element keeps its area and page but names no selector", () => {
+  const blank = comment({ kind: "image", selector: "body > img", ox: 100, oy: 200, ow: 300, oh: 150, page: "/" })
+  assert.equal(
+    formatElementReference(siteReviewElement(blank)),
+    "[an image]\nArea: 10%–40% across, 20%–35% down\nPage: /",
+  )
+})
+
+test("a comment left in Drop's viewer on a site keeps its own selector and quote", () => {
+  const anchored = comment({ kind: "text", selector: "main > p", label: "p", quote: "twelve" })
+  assert.equal(siteReviewElement(anchored), anchored)
+})
