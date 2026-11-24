@@ -148,11 +148,12 @@
   const at = (el) => { const { x, y } = el.dataset; if (x == null && y == null) return null; const p = [coord(x), coord(y)]; return p.includes(null) ? null : p; };
   // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
   const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
-  // `moved` names the items the reader moved; only those take their saved position. A save from before the list moved none.
-  const saved = { camera: null, positions: {} }, moved = new Set();
+  // `moved` separates reader moves from cached defaults so an authored layout can replace the defaults.
+  const saved = { camera: null, positions: {}, authored: false }, moved = new Set();
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
+      saved.authored = doc.authored === true;
       const c = (doc.version ?? null) === version ? doc.camera : null;
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
@@ -213,8 +214,9 @@
     tags.append(tag);
     return it;
   });
-  // The reader's moves first, then the page's data-x/data-y; the rest go in the empty space to the right of them all.
-  const start = (it) => (moved.has(it.el.id) && saved.positions[it.el.id]) || it.at;
+  // Keep legacy positions on unauthored canvases. Otherwise lay out the page before applying reader moves.
+  const hasAuthored = items.some((it) => it.at !== null);
+  const start = (it) => it.at || (!hasAuthored && !saved.authored && saved.positions[it.el.id]);
   function arrange() {
     let right = -Infinity;
     for (const it of items) {
@@ -227,6 +229,10 @@
       it.y = 0;
       right = it.x + it.w;
     }
+    for (const it of items) {
+      const position = saved.positions[it.el.id];
+      if (position && moved.has(it.el.id)) [it.x, it.y] = position;
+    }
   }
   arrange();
   const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); moved.add(it.el.id); schedule(); };
@@ -237,6 +243,13 @@
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
+
+  function dockMinimap() {
+    if (mode !== "canvas" || !bar.isConnected) return;
+    const toolbar = bar.getBoundingClientRect(), minimap = map.getBoundingClientRect();
+    const overlaps = toolbar.right > minimap.left && toolbar.left < minimap.right;
+    map.style.bottom = overlaps ? innerHeight - toolbar.top + 8 + "px" : "";
+  }
 
   // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size.
   function render() {
@@ -368,7 +381,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moved], version };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moved], authored: hasAuthored, version };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
@@ -690,7 +703,7 @@
     if (r.top + dy < 56) dy = 56 - r.top;
     if (dx || dy) { pan(dx, dy); settle(); }
   });
-  window.addEventListener("resize", () => { if (mode === "canvas") bound(); schedule(); });
+  window.addEventListener("resize", () => { if (mode === "canvas") { dockMinimap(); bound(); } schedule(); });
   window.addEventListener("pagehide", () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; save(); } });
 
   // Arrows between screens. In an item, a control with data-go="<id>" draws an arrow from its right edge to the element
@@ -792,6 +805,7 @@
 
   if (hosted || !several) bar.remove();
   document.body.append(host);
+  if (bar.isConnected) new ResizeObserver(dockMinimap).observe(bar);
   // A hash names an item to open in focus; otherwise two or more items open on the canvas.
   const named = find(location.hash.slice(1));
   current = Math.max(find(remembered()), 0);
