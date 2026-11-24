@@ -2080,20 +2080,31 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   });
 
   // Export as PDF waits for what a doc loads late, so the PDF has it. A doc script that fills the page only near the
-  // screen (DEFERRED_FILES_SCRIPT and EMBEDS_SCRIPT in shared/documents.ts) listens for "drop:print" on document and
-  // passes event.detail.waitUntil a promise that settles once its part is on the page. Then the images decode and the
-  // dialog opens, after 20 s at most whatever is still missing. The reader's own Ctrl+P can't wait.
+  // screen (DEFERRED_FILES_SCRIPT and EMBEDS_SCRIPT in shared/documents.ts) listens for "drop:print" on document,
+  // passes event.detail.waitUntil a promise that settles once its part is on the page, and calls event.detail.progress
+  // each time a piece of it arrives. Then the images decode and the dialog opens. It opens anyway once nothing has
+  // moved for 10 s, or after 2 minutes, with whatever is still missing. The reader's own Ctrl+P can't wait.
   let printing = false;
   const exportPdf = async (title) => {
     if (printing) return;
     printing = true;
+    const started = Date.now();
+    let moved = started;
+    const progress = () => { moved = Date.now(); };
     const waits = [];
-    document.dispatchEvent(new CustomEvent("drop:print", { detail: { waitUntil: (promise) => { waits.push(promise); } } }));
+    const waitUntil = (promise) => { waits.push(Promise.resolve(promise).finally(progress)); };
+    document.dispatchEvent(new CustomEvent("drop:print", { detail: { waitUntil, progress } }));
     const decoded = Promise.allSettled(waits).then(() => Promise.allSettled([...document.images].map((image) => {
       image.loading = "eager";
-      return image.decode();
+      return image.decode().finally(progress);
     })));
-    await Promise.race([decoded, new Promise((resolve) => setTimeout(resolve, 20000))]);
+    await new Promise((resolve) => {
+      const done = () => { clearInterval(stalled); resolve(); };
+      const stalled = setInterval(() => {
+        if (Date.now() - moved >= 10000 || Date.now() - started >= 120000) done();
+      }, 250);
+      void decoded.then(done);
+    });
     printing = false;
     if (typeof title === "string" && title) document.title = title;
     print();

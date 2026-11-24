@@ -57,7 +57,10 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   document.addEventListener("drop:print", (e) => {
     ask(waiting);
     e.detail.waitUntil(new Promise((resolve) => {
-      onArrive = () => { if ([...asked].every((path) => arrived.has(path))) resolve(); };
+      onArrive = () => {
+        e.detail.progress();
+        if ([...asked].every((path) => arrived.has(path))) resolve();
+      };
       onArrive();
     }));
   });
@@ -107,7 +110,10 @@ const EMBEDS_SCRIPT = String.raw`(() => {
   document.addEventListener("drop:print", (e) => {
     ask(document.querySelectorAll("[data-drop-embed]"));
     e.detail.waitUntil(new Promise((resolve) => {
-      onArrive = () => { if ([...asked].every((link) => arrived.has(link))) resolve(); };
+      onArrive = () => {
+        e.detail.progress();
+        if ([...asked].every((link) => arrived.has(link))) resolve();
+      };
       onArrive();
     }));
   });

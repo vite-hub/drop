@@ -26,7 +26,11 @@ async function open(browser, sandbox) {
   await frame.evaluate(() => {
     window.printed = []
     addEventListener("beforeprint", () =>
-      window.printed.push({ title: document.title, dark: document.documentElement.classList.contains("dark") }),
+      window.printed.push({
+        at: Date.now(),
+        title: document.title,
+        dark: document.documentElement.classList.contains("dark"),
+      }),
     )
   })
   return { page, frame }
@@ -50,6 +54,65 @@ test("Export as PDF prints a Markdown doc light, under the drop's title, without
     await browser.close()
   }
 })
+
+// A doc script's own wait on Export as PDF: `steps` are [ms, "progress" | "settle"] from the moment it starts.
+async function waitOn(frame, steps) {
+  await frame.evaluate((steps) => {
+    document.addEventListener("drop:print", (e) => {
+      window.started = Date.now()
+      e.detail.waitUntil(
+        new Promise((resolve) => {
+          for (const [ms, step] of steps)
+            setTimeout(() => {
+              window.last = Date.now()
+              if (step === "settle") resolve()
+              else e.detail.progress()
+            }, ms)
+        }),
+      )
+    })
+  }, steps)
+}
+
+test("Export as PDF prints soon after the last wait settles", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, previewSandbox("markdown"))
+    await waitOn(frame, [
+      [400, "progress"],
+      [800, "progress"],
+      [1_500, "settle"],
+    ])
+    await page.evaluate(() => window.tell({ type: "print", title: "SEO plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 5_000 })
+    const after = await frame.evaluate(() => Date.now() - window.last)
+    assert.ok(after < 1_000, `printed ${after} ms after the wait settled`)
+  } finally {
+    await browser.close()
+  }
+})
+
+test("Export as PDF keeps waiting while a wait makes progress and prints 10 s after it stalls", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, previewSandbox("markdown"))
+    await waitOn(frame, [
+      [3_000, "progress"],
+      [6_000, "progress"],
+    ])
+    await page.evaluate(() => window.tell({ type: "print", title: "SEO plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 25_000 })
+    const { started, last } = await frame.evaluate(() => ({ started: window.started, last: window.last }))
+    const [printed] = await frame.evaluate(() => window.printed)
+    assert.equal(last - started >= 6_000, true)
+    assert.ok(
+      printed.at - last >= 9_500 && printed.at - last < 12_000,
+      `printed ${printed.at - last} ms after the last progress`,
+    )
+  } finally {
+    await browser.close()
+  }
+}, 40_000)
 
 test("other drops' frames can't open the print dialog", async () => {
   assert.equal(previewSandbox("html"), PREVIEW_SANDBOX)
@@ -167,7 +230,7 @@ test("Export as PDF still prints when the viewer never sends the files", async (
 
     await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 25_000 })
     const [printed] = await frame.evaluate(() => window.printed)
-    assert.ok(printed.at - sent >= 15_000, `printed after ${printed.at - sent} ms`)
+    assert.ok(printed.at - sent >= 9_500 && printed.at - sent < 13_000, `printed after ${printed.at - sent} ms`)
     assert.equal(printed.placeholders, 2)
   } finally {
     await browser.close()
