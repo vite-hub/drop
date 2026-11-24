@@ -429,6 +429,39 @@ test("the minimap stays clear of the standalone controls when the toolbar wraps"
   }
 })
 
+test("fitted controls stay clickable above the raised minimap on a phone", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 393, height: 750 } })
+    const html = injectRuntime(
+      `<!doctype html><html><body>
+        <section id="v-one" data-variant="One" data-width="160" data-height="620" data-x="0" data-y="0">one</section>
+        <section id="v-two" data-variant="Two" data-width="120" data-height="80" data-x="209" data-y="526">
+          <button style="margin: 20px">Continue</button>
+        </section>
+      </body></html>`,
+      false,
+      0,
+      true,
+    )
+    await tab.route("https://picker.test/fitted", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.goto("https://picker.test/fitted")
+    const bar = tab.locator("prototype-picker .bar")
+    const map = tab.locator("prototype-picker .map")
+    const button = tab.getByRole("button", { name: "Continue", exact: true })
+    for (const action of ["Fit", "Reset layout"]) {
+      await bar.getByRole("button", { name: action, exact: true }).click()
+      await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const itemBox = await tab.locator("#v-two").boundingBox()
+      const mapBox = await map.boundingBox()
+      assert.ok(itemBox.y + itemBox.height < mapBox.y, `the fitted item clears the minimap after ${action}`)
+      await button.click({ trial: true })
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
 test("items open where data-x and data-y place them, a reader's move wins for that reader, and Reset layout goes back", async () => {
   const browser = await chromium.launch()
   try {

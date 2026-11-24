@@ -244,11 +244,18 @@
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
 
+  function setDockBottom(bottom) {
+    if (bottom === dockBottom) return;
+    dockBottom = bottom;
+    if (mode === "canvas" && fitted) fit(fitted);
+  }
   function dockMinimap() {
     if (mode !== "canvas" || !bar.isConnected) return;
     const toolbar = bar.getBoundingClientRect(), minimap = map.getBoundingClientRect();
     const overlaps = toolbar.right > minimap.left && toolbar.left < minimap.right;
-    map.style.bottom = overlaps ? innerHeight - toolbar.top + 8 + "px" : "";
+    const raisedBottom = innerHeight - toolbar.top + 8;
+    map.style.bottom = overlaps ? raisedBottom + "px" : "";
+    setDockBottom(overlaps ? Math.max(72, raisedBottom + minimap.height + 8) : 72);
   }
 
   // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size.
@@ -535,10 +542,7 @@
     const m = e.data;
     if (e.source !== parent || !m || m.__drop !== true) return;
     if (m.type === "inset" && Number.isFinite(m.bottom)) {
-      const bottom = Math.max(72, m.bottom + 4);
-      if (bottom === dockBottom) return;
-      dockBottom = bottom;
-      if (mode === "canvas" && fitted) fit(fitted);
+      setDockBottom(Math.max(72, m.bottom + 4));
     } else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
   });
 
