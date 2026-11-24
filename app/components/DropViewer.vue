@@ -1474,6 +1474,7 @@ usePaletteOffer("drop", () => {
           { label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbds: ["+"], onSelect: () => picker("zoom-in") },
           { label: "Fit", icon: "i-mingcute-fullscreen-2-line", kbds: ["shift", "1"], onSelect: () => picker("fit") },
           { label: "Reset zoom", icon: "i-mingcute-refresh-2-line", kbds: ["0"], onSelect: () => picker("reset") },
+          { label: "Reset layout", icon: "i-mingcute-layout-grid-line", onSelect: () => picker("layout") },
         ]
       : [
           { label: "Previous item", icon: "i-mingcute-left-line", kbds: ["←"], onSelect: () => picker("prev") },

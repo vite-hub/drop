@@ -24,6 +24,7 @@ export type PickerCommand =
   | "zoom-out"
   | "fit"
   | "reset"
+  | "layout"
   | "move"
   | "hand"
   | "hold"
