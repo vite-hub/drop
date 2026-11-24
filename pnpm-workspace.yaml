@@ -66,6 +66,7 @@ patchedDependencies:
   # Content-Location keeps the query string. Not upstream yet.
   "@vite-hub/content@0.0.0-preview-c3cfab6": patches/@vite-hub__content@0.0.0-preview-c3cfab6.patch
   # Restore offline delivery UI on the preview that also carries Send.
+  # Edit a comment in the row field, one field per thread (vite-hub/vitehub#5445).
   "@vite-hub/ui@0.0.0-preview-c3cfab6": patches/@vite-hub__ui@0.0.0-preview-c3cfab6.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { chromium } from "playwright"
 import { test } from "vite-plus/test"
 import { PREVIEW_SANDBOX } from "../../app/utils/feedback.ts"
-import { injectRuntime } from "../../shared/plan-runtime.ts"
+import { injectRuntime, withVariantBar } from "../../shared/plan-runtime.ts"
 
 // A prototype on Drop's canvas: three items side by side, which the picker moves with transforms as the reader pans.
 const html = `<!doctype html><html><head><meta charset="utf-8"></head><body>
@@ -30,8 +30,10 @@ const marker = {
   replies: 0,
 }
 
-async function open(browser) {
-  const escaped = injectRuntime(html, false, 0, true).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+// In Drop's viewer (bar), the picker takes the bar's commands, such as Space held in Drop's window.
+async function open(browser, { bar = false } = {}) {
+  const runtime = injectRuntime(html, false, 0, true)
+  const escaped = (bar ? withVariantBar(runtime) : runtime).replaceAll("&", "&amp;").replaceAll('"', "&quot;")
   const context = await browser.newContext({ viewport: { width: 1200, height: 700 } })
   await context.route("**/*", (route) => {
     if (new URL(route.request().url()).hostname !== "drop.test") return route.abort()
@@ -132,6 +134,68 @@ test("an area drawn across two canvas items goes on the one it covers most, and 
     assert.ok(Math.abs(after.moved + 80) < 1, "the canvas panned")
     assert.equal(after.draft, null)
     assert.equal(await page.evaluate(() => posts.filter((m) => m.type === "draft-place").length), count)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("Space held under the comment tool pans the canvas instead of drawing an area, until the drag ends", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, { bar: true })
+    await page.evaluate(() => send({ type: "tool", tool: "comment" }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+    const left = () => frame.evaluate(() => document.querySelector("#v-two").getBoundingClientRect().left)
+    const two = await frame.locator("#v-two").boundingBox()
+    const start = { x: two.x + 100, y: two.y + 100 }
+    const cursor = () =>
+      frame.evaluate(
+        ([x, y]) => {
+          const el = document.elementFromPoint(x, y)
+          return getComputedStyle(el.shadowRoot?.elementFromPoint(x, y) ?? el).cursor
+        },
+        [start.x, start.y],
+      )
+    assert.equal(await cursor(), "crosshair")
+
+    // Space from Drop's window, as the bar sends it, then a drag over an item: the canvas follows it.
+    await page.evaluate(() => send({ type: "picker", do: "hold" }))
+    await frame.waitForFunction(() => document.documentElement.dataset.prototypeHand === "")
+    assert.equal(await cursor(), "grab")
+    let before = await left()
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(start.x + 40, start.y, { steps: 4 })
+    // Letting go of Space mid-drag finishes the pan.
+    await page.evaluate(() => send({ type: "picker", do: "release" }))
+    await page.mouse.move(start.x + 90, start.y, { steps: 4 })
+    await page.mouse.up()
+    assert.equal(Math.round((await left()) - before), 90)
+    await frame.waitForFunction(() => !("prototypeHand" in document.documentElement.dataset))
+    assert.equal(await page.evaluate(() => posts.some((m) => m.type === "area")), false, "the pan drew no area")
+
+    // Space pressed in the page does the same.
+    await frame.evaluate(() => {
+      document.activeElement?.blur()
+      window.focus()
+    })
+    await page.keyboard.down(" ")
+    before = await left()
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(start.x - 60, start.y, { steps: 4 })
+    await page.mouse.up()
+    await page.keyboard.up(" ")
+    assert.equal(Math.round((await left()) - before), -60)
+    assert.equal(await page.evaluate(() => posts.some((m) => m.type === "area")), false)
+
+    // Space let go: the comment tool takes the pointer again.
+    assert.equal(await cursor(), "crosshair")
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.down()
+    await page.mouse.move(start.x + 80, start.y + 60, { steps: 4 })
+    await page.mouse.up()
+    await page.waitForFunction(() => posts.some((m) => m.type === "area"))
   } finally {
     await browser.close()
   }

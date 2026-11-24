@@ -472,7 +472,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   pageStyle.textContent = MARKS_CSS + ":root{--vh-ui-comment-ink:" + (THEMED ? "var(--foreground)" : "#808080") + "}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
     // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
     // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
-    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
+    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}" +
+    // A prototype canvas's Hand (EVENT_HOLD): the tools' layer lets the pointer through to the picker, which shows grab.
+    "html[data-prototype-hand] drop-comments{pointer-events:none!important}";
   // comark-comments' speech bubble, in a given color.
   const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
@@ -661,6 +663,21 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function sameAnchor(el, m) {
     if (!m.label) return true;
     return m.kind === "image" ? (el.getAttribute("alt") || "image") === m.label : labelOf(el) === m.label;
+  }
+
+  function elementForMarker(marker) {
+    const exact = query(marker?.selector);
+    if (exact && (!marker.earlier || sameAnchor(exact, marker))) return exact;
+    if (!article || !marker?.selector) return null;
+    const legacy = /^(.*\barticle) > table(?::nth-of-type\((\d+)\))?( > .+)?$/.exec(marker.selector);
+    if (!legacy) return null;
+    const [, parent, index, tail = ""] = legacy;
+    const position = index ? ":nth-child(" + index + " of table, div[data-wide]:has(> table))" : "";
+    try {
+      const matches = Array.from(document.querySelectorAll(parent + " > div[data-wide]" + position + " > table" + tail))
+        .filter((el) => article.contains(el) && sameAnchor(el, marker));
+      return matches.length === 1 ? matches[0] : null;
+    } catch { return null; }
   }
 
   /**
@@ -900,8 +917,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
         // Placed from the anchor's current box, so areas and pins follow reflow.
-        const el = query(m.selector);
-        if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
+        const el = elementForMarker(m);
+        if (!el) { unplaced.push(m.id); continue; }
         if (!shown.includes(m)) continue;
         resized.observe(el);
         const r = el.getBoundingClientRect();
@@ -1844,6 +1861,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     layer.style.pointerEvents = "none";
     const under = anchorFor(left, top, right, bottom, host), quote = markedText(list);
     layer.style.pointerEvents = "";
+    const anchor = zoom ? originalOf(under) : under;
+    if (!anchor) { finishing = false; return; }
     const r = under.getBoundingClientRect();
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
@@ -1864,7 +1883,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (session !== markSession || tool !== "mark") return;
     finishing = false;
     const n = ++shots;
-    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
+    post({ type: "area", selector: pathOf(anchor), label: labelOf(anchor), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
     post({ type: "area-shot", shot: n, image: marked });
   }
 
@@ -2049,7 +2068,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const focusMarker = (m) => {
     const marker = markers.find((entry) => entry.id === m.id);
     const range = marker?.kind === "text" && marker.quote ? findRange(marker.selector, marker.quote) : null;
-    const node = marker?.kind === "text" ? range?.startContainer : query(marker?.selector);
+    const node = marker?.kind === "text" ? range?.startContainer : elementForMarker(marker);
     const anchor = node?.nodeType === 1 ? node : node?.parentElement;
     if (anchor) anchor.dispatchEvent(new Event("drop:reveal-anchor", { bubbles: true }));
     active = m.id; render();
@@ -2214,7 +2233,9 @@ const EVENT_HOLD = String.raw`(() => {
   Object.defineProperty(self, "__dropHold", { value: (fn) => { hold = typeof fn === "function" ? fn : null; } });
   const POINTER = ["pointerdown", "pointerup", "pointermove", "pointerover", "pointerout", "pointerenter", "pointerleave", "pointercancel", "gotpointercapture", "lostpointercapture",
     "mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave", "click", "dblclick", "auxclick", "contextmenu", "focus", "blur", "focusin", "focusout"];
-  const stop = (e) => { if (!hold) return; e.stopImmediatePropagation(); hold(e); };
+  // While a prototype canvas's Hand is up (Space held, or a pan under way), its picker takes the pointer, so Space and a
+  // drag pan under the comment tools too.
+  const stop = (e) => { if (!hold || document.documentElement.hasAttribute("data-prototype-hand")) return; e.stopImmediatePropagation(); hold(e); };
   for (const type of POINTER) addEventListener(type, stop, true);
   // Passive, so scrolling never waits on them; Drop's layer takes pointer events, not these.
   for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) addEventListener(type, stop, { capture: true, passive: true });

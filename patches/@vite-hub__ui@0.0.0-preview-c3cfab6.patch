@@ -1,5 +1,5 @@
 diff --git a/dist/comment-row-Bbm9WwuF.js b/dist/comment-row-Bbm9WwuF.js
-index 9aaeb3d..3decdea 100644
+index 9aaeb3dd0608eb4d7f822cacacc8c190ffbde142..3decdea10c62e4dd62e3d4c2830f527669b8fdd0 100644
 --- a/dist/comment-row-Bbm9WwuF.js
 +++ b/dist/comment-row-Bbm9WwuF.js
 @@ -15,11 +15,26 @@ function rowSlotScope(thread) {
@@ -37,7 +37,7 @@ index 9aaeb3d..3decdea 100644
 -export { threadRow as n, rowSlotScope as t };
 +export { deliveryClock, deliveryLabel, threadRow as n, rowSlotScope as t };
 diff --git a/dist/comment-thread-BQuzrlkq.d.ts b/dist/comment-thread-BQuzrlkq.d.ts
-index 9345d5b..5947430 100644
+index 9345d5b2230b05b8a69c901b0b4c2da04ce590f6..5947430afa719cae9c7f1e1b62fbc56813644fc9 100644
 --- a/dist/comment-thread-BQuzrlkq.d.ts
 +++ b/dist/comment-thread-BQuzrlkq.d.ts
 @@ -1,7 +1,7 @@
@@ -57,15 +57,8 @@ index 9345d5b..5947430 100644
  };
  /** The scope of the `actions`, `anchor`, and `after` slots of `CommentThread`. */
  interface CommentThreadSlotScope {
-@@ -365,4 +366,4 @@ declare const CommentThread$1: import("vue").DefineComponent<import("vue").Extra
-   dismissible: boolean;
- }, SlotsType<CommentThreadSlots>, {}, {}, string, import("vue").ComponentProvideOptions, true, {}, any>;
- //#endregion
--export { CommentReplySlots as a, CommentThreadSlots as c, CommentReplySlotScope as i, messagesSinceResolved as l, CommentAttachmentUrl as n, CommentThread$1 as o, CommentReply as r, CommentThreadSlotScope as s, CommentAttachmentLink as t, repliedSinceResolved as u };
-\ No newline at end of file
-+export { CommentReplySlots as a, CommentThreadSlots as c, CommentReplySlotScope as i, messagesSinceResolved as l, CommentAttachmentUrl as n, CommentThread$1 as o, CommentReply as r, CommentThreadSlotScope as s, CommentAttachmentLink as t, repliedSinceResolved as u };
 diff --git a/dist/parts/components/comment-panel.js b/dist/parts/components/comment-panel.js
-index b8ced25..e869e3a 100644
+index b8ced25222617d525e9bf4ac35c826a156aece0a..e869e3ac31155c47cd86c82f1774b31f99374e54 100644
 --- a/dist/parts/components/comment-panel.js
 +++ b/dist/parts/components/comment-panel.js
 @@ -187,6 +187,8 @@ const CommentPanel = defineComponent({
@@ -78,7 +71,7 @@ index b8ced25..e869e3a 100644
  			"data-status": thread.status,
  			"data-thread-id": thread.id,
 diff --git a/dist/parts/components/comment-thread.js b/dist/parts/components/comment-thread.js
-index 530419f..1970ceb 100644
+index 530419fab601f4184ea7122ac21d8eeedf00121b..ac52fa1444bfe1a915e64bc53c72420d2852fa67 100644
 --- a/dist/parts/components/comment-thread.js
 +++ b/dist/parts/components/comment-thread.js
 @@ -10,6 +10,7 @@ import { n as mentionPlugin, r as mentionTag, t as CommentComposer } from "../..
@@ -98,7 +91,15 @@ index 530419f..1970ceb 100644
  				"data-size": props.size,
  				"data-slot": "comment-reply"
  			}, [h("div", { "data-slot": "comment-reply-content" }, [
-@@ -245,6 +248,7 @@ const CommentReply = defineComponent({
+@@ -223,6 +226,7 @@ const CommentReply = defineComponent({
+ 					autofocus: true,
+ 					busy: busy.value,
+ 					error: error.value,
++					layout: "row",
+ 					mentions: mentions.value,
+ 					modelValue: draft.value,
+ 					onCancel: () => {
+@@ -245,6 +249,7 @@ const CommentReply = defineComponent({
  					value: message.body
  				}),
  				editing.value || props.compact ? null : slots.attachments?.({ message }) ?? attachmentList(message, props.attachmentUrl, UIcon, icons.value.file),
@@ -106,7 +107,7 @@ index 530419f..1970ceb 100644
  				confirming.value ? h("div", {
  					"aria-label": "Confirm delete",
  					"data-slot": "comment-reply-confirm",
-@@ -448,6 +452,7 @@ const CommentThread = defineComponent({
+@@ -448,6 +453,7 @@ const CommentThread = defineComponent({
  		const replySlots = () => ({
  			...slots.body ? { body: slots.body } : {},
  			...slots.attachments ? { attachments: slots.attachments } : {},
@@ -114,7 +115,7 @@ index 530419f..1970ceb 100644
  			...slots["mention-item"] ? { "mention-item": slots["mention-item"] } : {},
  			...slots["mention-empty"] ? { "mention-empty": slots["mention-empty"] } : {}
  		});
-@@ -481,7 +486,7 @@ const CommentThread = defineComponent({
+@@ -481,7 +487,7 @@ const CommentThread = defineComponent({
  			const back = props.navigation === "back";
  			const anchor = slots.anchor ? slots.anchor({ thread }) : quote ? h("blockquote", { "data-slot": "comment-thread-quote" }, quote) : null;
  			return h("section", {
@@ -123,7 +124,7 @@ index 530419f..1970ceb 100644
  				"data-size": props.size,
  				"data-slot": "comment-thread",
  				"data-status": thread.status,
-@@ -498,7 +503,7 @@ const CommentThread = defineComponent({
+@@ -498,7 +504,7 @@ const CommentThread = defineComponent({
  						size: "xs",
  						variant: "ghost"
  					}) : null,
@@ -132,3 +133,18 @@ index 530419f..1970ceb 100644
  					h("span", { "data-slot": "comment-thread-spacer" }),
  					slots.actions ? h("div", { "data-slot": "comment-thread-actions" }, slots.actions({ thread })) : null,
  					!allowed("resolve") ? null : h(UButton, {
+diff --git a/dist/styles.css b/dist/styles.css
+index 3122bf3d4dc3dceac2f54077caa43f1ba8c02646..456b748737c7e8ade4c3b6e032118d724ef56b2f 100644
+--- a/dist/styles.css
++++ b/dist/styles.css
+@@ -2655,6 +2655,10 @@
+     padding: 0.25rem 0 0;
+   }
+ 
++  [data-slot="comment-thread"]:has([data-slot="comment-reply"][data-editing="true"]) > [data-slot="comment-composer"] {
++    display: none;
++  }
++
+   [data-slot="comment-toolbar"] {
+     align-items: center;
+     background: var(--vh-bg);

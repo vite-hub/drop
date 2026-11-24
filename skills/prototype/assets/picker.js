@@ -570,8 +570,10 @@
     hand();
     report();
   }
+  // A pan keeps the Hand up until the drag ends, even once Space is let go: Drop's comment tools stand aside only while
+  // the root carries data-prototype-hand, and the rest of the drag has to reach the picker.
   function hand() {
-    const on = mode === "canvas" && (tool === "hand" || space), grabbing = on && gesture && gesture.kind === "pan";
+    const grabbing = mode === "canvas" && Boolean(gesture && gesture.kind === "pan"), on = grabbing || (mode === "canvas" && (tool === "hand" || space));
     tags.classList.toggle("hand", on);
     tags.classList.toggle("grabbing", Boolean(grabbing));
     if (on) root.dataset.prototypeHand = grabbing ? "grabbing" : "";

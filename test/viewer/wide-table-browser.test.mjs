@@ -155,6 +155,75 @@ test.each([
   }
 })
 
+// A glossary whose last column holds two screenshots. Before they load, a review comment that opened the margin once
+// squeezed the text columns to one letter per line.
+const glossary = `# Glossary
+
+One row per concept.
+
+## Open
+
+| Term | Internal (where and how) | Nuance | Where in the app |
+| --- | --- | --- | --- |
+| **Pack size or Order multiple?**<br>_Pack size_ | Engine: \`Values.pack_sizes\` via \`POST /values/sources/query\` | The amount the supplier sells in, such as boxes of 12, so orders are rounded to a multiple of it. The engine stores a list of pack sizes; the app shows one. Today: Pack size / Order rounding / Order multiple / Pack Sizes. | ![Items → Order rounding column](https://example.com/a.jpg){width="150"} ![Alarms → Missing order rounding rule](https://example.com/b.jpg){width="150"}<br>[Link](https://example.com/a) [Link](https://example.com/b) |
+
+## Decided
+
+Nothing yet.
+`
+
+test("a review comment's margin leaves a glossary table's text columns readable", { timeout: 60000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    for (const width of [1100, 1440]) {
+      const frame = await openFrame(browser, width, "glossary-comment.md", glossary)
+      await frame.page().evaluate(() => {
+        const doc = document.querySelector("iframe").contentWindow
+        doc.postMessage({ __drop: true, type: "view", pins: true, style: "card" }, "*")
+        doc.postMessage(
+          {
+            __drop: true,
+            type: "markers",
+            markers: [
+              {
+                id: "c1",
+                n: 1,
+                kind: "text",
+                selector: "body",
+                ox: 0,
+                oy: 0,
+                ow: 0,
+                oh: 0,
+                quote: "One row per concept",
+                label: "p",
+                resolved: false,
+                earlier: false,
+                author: "A B",
+                image: null,
+                body: "To be discussed",
+                replies: 0,
+              },
+            ],
+          },
+          "*",
+        )
+      })
+      await frame.waitForFunction(() => document.documentElement.dataset.dropRail === "open")
+      await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      const headings = await frame
+        .locator("thead th")
+        .evaluateAll((cells) =>
+          cells.slice(0, 3).map((cell) => ({ text: cell.textContent, width: cell.getBoundingClientRect().width })),
+        )
+      for (const heading of headings)
+        assert.ok(heading.width >= 160, `at ${width}px, "${heading.text}" is ${Math.round(heading.width)}px wide`)
+      await frame.page().close()
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
 test("printing a folded table to A5 preserves the last column", { timeout: 30000 }, async () => {
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
   const { html } = await renderMarkdownCached("print-metrics.md", async () => metrics)
