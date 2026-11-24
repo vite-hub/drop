@@ -19,7 +19,7 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 
 - Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
 - Drop versions preserve the HTML and comments, not the live pages in the frames. To keep earlier rounds reviewable, give each round's `data-src` values deployment-specific URLs and keep those deployments accessible. A mutable branch URL always serves whatever is live there now, even when someone opens an older Drop version.
-- The frame keeps the reader's login when the URL is on the same site as Drop. A preview such as `https://pr123-demo.preview.example.com` inside Drop on `drop.example.com`, whose drops run on `drop-usercontent.example.com`, is all `example.com`, so its SameSite=Lax cookies flow. On another site the page loads signed out, or not at all if the browser blocks its cookies.
+- The frame keeps the reader's login when the URL is on the same site as Drop. A preview such as `https://pr123-demo.preview.example.com` inside Drop on `drop.example.com`, whose drops run on `drop-usercontent.example.com`, is all `example.com`, so its SameSite=Lax cookies flow. On another site those Lax cookies are left out, so the page usually loads signed out.
 - A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
 - Wheel and clicks over a live page go to that page. Pan from empty space, with Space + drag, or with the Hand tool.
 
@@ -30,19 +30,21 @@ To review a whole running app, publish one item per route. Take the routes from 
 Run this snippet in Node.js:
 
 ```js
-const base = "https://deploy-a1b2c3.preview.example.com"
-const routes = ["/", "/orders", "/orders/42", "/settings"]
-const sizes = [{ name: "desktop", width: 1440, height: 900 }]
-const id = (route, size) => `v-${size}-${Buffer.from(route, "utf8").toString("hex")}`
-const attr = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
-const html = routes.flatMap((route) => sizes.map(({ name, width, height }) =>
-  `<section id="${id(route, name)}" data-variant="${attr(`${route} · ${name}`)}" data-src="${attr(base + route)}" data-width="${width}" data-height="${height}"></section>`,
-)).join("\n")
+const base = "https://deploy-a1b2c3.preview.example.com/"
+const pages = [
+  ["v-home", "/"],
+  ["v-orders", "/orders"],
+  ["v-order-detail", "/orders/42"],
+  ["v-settings", "/settings"],
+]
+const html = pages.map(([id, route]) =>
+  `<section id="${id}" data-variant="${route}" data-src="${new URL(route, base)}" data-width="1440" data-height="900"></section>`,
+).join("\n")
 console.log(html)
 ```
 
-- Keep each `id` tied to the full, case-sensitive route and size name, not the host or the route's position in the list. This keeps focus links, saved positions, and comment anchors tied to the same item when you update the preview URL.
-- For a phone size too, add `{ name: "mobile", width: 390, height: 844 }` to `sizes`.
+- Give each route its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`.
+- For a phone size too, add a second item per route (`v-orders-mobile`, `data-width="390" data-height="844"`).
 - Use a host every reviewer can reach over https, such as a deployed preview; a `localhost` URL loads only on your machine.
 
 ## Flows: rows of screens with arrows
