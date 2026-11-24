@@ -112,7 +112,7 @@ location = /oauth2/auth {
 
 location = /signin/start {
   auth_request /oauth2/auth;
-  error_page 401 =403 /oauth2/sign_in;
+  error_page 401 = /oauth2/sign_in;
   auth_request_set $token $upstream_http_x_auth_request_access_token;
   proxy_set_header X-Auth-Request-Access-Token $token;
   proxy_pass http://127.0.0.1:3000;
