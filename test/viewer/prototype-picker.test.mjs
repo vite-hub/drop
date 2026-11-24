@@ -575,6 +575,7 @@ test("Ctrl+Z takes back a move or Reset layout, Ctrl+Shift+Z and Ctrl+Y redo it,
     await tab.mouse.move(handle.x + 10, handle.y + 10)
     await tab.mouse.down()
     await tab.mouse.move(handle.x + 10 + 50 * zoom, handle.y + 10, { steps: 4 })
+    await tab.keyboard.press("Control+z")
     await tab.mouse.up()
     assert.deepEqual(await saved(64, 1010), ["v-three", "v-two"])
     await tab.keyboard.press("Control+z")
@@ -634,6 +635,68 @@ test("items the page doesn't place wrap into rows with room between them, beside
       return { left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)) }
     })
     assert.ok(Math.abs(edges.left - 64) < 1 && Math.abs(1000 - edges.right - 64) < 1, JSON.stringify(edges))
+
+    await tab.locator("#v-0 > div").evaluate((el) => (el.style.height = "900px"))
+    await tab.waitForFunction(() => {
+      const doc = JSON.parse(localStorage.getItem("drop-prototype-canvas:/rows"))
+      return doc.positions["v-4"][1] === 1140 && doc.positions["v-8"][1] === 2080
+    })
+  } finally {
+    await browser.close()
+  }
+})
+
+test("automatic rows reflow across versions and undo, but a saved one-row layout stays until reset", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    let height = 300
+    const url = "https://picker.test/reflow"
+    await tab.route(url, (route) => {
+      const sections = Array.from(
+        { length: 6 },
+        (_, index) =>
+          `<section id="v-${index}" data-variant="Page ${index}"><div style="height:${index === 0 ? height : 300}px"></div></section>`,
+      ).join("")
+      const html = `<!doctype html><html><body><script>self.__dropVersion = "${height}"</script>${sections}</body></html>`
+      return route.fulfill({ contentType: "text/html", body: injectRuntime(html, false, 0, true) })
+    })
+    await tab.addInitScript(() => {
+      if (sessionStorage.getItem("seeded")) return
+      sessionStorage.setItem("seeded", "1")
+      const positions = Object.fromEntries(Array.from({ length: 6 }, (_, index) => [`v-${index}`, [index * 1440, 0]]))
+      localStorage.setItem("drop-prototype-canvas:/reflow", JSON.stringify({ v: 1, positions, moved: [] }))
+    })
+    const saved = (fifth, sixth) =>
+      tab.waitForFunction(
+        ([fifth, sixth]) => {
+          const { positions } = JSON.parse(localStorage.getItem("drop-prototype-canvas:/reflow"))
+          return String(positions["v-4"]) === String(fifth) && String(positions["v-5"]) === String(sixth)
+        },
+        [fifth, sixth],
+        { timeout: 3000 },
+      )
+    await tab.goto(url)
+    await saved([5760, 0], [7200, 0])
+    await tab.locator("prototype-picker .layout").click()
+    await saved([0, 540], [1440, 540])
+    await tab.keyboard.press("Control+z")
+    await saved([5760, 0], [7200, 0])
+    await tab.keyboard.press("Control+y")
+    await saved([0, 540], [1440, 540])
+
+    height = 900
+    await tab.reload()
+    await saved([0, 1140], [1440, 1140])
+
+    await tab.getByRole("button", { name: "Move Page 5" }).press("Shift+ArrowDown")
+    await saved([0, 1140], [1440, 1204])
+    await tab.locator("#v-0 > div").evaluate((el) => (el.style.height = "600px"))
+    await saved([0, 840], [1440, 1204])
+    await tab.keyboard.press("Control+z")
+    await saved([0, 840], [1440, 840])
+    await tab.keyboard.press("Control+y")
+    await saved([0, 840], [1440, 1204])
   } finally {
     await browser.close()
   }
