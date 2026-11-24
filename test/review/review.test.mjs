@@ -22,7 +22,7 @@ const { default: threadReply } = await import("../../server/api/review/comments/
 const { default: reviewImageGet } = await import("../../server/api/review/images/[id].get.ts")
 const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
-const { default: replyDelete } = await import("../../server/api/replies/[id].delete.ts")
+const { default: replyDelete } = await import("../../server/api/comments/[id]/replies/[messageId].delete.ts")
 const { deleteDrop, findDrop } = await import("../../server/utils/drops.ts")
 const { default: newSite } = await import("../../server/api/sites.post.ts")
 const { default: newFolder } = await import("../../server/api/folders.post.ts")
@@ -1666,9 +1666,12 @@ test("comments and replies in Drop take images, which belong to the drop and go 
   assert.equal(keys.length, 2)
   // A reply goes by its own id, with its image. The thread's first comment is no reply.
   const opening = threads().find((thread) => thread.id === posted.id).messages[0].id
-  const first = request(`/api/replies/${opening}`, { method: "DELETE", id: opening })
+  const replyAt = (thread, id) =>
+    request(`/api/comments/${thread}/replies/${id}`, { method: "DELETE", id: thread, params: { messageId: id } })
+  const first = replyAt(posted.id, opening)
   assert.equal((await answer(replyDelete, first)).status, 404)
-  const gone = request(`/api/replies/${answered.id}`, { method: "DELETE", id: answered.id })
+  assert.equal((await answer(replyDelete, replyAt("thread_other", answered.id))).status, 404)
+  const gone = replyAt(posted.id, answered.id)
   assert.deepEqual(await replyDelete(gone), { ok: true })
   assert.deepEqual((await dropComments(request("/api/drops/doc/comments", { id: "doc" })))[0].replies, [])
   assert.equal(sql.prepare("SELECT count(*) AS n FROM drops WHERE parent_id = 'doc'").get().n, 1)

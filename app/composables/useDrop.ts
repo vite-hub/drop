@@ -210,7 +210,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       return edited ? { value: { ...edited, id: messageId } } : { error: "This comment is gone." }
     }
     try {
-      const edited = await $fetch<CommentReply>(`/api/messages/${messageId}`, {
+      const edited = await $fetch<CommentReply>(`/api/comments/${commentId}/messages/${messageId}`, {
         method: "PATCH",
         body: { body, mentions },
       })
@@ -235,7 +235,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   async function removeReply(commentId: string, replyId: string) {
     if (waiting(commentId, replyId)) return discard(replyId, "Couldn't delete the reply")
     try {
-      await $fetch(`/api/replies/${replyId}`, { method: "DELETE" })
+      await $fetch(`/api/comments/${commentId}/replies/${replyId}`, { method: "DELETE" })
       setReplies(commentId, (replies) => replies.filter((reply) => reply.id !== replyId))
       void wrote.trigger()
     } catch (error) {
