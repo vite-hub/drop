@@ -69,6 +69,7 @@ function openApp(query, { hash = "", files: given, router, served = false } = {}
     useMounted: () => ref(true),
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({}),
+    useDocEmbeds: () => ({}),
     useDebounceFn: (fn) => fn,
     useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),

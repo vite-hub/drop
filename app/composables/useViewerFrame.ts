@@ -1,6 +1,6 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
-import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
+import { injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
@@ -194,32 +194,7 @@ export function useViewerFrame(options: {
   }
   const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
-  const embedLinks = computed(() => {
-    if (drop.value.kind !== "markdown") return new Set<string>()
-    const template = globalThis.document?.createElement("template")
-    if (!template) return new Set<string>()
-    template.innerHTML = drop.value.html ?? ""
-    return new Set(
-      Array.from(template.content.querySelectorAll("figure.drop-embed[data-drop-embed]"), (box) =>
-        box.getAttribute("data-drop-embed"),
-      ),
-    )
-  })
-  const embeds = new Map<string, Promise<{ html: string } | { error: string }>>()
-  function embedded(link: string) {
-    let embed = embeds.get(link)
-    if (!embed) {
-      embed = $fetch<DropDetail>(`/api/drops/${encodeURIComponent(link)}`).then(
-        (found) =>
-          found.kind === "html" && found.content
-            ? { html: found.content }
-            : { error: `“${found.title}” isn't an HTML drop, so it can't show inside a doc. Only HTML drops can.` },
-        () => ({ error: "This drop is private, expired, or deleted, so it can't show here." }),
-      )
-      embeds.set(link, embed)
-    }
-    return embed
-  }
+  const embeds = useDocEmbeds(drop, attached, dark)
 
   const reading = new Map<string, string[]>()
 
@@ -309,22 +284,10 @@ export function useViewerFrame(options: {
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
         return
-      case "embeds": {
-        if (drop.value.kind !== "markdown") return
-        const requestedId = drop.value.id
-        for (const link of message.links) {
-          if (!embedLinks.value.has(link)) continue
-          void embedded(link).then((embed) => {
-            if (drop.value.id !== requestedId || !embedLinks.value.has(link)) return
-            return send({
-              type: "embed-data",
-              link,
-              ...("html" in embed ? { html: embedDocument(embed.html, dark.value) } : embed),
-            })
-          })
-        }
-        return
-      }
+      case "embeds":
+        return embeds.answer(message.links, send)
+      case "embed-page":
+        return embeds.page(message.link, message.page, send)
       case "unplaced":
         unplaced.value = new Set(message.ids)
         return
@@ -332,6 +295,7 @@ export function useViewerFrame(options: {
         frameTool.value = message.tool
         return
       case "ready":
+        embeds.reloaded()
         variants.value = null
         frameTool.value = "browse"
         if (options.variantBar) send({ type: "picker", do: "sync" })

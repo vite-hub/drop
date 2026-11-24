@@ -8,6 +8,7 @@ import { compileScript, parse } from "vue/compiler-sfc"
 import { transpileModule, ModuleKind } from "typescript"
 
 const root = fileURLToPath(new URL("../../node_modules/.cache/pdf-browser/", import.meta.url))
+const pdfPages = fileURLToPath(new URL("../../app/utils/pdf-pages.ts", import.meta.url))
 const source = readFileSync(new URL("../../app/components/viewer/ViewerPdf.vue", import.meta.url), "utf8")
 const { descriptor } = parse(source)
 rmSync(root, { force: true, recursive: true })
@@ -27,8 +28,9 @@ writeFileSync(
   `
 import * as Vue from "vue"
 import * as VueUse from "@vueuse/core"
+import * as pdfPages from "/@fs${pdfPages}"
 import Viewer from "./viewer.js"
-Object.assign(window, Vue, VueUse)
+Object.assign(window, Vue, VueUse, pdfPages)
 window.useNotify = () => ({ alert: console.error })
 window.reportClientError = console.error
 const add = document.addEventListener.bind(document)

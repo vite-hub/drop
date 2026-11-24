@@ -23,6 +23,7 @@ test("content-origin app frames keep their own picker unless they are the viewer
     useMounted: () => ref(true),
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({}),
+    useDocEmbeds: () => ({}),
     useDebounceFn: (fn) => fn,
     useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),

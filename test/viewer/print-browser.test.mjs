@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import { chromium, webkit } from "playwright"
 import { test } from "vite-plus/test"
 import { PREVIEW_SANDBOX, previewSandbox } from "../../app/utils/feedback.ts"
@@ -186,8 +187,13 @@ async function openLazy(
                 window.posts.push(e.data);
                 if (e.data.type === "files" && answering.files) for (const path of e.data.paths)
                   answer(source, { type: "file-data", path, data: videos[path] ? video(videos[path]) : ${JSON.stringify(PNG)} });
+                // An attached PDF has one page; any other link is an HTML drop.
                 if (e.data.type === "embeds" && answering.embeds) for (const link of e.data.links)
-                  answer(source, { type: "embed-data", link, html: ${JSON.stringify(embed).replaceAll("<", "\\u003c")} });
+                  answer(source, link.startsWith("/f/")
+                    ? { type: "embed-data", link, kind: "pdf", pages: 1, title: "CV", href: link }
+                    : { type: "embed-data", link, html: ${JSON.stringify(embed).replaceAll("<", "\\u003c")} });
+                if (e.data.type === "embed-page" && answering.embeds)
+                  answer(source, { type: "embed-page-data", link: e.data.link, page: e.data.page, src: ${JSON.stringify(PNG)}, width: 1240, height: 1605, links: [], pins: [] });
               });
               window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
     })
@@ -207,6 +213,7 @@ async function openLazy(
         unfilled: document.querySelectorAll("[data-drop-embed]").length,
         frames: document.querySelectorAll(".drop-embed iframe").length,
         framesLoaded: window.framesLoaded,
+        pages: document.querySelectorAll(".drop-embed-page > img").length,
         images: [...document.images].map((image) => ({
           alt: image.alt,
           drawn: image.complete && image.naturalWidth > 0,
@@ -272,6 +279,116 @@ test("Export as PDF still prints when the viewer never sends the files", async (
   }
 }, 40_000)
 
+// A doc with an attached PDF at the top and a PDF drop far below. The viewer answers each page after a pause, and
+// answers the pages in `failing` with the reason it couldn't draw them.
+async function openPdfs(browser, { pages, failing = [] }) {
+  const CV = "/f/00000000-0000-4000-8000-000000000003.pdf"
+  const html = planDocument(
+    "markdown",
+    "",
+    false,
+    `<h1>Plan</h1><figure class="drop-embed" data-drop-file="${CV}" data-kind="pdf" data-title="CV"><a class="drop-embed-link" href="${CV}">CV</a></figure>` +
+      `${FILLER.repeat(5)}<figure class="drop-embed" data-drop-embed="${LINK}" data-title="Deck"><a class="drop-embed-link" href="/d/${LINK}">Deck</a></figure>`,
+  )
+  const escaped = html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+  const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+  await page.route("**/*", (route) =>
+    new URL(route.request().url()).hostname === "drop.test"
+      ? route.fulfill({
+          contentType: "text/html",
+          body: `<style>body{margin:0}iframe{border:0;width:100vw;height:700px;display:block}</style>
+          <iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+          <script>window.posts = []; window.answered = 0;
+            const pages = { ${JSON.stringify(CV)}: ${pages[0]}, ${JSON.stringify(LINK)}: ${pages[1]} };
+            const failing = ${JSON.stringify(failing)};
+            const answer = (source, message) => setTimeout(() => {
+              window.answered = Date.now();
+              source.postMessage({ __drop: true, ...message }, "*");
+            }, 150);
+            addEventListener("message", (e) => {
+              if (!e.data?.__drop) return;
+              window.posts.push(e.data);
+              const { link, page } = e.data;
+              if (e.data.type === "embeds") for (const link of e.data.links)
+                answer(e.source, { type: "embed-data", link, kind: "pdf", pages: pages[link], title: "Deck", href: "/d/" + link });
+              if (e.data.type !== "embed-page") return;
+              if (failing.includes(page)) answer(e.source, { type: "embed-page-data", link, page, error: "Bad page" });
+              else answer(e.source, { type: "embed-page-data", link, page, src: ${JSON.stringify(PNG)}, width: 1240, height: 1605, links: [], pins: [] });
+            });
+            window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
+        })
+      : route.abort(),
+  )
+  await page.goto("https://drop.test/")
+  await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
+  const frame = page.frames()[1]
+  // While reading, only the pages near the screen are asked for.
+  await page.waitForFunction(() => window.posts.some((m) => m.type === "embed-page"))
+  await page.waitForTimeout(500)
+  const read = await page.evaluate(() => window.posts.filter((m) => m.type === "embed-page").length)
+  assert.ok(read < 10, `${read} pages asked for while reading`)
+  await frame.evaluate(() => {
+    window.printed = []
+    addEventListener("beforeprint", () =>
+      window.printed.push({
+        at: Date.now(),
+        pages: Array.from(document.querySelectorAll(".drop-embed"), (box) => [
+          box.querySelectorAll(".drop-embed-page > img").length,
+          box.querySelectorAll(".drop-embed-page > .drop-embed-note").length,
+        ]),
+        notes: Array.from(document.querySelectorAll(".drop-embed-page > .drop-embed-note"), (note) => note.textContent),
+      }),
+    )
+  })
+  return { page, frame }
+}
+
+const pagesAsked = (posts) => posts.filter((m) => m.type === "embed-page").map((m) => `${m.link} ${m.page}`)
+
+test("Export as PDF draws every page of a doc's PDFs, all 42 of a long one, and asks for each page once", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await openPdfs(browser, { pages: [6, 42] })
+    await page.evaluate(() => window.tell({ type: "print", title: "Plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    const [printed] = await frame.evaluate(() => window.printed)
+    assert.deepEqual(printed.pages, [
+      [6, 0],
+      [42, 0],
+    ])
+    const posts = pagesAsked(await page.evaluate(() => window.posts))
+    assert.equal(posts.length, 48)
+    assert.equal(new Set(posts).size, 48)
+    await page.emulateMedia({ media: "print" })
+    // Only the page images print: no box background or border to band a Letter page on A4. Drop's colors from disk,
+    // since `vp test` leaves THEME_CSS empty.
+    const theme = await readFile(new URL("../../shared/theme.css", import.meta.url), "utf8")
+    await frame.evaluate((css) => {
+      const style = document.createElement("style")
+      style.textContent = css
+      document.head.prepend(style)
+    }, theme)
+    assert.deepEqual(
+      await frame.evaluate(() =>
+        [".drop-embed", ".drop-embed-page"].map((selector) => {
+          const style = getComputedStyle(document.querySelector(selector))
+          return [style.backgroundColor, style.borderTopWidth, style.backgroundImage]
+        }),
+      ),
+      [
+        ["rgba(0, 0, 0, 0)", "0px", "none"],
+        ["rgba(0, 0, 0, 0)", "0px", "none"],
+      ],
+    )
+    assert.equal(
+      await frame.evaluate(() => getComputedStyle(document.querySelector(".drop-embed-page")).breakInside),
+      "avoid",
+    )
+  } finally {
+    await browser.close()
+  }
+}, 40_000)
+
 test("Export as PDF asks for a long doc's files and drops in batches the viewer accepts", async () => {
   const paths = Array.from(
     { length: 101 },
@@ -298,6 +415,153 @@ test("Export as PDF asks for a long doc's files and drops in batches the viewer 
     await browser.close()
   }
 }, 40_000)
+
+test("Export as PDF asks for 10 attached PDFs and 11 drops below the screen in batches the viewer accepts", async () => {
+  const pdfs = Array.from(
+    { length: 10 },
+    (_, i) => `/f/00000000-0000-4000-8000-${String(i + 200).padStart(12, "0")}.pdf`,
+  )
+  const links = Array.from({ length: 11 }, (_, i) => `k7f2q9m4x${String(i).padStart(3, "0")}`)
+  const doc =
+    `<h1>Plan</h1>${FILLER.repeat(3)}` +
+    pdfs.map((path) => `<figure class="drop-embed" data-drop-file="${path}" data-kind="pdf"></figure>`).join("") +
+    links.map((link) => `<figure class="drop-embed" data-drop-embed="${link}"></figure>`).join("")
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await openLazy(browser, { answers: true, doc })
+    assert.deepEqual(asked(await page.evaluate(() => window.posts)).embeds, [])
+    await page.evaluate(() => window.tell({ type: "print", title: "SEO plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    assert.deepEqual(await page.evaluate(() => window.rejected), [])
+    const posts = await page.evaluate(() => window.posts)
+    assert.deepEqual(asked(posts).embeds, [...pdfs, ...links])
+    assert.ok(posts.filter((m) => m.type === "embeds").every((m) => m.links.length <= 20))
+    const [printed] = await frame.evaluate(() => window.printed)
+    assert.deepEqual(
+      { unfilled: printed.unfilled, framesLoaded: printed.framesLoaded, pages: printed.pages },
+      { unfilled: 0, framesLoaded: 11, pages: 10 },
+    )
+  } finally {
+    await browser.close()
+  }
+}, 40_000)
+
+test("Export as PDF prints each page of a tall PDF whole on a sheet of its own", async () => {
+  const CV = "/f/00000000-0000-4000-8000-000000000003.pdf"
+  // The doc as it prints: Chromium lays out the top-level page for page.pdf(), so the doc is the page, and the viewer's
+  // answers come from the doc's own window, which is its `parent`.
+  const html = planDocument(
+    "markdown",
+    "",
+    false,
+    `<h1>Plan</h1><p>Launch on November 18.</p><figure class="drop-embed" data-drop-file="${CV}" data-kind="pdf" data-title="CV"><a class="drop-embed-link" href="${CV}">CV</a></figure>`,
+  )
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(html)
+    await page.evaluate(
+      ({ CV, PNG }) => {
+        const tell = (message) => window.postMessage({ __drop: true, ...message }, "*")
+        tell({ type: "embed-data", link: CV, kind: "pdf", pages: 2, title: "CV", href: CV })
+        // Pages twice as tall as they're wide.
+        for (const n of [1, 2])
+          tell({ type: "embed-page-data", link: CV, page: n, src: PNG, width: 1000, height: 2000, links: [], pins: [] })
+      },
+      { CV, PNG },
+    )
+    await page.waitForFunction(() => document.querySelectorAll(".drop-embed-page > img").length === 2)
+    const pdf = await page.pdf({ format: "Letter" })
+    const lib = await import("pdfjs-dist/legacy/build/pdf.mjs")
+    const printed = await lib.getDocument({ data: new Uint8Array(pdf) }).promise
+    // The PDF pages drawn on each sheet: one split across two sheets would be drawn on both.
+    const sheets = []
+    for (let n = 1; n <= printed.numPages; n++) {
+      const { fnArray } = await (await printed.getPage(n)).getOperatorList()
+      sheets.push(fnArray.filter((fn) => fn === lib.OPS.paintImageXObject).length)
+    }
+    assert.deepEqual(sheets, [0, 1, 1])
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("Export as PDF prints right after a page the viewer couldn't draw, which says so in its place", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await openPdfs(browser, { pages: [2, 4], failing: [3] })
+    await page.evaluate(() => window.tell({ type: "print", title: "Plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    const [printed] = await frame.evaluate(() => window.printed)
+    const answered = await page.evaluate(() => window.answered)
+    assert.ok(printed.at - answered < 2_000, `printed ${printed.at - answered} ms after the last answer`)
+    assert.deepEqual(printed.pages, [
+      [2, 0],
+      [3, 1],
+    ])
+    assert.deepEqual(printed.notes, ["Page 3 couldn't be drawn."])
+  } finally {
+    await browser.close()
+  }
+}, 40_000)
+
+test("Export as PDF waits for an embedded video's first frame", async () => {
+  const VIDEO = "mp4vmp4vmp4v"
+  const html = planDocument(
+    "markdown",
+    "",
+    false,
+    `<h1>Plan</h1>${FILLER.repeat(5)}<figure class="drop-embed" data-drop-embed="${VIDEO}" data-title="Demo"><a class="drop-embed-link" href="/d/${VIDEO}">Demo</a></figure>`,
+  )
+  const escaped = html.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
+    // A tenth of a second of silent 8 kHz WAV, which a video element plays.
+    await page.route("**/*", (route) =>
+      new URL(route.request().url()).hostname === "drop.test"
+        ? route.fulfill({
+            contentType: "text/html",
+            body: `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+            <script>window.posts = [];
+              const wav = () => {
+                const samples = 800, view = new DataView(new ArrayBuffer(44 + samples));
+                const text = (at, value) => [...value].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+                text(0, "RIFF"); view.setUint32(4, 36 + samples, true); text(8, "WAVEfmt ");
+                view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+                view.setUint32(24, 8000, true); view.setUint32(28, 8000, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+                text(36, "data"); view.setUint32(40, samples, true);
+                for (let i = 0; i < samples; i++) view.setUint8(44 + i, 128);
+                return new Blob([view.buffer], { type: "audio/wav" });
+              };
+              addEventListener("message", (e) => {
+                if (!e.data?.__drop) return;
+                window.posts.push(e.data);
+                if (e.data.type === "embeds") for (const link of e.data.links)
+                  e.source.postMessage({ __drop: true, type: "embed-data", link, kind: "video", data: wav(), mime: "video/mp4" }, "*");
+              });
+              window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
+          })
+        : route.abort(),
+    )
+    await page.goto("https://drop.test/")
+    await page.waitForFunction(() => window.posts.some((m) => m.type === "ready"))
+    const frame = page.frames()[1]
+    await frame.evaluate(() => {
+      window.printed = []
+      addEventListener("beforeprint", () => {
+        const video = document.querySelector(".drop-embed video")
+        window.printed.push(video ? video.readyState : -1)
+      })
+    })
+    await page.evaluate(() => window.tell({ type: "print", title: "Plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    const [readyState] = await frame.evaluate(() => window.printed)
+    assert.ok(readyState >= 2, `printed at readyState ${readyState}`)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
 
 test("Export as PDF waits for an attached video's first frame, and not for one that can't play", async () => {
   const PLAYS = "/f/00000000-0000-4000-8000-000000000003.webm"

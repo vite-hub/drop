@@ -1,18 +1,14 @@
-import { deferImages, deferMedia, embeddedImagePaths, embeddedMediaPaths, FILE_LINK } from "#shared/embedded-images"
+import {
+  deferImages,
+  deferMedia,
+  deferPdfs,
+  embeddedImagePaths,
+  embeddedMediaPaths,
+  embeddedPdfPaths,
+  FILE_LINK,
+  localPdf,
+} from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
-
-const dataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    const settle = () => {
-      reader.removeEventListener("loadend", settle)
-      if (reader.result === null || reader.result instanceof ArrayBuffer)
-        reject(reader.error ?? new Error("Not a data URL"))
-      else resolve(reader.result)
-    }
-    reader.addEventListener("loadend", settle)
-    reader.readAsDataURL(blob)
-  })
 
 const cached = <T>(read: (path: string) => Promise<T>) => {
   const fetched = new Map<string, Promise<T | null>>()
@@ -48,7 +44,8 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
       (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
     ),
   )
-  const fetchImage = cached((path) => readBlob(path).then(dataUrl))
+  const pdfs = computed(() => embeddedPdfPaths(drop.value.html ?? "", host))
+  const fetchImage = cached((path) => readBlob(path).then(blobDataUrl))
   const fetchMedia = cached(readBlob)
   const deferred = computed(() => drop.value.kind === "markdown")
   watch(
@@ -73,12 +70,13 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
   )
   const inline = (source: string) =>
     data.value ? source.replace(FILE_LINK, (match, path: string) => data.value![path] ?? match) : source
-  const defer = (html: string) => deferMedia(deferImages(html, images.value), media.value)
+  const defer = (html: string) => deferPdfs(deferMedia(deferImages(html, images.value), media.value), host)
   const load = (path: string): Promise<string | Blob | null> =>
     images.value.includes(path)
       ? fetchImage(path)
-      : media.value.includes(path)
+      : media.value.includes(path) || pdfs.value.includes(path)
         ? fetchMedia(path)
         : Promise.resolve(null)
-  return { ready: computed(() => data.value !== null), deferred, inline, defer, load }
+  const pdfOf = (src: string) => localPdf(src, host)
+  return { ready: computed(() => data.value !== null), deferred, inline, defer, load, pdfs, pdfOf }
 }
