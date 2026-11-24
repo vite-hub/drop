@@ -11,7 +11,7 @@ const { default: siteReplyPost } = await import("../../server/api/review/comment
 const { default: siteCommentPost } = await import("../../server/api/drops/[id]/review.post.ts")
 const { default: commentPatch } = await import("../../server/api/comments/[id]/index.patch.ts")
 const { default: commentDelete } = await import("../../server/api/comments/[id]/index.delete.ts")
-const { default: replyDelete } = await import("../../server/api/replies/[id].delete.ts")
+const { default: replyDelete } = await import("../../server/api/comments/[id]/replies/[messageId].delete.ts")
 
 // A comment's retry key (`requestId`): a client that lost the answer sends the same comment again, and gets the first
 // one back, with nothing stored twice.
@@ -351,7 +351,12 @@ test("a guest resolves and deletes nothing, their own comments and replies inclu
   assert.equal(resolve.status, 404)
   const removeReply = await answer(
     replyDelete,
-    request(`/api/replies/${reply.id}`, { method: "DELETE", headers: { cookie }, id: reply.id }),
+    request(`/api/comments/${thread.id}/replies/${reply.id}`, {
+      method: "DELETE",
+      headers: { cookie },
+      id: thread.id,
+      params: { messageId: reply.id },
+    }),
   )
   assert.equal(removeReply.status, 404)
   const remove = await answer(
