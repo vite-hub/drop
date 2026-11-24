@@ -109,7 +109,7 @@ test(
   async () => {
     const browser = await chromium.launch()
     try {
-      const context = await browser.newContext({ viewport: { width: 900, height: 600 } })
+      const context = await browser.newContext({ viewport: { width: 900, height: 600 }, hasTouch: true })
       // The toolbar's shadow roots are closed; opened here so the test can read the drawings.
       await context.addInitScript(() => {
         const { value: attach } = Object.getOwnPropertyDescriptor(Element.prototype, "attachShadow")
@@ -125,8 +125,16 @@ test(
             body: `<!doctype html><html><head>${SITE_CSS}</head><body>${BOXES}<input id="q" style="position:absolute;left:40px;top:300px">
             <div id="closed-editor"></div>
             <div id="slider" role="slider" style="position:absolute;left:40px;top:400px;width:100px;height:24px"></div>
+            <iframe src="https://embedded.example.org/" style="position:absolute;left:300px;top:400px;width:120px;height:100px;border:0"></iframe>
             <section id="menu" popover="manual"><button>Do something</button></section>
             <script>window.clicks = 0; document.addEventListener("click", () => clicks++);
+            window.consumedReleases = 0;
+            addEventListener("pointerup", (event) => {
+              if (event.pointerType === "touch" && event.target.id === "a") {
+                consumedReleases++;
+                event.stopImmediatePropagation();
+              }
+            }, true);
             window.dragEvents = [];
             const slider = document.querySelector("#slider");
             slider.addEventListener("pointerdown", (event) => {
@@ -144,6 +152,8 @@ test(
           })
         if (url.origin === DROP && url.pathname === "/review.js")
           return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
+        if (url.hostname === "embedded.example.org")
+          return route.fulfill({ contentType: "text/html", body: "<!doctype html><body>Embedded page</body>" })
         return route.abort()
       })
       const page = await context.newPage()
@@ -192,14 +202,37 @@ test(
       assert.equal(await pressed(), "true", "S works again after the site receives the release")
       await page.keyboard.press("Escape")
 
+      await page.touchscreen.tap(A.x, A.y)
+      assert.equal(await page.evaluate(() => consumedReleases), 1)
+      await shortcut()
+      assert.equal(await pressed(), "true", "S recovers after a site consumes touch pointerup")
+      await page.keyboard.press("Escape")
+      await page.touchscreen.tap(A.x, A.y)
+      await button.tap()
+      assert.equal(await pressed(), "true", "the pill also recovers from a missed touch release")
+      await button.click()
+      await button.blur()
+
+      await page.mouse.move(A.x, A.y)
+      await page.mouse.down()
+      await page.mouse.move(360, 450)
+      await page.mouse.up()
+      await shortcut()
+      assert.equal(await pressed(), "true", "an uncaptured mouse release in an iframe must not leave S blocked")
+      await page.keyboard.press("Escape")
+
       await page.locator("#menu").evaluate((menu) => menu.showPopover())
       await shortcut()
       assert.equal(await pressed(), "false", "Measure cannot intercept a native popover")
       await button.click()
       assert.equal(await pressed(), "false")
       assert.equal(await page.locator("#menu").evaluate((menu) => menu.matches(":popover-open")), true)
+      const clicksBefore = await page.evaluate(() => clicks)
+      await page.locator("#menu button").click()
+      assert.equal(await page.evaluate(() => clicks), clicksBefore + 1, "declining Measure keeps the popover usable")
       await page.locator("#menu").evaluate((menu) => menu.hidePopover())
       await button.blur()
+      await page.evaluate(() => (clicks = 0))
 
       await shortcut()
       assert.equal(await pressed(), "true")
