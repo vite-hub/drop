@@ -1,6 +1,14 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+
 import { addPlugin, createResolver, defineNuxtModule, useLogger } from "@nuxt/kit"
 import { buildMetaContent, buildMetaName, readForgeBuild } from "@vite-hub/forge/build/node"
 
+import { canvasManifest } from "./canvas.ts"
+
+import type { Nuxt } from "@nuxt/schema"
+
+import type { CanvasPageMeta } from "./canvas.ts"
 import type { DropPublicConfig } from "./runtime/script.ts"
 
 export interface DropModuleOptions {
@@ -11,7 +19,13 @@ export interface DropModuleOptions {
   preview?: boolean
 }
 
-export type { DropPublicConfig }
+export type { CanvasPageMeta, DropPublicConfig }
+
+declare module "#app" {
+  interface PageMeta {
+    canvas?: false | CanvasPageMeta
+  }
+}
 
 type DropModuleSetupResult = false | void | { timings?: { setup?: number; [key: string]: number | undefined } }
 
@@ -39,6 +53,7 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
     addPlugin({ src: resolver.resolve("./runtime/review.client"), mode: "client" })
 
     if (!(options.preview ?? process.env.DROP_PREVIEW === "1")) return
+    serveCanvasManifest(nuxt)
     const content = buildMetaContent(await readForgeBuild(nuxt.options.rootDir))
     if (!content) {
       useLogger("@vite-hub/drop").warn(
@@ -49,5 +64,16 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
     nuxt.options.app.head.meta = [...(nuxt.options.app.head.meta ?? []), { name: buildMetaName, content }]
   },
 })
+
+function serveCanvasManifest(nuxt: Nuxt) {
+  const dir = join(nuxt.options.buildDir, "drop-canvas")
+  rmSync(dir, { recursive: true, force: true })
+  nuxt.options.experimental.extraPageMetaExtractionKeys.push("canvas")
+  nuxt.options.nitro.publicAssets = [...(nuxt.options.nitro.publicAssets ?? []), { dir, maxAge: 0 }]
+  nuxt.hook("pages:resolved", (pages) => {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, "__canvas.json"), JSON.stringify(canvasManifest(pages)))
+  })
+}
 
 export default dropModule

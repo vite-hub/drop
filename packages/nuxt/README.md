@@ -25,4 +25,22 @@ The same options go under `drop` in `nuxt.config`: `url`, `edge`, `at`, `collaps
 
 On a pull request in GitHub Actions, pass the head commit, `${{ github.event.pull_request.head.sha }}`; `GITHUB_SHA` is the test merge commit there. The meta tag is only a claim. Drop's pull request reviews, still to come, will check it against a GitHub deployment of that commit at the page's address before they link the preview to a pull request.
 
+## Page list for a canvas
+
+A preview build also serves `/__canvas.json`, the app's pages, so an agent can lay out a Drop canvas with one item per page:
+
+```json
+{ "pages": [{ "path": "/", "name": "index" }, { "path": "/orders/:id", "name": "orders-id", "params": { "id": "42" } }] }
+```
+
+A route with params, such as `/orders/:id`, opens only with sample values, which the page gives in `definePageMeta`. `canvas: false` leaves a page out. Redirects and catch-all routes without sample values are left out too. An app without pages serves no file.
+
+```vue [app/pages/orders/[id].vue]
+<script setup lang="ts">
+definePageMeta({ canvas: { params: { id: "42" } } })
+</script>
+```
+
+The module reads `canvas` at build time, so its value has to be a plain object or `false`, not a variable.
+
 Works with Nuxt 4 and later.
