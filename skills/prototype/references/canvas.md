@@ -18,7 +18,7 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 ```
 
 - Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
-- Live pages load as the camera reaches them, two at a time, and sleep (blank, with their name) after a few seconds far away, so a canvas of 20 previews doesn't run 20 apps at once.
+- Live pages load as the camera comes near them, two at a time, and sleep (blank, with their name) after five seconds far away.
 - The frame keeps the reader's login when the URL is on the same site as Drop. A Quiver preview such as `https://pr1473-demo.preview.quiver.dk` inside drop.quiver.dk, whose drops run on drop-usercontent.quiver.dk, is all `quiver.dk`, so its SameSite=Lax cookies flow. On another site the page loads signed out, or not at all if the browser blocks its cookies.
 - A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
 - Wheel and clicks over a live page go to that page. Pan from empty space, with Space + drag, or with the Hand tool.

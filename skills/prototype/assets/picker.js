@@ -44,7 +44,7 @@
     let url;
     try { url = new URL(el.dataset.src, location.href); } catch { continue; }
     if (url.protocol !== "https:" && url.protocol !== "http:") continue;
-    const live = { url: url.href, frame: null, state: "asleep", timer: 0, slow: 0 };
+    const live = { url: url.href, frame: null, state: "asleep", timer: 0 };
     lives.set(el, live);
     blank(el, live);
   }
@@ -283,25 +283,24 @@
       if (near(it, v)) {
         clearTimeout(live.timer); live.timer = 0;
         if (live.state === "asleep" && loading < LOADING) { load(it, live); loading++; }
-      } else if (live.state !== "asleep" && !live.timer && !kept(it)) {
+      } else if (live.state !== "asleep" && !live.timer) {
         live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP);
       }
     }
   }
   function load(it, live) {
     const frame = live.frame;
-    // A page that never reports its load frees its turn after a while.
-    const done = () => { clearTimeout(live.slow); if (live.frame === frame && live.state === "loading") { live.state = "awake"; rest(); } };
+    // The turn ends with the frame's load, which an error page fires too, or with its sleep.
     live.state = "loading";
-    frame.addEventListener("load", done, { once: true });
-    live.slow = setTimeout(done, 10000);
+    frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { live.state = "awake"; rest(); } }, { once: true });
     frame.src = live.url;
     it.el.removeAttribute("data-prototype-asleep");
   }
   const kept = (it) => commenting || threadOpen || it.el.contains(document.activeElement);
+  // Focus moving between two frames tells this page nothing, so a kept frame checks again later.
   function sleep(it, live) {
-    if (near(it, view()) || kept(it)) return;
-    clearTimeout(live.slow);
+    if (near(it, view())) return;
+    if (kept(it)) { live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP); return; }
     live.state = "asleep";
     blank(it.el, live);
     rest();

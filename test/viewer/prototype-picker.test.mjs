@@ -789,13 +789,21 @@ test("live pages load as their items come near the screen, two at a time, and sl
     assert.deepEqual(await loaded(), ["v-0", "v-1", "v-2"])
     assert.equal(await asleep("v-5"), true)
 
-    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while.
+    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while, and the
+    // one being typed in stays loaded until focus moves to another page.
+    await tab.evaluate(() => document.getElementById("v-0").querySelector("iframe").focus())
     await tab.mouse.move(500, 600)
     for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
     await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
     assert.ok((await loaded()).includes("v-0"))
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-1").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.equal(await asleep("v-0"), false)
+    await tab.evaluate(() => document.getElementById("v-11").querySelector("iframe").focus())
     await tab.clock.fastForward(6000)
     await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
