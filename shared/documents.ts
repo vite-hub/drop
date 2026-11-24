@@ -28,6 +28,10 @@ main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)
 /* \`::drop\` (EMBEDS_SCRIPT): another drop's box, a link until the viewer fills it with the drop in a frame. */
 .drop-embed { display: grid; place-items: center; height: var(--drop-embed-height, 480px); margin: 1.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); overflow: hidden; }
 .drop-embed iframe { display: block; width: 100%; height: 100%; border: 0; background: var(--background); }
+/* A PDF, image or video (an attached PDF from the start, a drop once the viewer says what it is) takes its pages' or
+   its media's own height in the doc's flow instead of the fixed frame height. */
+.drop-embed:is([data-kind="pdf"], [data-kind="image"], [data-kind="video"]) { display: block; height: auto; min-height: 0; }
+.drop-embed:is([data-kind="pdf"], [data-kind="image"], [data-kind="video"]) > .drop-embed-link { display: block; padding: 1rem; text-align: center; }
 .drop-embed-note { margin: 0; padding: 1rem; color: var(--muted-foreground); font-size: .875rem; text-align: center; }
 /* An image on its way (DEFERRED_FILES_SCRIPT) keeps a screenshot's room, so the text below doesn't jump as much. */
 .typeset img[data-drop-image] { width: 100%; aspect-ratio: 16 / 10; background: var(--muted); }

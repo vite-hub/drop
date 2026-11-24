@@ -1,4 +1,11 @@
-import { deferImages, deferMedia, embeddedImagePaths, embeddedMediaPaths, FILE_LINK } from "#shared/embedded-images"
+import {
+  deferImages,
+  deferMedia,
+  embeddedImagePaths,
+  embeddedMediaPaths,
+  embeddedPdfPaths,
+  FILE_LINK,
+} from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
 
 const dataUrl = (blob: Blob) =>
@@ -48,6 +55,13 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
       (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
     ),
   )
+  const pdfs = computed(() =>
+    embeddedPdfPaths(
+      [drop.value.content ?? "", drop.value.html ?? ""],
+      host,
+      (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
+    ),
+  )
   const fetchImage = cached((path) => readBlob(path).then(dataUrl))
   const fetchMedia = cached(readBlob)
   const deferred = computed(() => drop.value.kind === "markdown")
@@ -77,8 +91,8 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
   const load = (path: string): Promise<string | Blob | null> =>
     images.value.includes(path)
       ? fetchImage(path)
-      : media.value.includes(path)
+      : media.value.includes(path) || pdfs.value.includes(path)
         ? fetchMedia(path)
         : Promise.resolve(null)
-  return { ready: computed(() => data.value !== null), deferred, inline, defer, load }
+  return { ready: computed(() => data.value !== null), deferred, inline, defer, load, pdfs }
 }

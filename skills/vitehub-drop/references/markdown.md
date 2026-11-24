@@ -133,7 +133,17 @@ For a Drop served over HTTP, such as `http://localhost:3000`, use Drop's legacy 
 
 To lint this fallback with `comark-lint`, include `"drop"` in your `comark-lint.config.mjs` components, for example `export default { components: ["drop"] }`. HTTPS `::embed` needs no custom lint configuration.
 
-The drop runs in its own sandbox inside the doc, so it can't reach Drop, the reader's session, or the doc around it. Make it one self-contained HTML file: with no origin of its own, it can't load another drop's files or Drop's private images. Only HTML drops show; an app, a doc, or an image shows a note instead. Each reader sees the drop only if they may open it themselves, so share it at least as widely as the doc. On the doc's plain `/f/` page, which runs no scripts, the box is a link to the drop.
+The drop runs in its own sandbox inside the doc, so it can't reach Drop, the reader's session, or the doc around it. Make it one self-contained HTML file: with no origin of its own, it can't load another drop's files or Drop's private images. An HTML drop plays in that sandbox. A PDF, image, or video drop shows in the doc's flow at its own height, so `height` doesn't apply: a PDF's pages appear one after another as images, their links still open, and the PDF's page comments show as pins you can't edit from the doc. An app or a doc shows a note instead. Each reader sees the drop only if they may open it themselves, so share it at least as widely as the doc. On the doc's plain `/f/` page, which runs no scripts, the box is a link to the drop.
+
+## PDFs
+
+A PDF that is part of the doc, such as a CV under a cover letter, goes in as a file, like a screenshot: publish it with `file`, then write its `fileUrl` as an image on a line of its own:
+
+```md
+![Curriculum vitae](/f/0b6f3c2e-8d4a-4c1e-9f7b-2a5d6e8c1f40.pdf)
+```
+
+Drop shows its pages in the doc, in order, at the doc's width, with their links still working; the alt text names it where the pages can't show. Like an embedded screenshot, the PDF then belongs to the doc and lives and goes to the Trash with it. Inside a line of text, the same image is a link to the PDF. A PDF that should stay its own drop, with its own comments and lifetime, is embedded by its link instead: `::embed{url="<its /d/ link>"}`.
 
 ## Front matter
 

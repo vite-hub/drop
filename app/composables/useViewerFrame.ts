@@ -1,5 +1,5 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
-import type { FrameMessage } from "#shared/frame-messages"
+import type { EmbedMessage, FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
@@ -319,8 +319,8 @@ export function useViewerFrame(options: {
             return send({
               type: "embed-data",
               link,
-              ...("html" in embed ? { html: embedDocument(embed.html, dark.value) } : embed),
-            })
+              ...("html" in embed ? { kind: "html", html: embedDocument(embed.html, dark.value) } : embed),
+            } satisfies EmbedMessage)
           })
         }
         return

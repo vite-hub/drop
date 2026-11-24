@@ -2,14 +2,22 @@ export const FILE_LINK = /(?:https?:\/\/[^\s"'()<>]+)?(\/f\/[0-9a-f-]{36}\.[a-z0
 
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg)$/i
 const MEDIA_FILE = /\.(?:mp4|webm|mov|m4v|mp3|wav|ogg|m4a)$/i
+const PDF_FILE = /\.pdf$/i
 const MAX_IMAGES = 60
+const MAX_PDFS = 10
 
-function embeddedPaths(file: RegExp, sources: string[], host: string, attachments: string[]): string[] {
+function embeddedPaths(
+  file: RegExp,
+  sources: string[],
+  host: string,
+  attachments: string[],
+  max = MAX_IMAGES,
+): string[] {
   const paths = new Set(attachments)
   for (const [link, path] of sources.join("\n").matchAll(FILE_LINK)) {
     if (path && file.test(path) && (!link.startsWith("http") || new URL(link).host === host)) paths.add(path)
   }
-  return [...paths].slice(0, MAX_IMAGES)
+  return [...paths].slice(0, max)
 }
 
 export const embeddedImagePaths = (sources: string[], host: string, attachments: string[] = []) =>
@@ -21,6 +29,15 @@ export const embeddedMediaPaths = (sources: string[], host: string, attachments:
     sources,
     host,
     attachments.filter((path) => MEDIA_FILE.test(path)),
+  )
+
+export const embeddedPdfPaths = (sources: string[], host: string, attachments: string[] = []) =>
+  embeddedPaths(
+    PDF_FILE,
+    sources,
+    host,
+    attachments.filter((path) => PDF_FILE.test(path)),
+    MAX_PDFS,
   )
 
 const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")

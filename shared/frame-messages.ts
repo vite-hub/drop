@@ -36,6 +36,11 @@ export const FrameMessage = v.variant("type", [
   }),
   v.object({ type: v.literal("files"), paths: v.pipe(v.array(v.string()), v.maxLength(100)) }),
   v.object({ type: v.literal("embeds"), links: v.pipe(v.array(v.string()), v.maxLength(20)) }),
+  v.object({
+    type: v.literal("embed-page"),
+    link: v.pipe(v.string(), v.maxLength(200)),
+    page: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10_000)),
+  }),
   v.variant("clear", [
     v.object({ type: v.literal("selection"), clear: v.literal(true) }),
     v.object({
@@ -141,6 +146,27 @@ export const FrameMessage = v.variant("type", [
     v.check((message) => message.current < message.variants.length),
   ),
 ])
+
+export type EmbedLink = { x: number; y: number; w: number; h: number; href: string }
+type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number; resolved: boolean }
+export type EmbedMessage =
+  | ({ type: "embed-data"; link: string } & (
+      | { kind: "html"; html: string }
+      | { kind: "pdf"; pages: number; title: string; href: string }
+      | { kind: "image"; src: string }
+      | { kind: "video"; data: Blob; mime: string }
+      | { error: string }
+    ))
+  | {
+      type: "embed-page-data"
+      link: string
+      page: number
+      src: string
+      width: number
+      height: number
+      links: EmbedLink[]
+      pins: EmbedPin[]
+    }
 
 const QuizMessage = v.variant("type", [
   v.object({

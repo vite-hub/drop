@@ -205,6 +205,40 @@ function dropBox(link: string, height: unknown, title: string) {
   )
 }
 
+const PDF_FILE = /^(?:https?:\/\/[^/\s]+)?(\/f\/[0-9a-f-]{36}\.pdf)(?:\?raw)?$/i
+
+function pdfImage(node: MarkdownNode | undefined) {
+  if (!Array.isArray(node) || node[0] !== "img") return
+  const src = textValue(node[1].src)
+  const path = src?.match(PDF_FILE)?.[1]
+  return src && path ? { src, path, alt: textValue(node[1].alt)?.trim() || "PDF" } : undefined
+}
+
+function boxAttachedPdfs(nodes: MarkdownNode[]): void {
+  nodes.forEach((node, index) => {
+    if (!Array.isArray(node) || node[0] === null) return
+    const [tag, , ...children] = node
+    const content = children.filter((child) => typeof child !== "string" || child.trim())
+    const lone = tag === "p" && content.length === 1 ? pdfImage(content[0]) : undefined
+    const inline = pdfImage(node)
+    if (lone) nodes[index] = ["drop-pdf", lone]
+    else if (inline) nodes[index] = ["a", { href: inline.src }, inline.alt]
+    else {
+      boxAttachedPdfs(children)
+      node.splice(2, children.length, ...children)
+    }
+  })
+}
+
+const renderPdfBox: NodeHandler = ([, attrs]) => {
+  const src = textValue(attrs.src) ?? ""
+  const title = textValue(attrs.alt) ?? "PDF"
+  return (
+    `<figure class="drop-embed" data-drop-file="${escapeHtml(textValue(attrs.path) ?? "")}" data-kind="pdf" data-title="${escapeHtml(title)}">` +
+    `<a class="drop-embed-link" href="${escapeHtml(src)}">${escapeHtml(title)}</a></figure>`
+  )
+}
+
 const renderEmbed: NodeHandler = (node, state) => {
   const [, attrs] = node
   const link = attrs.provider === "drop" ? textValue(attrs.src)?.match(DROP_LINK)?.[1] : undefined
@@ -303,6 +337,7 @@ async function renderMarkdownBody(
 ): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseForReaders(renameLegacyProps(markdown))
+    boxAttachedPdfs(document.nodes)
     capProseImageWidths(document.nodes)
     markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
@@ -318,6 +353,7 @@ async function renderMarkdownBody(
         callout: renderCallout,
         caution: renderCallout,
         drop: renderDropEmbed,
+        "drop-pdf": renderPdfBox,
         embed: renderEmbed,
         important: renderCallout,
         info: renderCallout,

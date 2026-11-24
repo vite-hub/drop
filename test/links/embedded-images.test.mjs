@@ -1,6 +1,12 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
-import { deferImages, deferMedia, embeddedImagePaths, embeddedMediaPaths } from "../../shared/embedded-images.ts"
+import {
+  deferImages,
+  deferMedia,
+  embeddedImagePaths,
+  embeddedMediaPaths,
+  embeddedPdfPaths,
+} from "../../shared/embedded-images.ts"
 
 const a = "11111111-1111-4111-8111-111111111111"
 const b = "22222222-2222-4222-8222-222222222222"
@@ -81,4 +87,16 @@ test("a Markdown doc's videos and audio wait in the frame without a source; othe
   )
   assert.match(deferred, new RegExp(`<audio data-drop-media="/f/${b}.mp3" controls>`))
   assert.match(deferred, /<video src="https:\/\/example.com\/x.mp4" controls>/)
+})
+
+test("a doc's PDFs on this Drop are handed in after its attached PDFs, up to 10, and other files aren't", () => {
+  const markdown = `![CV](https://drop.example.com/f/${a}.pdf)\n![](/f/${b}.pdf?raw)\n![](https://other.example.com/f/${c}.pdf)\n![](/f/${c}.png)`
+  assert.deepEqual(embeddedPdfPaths([markdown], "drop.example.com", [`/f/${c}.pdf`, `/f/${c}.mov`]), [
+    `/f/${c}.pdf`,
+    `/f/${a}.pdf`,
+    `/f/${b}.pdf`,
+  ])
+  assert.deepEqual(embeddedImagePaths([markdown], "drop.example.com"), [`/f/${c}.png`])
+  const ids = Array.from({ length: 12 }, (_, i) => `${String(i).padStart(8, "0")}-0000-4000-8000-000000000000`)
+  assert.equal(embeddedPdfPaths([ids.map((id) => `![](/f/${id}.pdf)`).join("\n")], "x").length, 10)
 })

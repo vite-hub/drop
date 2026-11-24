@@ -252,6 +252,23 @@ test("local HTTP Drop addresses use ::drop as the documented fallback for HTTPS-
   assert.doesNotMatch(html, /<iframe|unsupported-component|render-error/)
 })
 
+test("an attached PDF written as an image becomes the PDF's box in the doc, or a link inside a line of text", async () => {
+  const pdf = "/f/11111111-1111-4111-8111-111111111111.pdf"
+  const markdown = `# CV\n\n![Curriculum <b>](${pdf})\n\nRead ![the CV](https://drop.example.com${pdf}) first.\n\n- ![Old CV](${pdf}?raw)\n`
+  const { html } = await renderMarkdownCached("attached-pdf.md", async () => markdown)
+  assert.match(
+    html,
+    new RegExp(
+      `<figure class="drop-embed" data-drop-file="${pdf}" data-kind="pdf" data-title="Curriculum &lt;b&gt;"><a class="drop-embed-link" href="${pdf}">Curriculum &lt;b&gt;</a></figure>`,
+    ),
+  )
+  assert.match(html, new RegExp(`<p>Read <a href="https://drop.example.com${pdf}">the CV</a> first.</p>`))
+  // Alone in a list item it isn't a paragraph of its own, so it stays a link too.
+  assert.match(html, new RegExp(`<li><a href="${pdf}\\?raw">Old CV</a></li>`))
+  assert.doesNotMatch(html, /<img|<p><figure|render-error/)
+  assert.deepEqual(await lintMarkdown(markdown), [])
+})
+
 test("documented Graphviz fences render a diagram rather than falling back to source", async () => {
   const { html } = await renderMarkdownCached(
     "diagram-upgrade.md",
