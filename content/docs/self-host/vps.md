@@ -83,22 +83,32 @@ extra:
 
 **The proxy guards sign-in, and Drop guards the rest.** Put oauth2-proxy in front of `/signin/start` only. There it forwards the person's GitHub token, and Drop turns it into its own 30-day session. Every other path goes straight to Drop. Without a session it answers 401, except where a drop's share, a review token, an upload ticket or an MCP token lets the request in. Public links, MCP, uploads and [site review](/docs/sites) need no list of exempt paths, and an expired proxy cookie can't break a page that is already open. If the proxy used to keep the whole host private, check which drops have public links before you switch: those links now open without it.
 
-Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Configure the existing OAuth app to accept `https://<your-domain>/oauth2/callback`, and run oauth2-proxy with:
+Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native GitHub client credentials are unnecessary in this mode. Set the same public callback URL in the GitHub OAuth app and in oauth2-proxy, replacing `drop.example.com` with your Drop hostname:
 
 ```sh
 --provider=github --github-org=your-org --email-domain="*" --scope="user:email read:org"
 --set-xauthrequest=true --pass-access-token=true --reverse-proxy=true
+--redirect-url=https://drop.example.com/oauth2/callback
 --cookie-name=__Host-drop-auth --cookie-secure=true
 ```
 
-Set `DROP_AUTH_PROXY_COOKIE=__Host-drop-auth` so signing out of Drop clears it too. With nginx and oauth2-proxy on port 4180, add these locations next to the [one that proxies to Drop](#proxy):
+Set `DROP_AUTH_PROXY_COOKIE=__Host-drop-auth` so signing out of Drop clears it too. With nginx and oauth2-proxy on port 4180, add this `map` in nginx's `http` block. It keeps the full original sign-in URL for the internal fallback, but leaves the header unset for direct requests to `/oauth2/`, so their normal return targets still work.
+
+```nginx
+map $request_uri $drop_auth_return {
+  default "";
+  ~^/signin/start(\?|$) $request_uri;
+}
+```
+
+Add these locations next to the [one that proxies to Drop](#proxy):
 
 ```nginx
 location /oauth2/ {
   proxy_pass http://127.0.0.1:4180;
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-Proto $scheme;
-  proxy_set_header X-Auth-Request-Redirect $request_uri;
+  proxy_set_header X-Auth-Request-Redirect $drop_auth_return;
 }
 
 location = /oauth2/auth {
