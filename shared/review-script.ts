@@ -1210,18 +1210,15 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, true);
   const releaseSitePointer = (event) => { if (event.isTrusted) sitePointers.delete(event.pointerId); };
   addEventListener("pointercancel", releaseSitePointer, true);
-  for (const type of ["pointermove", "lostpointercapture", "pointerout"]) {
+  for (const type of ["pointermove", "lostpointercapture"]) {
     addEventListener(type, (event) => {
-      if (!sitePointers.size) return;
-      const mouseLeftPage = type === "pointerout" && event.pointerType === "mouse" &&
-        (!event.relatedTarget || event.relatedTarget.localName === "iframe");
-      if (!event.buttons || mouseLeftPage) releaseSitePointer(event);
+      if (!event.buttons) releaseSitePointer(event);
     }, true);
   }
   for (const type of ["pointerdown", "pointerup", "click"]) {
     addEventListener(type, (event) => {
       if (!event.isTrusted) return;
-      if (type === "pointerup") releaseSitePointer(event);
+      if (type === "pointerup" || type === "pointerdown") releaseSitePointer(event);
       if (event.composedPath().includes(host)) return;
       if (gauge.hidden) {
         if (type === "pointerdown") sitePointers.add(event.pointerId);

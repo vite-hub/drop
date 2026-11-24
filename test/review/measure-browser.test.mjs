@@ -136,6 +136,10 @@ test(
               }
             }, true);
             window.dragEvents = [];
+            window.uncapturedReleases = 0;
+            document.querySelector("#a").addEventListener("pointerup", (event) => {
+              if (event.pointerType === "mouse") uncapturedReleases++;
+            });
             const slider = document.querySelector("#slider");
             slider.addEventListener("pointerdown", (event) => {
               slider.setPointerCapture(event.pointerId);
@@ -216,20 +220,33 @@ test(
       await page.mouse.move(A.x, A.y)
       await page.mouse.down()
       await page.mouse.move(360, 450)
-      await page.mouse.up()
+      await page.mouse.move(A.x, A.y)
       await shortcut()
-      assert.equal(await pressed(), "true", "an uncaptured mouse release in an iframe must not leave S blocked")
+      const pressedAfterReentry = await pressed()
+      await page.mouse.up()
+      assert.equal(pressedAfterReentry, "false", "returning from an iframe with a button held is still a site drag")
+      assert.equal(await page.evaluate(() => uncapturedReleases), 1, "the site receives the release after reentry")
+
+      await page.mouse.down()
+      await page.mouse.move(360, 450)
+      await page.mouse.up()
+      await page.mouse.move(A.x, A.y)
+      await shortcut()
+      assert.equal(await pressed(), "true", "returning from an iframe with no buttons held unblocks S")
       await page.keyboard.press("Escape")
 
       await page.locator("#menu").evaluate((menu) => menu.showPopover())
       await shortcut()
       assert.equal(await pressed(), "false", "Measure cannot intercept a native popover")
+      assert.match(await page.locator("drop-review .toast").innerText(), /Close the site's popover/)
       await button.click()
       assert.equal(await pressed(), "false")
       assert.equal(await page.locator("#menu").evaluate((menu) => menu.matches(":popover-open")), true)
       const clicksBefore = await page.evaluate(() => clicks)
-      await page.locator("#menu button").click()
+      const menuButton = page.locator("#menu button")
+      await menuButton.click()
       assert.equal(await page.evaluate(() => clicks), clicksBefore + 1, "declining Measure keeps the popover usable")
+      await menuButton.blur()
       await page.locator("#menu").evaluate((menu) => menu.hidePopover())
       await button.blur()
       await page.evaluate(() => (clicks = 0))
