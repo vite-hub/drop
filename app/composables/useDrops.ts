@@ -128,7 +128,7 @@ export function useDropActions() {
     form.append("file", file)
     if (folder) form.append("folder", folder.id)
     try {
-      const { privateEmbeds, uncheckedEmbeds, ...result } = await sendFile(
+      const { privateEmbeds, uncheckedEmbeds, embedCheckFailed, ...result } = await sendFile(
         "/api/files",
         form,
         v.object({ id: v.string(), ...EmbedCheckSchema }),
@@ -142,7 +142,7 @@ export function useDropActions() {
             ? "Dropped for the team"
             : "Dropped privately",
       )
-      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds })
+      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds, embedCheckFailed })
       return result
     } catch (error) {
       notify.fail("Upload failed", error)
@@ -158,7 +158,7 @@ export function useDropActions() {
       ...(detail.sharedFrom ? { ownShare: share } : { share }),
     }))
     try {
-      const { privateEmbeds, uncheckedEmbeds, ...result } = await $fetch<DropSummary & EmbedCheck>(
+      const { privateEmbeds, uncheckedEmbeds, embedCheckFailed, ...result } = await $fetch<DropSummary & EmbedCheck>(
         `/api/drops/${drop.id}`,
         { method: "PATCH", body: { share } },
       )
@@ -170,7 +170,7 @@ export function useDropActions() {
         ...folders(),
         ...(result.kind === "folder" ? [keys.drop(drop.id)] : []),
       ])
-      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds })
+      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds, embedCheckFailed })
       return true
     } catch (error) {
       if (before) patch(drop.id, { share: before })

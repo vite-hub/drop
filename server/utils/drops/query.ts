@@ -46,18 +46,11 @@ import { permissions, toCrumb, toSummary } from "./access"
 import { liveEditorKeeps } from "../live-editor"
 const TEXT_KINDS = new Set(["markdown", "html"])
 
-async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
-  const rows = await db
-    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
-    .from(drops)
-    .leftJoin(user, eq(user.id, drops.ownerId))
-    .where(inArray(drops.id, withAncestors(hit)))
-  const row = rows.find((item) => item.hit)
-  if (!row) return null
-  const ancestors = row.drop.parentId
-    ? walkUp([row.drop], new Map(rows.map((item) => [item.drop.id, item.drop]))).get(row.drop.id)!
-    : []
-  const found = await currentReview(
+type Found = { drop: typeof drops.$inferSelect; owner: typeof user.$inferSelect | null }
+
+function resolveFound(row: Found, byId: Map<string, typeof drops.$inferSelect>, event?: H3Event) {
+  const ancestors = row.drop.parentId ? walkUp([row.drop], byId).get(row.drop.id)! : []
+  return currentReview(
     {
       ...resolveNode(row.drop, ancestors, expiryPolicy(event).days),
       ownerBanned: !row.owner || Boolean(row.owner.banned),
@@ -66,8 +59,34 @@ async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
     row.owner,
     event,
   )
+}
+
+async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
+  const rows = await db
+    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(inArray(drops.id, withAncestors(hit)))
+  const row = rows.find((item) => item.hit)
+  if (!row) return null
+  const found = await resolveFound(row, new Map(rows.map((item) => [item.drop.id, item.drop])), event)
   logDrop(event, found)
   return found
+}
+
+export async function findDrops(ids: string[], event?: H3Event): Promise<Map<string, DropRow>> {
+  if (!ids.length) return new Map()
+  const rows = await db
+    .select({ drop: drops, owner: user })
+    .from(drops)
+    .leftJoin(user, eq(user.id, drops.ownerId))
+    .where(inArray(drops.id, withAncestors(sql`SELECT value FROM json_each(${JSON.stringify(ids)})`)))
+  const byId = new Map(rows.map((item) => [item.drop.id, item.drop]))
+  const wanted = new Set(ids)
+  const found = await Promise.all(
+    rows.filter((item) => wanted.has(item.drop.id)).map((item) => resolveFound(item, byId, event)),
+  )
+  return new Map(found.map((row) => [row.id, row]))
 }
 
 export async function currentReview(drop: DropRow, owner: typeof user.$inferSelect | null, event?: H3Event) {

@@ -1,11 +1,14 @@
 import { and, count, desc, eq, inArray, isNull } from "drizzle-orm"
 import type { H3Event } from "h3"
 import { db } from "vite-hub/database"
+import { isPublic } from "#shared/share"
 import type { PrivateEmbed, UncheckedEmbeds } from "#shared/types"
 import { drops } from "../databases/default/index"
-import { type DropRow, findDrop, permissions, readText } from "./drops"
+import { type DropRow, findDrop, findDrops, permissions, readText } from "./drops"
+import { expiryPolicy } from "./expiry"
 import type { Identity } from "./identity"
-import { foldersUnder } from "./nodes"
+import { logError } from "./logs"
+import { foldersUnder, resolveNode } from "./nodes"
 
 const MAX_DOCS = 50
 const MAX_LINKS = 20
@@ -13,44 +16,88 @@ const MAX_LINKS = 20
 export interface EmbedCheck {
   embeds: PrivateEmbed[]
   unchecked: UncheckedEmbeds | null
+  failed?: boolean
 }
 
-const approved = (row: DropRow): DropRow => (row.shareReview === "pending" ? { ...row, shareReview: null } : row)
+type Node = NonNullable<DropRow["raw"]>
+type Approval = (row: DropRow) => DropRow
 
-const asSeenFrom = (doc: DropRow, target: DropRow) =>
-  doc.shareReview === "pending" && target.ownerId === doc.ownerId ? approved(target) : target
+const pathOf = (row: DropRow): Node[] => [row.raw ?? row, ...(row.ancestors ?? [])]
 
-export async function privateEmbeds(docs: DropRow[], who: Identity, event?: H3Event, skippedDocs = 0) {
-  const { embeddedLinks, renderMarkdownCached } = await import("./markdown-document")
-  const found: PrivateEmbed[] = []
-  let skippedLinks = 0
-  for (const row of docs.slice(0, MAX_DOCS)) {
-    const key = row.blobKey
-    if (row.kind !== "markdown" || !key || !permissions(approved(row), null).view) continue
-    const { html } = await renderMarkdownCached(key, () => readText(key), event)
-    const all = embeddedLinks(html).filter((link) => link !== row.id)
-    skippedLinks += Math.max(0, all.length - MAX_LINKS)
-    const links = all.slice(0, MAX_LINKS)
-    const targets = await Promise.all(links.map((link) => findDrop(link, event)))
-    const doc = { id: row.id, title: row.title }
-    links.forEach((link, index) => {
-      const target = targets[index]
-      if (!target) found.push({ doc, link, title: null, missing: true })
-      else if (!permissions(asSeenFrom(row, target), null).view)
-        found.push({ doc, link, title: permissions(target, who).view ? target.title : null })
-    })
+const approving =
+  (account: string, days: number): Approval =>
+  (row) => {
+    if (!row.shareReview) return row
+    if (row.ownerId === account) return { ...row, shareReview: null }
+    const clear = (node: Node) =>
+      node.ownerId === account && isPublic(node.share) ? { ...node, shareReview: null } : node
+    const [own, ...above] = pathOf(row).map(clear)
+    return { ...row, ...resolveNode(own!, above, days) }
   }
-  const docsLeft = skippedDocs + Math.max(0, docs.length - MAX_DOCS)
-  const unchecked = docsLeft || skippedLinks ? { docs: docsLeft, embeds: skippedLinks } : null
-  return { embeds: found, unchecked } satisfies EmbedCheck
+
+const asItStands: Approval = (row) => row
+const readable = (row: DropRow) => permissions(row, null).view
+
+function approvalsOpening(doc: DropRow, days: number): Approval[] {
+  if (readable(doc)) return [asItStands]
+  if (!doc.shareReview) return []
+  const held = [...new Set(pathOf(doc).flatMap((node) => (node.shareReview ? [node.ownerId] : [])))]
+  const opening = held.map((account) => approving(account, days)).filter((approval) => readable(approval(doc)))
+  if (opening.length) return opening
+  return readable({ ...doc, shareReview: null }) ? [asItStands] : []
 }
 
-export async function openedEmbeds(id: string, who: Identity, event?: H3Event): Promise<EmbedCheck> {
-  const drop = await findDrop(id, event)
-  if (!drop || !permissions(approved(drop), null).view) return { embeds: [], unchecked: null }
-  const { docs, skipped } = await docsUnder(drop, event)
-  return privateEmbeds(docs, who, event, skipped)
+async function scan(docs: DropRow[], who: Identity, event?: H3Event, skippedDocs = 0): Promise<EmbedCheck> {
+  const { embeddedLinks, renderMarkdownCached } = await import("./markdown-document")
+  const { days } = expiryPolicy(event)
+  let skippedLinks = 0
+  const read: { doc: DropRow; approvals: Approval[]; links: string[] }[] = []
+  for (const doc of docs.slice(0, MAX_DOCS)) {
+    const key = doc.blobKey
+    const approvals = doc.kind === "markdown" && key ? approvalsOpening(doc, days) : []
+    if (!key || !approvals.length) continue
+    const { html } = await renderMarkdownCached(key, () => readText(key), event)
+    const all = embeddedLinks(html).filter((link) => link !== doc.id)
+    skippedLinks += Math.max(0, all.length - MAX_LINKS)
+    read.push({ doc, approvals, links: all.slice(0, MAX_LINKS) })
+  }
+  const targets = await findDrops([...new Set(read.flatMap(({ links }) => links))], event)
+  const found: PrivateEmbed[] = []
+  for (const { doc, approvals, links } of read)
+    for (const link of links) {
+      const target = targets.get(link)
+      const named = { id: doc.id, title: doc.title }
+      if (!target || !permissions(target, who).view) found.push({ doc: named, link, title: null })
+      else if (!approvals.every((approval) => readable(approval(target))))
+        found.push({ doc: named, link, title: target.title })
+    }
+  const docsLeft = skippedDocs + Math.max(0, docs.length - MAX_DOCS)
+  return { embeds: found, unchecked: docsLeft || skippedLinks ? { docs: docsLeft, embeds: skippedLinks } : null }
 }
+
+async function advisory(run: () => Promise<EmbedCheck>, event?: H3Event, id?: string): Promise<EmbedCheck> {
+  try {
+    return await run()
+  } catch (error) {
+    logError(event, error, { action: "embed-check", drop: id })
+    return { embeds: [], unchecked: null, failed: true }
+  }
+}
+
+export const privateEmbeds = (docs: DropRow[], who: Identity, event?: H3Event) =>
+  advisory(() => scan(docs, who, event), event, docs[0]?.id)
+
+export const openedEmbeds = (id: string, who: Identity, event?: H3Event) =>
+  advisory(
+    async () => {
+      const drop = await findDrop(id, event)
+      if (!drop || !approvalsOpening(drop, expiryPolicy(event).days).length) return { embeds: [], unchecked: null }
+      const { docs, skipped } = await docsUnder(drop, event)
+      return scan(docs, who, event, skipped)
+    },
+    event,
+    id,
+  )
 
 async function docsUnder(drop: DropRow, event?: H3Event): Promise<{ docs: DropRow[]; skipped: number }> {
   if (drop.kind === "markdown") return { docs: [drop], skipped: 0 }
@@ -69,21 +116,28 @@ async function docsUnder(drop: DropRow, event?: H3Event): Promise<{ docs: DropRo
       .limit(MAX_DOCS),
     db.select({ count: count() }).from(drops).where(inside),
   ])
-  const found = await Promise.all(rows.map(({ id }) => findDrop(id, event)))
-  return { docs: found.filter((row) => row !== null), skipped: Math.max(0, (total?.count ?? 0) - rows.length) }
+  const found = await findDrops(
+    rows.map(({ id }) => id),
+    event,
+  )
+  return {
+    docs: rows.flatMap(({ id }) => found.get(id) ?? []),
+    skipped: Math.max(0, (total?.count ?? 0) - rows.length),
+  }
 }
 
-export const embedResponse = ({ embeds, unchecked }: EmbedCheck) => ({
+export const embedResponse = ({ embeds, unchecked, failed }: EmbedCheck) => ({
   ...(embeds.length ? { privateEmbeds: embeds } : {}),
   ...(unchecked ? { uncheckedEmbeds: unchecked } : {}),
+  ...(failed ? { embedCheckFailed: true } : {}),
 })
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`
 
-const embedWarning = ({ doc, link, title, missing }: PrivateEmbed) =>
-  missing
-    ? `drop/embed-missing "${doc.title}" embeds /d/${link}, a drop that no longer exists; readers see a note in its place. Remove the embed or point it at another drop.`
-    : `drop/embed-private "${doc.title}" embeds ${title === null ? "a drop" : `"${title}"`} (/d/${link}), which people with the public link can't open. Share it the same way as the doc, or remove the embed.`
+const embedWarning = ({ doc, link, title }: PrivateEmbed) =>
+  title === null
+    ? `drop/embed-private "${doc.title}" embeds /d/${link}, a drop you can't open, so people with the public link can't open it either. Remove the embed, or ask its owner to share it the same way as the doc.`
+    : `drop/embed-private "${doc.title}" embeds "${title}" (/d/${link}), which people with the public link can't open. Share it the same way as the doc, or remove the embed.`
 
 const partialWarning = ({ docs, embeds }: UncheckedEmbeds) => {
   const parts = [
@@ -93,13 +147,17 @@ const partialWarning = ({ docs, embeds }: UncheckedEmbeds) => {
   return `drop/embed-partial The check was partial: it didn't read ${parts.join(" or ")}. Open those docs to check their embeds.`
 }
 
-export const embedWarnings = ({ embeds, unchecked }: EmbedCheck) => [
+const FAILED_WARNING =
+  "drop/embed-unchecked The change is saved, but the check for embeds people with the public link can't open didn't complete. Open the doc to check its embeds."
+
+export const embedWarnings = ({ embeds, unchecked, failed }: EmbedCheck) => [
   ...embeds.map(embedWarning),
   ...(unchecked ? [partialWarning(unchecked)] : []),
+  ...(failed ? [FAILED_WARNING] : []),
 ]
 
 const EMBED_WARNINGS_LEAD =
-  'People with the public link can\'t open these embedded drops: they see "This drop is private, expired, or deleted", or a note that it no longer exists, in their place.'
+  'People with the public link can\'t open these embedded drops: they see "This drop is private, expired, or deleted" in their place.'
 
 export const embedSection = (warnings: string[]) =>
   warnings.length ? `\n\n${EMBED_WARNINGS_LEAD}\n${warnings.map((warning) => `- ${warning}`).join("\n")}` : ""

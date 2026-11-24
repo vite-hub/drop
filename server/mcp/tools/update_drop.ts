@@ -133,6 +133,7 @@ export default defineMcpTool({
     const warnings = embedWarnings({
       embeds: changed?.privateEmbeds ?? [],
       unchecked: changed?.uncheckedEmbeds ?? null,
+      failed: changed?.embedCheckFailed,
     })
     const result = { ...updated, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
     return {

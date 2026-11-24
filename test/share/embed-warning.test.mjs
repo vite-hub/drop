@@ -2,11 +2,12 @@ import assert from "node:assert/strict"
 import { beforeEach, test } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
-import { sql, state, migrate, reset, who } from "../cost/harness.mjs"
+import { event, insertDrop, objects, queries, sql, state, migrate, reset, who } from "../cost/harness.mjs"
 const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: updateTool } = await import("../../server/mcp/tools/update_drop.ts")
 const { default: createFolderTool } = await import("../../server/mcp/tools/create_folder.ts")
 const { default: patchHandler } = await import("../../server/api/drops/[id].patch.ts")
+const { openedEmbeds } = await import("../../server/utils/embed-access.ts")
 
 migrate()
 const agent = { ...who, actorKind: "agent", actorName: "Claude Code" }
@@ -73,6 +74,7 @@ const embedding = (id) =>
   `# Plan\n\n::embed{url="https://drop.example/d/${id}" height=420 title="Demo"}\n::\n\n::drop{link=${id}}\n::\n`
 const embedWarnings = (result) => (result.warnings ?? []).filter((line) => line.startsWith("drop/embed-private"))
 const LEAD = "People with the public link can't open"
+const partial = (result) => (result.warnings ?? []).filter((line) => line.startsWith("drop/embed-partial"))
 
 test("a public doc that embeds a drop its readers can't open publishes with a warning", async () => {
   const demo = await target("Rebuild demo")
@@ -161,15 +163,102 @@ test("a public doc that isn't waiting for review warns about a held drop of the 
   assert.equal(embedWarnings(moved).length, 1, "the doc's readers get 403 until the owner's shares are approved")
 })
 
-test("an embed of a drop that no longer exists warns", async () => {
-  const plan = await doc(embedding("k7f2q9m4x8wd"), { share: "public" })
-  const [warning, ...more] = (plan.warnings ?? []).filter((line) => line.startsWith("drop/embed-missing"))
-  assert.equal(more.length, 0)
-  assert.ok(warning.includes("/d/k7f2q9m4x8wd"), warning)
-  assert.match(warning, /no longer exists; readers see a note/)
+test("an embed the author can't open warns the same whether that drop is private or deleted", async () => {
+  sql.prepare("INSERT INTO user (id, name, email) VALUES ('other', 'Other', 'other@example.com')").run()
+  insertDrop("h3n8q2w6x4zd", { owner_id: "other", visibility: "private", title: "Someone's secret" })
+  const unreadable = (id) =>
+    doc(embedding(id), { share: "public" }).then((plan) =>
+      (plan.warnings ?? []).filter((line) => line.startsWith("drop/embed")).map((line) => line.replace(id, "<id>")),
+    )
+  const [hidden, deleted] = [await unreadable("h3n8q2w6x4zd"), await unreadable("k7f2q9m4x8wd")]
+  assert.equal(hidden.length, 1, hidden.join("\n"))
+  assert.deepEqual(deleted, hidden, "the warning says no more than the drop's 404 does")
+  assert.ok(!hidden[0].includes("Someone's secret"), hidden[0])
+
+  state.who = who
+  const plan = await doc(embedding("k7f2q9m4x8wd"))
+  const browser = await patch(plan.id, { share: "public" })
+  assert.deepEqual(browser.privateEmbeds, [{ doc: { id: plan.id, title: "Plan" }, link: "k7f2q9m4x8wd", title: null }])
 })
 
-const partial = (result) => (result.warnings ?? []).filter((line) => line.startsWith("drop/embed-partial"))
+test("a check that fails after the change is saved reports the change and says the check didn't complete", async () => {
+  state.who = who
+  const demo = await target("Rebuild demo")
+  const plan = await doc(embedding(demo.id))
+  state.entries.clear()
+  const get = state.blob.get
+  state.blob.get = async () => [Object.assign(new Error("injected blob outage"), { code: "BLOB_R0001" })]
+  try {
+    const shared = await patch(plan.id, { share: "public" })
+    assert.equal(shared.share, "public")
+    assert.equal(shared.embedCheckFailed, true)
+    state.who = agent
+    const folder = await call(createFolderTool, { title: "Plans", lifetime: "review" })
+    await call(updateTool, { id: plan.id, folder: folder.id })
+    const opened = await call(updateTool, { id: folder.id, share: "public" })
+    assert.equal(opened.share, "public")
+    assert.ok(
+      (opened.warnings ?? []).some((line) => line.startsWith("drop/embed-unchecked")),
+      (opened.warnings ?? []).join("\n"),
+    )
+  } finally {
+    state.blob.get = get
+  }
+})
+
+test("sharing a folder at the scan limits stays within D1's queries for one request", async () => {
+  const folder = await call(createFolderTool, { title: "Plans", lifetime: "review" })
+  const demos = []
+  for (let index = 0; index < 20; index++) demos.push(await target(`Demo ${index}`))
+  const markdown = `# Plan\n\n${demos.map(({ id }) => `::drop{link=${id}}\n::\n`).join("\n")}`
+  for (let index = 0; index < 50; index++) await doc(markdown, { folder: folder.id })
+  queries.length = 0
+  const opened = await call(updateTool, { id: folder.id, share: "public" })
+  assert.equal(embedWarnings(opened).length, 50 * 20)
+  assert.equal(partial(opened).length, 0)
+  assert.ok(queries.length <= 15, `${queries.length} queries; D1 allows 50 a request on Free`)
+})
+
+const m1 = { ...who, userId: "m1", name: "Member One", email: "m1@example.com", actorName: "Member One" }
+const held = { visibility: "public", access: "view", share_review: "pending" }
+/** A team Drop with share reviews, and a team folder whose owner's public share waits for an admin. */
+function heldTeamFolder() {
+  state.mode = "team"
+  state.shareApproval = true
+  sql
+    .prepare(
+      "INSERT INTO user (id, name, email) VALUES ('lead', 'Lead', 'lead@example.com'), ('m1', 'Member One', 'm1@example.com'), ('m2', 'Member Two', 'm2@example.com')",
+    )
+    .run()
+  insertDrop("f4k8m2q6w9zd", {
+    ...held,
+    owner_id: "lead",
+    kind: "folder",
+    title: "Team plans",
+    blob_key: null,
+    team_folder: 1,
+  })
+}
+const member = (id, owner_id) => insertDrop(id, { visibility: "team", owner_id, parent_id: "f4k8m2q6w9zd" })
+async function warned(docId, targetId) {
+  objects.set(`${docId}.md`, { body: new Blob([embedding(targetId)]), uploadedAt: new Date() })
+  const { embeds } = await openedEmbeds(docId, m1, event(`/api/drops/${docId}`))
+  return embeds.map(({ link }) => link)
+}
+
+test("a doc in a held team folder warns about its author's own held drop, which the folder's approval leaves held", async () => {
+  heldTeamFolder()
+  insertDrop("s2d7k4n8q3wx", { ...held, owner_id: "m1", title: "Own demo" })
+  member("d1x5m8q2k7wz", "m1")
+  assert.deepEqual(await warned("d1x5m8q2k7wz", "s2d7k4n8q3wx"), ["s2d7k4n8q3wx"])
+})
+
+test("a doc in a held team folder doesn't warn about another member's drop that the same approval opens", async () => {
+  heldTeamFolder()
+  member("t9w3k6m2q8xd", "m2")
+  member("d2z4n7q3k8wx", "m1")
+  assert.deepEqual(await warned("d2z4n7q3k8wx", "t9w3k6m2q8xd"), [])
+})
 
 test("a doc with more embeds than the check reads says how many it skipped", async () => {
   const hidden = []
