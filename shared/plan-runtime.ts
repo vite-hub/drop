@@ -2093,6 +2093,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const progress = () => { moved = Date.now(); };
     const waits = [];
     const waitUntil = (promise) => { waits.push(Promise.resolve(promise).finally(progress)); };
+    // Lazy images load as soon as their file comes, so the PDF has them even when another wait runs out the clock.
+    for (const image of document.images) image.loading = "eager";
     document.dispatchEvent(new CustomEvent("drop:print", { detail: { waitUntil, progress } }));
     const decoded = Promise.allSettled(waits).then(() => Promise.allSettled([...document.images].map((image) => {
       image.loading = "eager";
