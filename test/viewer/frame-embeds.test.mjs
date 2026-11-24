@@ -8,10 +8,12 @@ const OTHER_LINK = "a1b2c3d4e5f6"
 const RENDERED = `<figure class="drop-embed" data-drop-embed="${LINK}"></figure>`
 const PRIVATE_HTML = "<!doctype html><html><body>Private source</body></html>"
 let scope
+let debounce = (fn) => fn
 
 afterEach(() => {
   scope?.stop()
   vi.unstubAllGlobals()
+  debounce = (fn) => fn
 })
 
 function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML }), errors) {
@@ -30,7 +32,7 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
     useMounted: () => ref(true),
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({ ready: ref(true), deferred: ref(false), inline: (html) => html }),
-    useDebounceFn: (fn) => fn,
+    useDebounceFn: (fn) => debounce(fn),
     useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
     useDropFrame: (_frame, _origin, handler) => {
@@ -85,30 +87,30 @@ function viewer(kind, fetch = async () => ({ kind: "html", content: PRIVATE_HTML
   return { drop, sent, request, receive }
 }
 
-test("an error the open page reports joins the viewer's list once Drop stores it, for that version only", async () => {
+test("an error the open page reports is sent for the version that threw it, and the viewer shows what Drop stored", async () => {
   const errors = ref([])
-  let stored
-  const { drop, receive, request } = viewer("html", () => new Promise((resolve) => (stored = resolve)), errors)
+  const flushes = []
+  debounce = (fn) => () => flushes.push(fn)
+  const kept = [{ kind: "error", message: "TypeError: x", count: 3, lastAt: 1 }]
+  const { drop, receive, request } = viewer(
+    "html",
+    async (_url, { body }) => (body.version === 2 ? { errors: kept } : undefined),
+    errors,
+  )
   drop.value = { ...drop.value, version: 2, trashedAt: null }
   const boom = { type: "runtime-error", kind: "error", message: "TypeError: x", source: "https://example.com/a.js:1:2" }
-  for (let i = 0; i < 2; i++) {
-    receive(boom)
-    assert.equal(errors.value[0]?.count ?? 0, i, "nothing new shows before Drop stores it")
-    stored()
-    await vi.waitFor(() => assert.equal(errors.value[0]?.count, i + 1))
-  }
-  assert.deepEqual(request.mock.calls[0], [
-    "/api/drops/doc/errors",
-    { method: "POST", body: { version: 2, errors: [{ kind: "error", message: "TypeError: x", source: boom.source }] } },
-  ])
+  receive(boom)
+  await flushes.pop()()
+  assert.deepEqual(errors.value, kept, "the list Drop stored, as read_drop shows it")
   receive({ ...boom, message: "Late" })
   drop.value = { ...drop.value, version: 3 }
-  stored()
-  await nextTick()
-  assert.deepEqual(
-    errors.value.map((error) => error.message),
-    ["TypeError: x"],
-  )
+  await flushes.pop()()
+  assert.equal(request.mock.calls[1][1].body.version, 2, "the batch keeps the version it was reported on")
+  assert.deepEqual(errors.value, kept, "the viewer moved on, so v2's list stays out")
+  drop.value = { ...drop.value, version: 1 }
+  receive(boom)
+  await flushes.pop()()
+  assert.deepEqual(errors.value, kept, "Drop stored nothing for an old version")
 })
 
 for (const kind of ["html", "app"])

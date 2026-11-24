@@ -2,7 +2,6 @@ import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
-import { addRuntimeErrors } from "#shared/runtime-errors"
 import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
@@ -176,19 +175,19 @@ export function useViewerFrame(options: {
 
   const unplaced = ref(new Set<string>())
 
-  let runtimeReports: RuntimeReport[] = []
-  const flushRuntimeReports = useDebounceFn(async () => {
-    const errors = runtimeReports.splice(0, 20)
-    runtimeReports = []
-    if (!errors.length) return
-    const { id, version } = drop.value
-    const stored = await $fetch(`/api/drops/${id}/errors`, { method: "POST", body: { version, errors } }).then(
-      () => true,
-      (error: unknown) => reportClientError("runtime-errors", error, { drop: id }),
-    )
+  let runtimeReports: { id: string; version: number; errors: RuntimeReport[] } | null = null
+  async function sendRuntimeReports() {
+    if (!runtimeReports) return
+    const { id, version, errors } = runtimeReports
+    runtimeReports = null
+    const stored = await $fetch<{ errors: DropRuntimeError[] } | undefined>(`/api/drops/${id}/errors`, {
+      method: "POST",
+      body: { version, errors: errors.slice(0, 20) },
+    }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: id }))
     if (stored && options.errors && drop.value.id === id && drop.value.version === version)
-      options.errors.value = addRuntimeErrors(options.errors.value, errors, Date.now())
-  }, 2000)
+      options.errors.value = stored.errors
+  }
+  const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
   const embedLinks = computed(() => {
     if (drop.value.kind !== "markdown") return new Set<string>()
@@ -233,7 +232,11 @@ export function useViewerFrame(options: {
             ...(message.source ? { source: message.source } : {}),
           })
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
-          runtimeReports.push({
+          const { id, version } = drop.value
+          if (runtimeReports && (runtimeReports.id !== id || runtimeReports.version !== version))
+            void sendRuntimeReports()
+          runtimeReports ??= { id, version, errors: [] }
+          runtimeReports.errors.push({
             kind: message.kind,
             message: message.message.slice(0, 500),
             source: message.source?.slice(0, 300),

@@ -1074,6 +1074,24 @@ test("read_drop shows the errors people's browsers reported for the current app 
     [[report.message, 2]],
     "the viewer gets the same errors, for Copy feedback and Copy prompt",
   )
+  const { default: errorsPost } = await import("../../server/api/drops/[id]/errors.post.ts")
+  const post = (version) => {
+    const request = new H3Event(
+      new Request(`https://drop.example/api/drops/${app.id}/errors`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ version, errors: [report] }),
+      }),
+    )
+    request.context.params = { id: app.id }
+    return errorsPost(request)
+  }
+  assert.deepEqual(
+    (await post(1)).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 3]],
+    "the page gets back the list Drop stored",
+  )
+  assert.equal((await post(0)).status, 204, "a report for another version stores nothing")
   state.who = { ...who, userId: "other" }
   await assert.rejects(detail(), { status: 404 }, "someone who can't read the drop doesn't see its errors")
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
