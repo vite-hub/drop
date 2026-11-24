@@ -76,11 +76,21 @@ describe("canvasManifest", () => {
 })
 
 describe("canvasPageURL", () => {
-  it("requires every parameter and encodes sample values as path segments", () => {
+  it("requires mandatory parameters and encodes sample values as path segments", () => {
     expect(canvasPageURL({ path: "/:team/:product()_details", params: { product: "x" } })).toBeUndefined()
     expect(canvasPageURL({ path: "/:team/:product()_details", params: { team: "a/b", product: "? #" } })).toBe(
       "/a%2Fb/%3F%20%23_details",
     )
+  })
+
+  it("omits unsampled optional parameters and their separator when alone in a segment", () => {
+    expect(canvasPageURL({ path: "/blog/:slug?" })).toBe("/blog")
+    expect(canvasPageURL({ path: "/:lang?/blog/:slug?/edit" })).toBe("/blog/edit")
+    expect(canvasPageURL({ path: "/:lang?/:slug?" })).toBe("/")
+    expect(canvasPageURL({ path: "/docs/:slug()?_details" })).toBe("/docs/_details")
+    expect(canvasPageURL({ path: "/blog/:slug?", params: { slug: "a/b" } })).toBe("/blog/a%2Fb")
+    expect(canvasPageURL({ path: "/docs/:slug(.*)*" })).toBeUndefined()
+    expect(canvasPageURL({ path: "/docs/:slug([^/]*)*/edit" })).toBeUndefined()
   })
 })
 

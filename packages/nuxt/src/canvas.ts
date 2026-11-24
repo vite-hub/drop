@@ -23,6 +23,10 @@ interface ResolvedRoute {
 
 const routeParam = /(?<!\\):([\w]+)(?:\(((?:\\.|[^\\)])*)\))?([?*+])?/g
 
+function isCatchAll(pattern: string | undefined): boolean {
+  return pattern === ".*" || pattern === "[^/]*"
+}
+
 export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
   const pages: CanvasPage[] = []
   const visit = (route: ResolvedRoute, parent: string) => {
@@ -35,7 +39,7 @@ export function canvasManifest(routes: ResolvedRoute[]): CanvasManifest {
       const params = canvas?.params
       if (
         [...path.matchAll(routeParam)].every(([, name, pattern]) => {
-          return (pattern !== ".*" && pattern !== "[^/]*") || Boolean(params?.[name])
+          return !isCatchAll(pattern) || Boolean(params?.[name])
         })
       ) {
         const page: CanvasPage = {
@@ -69,13 +73,19 @@ export function canvasPageURL({ path, params }: CanvasPage): string | undefined 
   let url = ""
   let offset = 0
   for (const match of path.matchAll(routeParam)) {
-    const [token, name] = match
+    const [token, name, pattern, modifier] = match
     const value = params?.[name]
-    if (!value) return
-    url += encodeLiteral(path.slice(offset, match.index)) + encodeURIComponent(value)
+    const literal = path.slice(offset, match.index)
     offset = match.index + token.length
+    if (value) {
+      url += encodeLiteral(literal) + encodeURIComponent(value)
+    } else {
+      if (isCatchAll(pattern) || (modifier !== "?" && modifier !== "*")) return
+      const wholeSegment = literal.endsWith("/") && (path[offset] === "/" || offset === path.length)
+      url += encodeLiteral(wholeSegment ? literal.slice(0, -1) : literal)
+    }
   }
-  return url + encodeLiteral(path.slice(offset))
+  return url + encodeLiteral(path.slice(offset)) || "/"
 }
 
 export function routeRuleRedirects(rules: Record<string, { redirect?: unknown }>, path: string): boolean {

@@ -71,6 +71,10 @@ const dropModule: DropNuxtModule = defineNuxtModule<DropModuleOptions>({
   },
 })
 
+function prerenderKey(path: string): string {
+  return path.replace(/\/$/, "") || "/"
+}
+
 function serveCanvasManifest(nuxt: Nuxt) {
   const dir = join(nuxt.options.buildDir, "drop-canvas")
   const filename = "__canvas.json"
@@ -130,10 +134,10 @@ function serveCanvasManifest(nuxt: Nuxt) {
               (entry) =>
                 entry.fileName?.endsWith(".html") && (!entry.contentType || entry.contentType.includes("text/html")),
             )
-            .map((entry) => entry.route),
+            .map((entry) => prerenderKey(entry.route)),
         )
         writeManifest(nitro.options.output.publicDir, routes, (url) =>
-          Boolean(url && rendered.has(decodeURI(url)) && !redirects(url)),
+          Boolean(url && rendered.has(prerenderKey(decodeURI(url))) && !redirects(url)),
         )
       },
     )

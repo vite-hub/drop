@@ -31,12 +31,13 @@ async function buildFixture(
       app: { baseURL: "/preview/" },
       experimental: { scanPageMeta: ${options.scan ? '"after-resolve"' : "false"}, typedPages: false },
       routeRules: { "/legacy": { redirect: "/" }, "/moved": { redirect: "/" } },
-      ${mode === "generate" ? 'nitro: { prerender: { routes: ["/items/43"] } },' : ""}
+      ${mode === "generate" ? 'nitro: { prerender: { routes: ["/blog", "/items/43/"] } },' : ""}
     })`,
     )
     const page = "<template><div>Fixture page</div></template>"
     if (options.pages !== false) {
       await write("app/pages/index.vue", page)
+      await write("app/pages/blog/[[slug]].vue", page)
       await write("app/pages/legacy.vue", page)
       await write("app/pages/docs/[...slug]/edit.vue", page)
       await write(
@@ -66,7 +67,12 @@ async function buildFixture(
 it("builds an SSR manifest without scanning and omits actual route-rule redirects", async () => {
   await buildFixture("build", { scan: false }, async (read) => {
     const { pages } = JSON.parse(await read("__canvas.json"))
-    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual(["/", "/items/:id", "/orders/:id"])
+    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual([
+      "/",
+      "/blog/:slug?",
+      "/items/:id",
+      "/orders/:id",
+    ])
   })
 }, 30_000)
 
@@ -79,8 +85,9 @@ it("does not publish a manifest for an empty pages app", async () => {
 it("publishes only generated static targets, with no fallback required", async () => {
   await buildFixture("generate", { scan: true }, async (read) => {
     const { pages } = JSON.parse(await read("__canvas.json"))
-    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual(["/", "/items/:id"])
+    expect(await read("blog/index.html")).toContain("Fixture page")
     expect(await read("items/43/index.html")).toContain("Fixture page")
+    expect(pages.map((page: { path: string }) => page.path).sort()).toEqual(["/", "/blog/:slug?", "/items/:id"])
     await expect(read("orders/42/index.html")).rejects.toMatchObject({ code: "ENOENT" })
   })
 }, 30_000)

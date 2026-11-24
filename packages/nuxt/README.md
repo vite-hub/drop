@@ -33,7 +33,7 @@ A preview build also serves `/__canvas.json`, the app's pages, so an agent can l
 { "pages": [{ "path": "/", "name": "index" }, { "path": "/orders/:id", "name": "orders-id", "params": { "id": "42" } }] }
 ```
 
-A route with params, such as `/orders/:id`, opens only with sample values, which the page gives in `definePageMeta`. `canvas: false` leaves a page out. Redirects and catch-all routes without sample values are left out too. An app without pages serves no file.
+A route with required params, such as `/orders/:id`, needs sample values, which the page gives in `definePageMeta`. Optional params can be omitted. `canvas: false` leaves a page out. Redirects and catch-all routes without sample values are left out too. An app without pages serves no file.
 
 ```vue [app/pages/orders/[id].vue]
 <script setup lang="ts">
