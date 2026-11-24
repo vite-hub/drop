@@ -25,9 +25,10 @@ export function formatElementReference(comment: Pointed) {
 
 /**
  * review.js stores a site comment's element selector in label and its description in quote, with the screenshot
- * (`body > img`) or the element itself as selector. Other comments on a site pass through as they are.
+ * (`body > img`) or the element itself as selector, and always with a page. Other comments on a site, such as a
+ * reply on a screenshot in Drop's viewer, pass through as they are.
  */
 export const siteReviewElement = <T extends Pointed>(comment: T): T =>
-  comment.selector === "body > img" || (comment.label !== null && comment.label === comment.selector)
+  comment.page && (comment.selector === "body > img" || (comment.label !== null && comment.label === comment.selector))
     ? { ...comment, selector: comment.label ?? "", label: comment.quote, quote: null }
     : comment

@@ -65,4 +65,6 @@ test("a site screenshot with no element keeps its area and page but names no sel
 test("a comment left in Drop's viewer on a site keeps its own selector and quote", () => {
   const anchored = comment({ kind: "text", selector: "main > p", label: "p", quote: "twelve" })
   assert.equal(siteReviewElement(anchored), anchored)
+  const onScreenshot = comment({ kind: "image", selector: "body > img", ox: 10, oy: 10 })
+  assert.equal(siteReviewElement(onScreenshot), onScreenshot)
 })
