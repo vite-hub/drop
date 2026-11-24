@@ -21,13 +21,14 @@ Codex keeps trying to renew the old sign-in instead of asking you again, so it w
 
 ## Publishing {#publishing}
 
-**`publish` fails with `DROP_LIMIT_REACHED` and `retryable: true`.** You can publish 30 times a minute. Nothing was created or changed. Wait the `retryAfterSeconds` it returns and make the same call once more.
+**`publish` fails with `DROP_LIMIT_REACHED` and `retryable: true`.** You hit the limit of 30 publishes a minute. The requested drop wasn't published. Wait the `retryAfterSeconds` it returns and make the same call once more.
 
-**`publish` fails with `DROP_LIMIT_REACHED` and `retryable: false`.** The plan has hit one of its limits, and the message names which. Nothing was created or changed, and retrying won't help. `list_drops` shows the plan's usage.
+**`publish` fails with `DROP_LIMIT_REACHED` and `retryable: false`.** The plan has hit one of its limits, and the message names which. The requested drop wasn't published, and retrying won't help until you address the limit. `list_drops` shows the plan's usage.
 
 | Limit                        | Fix                                                               |
 | ---------------------------- | ----------------------------------------------------------------- |
-| Drops or storage             | Move drops you no longer need to the Trash.                       |
+| Drop count                   | Move drops you no longer need to the Trash.                       |
+| Storage                      | Trashed drops and their versions still count. Wait for automatic purge or permanently delete them from the Trash. Permanent deletion can't be undone. |
 | Monthly file writes          | Wait for the reset on the first of next month.                    |
 | Drops set to Forever (keep)  | Publish with `review` or `temporary`, or free a kept drop.        |
 | App files                    | Leave source maps and unused assets out of the build.             |
@@ -37,7 +38,7 @@ Agents stop here and ask you. They don't retry or delete your work.
 
 **`publish` fails with a list of `line:column rule message` lines.** The Markdown has a block that never closes, broken `{…}` attributes, a component Drop doesn't render, or a problem in an annotated screenshot. Nothing was stored. Fix each line it names and publish again.
 
-**`publish` succeeds with `warnings`.** In an app or HTML page, a script, stylesheet, image, import, `fetch()` path, or link points at nothing you published. In a Markdown doc, it's a smaller problem, such as an image without alt text. The drop is live. Fix what each warning names and publish again with `previous`.
+**`publish` succeeds with `warnings`.** In an app or HTML page, examples include missing scripts, stylesheets, images, or `fetch()` targets, and bare module imports without an import map. Apps can also warn about links to missing pages. In a Markdown doc, a warning might flag an image without alt text. The drop is live. Fix what each warning names and publish again with `previous`.
 
 ## Comments {#comments}
 
@@ -63,7 +64,7 @@ These are items made with `data-src`, which show a live page in a frame on a [pr
 
 **An item stays empty.** The site sends `X-Frame-Options`, or a Content Security Policy `frame-ancestors` that leaves Drop out, so the browser won't show it in a frame. Review that page as a [site review](/docs/sites) with the bookmarklet instead. Before you publish a canvas of live pages, check that one item renders.
 
-**An item loads signed out.** Browsers send a site's usual login cookies (SameSite=Lax) to a frame only when the frame and Drop are on the same site. A preview on `pr123-demo.preview.example.com` inside a Drop on `drop.example.com` keeps your login, since both are `example.com`. On another domain the page loads signed out.
+**An item loads signed out.** If the preview's login uses `SameSite=Lax` cookies, the preview, canvas frame, and Drop dashboard all need to be on the same site. For example, `https://pr123-demo.preview.example.com` can receive those cookies in a canvas served from `https://abc-drop.example.com` inside the dashboard at `https://drop.example.com`. A cross-site or sandboxed canvas with no origin breaks that chain. If you self-host, see [content-origin setup](/docs/self-host#content-origin) to give the canvas its own origin; it must still be on the same site for these cookies to work.
 
 ## Self-hosting {#self-host}
 

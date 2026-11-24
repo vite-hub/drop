@@ -44,21 +44,21 @@ Paste this shell as the page's first `<style>`, before any item's own styles. It
 <style>
   :root {
     color-scheme: light;
-    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-    --bg: #fff; --surface: #fafafa; --fg: #171717; --muted: #737373;
-    --line: rgb(0 0 0 / .08); --accent: #2563eb;
-    --radius: 8px; --pad: 32px;
+    --prototype-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --prototype-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --prototype-bg: #fff; --prototype-surface: #fafafa; --prototype-fg: #171717; --prototype-muted: #737373;
+    --prototype-line: rgb(0 0 0 / .08); --prototype-accent: #2563eb;
+    --prototype-radius: 8px; --prototype-pad: 32px;
   }
   :root[data-theme="dark"], body > [data-variant][data-theme="dark"] {
     color-scheme: dark;
-    --bg: #171717; --surface: #1f1f1f; --fg: #fafafa; --muted: #a3a3a3;
-    --line: #2a2a2a; --accent: #60a5fa;
+    --prototype-bg: #171717; --prototype-surface: #1f1f1f; --prototype-fg: #fafafa; --prototype-muted: #a3a3a3;
+    --prototype-line: #2a2a2a; --prototype-accent: #60a5fa;
   }
   body > [data-variant] {
-    box-sizing: border-box; padding: var(--pad);
-    background: var(--bg); color: var(--fg);
-    font: 16px/1.5 var(--font); font-synthesis: none;
+    box-sizing: border-box; padding: var(--prototype-pad);
+    background: var(--prototype-bg); color: var(--prototype-fg);
+    font: 16px/1.5 var(--prototype-font); font-synthesis: none;
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
   }
   body > [data-variant] * { box-sizing: border-box; }
@@ -68,8 +68,8 @@ Paste this shell as the page's first `<style>`, before any item's own styles. It
 ```
 
 - **For a real product**, set the tokens in `:root` to its font, colors and radius, once. Keep the defaults only when there is no product yet.
-- **Item styles use the tokens** (`var(--line)`, `var(--muted)`), never a raw hex, so the whole page changes in one place.
-- **An item overrides a token only when its direction is about that property**, scoped to its id: `#v-hero-editorial { --font: Georgia, serif; }`. A whole-page item with its own header sets `--pad: 0`.
+- **Item styles use the tokens** (`var(--prototype-line)`, `var(--prototype-muted)`), never a raw hex, so the whole page changes in one place.
+- **An item overrides a token only when its direction is about that property**, scoped to its id: `#v-hero-editorial { --prototype-font: Georgia, serif; }`. A whole-page item with its own header sets `--prototype-pad: 0`.
 - **Dark mode**: `data-theme="dark"` on `<html>` turns every item dark; on one section, it shows that item's dark version beside the light ones.
 - Live items (`data-src`) draw their own page; Drop removes their padding.
 
