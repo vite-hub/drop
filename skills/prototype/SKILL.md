@@ -30,6 +30,7 @@ One self-contained HTML page. Each item is a `<section>` directly inside `<body>
 
 - `id` is `v-` and the name in lowercase words and dashes. Every other id inside an item starts with the item's id (`v-pricing-tiers-cta`), so each comment's anchor names its item.
 - `data-width` is the item's real width in pixels (default 1280). `data-height` fixes its height and scrolls the rest; leave it out and the item is as tall as its content.
+- `data-x` and `data-y` place an item on the canvas, in canvas pixels from the top-left. Items without them follow in one row to the right, 160px apart. Set them to lay the canvas out yourself, such as a desktop item with its mobile item beside it and the next pair in a row below; every reader opens that layout until they drag an item.
 - Use the product's real copy and plausible data in every item. Lorem ipsum hides the question.
 - Make the items live: real inputs, hovers, menus. Load libraries from a CDN such as `https://esm.sh/three`.
 - Drop listens for keys on the page too: Esc closes what Drop has open, and C, E and single letters pick its tools. When an item uses one of those keys itself, such as Esc to close its own menu, call `event.preventDefault()` in that handler so Drop leaves the key alone.
@@ -58,7 +59,7 @@ Give the user that link first, then tell reviewers how to answer: the page opens
 
 ## 5. Read the round
 
-Call `read_drop`. Sort every open comment into its item: an anchor shows `in #v-…`, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
+Call `read_drop`. Sort every open comment into its item: the item's id shows as `#v-…` at the start of the selector, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
 
 For each item decide: keep, drop, change, or try another. Done when every open comment sits under an item or has a question waiting for an answer.
 
