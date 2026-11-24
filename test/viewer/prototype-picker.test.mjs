@@ -937,7 +937,7 @@ test("live pages load as their items come near the screen, two at a time, and sl
         )
     })
     await tab.clock.install()
-    await tab.goto("https://picker.test/sleep")
+    await tab.goto("https://picker.test/sleep", { waitUntil: "domcontentloaded" })
     const loaded = () =>
       tab.evaluate(() =>
         [...document.querySelectorAll("iframe[data-prototype-src]")]
@@ -959,9 +959,9 @@ test("live pages load as their items come near the screen, two at a time, and sl
     assert.deepEqual(await loaded(), ["v-0", "v-1", "v-2"])
     assert.equal(await asleep("v-5"), true)
 
-    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while.
+    // Pan to the middle of the row: item 6 stays near while the first items wait to sleep.
     await tab.mouse.move(500, 600)
-    for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
+    await tab.mouse.wheel(3000, 0)
     await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
@@ -978,7 +978,7 @@ test("live pages load as their items come near the screen, two at a time, and sl
     assert.equal(await tab.evaluate(() => document.getElementById("v-0").getBoundingClientRect().height), 300)
 
     // Coming back wakes it.
-    for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
+    await tab.mouse.wheel(-3000, 0)
     await tab.waitForFunction(
       () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",
       null,
