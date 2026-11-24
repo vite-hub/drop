@@ -2,6 +2,7 @@ import { useLogger } from "evlog/nitro/v3"
 import { defineHandler, HTTPError, requireContentType } from "h3"
 import { textValue } from "#shared/utils/text"
 import { createDocDrop, dropPageUrl, findDrop, MAX_FILE_BYTES, permissions } from "../utils/drops"
+import { openedEmbeds } from "../utils/embed-access"
 import { requireFolder } from "../utils/folders"
 import { requireIdentity } from "../utils/identity"
 import { readFormWithin } from "../utils/params"
@@ -52,11 +53,13 @@ export default defineHandler(async (event) => {
   useLogger(event).set({ drop: { id: drop.id, kind: drop.kind, size: drop.size, version: drop.version } })
   const origin = event.url.origin
   const path = `/f/${drop.blobKey}`
+  const embeds = drop.kind === "markdown" && !attachment ? await openedEmbeds(drop.id, who, event) : []
   return {
     id: drop.id,
     url: attachment ? path : new URL(path, origin).href,
     page: dropPageUrl(origin, drop),
     share: drop.share,
     version: drop.version,
+    ...(embeds.length ? { privateEmbeds: embeds } : {}),
   }
 })

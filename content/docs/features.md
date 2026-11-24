@@ -130,7 +130,7 @@ More in [Code images](/docs/agents#code-images).
 
 ### Interactive figures in docs {#interactive-drops}
 
-A doc runs no scripts, but it can show an HTML drop that does: a demo, an animated figure, or a small widget. Publish the HTML on its own, then write `::embed{url="<its link>" height=420}` where it goes in the doc. For an HTTP Drop, such as `http://localhost:3000`, use `::drop{link="<its link>" height=420}` instead, since `::embed` accepts only HTTPS. It plays inside the doc in a sandbox of its own, cut off from Drop and from your session, and each reader sees it only if they can open that drop themselves.
+A doc runs no scripts, but it can show an HTML drop that does: a demo, an animated figure, or a small widget. Publish the HTML on its own, then write `::embed{url="<its link>" height=420}` where it goes in the doc. For an HTTP Drop, such as `http://localhost:3000`, use `::drop{link="<its link>" height=420}` instead, since `::embed` accepts only HTTPS. It plays inside the doc in a sandbox of its own, cut off from Drop and from your session, and each reader sees it only if they can open that drop themselves. When people with the doc's public link can't open it, Drop warns you as you publish the doc and when you share the doc or its folder: share the embedded drop the same way, or remove the embed.
 
 More in [the Markdown reference](/.well-known/skills/vitehub-drop/references/markdown.md#interactive-drops).
 

@@ -118,6 +118,12 @@ export interface DropRuntimeError {
   lastAt: number
 }
 
+export interface PrivateEmbed {
+  doc: { id: string; title: string }
+  link: string
+  title: string | null
+}
+
 export interface DropDetail extends DropSummary {
   siteScreenshot?: boolean
   lifetimeFixed?: boolean

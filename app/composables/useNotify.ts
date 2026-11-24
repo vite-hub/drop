@@ -1,4 +1,5 @@
 import type { QuotaFailure } from "#shared/quotas"
+import type { PrivateEmbed } from "#shared/types"
 
 export const useQuotaNotice = () => useState<QuotaFailure | null>("quota-notice", () => null)
 
@@ -20,8 +21,14 @@ export function useNotify() {
     toast.add({ title, description, color: "error", icon: "i-mingcute-warning-line", duration: 0 })
   const say = (title: string, options: Omit<StatusNote, "title" | "at"> = {}) =>
     (note.value = { title, ...options, at: Date.now() })
+  const privateEmbeds = (embeds: PrivateEmbed[] | undefined) => {
+    if (!embeds?.length) return
+    const { title, description } = privateEmbedsNotice(embeds)
+    toast.add({ title, description, color: "warning", icon: "i-mingcute-warning-line", duration: 12_000 })
+  }
   return {
     say,
+    privateEmbeds,
     done: (title: string) => say(title),
     alert,
     fail: (title: string, error: unknown) => {
