@@ -37,13 +37,22 @@ const pages = [
   ["v-order-detail", "/orders/42"],
   ["v-settings", "/settings"],
 ]
-const html = pages.map(([id, route]) =>
-  `<section id="${id}" data-variant="${route}" data-src="${new URL(route, base)}" data-width="1440" data-height="900"></section>`,
-).join("\n")
+const attr = (value) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;")
+const ids = new Set()
+const html = pages.map(([id, route]) => {
+  if (!/^v-[a-z0-9-]{1,198}$/.test(id) || ids.has(id)) {
+    throw new Error(`Use a unique, short section ID: ${id}`)
+  }
+  ids.add(id)
+  const label = route.length > 200 ? `${route.slice(0, 199).toWellFormed()}…` : route
+  const src = new URL(route, base).href
+  return `<section id="${id}" data-variant="${attr(label)}" data-src="${attr(src)}" data-width="1440" data-height="900"></section>`
+}).join("\n")
 console.log(html)
 ```
 
 - Give each route its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`. If the app lives under a subpath (`https://preview.example.com/my-app/`), write routes without the leading `/` (`orders`), or `new URL` drops the subpath.
+- Drop accepts IDs and labels up to 200 characters. The snippet checks IDs and shortens only the display label, not the URL. If you have more than 100 items, split them across canvases.
 - For a phone size too, add a second item per route (`v-orders-mobile`, `data-width="390" data-height="844"`).
 - Use a host every reviewer can reach over https, such as a deployed preview; a `localhost` URL loads only on your machine.
 
