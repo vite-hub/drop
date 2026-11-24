@@ -884,7 +884,8 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
-const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
+const feedback = () =>
+  feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version, drop.value.kind)
 const readerId = computed(
   () =>
     me.value?.id ??

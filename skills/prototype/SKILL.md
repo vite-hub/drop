@@ -58,7 +58,7 @@ Give the user that link first, then tell reviewers how to answer: the page opens
 
 ## 5. Read the round
 
-Call `read_drop`. Sort every open comment into its item: an anchor shows `in #v-…`, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
+Call `read_drop`. Sort every open comment into its item: the item's id shows as `#v-…` at the start of the selector, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
 
 For each item decide: keep, drop, change, or try another. Done when every open comment sits under an item or has a question waiting for an answer.
 
