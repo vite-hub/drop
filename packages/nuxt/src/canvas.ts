@@ -78,15 +78,20 @@ interface MatcherRoute {
   children?: MatcherRoute[]
 }
 
+interface PathMatchingOptions {
+  strict?: boolean
+  sensitive?: boolean
+}
+
 interface VueRouterMatcherAPI {
   createRouterMatcher(
     this: void,
     routes: MatcherRoute[],
-    options: { strict?: boolean; sensitive?: boolean },
+    options: PathMatchingOptions,
   ): { resolve(location: { path: string }, current: { path?: string }): { matched: MatcherRoute[] } }
 }
 
-export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[]) {
+export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[], options: PathMatchingOptions = {}) {
   const requireFromApp = createRequire(join(rootDir, "package.json"))
   const requireFromNuxt = createRequire(requireFromApp.resolve("nuxt/package.json"))
   const router: VueRouterMatcherAPI = requireFromNuxt("vue-router")
@@ -99,7 +104,7 @@ export function canvasRouteOwner(rootDir: string, routes: ResolvedRoute[]) {
     meta: { source: route },
     children: route.children?.map(toMatcherRoute),
   })
-  const matcher = router.createRouterMatcher(routes.map(toMatcherRoute), {})
+  const matcher = router.createRouterMatcher(routes.map(toMatcherRoute), options)
   return (url: string) => matcher.resolve({ path: url }, {}).matched.at(-1)?.meta.source
 }
 

@@ -133,7 +133,9 @@ function serveCanvasManifest(nuxt: Nuxt) {
             )
             .map((entry) => prerenderKey(entry.route)),
         )
-        const owner = routes.length ? canvasRouteOwner(nuxt.options.rootDir, routes) : undefined
+        const owner = routes.length
+          ? canvasRouteOwner(nuxt.options.rootDir, routes, nuxt.options.router.options)
+          : undefined
         writeManifest(nitro.options.output.publicDir, routes, (url, route) =>
           Boolean(url && rendered.has(prerenderKey(decodeURI(url))) && owner?.(url) === route && !redirects(url)),
         )

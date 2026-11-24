@@ -31,7 +31,12 @@ async function buildFixture(
       app: { baseURL: "/preview/" },
       experimental: { scanPageMeta: ${options.scan ? '"after-resolve"' : "false"}, typedPages: false },
       routeRules: { "/legacy": { redirect: "/" }, "/moved": { redirect: "/" } },
-      ${mode === "generate" ? 'nitro: { prerender: { routes: ["/blog", "/items/43/", "/en", "/localized/en"] } },' : ""}
+      ${
+        mode === "generate"
+          ? `router: { options: { sensitive: true } },
+      nitro: { prerender: { routes: ["/blog", "/items/43/", "/en", "/localized/en", "/docs/title"] } },`
+          : ""
+      }
     })`,
     )
     const page = "<template><div>Fixture page</div></template>"
@@ -39,6 +44,11 @@ async function buildFixture(
       await write("app/pages/index.vue", page)
       if (mode === "generate") {
         await write("app/pages/[[lang]].vue", "<template><div>Optional language page</div></template>")
+        await write("app/pages/docs/TITLE.vue", "<template><div>Uppercase docs page</div></template>")
+        await write(
+          "app/pages/docs/[[slug]].vue",
+          `<script setup>definePageMeta({ canvas: { params: { slug: 'title' } } })</script><template><div>Dynamic docs page</div></template>`,
+        )
         await write(
           "app/pages/localized/[[lang]].vue",
           `<script setup>definePageMeta({ canvas: { params: { lang: 'en' } } })</script>${page}`,
@@ -95,10 +105,12 @@ it("publishes only generated static targets, with no fallback required", async (
     expect(await read("index.html")).not.toContain("Optional language page")
     expect(await read("en/index.html")).toContain("Optional language page")
     expect(await read("blog/index.html")).toContain("Fixture page")
+    expect(await read("docs/title/index.html")).toContain("Dynamic docs page")
     expect(await read("items/43/index.html")).toContain("Fixture page")
     expect(pages.map((page: { path: string }) => page.path).sort()).toEqual([
       "/",
       "/blog/:slug?",
+      "/docs/:slug?",
       "/items/:id",
       "/localized/:lang?",
     ])

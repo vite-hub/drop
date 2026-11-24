@@ -88,6 +88,18 @@ it("only assigns a concrete URL to the route Vue Router would open", () => {
   expect(owner(canvasPageURL(blog)!)).toBe(blog)
 })
 
+it("matches canvas route owners with the app's path matching options", () => {
+  const title = { path: "/docs/TITLE", file: "docs/TITLE.vue" }
+  const article = { path: "/docs/:slug?", file: "docs/[[slug]].vue" }
+  const rootDir = fileURLToPath(new URL("..", import.meta.url))
+  expect(canvasRouteOwner(rootDir, [title, article])("/docs/title")).toBe(title)
+
+  const owner = canvasRouteOwner(rootDir, [title, article], { sensitive: true, strict: true })
+  expect(owner("/docs/title")).toBe(article)
+  expect(owner("/docs/TITLE")).toBe(title)
+  expect(owner("/docs/title/")).toBeUndefined()
+})
+
 describe("canvasPageURL", () => {
   it("requires mandatory parameters and encodes sample values as path segments", () => {
     expect(canvasPageURL({ path: "/:team/:product()_details", params: { product: "x" } })).toBeUndefined()
