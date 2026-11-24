@@ -124,8 +124,17 @@ test(
             contentType: "text/html; charset=utf-8",
             body: `<!doctype html><html><head>${SITE_CSS}</head><body>${BOXES}<input id="q" style="position:absolute;left:40px;top:300px">
             <div id="closed-editor"></div>
+            <div id="slider" role="slider" style="position:absolute;left:40px;top:400px;width:100px;height:24px"></div>
             <section id="menu" popover="manual"><button>Do something</button></section>
             <script>window.clicks = 0; document.addEventListener("click", () => clicks++);
+            window.dragEvents = [];
+            const slider = document.querySelector("#slider");
+            slider.addEventListener("pointerdown", (event) => {
+              slider.setPointerCapture(event.pointerId);
+              dragEvents.push("down");
+            });
+            slider.addEventListener("pointerup", () => dragEvents.push("up"));
+            slider.addEventListener("click", () => dragEvents.push("click"));
             window.editor = document.querySelector("#closed-editor").attachShadow({mode: "closed"});
             editor.innerHTML = "<input>";</script>
             <script src="${DROP}/review.js"></script>
@@ -167,7 +176,21 @@ test(
       assert.equal(await pressed(), "false")
       assert.equal(await page.locator("#q").inputValue(), "s")
       await page.locator("#q").blur()
+
+      await page.mouse.move(70, 412)
+      await page.mouse.down()
+      await page.mouse.move(200, 412)
+      await shortcut()
+      const pressedDuringDrag = await pressed()
+      await page.mouse.up()
+      assert.deepEqual(await page.evaluate(() => dragEvents), ["down", "up", "click"])
+      assert.equal(pressedDuringDrag, "false", "Measure must leave an in-flight site gesture alone")
+      assert.equal(await page.locator("drop-review .toast").isVisible(), false, "a drag is not a site popover")
       await page.evaluate(() => (clicks = 0))
+
+      await shortcut()
+      assert.equal(await pressed(), "true", "S works again after the site receives the release")
+      await page.keyboard.press("Escape")
 
       await page.locator("#menu").evaluate((menu) => menu.showPopover())
       await shortcut()

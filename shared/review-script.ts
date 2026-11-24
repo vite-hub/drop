@@ -1172,8 +1172,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const redrawGauge = () => { if (!gaugeFrame) gaugeFrame = requestAnimationFrame(drawGauge); };
   const siteInTopLayer = () => document.fullscreenElement || document.querySelector(":is(:popover-open, :modal)");
   const topLayerNotice = () => say("Close the site's popover, dialog, or fullscreen view to use Measure.");
+  const sitePointers = new Set();
   function measure(on) {
     if (on) {
+      if (sitePointers.size) return;
       if (busy) return say("Sending your comment…");
       if (siteInTopLayer()) return topLayerNotice();
       cancel(); closeThread(); list.hidden = true;
@@ -1206,12 +1208,31 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
   for (const type of ["toggle", "fullscreenchange"])
     document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, true);
+  const releaseSitePointer = (event) => { if (event.isTrusted) sitePointers.delete(event.pointerId); };
+  addEventListener("pointercancel", releaseSitePointer, true);
+  addEventListener("pointermove", (event) => {
+    if (sitePointers.size && !event.buttons) releaseSitePointer(event);
+  }, true);
   for (const type of ["pointerdown", "pointerup", "click"]) {
     addEventListener(type, (event) => {
-      if (gauge.hidden || !event.isTrusted || event.composedPath().includes(host)) return;
+      if (!event.isTrusted) return;
+      if (type === "pointerup") releaseSitePointer(event);
+      if (event.composedPath().includes(host)) return;
+      if (gauge.hidden) {
+        if (type === "pointerdown") sitePointers.add(event.pointerId);
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (type === "click") stopForTopLayer();
+      if (type !== "click") return;
+      if (siteInTopLayer()) stopForTopLayer();
+      else if (event.detail) {
+        const hit = document.elementFromPoint(event.clientX, event.clientY);
+        if (hit && hit !== host && event.composedPath().includes(hit)) {
+          measure(false);
+          say("A site element is covering Measure. Close it and try again.");
+        }
+      }
     }, { capture: true, passive: false });
   }
   measureButton.addEventListener("click", () => measure(gauge.hidden));
@@ -1220,7 +1241,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const canMeasureFromKey = () => paint.hidden && draw.hidden && pop.hidden;
   function measureKey(event) {
     if (event.defaultPrevented || event.isComposing || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.key.toLowerCase() !== "s") return;
-    if (!canMeasureFromKey()) return;
+    if (!canMeasureFromKey() || (gauge.hidden && sitePointers.size)) return;
     if (event.currentTarget === host) {
       if (!root.activeElement || typing(root.activeElement)) return;
       event.preventDefault();
