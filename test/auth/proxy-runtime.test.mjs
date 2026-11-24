@@ -41,19 +41,25 @@ test.skipIf(!origin || !database || !githubToken)(
     let dropId
     try {
       assert.equal((await request("/api/drops", { anonymous: true })).status, 401)
+      // Only /signin/start reads the proxy's header; elsewhere the client could have sent it.
       assert.equal(
         (await request("/api/drops", { headers: { "x-auth-request-access-token": "invalid-token" } })).status,
+        401,
+      )
+      assert.equal(
+        (await request("/signin/start", { headers: { "x-auth-request-access-token": "invalid-token" } })).status,
         403,
       )
       assert.equal((await request("/api/auth/sign-in/social", { body: { provider: "github" } })).status, 404)
-      const login = await request("/api/auth/get-session", { proxy: true })
-      assert.equal(login.status, 200, login.text)
-      const userId = login.json.user.id
+      const login = await request("/signin/start?redirect=%2Fdrops", { proxy: true })
+      assert.equal(login.status, 302, login.text)
+      assert.equal(login.headers.get("location"), "/drops")
       cookie = login.headers
         .getSetCookie()
         .map((value) => value.split(";")[0])
         .join("; ")
       assert.ok(cookie)
+      const userId = (await request("/api/auth/get-session")).json.user.id
       const sessions = db.prepare("SELECT count(*) AS n FROM session WHERE user_id=?").get(userId).n
       assert.equal((await request("/api/drops", { proxy: true })).status, 200)
       assert.equal(
