@@ -6,6 +6,12 @@ const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
 const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
 
 const PICKER = await readFile(new URL("../../skills/prototype/assets/picker.js", import.meta.url), "utf8")
+const liveItems = (count) =>
+  Array.from(
+    { length: count },
+    (_, index) =>
+      `<section id="v-${index}" data-variant="Page ${index}" data-src="/live/${index}" data-width="280" data-height="240"></section>`,
+  ).join("")
 const variants = (fields) => parseFrameMessage({ __drop: true, type: "variants", canvas: false, zoom: 100, ...fields })
 const one = (id) => ({ id, label: id, note: "" })
 
@@ -835,6 +841,98 @@ test("live pages load as their items come near the screen, two at a time, and sl
       { polling: 100 },
     )
     assert.equal(await asleep("v-0"), false)
+  } finally {
+    await browser.close()
+  }
+})
+
+for (const reviewing of [false, true]) {
+  test(`unrelated stalled previews release their slots during ${reviewing ? "an open thread" : "Comment mode"}`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const tab = await browser.newPage({ viewport: { width: 1100, height: 700 } })
+      const host = `<iframe src="/canvas" style="width:1000px;height:600px;border:0"></iframe>`
+      const canvas = `<!doctype html><body>${liveItems(3)}
+        <script>self.__dropVariantBar = true; ${PICKER}</script>
+        <script>addEventListener("message", ({ data }) => { window.lastMessage = data; });</script>`
+      await tab.route("https://picker.test/**", (route) => {
+        const path = new URL(route.request().url()).pathname
+        if (path === "/live/0" || path === "/live/1") return
+        return route.fulfill({
+          contentType: "text/html",
+          body: path === "/" ? host : path === "/canvas" ? canvas : "Healthy",
+        })
+      })
+      await tab.clock.install()
+      await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+      const picker = tab.frameLocator("iframe")
+      await picker.locator("#v-1 iframe[src]").waitFor({ state: "attached" })
+      const frame = tab.frame({ url: "https://picker.test/canvas" })
+      const send = (messages) =>
+        tab.evaluate((messages) => {
+          for (const message of messages)
+            document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+        }, messages)
+      await send(
+        reviewing
+          ? [
+              { type: "markers", markers: [{ id: "thread", selector: "#v-0 > iframe" }] },
+              { type: "active", id: "thread" },
+            ]
+          : [{ type: "tool", tool: "comment" }],
+      )
+      await frame.waitForFunction((type) => window.lastMessage?.type === type, reviewing ? "active" : "tool", {
+        polling: 100,
+      })
+      assert.equal(await picker.locator("#v-2 iframe[src]").count(), 0)
+      await tab.clock.fastForward(16000)
+      await picker.frameLocator("#v-2 iframe").getByText("Healthy").waitFor()
+      assert.equal(await picker.locator("#v-1 [data-prototype-retry]").count(), 1)
+      assert.equal(await picker.locator("#v-0 iframe[src]").count(), reviewing ? 1 : 0)
+      if (reviewing) {
+        await send([{ type: "active", id: null }])
+        await frame.waitForFunction(
+          () => window.lastMessage?.type === "active" && window.lastMessage.id === null,
+          null,
+          { polling: 100 },
+        )
+        await tab.clock.fastForward(6000)
+        await picker.locator("#v-0 [data-prototype-retry]").waitFor()
+      }
+    } finally {
+      await browser.close()
+    }
+  })
+}
+
+test("a stalled single preview can retry in Focus without moving the camera", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage()
+    let attempts = 0
+    await tab.route("https://picker.test/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<!doctype html><body>${liveItems(1)}<script>${PICKER}</script>`,
+      }),
+    )
+    await tab.route("https://picker.test/live/0", (route) => {
+      if (++attempts === 1) return
+      return route.fulfill({ contentType: "text/html", body: "Recovered" })
+    })
+    await tab.clock.install()
+    const request = tab.waitForRequest("https://picker.test/live/0")
+    await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+    await request
+    await tab.clock.fastForward(16000)
+    const retry = tab.getByRole("button", { name: "Retry preview: Page 0" })
+    await retry.waitFor()
+    await tab.clock.fastForward(16000)
+    assert.equal(attempts, 1)
+    await retry.press("Enter")
+    await tab.frameLocator("#v-0 iframe").getByText("Recovered").waitFor()
+    assert.equal(attempts, 2)
+    assert.equal(await retry.count(), 0)
   } finally {
     await browser.close()
   }

@@ -19,6 +19,7 @@ A section with `data-src` shows that URL in a frame, live, as an item like any o
 
 - Leave the section empty; Drop fills it. Its height defaults to 900 on the canvas and the full screen in focus.
 - Live pages load as the camera comes near them, two at a time, and sleep (blank, with their name) after five seconds far away.
+- A preview that is still loading after 15 seconds gives up its turn unless you're interacting with it or its comment thread is open. Click **Retry preview** to try again, or move the item out of range and back.
 - Drop versions preserve the HTML and comments, not the live pages in the frames. To keep earlier rounds reviewable, give each round's `data-src` values deployment-specific URLs and keep those deployments accessible. A mutable branch URL always serves whatever is live there now, even when someone opens an older Drop version.
 - The frame keeps the reader's login when the URL is on the same site as Drop. A preview such as `https://pr123-demo.preview.example.com` inside Drop on `drop.example.com`, whose drops run on `drop-usercontent.example.com`, is all `example.com`, so its SameSite=Lax cookies flow. On another site those Lax cookies are left out, so the page usually loads signed out.
 - A site that sends `X-Frame-Options` or a CSP `frame-ancestors` that excludes Drop shows an empty frame. Check one item renders before publishing the rest.
