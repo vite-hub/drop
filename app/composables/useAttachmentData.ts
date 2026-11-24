@@ -8,19 +8,6 @@ import {
 } from "#shared/embedded-images"
 import type { DropDetail } from "#shared/types"
 
-const dataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    const settle = () => {
-      reader.removeEventListener("loadend", settle)
-      if (reader.result === null || reader.result instanceof ArrayBuffer)
-        reject(reader.error ?? new Error("Not a data URL"))
-      else resolve(reader.result)
-    }
-    reader.addEventListener("loadend", settle)
-    reader.readAsDataURL(blob)
-  })
-
 const cached = <T>(read: (path: string) => Promise<T>) => {
   const fetched = new Map<string, Promise<T | null>>()
   return (path: string) => {
@@ -62,7 +49,7 @@ export function useAttachmentData(drop: Ref<DropDetail>) {
       (drop.value.attachments ?? []).map((file) => new URL(file.url).pathname),
     ),
   )
-  const fetchImage = cached((path) => readBlob(path).then(dataUrl))
+  const fetchImage = cached((path) => readBlob(path).then(blobDataUrl))
   const fetchMedia = cached(readBlob)
   const deferred = computed(() => drop.value.kind === "markdown")
   watch(

@@ -147,26 +147,26 @@ export const FrameMessage = v.variant("type", [
   ),
 ])
 
+export const EMBED_PAGES = 30
 export type EmbedLink = { x: number; y: number; w: number; h: number; href: string }
-type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number; resolved: boolean }
+export type EmbedPin = { n: number; x: number; y: number; w?: number; h?: number }
+export type EmbedData =
+  | { kind: "html"; html: string }
+  | { kind: "pdf"; pages: number; title: string; href: string }
+  | { kind: "image"; src: string }
+  | { kind: "video"; data: Blob; mime: string }
+  | { error: string }
+type EmbedPage = {
+  page: number
+  src: string
+  width: number
+  height: number
+  links: EmbedLink[]
+  pins: EmbedPin[]
+}
 export type EmbedMessage =
-  | ({ type: "embed-data"; link: string } & (
-      | { kind: "html"; html: string }
-      | { kind: "pdf"; pages: number; title: string; href: string }
-      | { kind: "image"; src: string }
-      | { kind: "video"; data: Blob; mime: string }
-      | { error: string }
-    ))
-  | {
-      type: "embed-page-data"
-      link: string
-      page: number
-      src: string
-      width: number
-      height: number
-      links: EmbedLink[]
-      pins: EmbedPin[]
-    }
+  | ({ type: "embed-data"; link: string } & EmbedData)
+  | ({ type: "embed-page-data"; link: string } & EmbedPage)
 
 const QuizMessage = v.variant("type", [
   v.object({

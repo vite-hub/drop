@@ -87,6 +87,7 @@ test("a frame Marker retry releases Done without leaving Marker mode or losing s
     useMounted: () => ref(false),
     useBase64: () => ({ base64: ref("") }),
     useAttachmentData: () => ({}),
+    useDocEmbeds: () => ({}),
     useDebounceFn: (fn) => fn,
     useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
