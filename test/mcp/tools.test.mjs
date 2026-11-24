@@ -1063,6 +1063,20 @@ test("read_drop shows the errors people's browsers reported for the current app 
     read.content[0].text,
     /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/,
   )
+  const { default: detailGet } = await import("../../server/api/drops/[id].get.ts")
+  const detail = () => {
+    const request = event(`/api/drops/${app.id}`)
+    request.context.params = { id: app.id }
+    return detailGet(request)
+  }
+  assert.deepEqual(
+    (await detail()).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 2]],
+    "the viewer gets the same errors, for Copy feedback and Copy prompt",
+  )
+  state.who = { ...who, userId: "other" }
+  await assert.rejects(detail(), { status: 404 }, "someone who can't read the drop doesn't see its errors")
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
   const newReport = { ...report, message: "Only in v2" }

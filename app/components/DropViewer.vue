@@ -884,7 +884,9 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
-const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
+const pageErrors = computed(() => drop.value.errors ?? [])
+const feedback = () =>
+  feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version, pageErrors.value)
 const readerId = computed(
   () =>
     me.value?.id ??
@@ -893,7 +895,7 @@ const readerId = computed(
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const prompt = () => promptMarkdown(drop.value, link.value, waiting.value)
+const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, pageErrors.value.length)
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -1885,7 +1887,7 @@ watch(
               @focus="focusComment"
             >
               <template #actions>
-                <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
+                <UTooltip v-if="(comments.length || pageErrors.length) && !popover" text="Copy feedback for your agent">
                   <DropCopyButton aria-label="Copy feedback for your agent" size="sm" :value="feedback" />
                 </UTooltip>
                 <UButton
@@ -2038,8 +2040,9 @@ watch(
                     :send="dropSend"
                   />
                   <ViewerCopyPrompt
-                    v-else-if="waiting.length && !lightbox && !commentMode"
+                    v-else-if="(waiting.length || pageErrors.length) && !lightbox && !commentMode"
                     :count="waiting.length"
+                    :errors="pageErrors.length"
                     :signed-in="Boolean(me)"
                     :value="prompt"
                   />

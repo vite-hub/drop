@@ -2,7 +2,7 @@
 import type { CopyValue } from "vite-hub/ui"
 import type { ConnectedAgent } from "#shared/types"
 
-const props = defineProps<{ value: CopyValue; count: number; signedIn: boolean }>()
+const props = defineProps<{ value: CopyValue; count: number; errors?: number; signedIn: boolean }>()
 const agents = ref<ConnectedAgent[] | null>(null)
 async function load() {
   if (props.signedIn) agents.value = await $fetch<ConnectedAgent[]>("/api/agents").catch(() => agents.value)
@@ -11,10 +11,13 @@ onMounted(load)
 useEventListener("focus", () => agents.value?.length === 0 && void load())
 const noAgent = computed(() => agents.value?.length === 0)
 const open = ref(false)
-const tip = computed(
-  () =>
-    `Copy a prompt with ${props.count === 1 ? "the comment" : `the ${props.count} comments`} that wait for an answer, for your agent`,
-)
+const tip = computed(() => {
+  const comments = props.count
+    ? `${props.count === 1 ? "the comment" : `the ${props.count} comments`} that wait for an answer`
+    : ""
+  const errors = props.errors ? (props.errors === 1 ? "the page error" : `the ${props.errors} page errors`) : ""
+  return `Copy a prompt with ${[comments, errors].filter(Boolean).join(" and ")}, for your agent`
+})
 const button = {
   "aria-label": "Copy prompt for your agent",
   class: "[animation:pop-in_200ms_var(--ease-out)]",
@@ -36,7 +39,7 @@ const button = {
   </UTooltip>
   <UModal
     v-model:open="open"
-    description="The prompt has your agent read these comments through Drop's MCP server, and no agent is connected to your account. Connect one, then paste the prompt into it."
+    description="The prompt has your agent read this drop through Drop's MCP server, and no agent is connected to your account. Connect one, then paste the prompt into it."
     title="No agent connected"
   >
     <template #footer>
