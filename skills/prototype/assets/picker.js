@@ -70,6 +70,10 @@
     body > [data-variant][data-prototype-asleep] { position: relative; }
     body > [data-variant][data-prototype-asleep]::after { content: attr(data-variant); position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
       background: #f5f5f5; color: #737373; font: 500 14px/1.4 ui-sans-serif, system-ui, sans-serif; text-align: center; pointer-events: none; }
+    body > [data-variant][data-prototype-stalled]::after { padding-block: 0 40px; }
+    body > [data-variant] > [data-prototype-retry] { position: absolute; z-index: 1; top: 50%; left: 50%; transform: translateX(-50%);
+      border: 1px solid #737373; border-radius: 6px; padding: 4px 8px; background: #fff; color: #171717;
+      font: 500 14px/1.4 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
     html[data-prototype-layout="canvas"], html[data-prototype-layout="canvas"] body { overflow: hidden !important; overscroll-behavior: none !important; height: 100% !important; }
     html[data-prototype-layout="canvas"] body { margin: 0 !important; cursor: default; }
     html[data-prototype-layout="canvas"] body > [data-variant] { cursor: auto; }
@@ -295,10 +299,15 @@
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
   // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
-  // further away for SLEEP ms. The item in focus never sleeps (it's the only one near), nor the one being typed in, nor
-  // any while Drop's comment tools are on or a thread is open: a comment needs the page it was written on.
-  const NEAR = 600, LOADING = 2, SLEEP = 5000;
-  let commenting = false, threadOpen = false;
+  // further away for SLEEP ms. A page still loading after STALL ms is stopped and tried again only once its item has
+  // left and come back near or the reader clicks Retry. The item in focus never sleeps (it's the only one near), nor
+  // the one being typed in, nor any while Drop's comment tools are on or a thread is open.
+  const NEAR = 600, LOADING = 2, SLEEP = 5000, STALL = 15000;
+  let commenting = false, openThread = null, markers = [];
+  let draftItem = null;
+  document.addEventListener("drop:area-draft", (event) => {
+    draftItem = event.detail instanceof Element ? event.detail.closest("[data-variant]") : null;
+  });
   function near(it, v) {
     if (mode !== "canvas") return mode === "focus" && it.i === current;
     const b = box(it), x = cam.x + b.x * cam.z, y = cam.y + b.y * cam.z;
@@ -314,24 +323,55 @@
       if (near(it, v)) {
         clearTimeout(live.timer); live.timer = 0;
         if (live.state === "asleep" && loading < LOADING) { load(it, live); loading++; }
-      } else if (live.state !== "asleep" && !live.timer && !kept(it)) {
+      } else if (live.state === "stalled") resetStall(it, live);
+      else if (live.state !== "asleep" && !live.timer) {
         live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP);
       }
     }
   }
   function load(it, live) {
     const frame = live.frame;
-    // A page that never reports its load frees its turn after a while.
-    const done = () => { clearTimeout(live.slow); if (live.frame === frame && live.state === "loading") { live.state = "awake"; rest(); } };
+    // The turn ends with the frame's load, which an error page fires too, with its sleep, or after STALL ms, when a new
+    // empty frame takes its place and so stops the navigation. A frame being edited or reviewed checks again later.
     live.state = "loading";
-    frame.addEventListener("load", done, { once: true });
-    live.slow = setTimeout(done, 10000);
+    frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { clearTimeout(live.slow); live.state = "awake"; rest(); } }, { once: true });
+    const stall = () => {
+      if (live.frame !== frame || live.state !== "loading") return;
+      if (document.activeElement === frame || draftItem === it.el || reviewedItem() === it.el) { live.slow = setTimeout(stall, SLEEP); return; }
+      live.state = "stalled"; blank(it.el, live);
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Retry preview";
+      retry.setAttribute("aria-label", "Retry preview: " + nameOf(it.el));
+      retry.setAttribute("data-prototype-retry", "");
+      const retryPreview = () => { if (live.retry === retry) { resetStall(it, live); rest(); } };
+      retry.addEventListener("click", retryPreview);
+      retry.addEventListener("drop:retry-preview", retryPreview);
+      live.retry = retry;
+      it.el.setAttribute("data-prototype-stalled", "");
+      it.el.append(retry);
+      rest();
+    };
+    live.slow = setTimeout(stall, STALL);
     frame.src = live.url;
     it.el.removeAttribute("data-prototype-asleep");
   }
-  const kept = (it) => commenting || threadOpen || it.el.contains(document.activeElement);
+  function resetStall(it, live) {
+    live.state = "asleep";
+    live.retry.remove(); live.retry = null;
+    it.el.removeAttribute("data-prototype-stalled");
+  }
+  function reviewedItem() {
+    if (openThread === null) return null;
+    const selector = markers.find((marker) => marker?.id === openThread)?.selector;
+    if (typeof selector !== "string") return null;
+    try { return document.querySelector(selector)?.closest("[data-variant]"); } catch { return null; }
+  }
+  const kept = (it) => commenting || openThread !== null || draftItem === it.el || it.el.contains(document.activeElement);
+  // Focus moving between two frames tells this page nothing, so a kept frame checks again later.
   function sleep(it, live) {
-    if (near(it, view()) || kept(it)) return;
+    if (near(it, view())) return;
+    if (kept(it)) { live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP); return; }
     clearTimeout(live.slow);
     live.state = "asleep";
     blank(it.el, live);
@@ -603,7 +643,8 @@
     if (m.type === "inset" && Number.isFinite(m.bottom)) {
       setDockBottom(Math.max(72, m.bottom + 4));
     } else if (m.type === "tool" && typeof m.tool === "string") { commenting = m.tool !== "browse"; rest(); }
-    else if (m.type === "active") { threadOpen = typeof m.id === "string"; rest(); }
+    else if (m.type === "active") { openThread = typeof m.id === "string" ? m.id : null; rest(); }
+    else if (m.type === "markers" && Array.isArray(m.markers)) markers = m.markers;
     else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
   });
 

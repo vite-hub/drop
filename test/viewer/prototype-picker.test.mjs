@@ -6,6 +6,12 @@ const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
 const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
 
 const PICKER = await readFile(new URL("../../skills/prototype/assets/picker.js", import.meta.url), "utf8")
+const liveItems = (count) =>
+  Array.from(
+    { length: count },
+    (_, index) =>
+      `<section id="v-${index}" data-variant="Page ${index}" data-src="/live/${index}" data-width="280" data-height="240"></section>`,
+  ).join("")
 const variants = (fields) => parseFrameMessage({ __drop: true, type: "variants", canvas: false, zoom: 100, ...fields })
 const one = (id) => ({ id, label: id, note: "" })
 
@@ -918,15 +924,15 @@ test("live pages load as their items come near the screen, two at a time, and sl
         `<section id="v-${n}" data-variant="Page ${n}" data-src="/live/${n}" data-width="400" data-height="300"></section>`,
     ).join("")
     const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
-    // Live pages answer only once let go, so the test sees which ones are loading.
-    const held = []
-    let hold = true
+    // The first two attempts never answer; later navigations can load normally.
+    let holdFirstLoads = true
     await tab.route("https://picker.test/**", (route) => {
       const path = new URL(route.request().url()).pathname
-      const answer = () =>
-        route.fulfill({ contentType: "text/html", body: path === "/sleep" ? html : `<!doctype html><p>${path}</p>` })
-      if (hold && path.startsWith("/live/")) held.push(answer)
-      else return answer()
+      if ((path === "/live/0" || path === "/live/1") && holdFirstLoads) return
+      return route.fulfill({
+        contentType: "text/html",
+        body: path === "/sleep" ? html : `<!doctype html><p>${path}</p>`,
+      })
     })
     // The camera at 100% on the first items, so the rest of the row lies far to the right.
     await tab.addInitScript(() => {
@@ -937,7 +943,7 @@ test("live pages load as their items come near the screen, two at a time, and sl
         )
     })
     await tab.clock.install()
-    await tab.goto("https://picker.test/sleep")
+    await tab.goto("https://picker.test/sleep", { waitUntil: "domcontentloaded" })
     const loaded = () =>
       tab.evaluate(() =>
         [...document.querySelectorAll("iframe[data-prototype-src]")]
@@ -949,35 +955,54 @@ test("live pages load as their items come near the screen, two at a time, and sl
     await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 2, null, {
       polling: 100,
     })
-    await tab.waitForTimeout(200)
+    await tab.clock.fastForward(11000)
     assert.deepEqual(await loaded(), ["v-0", "v-1"])
-    hold = false
-    for (const answer of held.splice(0)) await answer()
-    await tab.waitForFunction(() => document.querySelectorAll("iframe[data-prototype-src][src]").length === 3, null, {
+    // Two pages that never answer give up their turns after a while, stop loading, and wait until their items have
+    // left and come back; the third loads meanwhile. The one being typed in keeps loading until focus leaves it.
+    await tab.evaluate(() => document.getElementById("v-0").querySelector("iframe").focus())
+    await tab.clock.fastForward(5000)
+    await tab.waitForFunction(() => document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.deepEqual(await loaded(), ["v-0", "v-1", "v-2"])
+    assert.deepEqual(await loaded(), ["v-0", "v-2"])
+    await tab.evaluate(() => document.activeElement.blur())
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.deepEqual(await loaded(), ["v-2"])
+    assert.equal(await asleep("v-0"), true)
+    holdFirstLoads = false
+    await tab.frameLocator("#v-2 iframe").getByText("/live/2").waitFor()
+    assert.deepEqual(await loaded(), ["v-2"])
     assert.equal(await asleep("v-5"), true)
 
-    // Panning to the far end of the row: the first items stay loaded until they've been far away for a while.
+    // Panning to the far end of the row: the loaded items stay until they've been far away for a while, and the one
+    // being typed in stays loaded until focus moves to another page.
+    await tab.evaluate(() => document.getElementById("v-2").querySelector("iframe").focus())
     await tab.mouse.move(500, 600)
     for (let n = 0; n < 6; n++) await tab.mouse.wheel(1000, 0)
     await tab.waitForFunction(() => document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.ok((await loaded()).includes("v-0"))
     await tab.clock.fastForward(6000)
-    await tab.waitForFunction(() => !document.getElementById("v-0").querySelector("iframe").getAttribute("src"), null, {
+    await tab.waitForFunction(() => !document.getElementById("v-6").querySelector("iframe").getAttribute("src"), null, {
       polling: 100,
     })
-    assert.equal(await asleep("v-0"), true)
+    assert.equal(await asleep("v-2"), false)
+    await tab.evaluate(() => document.getElementById("v-11").querySelector("iframe").focus())
+    await tab.clock.fastForward(6000)
+    await tab.waitForFunction(() => !document.getElementById("v-2").querySelector("iframe").getAttribute("src"), null, {
+      polling: 100,
+    })
+    assert.equal(await asleep("v-2"), true)
     assert.equal(
-      await tab.evaluate(() => getComputedStyle(document.getElementById("v-0"), "::after").content),
-      '"Page 0"',
+      await tab.evaluate(() => getComputedStyle(document.getElementById("v-2"), "::after").content),
+      '"Page 2"',
     )
-    assert.equal(await tab.evaluate(() => document.getElementById("v-0").getBoundingClientRect().height), 300)
+    assert.equal(await tab.evaluate(() => document.getElementById("v-2").getBoundingClientRect().height), 300)
 
-    // Coming back wakes it.
+    // Coming back wakes it, and tries the page that never answered again.
     for (let n = 0; n < 6; n++) await tab.mouse.wheel(-1000, 0)
     await tab.waitForFunction(
       () => document.getElementById("v-0").querySelector("iframe").getAttribute("src") === "https://picker.test/live/0",
@@ -988,4 +1013,155 @@ test("live pages load as their items come near the screen, two at a time, and sl
   } finally {
     await browser.close()
   }
+}, 30_000)
+
+for (const reviewing of [false, true]) {
+  test(`unrelated stalled previews release their slots during ${reviewing ? "an open thread" : "Comment mode"}`, async () => {
+    const browser = await chromium.launch()
+    try {
+      const tab = await browser.newPage({ viewport: { width: 1100, height: 700 } })
+      const host = `<iframe src="/canvas" style="width:1000px;height:600px;border:0"></iframe>`
+      const canvas = `<!doctype html><body>${liveItems(3)}
+        <script>self.__dropVariantBar = true; ${PICKER}</script>
+        <script>addEventListener("message", ({ data }) => { window.lastMessage = data; });</script>`
+      await tab.route("https://picker.test/**", (route) => {
+        const path = new URL(route.request().url()).pathname
+        if (path === "/live/0" || path === "/live/1") return
+        return route.fulfill({
+          contentType: "text/html",
+          body: path === "/" ? host : path === "/canvas" ? canvas : "Healthy",
+        })
+      })
+      await tab.clock.install()
+      await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+      const picker = tab.frameLocator("iframe")
+      await picker.locator("#v-1 iframe[src]").waitFor({ state: "attached" })
+      const frame = tab.frame({ url: "https://picker.test/canvas" })
+      const send = (messages) =>
+        tab.evaluate((messages) => {
+          for (const message of messages)
+            document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+        }, messages)
+      await send(
+        reviewing
+          ? [
+              { type: "markers", markers: [{ id: "thread", selector: "#v-0 > iframe" }] },
+              { type: "active", id: "thread" },
+            ]
+          : [{ type: "tool", tool: "comment" }],
+      )
+      await frame.waitForFunction((type) => window.lastMessage?.type === type, reviewing ? "active" : "tool", {
+        polling: 100,
+      })
+      assert.equal(await picker.locator("#v-2 iframe[src]").count(), 0)
+      await tab.clock.fastForward(16000)
+      await picker.frameLocator("#v-2 iframe").getByText("Healthy").waitFor()
+      assert.equal(await picker.locator("#v-1 [data-prototype-retry]").count(), 1)
+      assert.equal(await picker.locator("#v-0 iframe[src]").count(), reviewing ? 1 : 0)
+      if (reviewing) {
+        await send([{ type: "active", id: null }])
+        await frame.waitForFunction(
+          () => window.lastMessage?.type === "active" && window.lastMessage.id === null,
+          null,
+          { polling: 100 },
+        )
+        await tab.clock.fastForward(6000)
+        await picker.locator("#v-0 [data-prototype-retry]").waitFor()
+      }
+    } finally {
+      await browser.close()
+    }
+  })
+}
+
+test("a stalled single preview can retry in Focus without moving the camera", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage()
+    let attempts = 0
+    await tab.route("https://picker.test/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: `<!doctype html><body>${liveItems(1)}<script>${PICKER}</script>`,
+      }),
+    )
+    await tab.route("https://picker.test/live/0", (route) => {
+      if (++attempts === 1) return
+      return route.fulfill({ contentType: "text/html", body: "Recovered" })
+    })
+    await tab.clock.install()
+    const request = tab.waitForRequest("https://picker.test/live/0")
+    await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+    await request
+    await tab.clock.fastForward(16000)
+    const retry = tab.getByRole("button", { name: "Retry preview: Page 0" })
+    await retry.waitFor()
+    await tab.clock.fastForward(16000)
+    assert.equal(attempts, 1)
+    await retry.press("Enter")
+    await tab.frameLocator("#v-0 iframe").getByText("Recovered").waitFor()
+    assert.equal(attempts, 2)
+    assert.equal(await retry.count(), 0)
+  } finally {
+    await browser.close()
+  }
 })
+
+test("Comments mode protects only the draft's live preview and leaves Retry clickable", async () => {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1100, height: 700 } })
+    const canvas = withVariantBar(injectRuntime(`<!doctype html><body>${liveItems(3)}</body>`, false, 0, true))
+    const viewer = `<iframe src="/canvas" style="width:1000px;height:600px;border:0"></iframe>
+      <script>window.posts = []; addEventListener("message", (event) => posts.push(event.data));</script>`
+    let attempts = 0
+    await tab.route("**/*", (route) => {
+      const url = new URL(route.request().url())
+      if (url.hostname !== "picker.test") return route.abort()
+      if (url.pathname === "/slow-image" || (url.pathname === "/live/1" && ++attempts === 1)) return
+      const body = {
+        "/": viewer,
+        "/canvas": canvas,
+        "/live/0": '<p>Still loading</p><img src="/slow-image">',
+        "/live/1": "Recovered",
+        "/live/2": "Healthy",
+      }[url.pathname]
+      return route.fulfill({ contentType: "text/html", body })
+    })
+    await tab.clock.install()
+    await tab.goto("https://picker.test/", { waitUntil: "domcontentloaded" })
+    const picker = tab.frameLocator("iframe")
+    await picker.frameLocator("#v-0 iframe").getByText("Still loading").waitFor()
+    const send = (message) =>
+      tab.evaluate((message) => {
+        document.querySelector("iframe").contentWindow.postMessage({ __drop: true, ...message }, location.origin)
+      }, message)
+    await send({ type: "tool", tool: "comment", clickComments: true })
+    await tab.waitForFunction(() => posts.some((post) => post.type === "tool" && post.tool === "comment"))
+    const first = picker.locator("#v-0 iframe[src]")
+    const bounds = await first.boundingBox()
+    await tab.mouse.move(bounds.x + 25, bounds.y + 25)
+    await tab.mouse.down()
+    await tab.mouse.move(bounds.x + 75, bounds.y + 75, { steps: 3 })
+    await tab.mouse.up()
+    await tab.waitForFunction(() => posts.some((post) => post.type === "area" && post.selector?.startsWith("#v-0")))
+    const draft = picker.locator("drop-comments .draft [data-slot=comment-mark-area]")
+
+    await tab.clock.fastForward(16000)
+    await picker.frameLocator("#v-2 iframe").getByText("Healthy").waitFor()
+    assert.equal(await first.count(), 1, "the draft is still anchored to the loading iframe")
+    assert.equal(await draft.isVisible(), true)
+    const retry = picker.getByRole("button", { name: "Retry preview: Page 1" })
+    const button = await retry.boundingBox()
+    await tab.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
+    await picker.frameLocator("#v-1 iframe").getByText("Recovered").waitFor()
+    assert.equal(await tab.evaluate(() => posts.filter((post) => post.type === "area").length), 1)
+
+    await send({ type: "clear-area" })
+    await draft.waitFor({ state: "detached" })
+    await tab.clock.fastForward(6000)
+    await picker.getByRole("button", { name: "Retry preview: Page 0" }).waitFor()
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
