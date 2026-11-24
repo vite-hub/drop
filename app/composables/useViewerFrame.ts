@@ -176,16 +176,22 @@ export function useViewerFrame(options: {
   const unplaced = ref(new Set<string>())
 
   let runtimeReports: { id: string; version: number; errors: RuntimeReport[] } | null = null
+  // A reply older than one already applied is skipped, so a late reply can't drop an error.
+  let runtimeSends = 0
+  let runtimeApplied = 0
   async function sendRuntimeReports() {
     if (!runtimeReports) return
     const { id, version, errors } = runtimeReports
     runtimeReports = null
+    const sent = ++runtimeSends
     const stored = await $fetch<{ errors: DropRuntimeError[] } | undefined>(`/api/drops/${id}/errors`, {
       method: "POST",
       body: { version, errors: errors.slice(0, 20) },
     }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: id }))
-    if (stored && options.errors && drop.value.id === id && drop.value.version === version)
+    if (stored && sent > runtimeApplied && options.errors && drop.value.id === id && drop.value.version === version) {
+      runtimeApplied = sent
       options.errors.value = stored.errors
+    }
   }
   const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
