@@ -84,7 +84,16 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
   waiting.forEach((element) => near.observe(element));
   // Export as PDF (plan-runtime) asks for the rest and prints once every file asked for is here and every video shows a frame.
   let onArrive = () => {};
+  let printing = false;
+  // Safari stops a metadata-only video before its first frame, so a print asks for the whole file.
+  const fetchFrame = (media) => {
+    if (media.getAttribute("preload") === "auto") return;
+    media.preload = "auto";
+    media.load();
+  };
   document.addEventListener("drop:print", (e) => {
+    printing = true;
+    loading.forEach(fetchFrame);
     ask(waiting);
     e.detail.waitUntil(new Promise((resolve) => {
       onArrive = () => {
@@ -105,6 +114,7 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
     };
     media.addEventListener("loadeddata", done);
     media.addEventListener("error", done);
+    if (printing) fetchFrame(media);
   };
   addEventListener("message", (e) => {
     const m = e.data;

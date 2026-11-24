@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { chromium } from "playwright"
+import { chromium, webkit } from "playwright"
 import { test } from "vite-plus/test"
 import { PREVIEW_SANDBOX, previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
@@ -162,6 +162,8 @@ async function openLazy(
   await page.exposeFunction("parseFrameMessage", (message) => parseFrameMessage(message) !== null)
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
+    // WebKit routes the frame's own blob: URLs too.
+    if (url.protocol === "blob:") return route.continue()
     if (url.hostname !== "drop.test") return route.abort()
     if (url.pathname !== "/") return onRequest(route, url)
     return route.fulfill({
@@ -220,6 +222,7 @@ async function openLazy(
           title: video.title,
           readyState: video.readyState,
           width: video.videoWidth,
+          preload: video.getAttribute("preload"),
         })),
       }),
     )
@@ -565,8 +568,8 @@ test("Export as PDF waits for an attached video's first frame, and not for one t
   const BROKEN = "/f/00000000-0000-4000-8000-000000000004.webm"
   const doc =
     `<h1>Plan</h1>${FILLER.repeat(5)}` +
-    `<p><video controls title="plays" data-drop-media="${PLAYS}"></video></p>` +
-    `<p><video controls title="broken" data-drop-media="${BROKEN}"></video></p>`
+    `<p><video controls preload="metadata" title="plays" data-drop-media="${PLAYS}"></video></p>` +
+    `<p><video controls preload="metadata" title="broken" data-drop-media="${BROKEN}"></video></p>`
   const browser = await chromium.launch()
   try {
     const { page, frame } = await openLazy(browser, {
@@ -585,6 +588,43 @@ test("Export as PDF waits for an attached video's first frame, and not for one t
     await browser.close()
   }
 }, 30_000)
+
+// Comark renders an attached video with preload="metadata", where Safari stops before the first frame. WebKit on
+// Linux shows that stop only for preload="none", so the video that arrives while reading stands in for it.
+test("Export as PDF asks a video that stopped before its first frame for the rest of the file", async () => {
+  const READING = "/f/00000000-0000-4000-8000-000000000005.webm"
+  const PRINTING = "/f/00000000-0000-4000-8000-000000000006.webm"
+  const doc =
+    `<h1>Plan</h1><p><video controls preload="none" title="reading" data-drop-media="${READING}"></video></p>` +
+    `${FILLER.repeat(5)}<p><video controls preload="metadata" title="printing" data-drop-media="${PRINTING}"></video></p>`
+  const browser = await webkit.launch()
+  try {
+    const { page, frame } = await openLazy(browser, {
+      answers: { files: true },
+      doc,
+      videos: { [READING]: "webm", [PRINTING]: "webm" },
+    })
+    // Headless WebKit's print() opens nothing and fires no beforeprint.
+    await frame.evaluate(() => {
+      window.print = () => dispatchEvent(new Event("beforeprint"))
+    })
+    await page.waitForFunction((path) => window.delivered.includes(path), READING)
+    await page.waitForTimeout(1_000)
+    assert.equal(await frame.evaluate(() => document.querySelector("video[title=reading]").readyState), 0)
+
+    const sent = await frame.evaluate(() => Date.now())
+    await page.evaluate(() => window.tell({ type: "print", title: "SEO plan" }))
+    await frame.waitForFunction(() => window.printed.length > 0, null, { timeout: 20_000 })
+    const [printed] = await frame.evaluate(() => window.printed)
+    for (const video of printed.videos) {
+      assert.ok(video.readyState >= 2 && video.width > 0, `printed ${video.title} at readyState ${video.readyState}`)
+      assert.equal(video.preload, "auto")
+    }
+    assert.ok(printed.at - sent < 8_000, `printed after ${printed.at - sent} ms`)
+  } finally {
+    await browser.close()
+  }
+}, 40_000)
 
 test("Export as PDF waits for every copy of a drop embedded twice", async () => {
   let images = 0
