@@ -43,7 +43,7 @@ const html = pages.map(([id, route]) =>
 console.log(html)
 ```
 
-- Give each route its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`.
+- Give each route its own id, unique and the same every round, so comments stay pinned and items keep their place. Build `data-src` with `new URL(route, base)`; a new preview URL changes only `base`. If the app lives under a subpath (`https://preview.example.com/my-app/`), write routes without the leading `/` (`orders`), or `new URL` drops the subpath.
 - For a phone size too, add a second item per route (`v-orders-mobile`, `data-width="390" data-height="844"`).
 - Use a host every reviewer can reach over https, such as a deployed preview; a `localhost` URL loads only on your machine.
 
