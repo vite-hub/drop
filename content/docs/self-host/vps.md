@@ -92,7 +92,7 @@ Set `DROP_AUTH_PROXY=true` and `VITEHUB_MEMBERS=github-org:your-org`. Native Git
 --cookie-name=__Host-drop-auth --cookie-secure=true
 ```
 
-Set `DROP_AUTH_PROXY_COOKIE=__Host-drop-auth` so signing out of Drop clears it too. With nginx and oauth2-proxy on port 4180, add this `map` in nginx's `http` block. It keeps the full original sign-in URL for the internal fallback, but leaves the header unset for direct requests to `/oauth2/`, so their normal return targets still work.
+Set `DROP_AUTH_PROXY_COOKIE=__Host-drop-auth` so signing out of Drop clears it too. **Use another account** leaves the cookie to oauth2-proxy's `/oauth2/sign_out`, which needs it to end the proxy session. With nginx and oauth2-proxy on port 4180, add this `map` in nginx's `http` block. It keeps the full original sign-in URL for the internal fallback, but leaves the header unset for direct requests to `/oauth2/`, so their normal return targets still work.
 
 ```nginx
 map $request_uri $drop_auth_return {
