@@ -672,9 +672,16 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   state.who = ana
   const transport = transportFor(doc.id)
   let pairCode
+  let gate
   const client = createCommentSend(
     {
       ...transport,
+      status: async () => {
+        const wait = gate
+        const status = await transport.status()
+        await wait
+        return status
+      },
       startPairing: async () => {
         const pairing = await transport.startPairing()
         pairCode = pairing.code
@@ -707,15 +714,42 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
     assert.notEqual(delivered[0].endpoint, publishing.id)
     const waiting = client.state.count
     await comment(doc.id, ana, "Added after Allow failed.")
-    await client.refresh()
+    const routine = client.refresh()
+    let release
+    gate = new Promise((resolve) => (release = resolve))
+    const retry = client.send()
+    await routine
     assert.deepEqual([client.state.status, client.state.count], ["failed", waiting + 1])
-    await client.send()
+    release()
+    await retry
     assert.equal(client.state.status, "idle")
     assert.equal(delivered.length, 1)
   } finally {
     client.start()()
   }
 }, 3000)
+
+test("a failed pairing clears once no comment waits", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+  state.who = ana
+  const client = createCommentSend(transportFor(doc.id))
+  try {
+    await client.refresh()
+    await client.pairAnother(() => Promise.reject(new Error("clipboard denied")))
+    assert.equal(client.state.status, "failed")
+
+    state.who = agentOf(ana)
+    await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })
+    state.who = agentOf(bob)
+    await call(reply, { id: doc.id, comment: theirs.n, body: "The freeze has moved." })
+    state.who = ana
+    await client.refresh()
+    assert.deepEqual([client.state.status, client.state.count], ["idle", 0])
+  } finally {
+    client.start()()
+  }
+})
 
 test("a failed ordinary Send stays failed with its count updated while comments wait, and clears when they are answered", async () => {
   const { doc, mine, theirs } = await reviewed()

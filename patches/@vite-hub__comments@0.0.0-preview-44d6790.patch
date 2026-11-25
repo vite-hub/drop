@@ -21,7 +21,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..1780adfeffded39b7a66a64f841221cf
    status: "limited";
    count: number;
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..7caa9b3040b27d4665af66dee4d69b2ce04fb324 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..05e7ad205f20c0189e4d2d6aa587f9d1dab1ee7c 100644
 --- a/dist/client.js
 +++ b/dist/client.js
 @@ -1244,7 +1244,7 @@ function createCommentSend(transport, options = {}) {
@@ -33,22 +33,25 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..7caa9b3040b27d4665af66dee4d69b2c
  		const at = step;
  		const canApply = () => at === step && !fetching && state.status !== "pairing" && state.status !== "confirm" && (state.status !== "sending" || deliveryPending);
  		if (!canApply()) return;
-@@ -1254,6 +1254,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1254,6 +1254,17 @@ function createCommentSend(transport, options = {}) {
  			if (!canApply()) return;
  			if (revision === countRevision) count = status.count;
  			selection = status.selection ?? "";
-+			if (state.status === "failed" && !recover && (lastStep !== "send" || count > 0)) {
++			if (state.status === "failed" && !recover && count > 0) {
 +				agent = status.agent;
-+				if (count !== state.count) set({
-+					...state,
-+					count
-+				});
++				if (count !== state.count) {
++					state = {
++						...state,
++						count
++					};
++					notify();
++				}
 +				return;
 +			}
  			apply(status);
  		} catch (error) {
  			if (!onError) throw error;
-@@ -1281,7 +1289,9 @@ function createCommentSend(transport, options = {}) {
+@@ -1281,7 +1292,9 @@ function createCommentSend(transport, options = {}) {
  		if (result.status === "failed") return set({
  			status: "failed",
  			count,
@@ -59,7 +62,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..7caa9b3040b27d4665af66dee4d69b2c
  		});
  		if (paired) agent = paired.agent;
  		if (result.status === "limited") return limited(result.retryAt);
-@@ -1469,13 +1479,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1469,13 +1482,14 @@ function createCommentSend(transport, options = {}) {
  			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
  			if (state.status === "failed" && lastStep === "pair") return pair(copy);
