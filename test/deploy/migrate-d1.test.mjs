@@ -25,12 +25,15 @@ test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])(
     const entries = dropMigrations()
     const pinsMigration = "0016_drop_pins.sql"
     const cascadeMigration = "0018_drop_pin_user_cascade.sql"
+    // Indexes tables 0017_comment_sends creates, so no ledger here has it yet.
+    const liveKeyMigration = "0020_comment_sends_live_key.sql"
     const applied =
       scenario === "fresh database"
         ? []
         : entries.filter(
             ({ name }) =>
               name !== cascadeMigration &&
+              name !== liveKeyMigration &&
               name !== (scenario === "ledger with pins" ? "0017_comment_sends.sql" : pinsMigration),
           )
     const expected = entries.filter((entry) => !applied.includes(entry))
@@ -201,13 +204,16 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
   const database = new DatabaseSync(":memory:")
   const all = dropMigrations()
   const send = all.find((migration) => migration.name === "0017_comment_sends.sql")
+  const liveKey = all.find((migration) => migration.name === "0020_comment_sends_live_key.sql")
   assert.ok(send, "0017_comment_sends is a migration")
+  assert.ok(liveKey, "0020_comment_sends_live_key is a migration")
   try {
-    // Production's D1 before this change: every other migration applied and in Wrangler's ledger.
+    // Production's D1 before this change: every other migration applied and in Wrangler's ledger, except the later one
+    // that indexes Send's tables.
     database.exec(
       "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
     )
-    for (const migration of all.filter((item) => item !== send)) {
+    for (const migration of all.filter((item) => item !== send && item !== liveKey)) {
       database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
       database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(migration.name)
     }
@@ -222,8 +228,9 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
       return Response.json({ success: true, result: [{ success: true, results: [] }] })
     }
     await migrateD1()
-    assert.equal(applied.length, 1)
+    assert.equal(applied.length, 2)
     assert.match(applied[0], /INSERT INTO d1_migrations \(name\) VALUES \('0017_comment_sends\.sql'\)/)
+    assert.match(applied[1], /INSERT INTO d1_migrations \(name\) VALUES \('0020_comment_sends_live_key\.sql'\)/)
     // The columns ViteHub reads and writes: a send's endpoint and agent thread, a code's thread, and who owns or
     // disabled an endpoint.
     const columns = (table) =>
@@ -241,11 +248,15 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
 
     // What `list_handoffs` asks: a member's sends that wait, newest first, through the member index.
     const insert = database.prepare(
-      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', 'k', ?, '{}', ?, ?)",
+      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', ?, ?, '{}', ?, ?)",
     )
-    insert.run("send_a", "ana", "sent", 1, 1)
-    insert.run("send_b", "ana", "done", 2, 2)
-    insert.run("send_c", "bob", "sent", 3, 3)
+    insert.run("send_a", "ana", "k", "sent", 1, 1)
+    insert.run("send_b", "ana", "k2", "done", 2, 2)
+    insert.run("send_c", "bob", "k3", "sent", 3, 3)
+    // One send per key is live; a failed one leaves its key free for the retry.
+    assert.throws(() => insert.run("send_d", "ana", "k", "working", 4, 4), /UNIQUE/)
+    insert.run("send_e", "ana", "k", "failed", 5, 5)
+    insert.run("send_f", "ana", "k", "failed", 6, 6)
     const lookup =
       "SELECT id FROM vitehub_comment_sends WHERE member = ? AND state IN ('sent', 'working') ORDER BY created_at DESC"
     assert.deepEqual(
@@ -273,7 +284,7 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_pairings'").get())
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_deliveries'").get())
     await migrateD1()
-    assert.equal(applied.length, 1)
+    assert.equal(applied.length, 2)
   } finally {
     globalThis.fetch = previousFetch
     process.env = previousEnv
