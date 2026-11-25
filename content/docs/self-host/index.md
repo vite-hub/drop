@@ -120,6 +120,8 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
 | `identity.denied`, `identity.session` | Why Drop refused a session (`banned` or `not-member`), or that a session lookup failed. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `auth.proxy.refused` | Why ViteHub Auth refused a person the sign-in proxy vouched for, such as `account_not_linked`. For `denied`, `auth.proxy.denied` holds the refusing hook's code. |
+| `mcp.auth` | Whether an MCP request sent a token, and for a refused token ViteHub's reason, such as `expired` or `session_ended`, with the OAuth client's id. |
 | `roomAccess.refused` | Which of Drop's access rules refused a realtime connection. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |

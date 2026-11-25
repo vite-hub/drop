@@ -47,6 +47,10 @@ export const proxyAuth = () =>
       const stored = await storedAccount(identity)
       return stored?.accessToken === token ? identity : { ...identity, accessToken: token }
     },
+    onRefused({ code, error }) {
+      const denied = error instanceof APIError && typeof error.body?.code === "string" ? error.body.code : undefined
+      requestLog(authRequest.getStore())?.set({ auth: { proxy: { refused: code, ...(denied ? { denied } : {}) } } })
+    },
   })
 
 async function storedAccount({ providerId, accountId }: ForwardedIdentity) {

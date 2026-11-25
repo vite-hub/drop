@@ -60,7 +60,7 @@ export const requireCaller = async (event) => {
   const headers = event.req.headers
   if (/^Bearer\\s+\\S+$/i.test(headers.get("authorization") ?? "")) {
     const caller = globalThis.dropTest.mcpCaller
-    if (!caller) return [globalThis.dropTest.mcpRefusal ?? { code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
+    if (!caller) return [globalThis.dropTest.mcpRefusal ?? { code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token", data: { reason: "malformed" } }, undefined]
     return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
   }
   const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })
