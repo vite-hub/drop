@@ -132,6 +132,12 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       allow: async (code) => {
         if (pairing?.owner !== owner || pairing.code !== code || !pairing.agent)
           return { status: "failed", reason: "The setup code is not paired." }
+        if (setup.problem)
+          return {
+            status: "failed",
+            problem: setup.problem === "unset" ? "key-unset" : "key-invalid",
+            reason: "Cannot open receiver.",
+          }
         const { agent, batch } = pairing
         endpoint = { agent, lastSentAt: null }
         pairing = null

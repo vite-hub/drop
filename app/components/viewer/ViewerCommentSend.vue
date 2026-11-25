@@ -65,10 +65,10 @@ watch(
 
 const { copy } = useCopy()
 const retrying = ref(false)
-async function retry() {
+async function attempt(action: "send" | "pairAnother") {
   retrying.value = true
   try {
-    await client.value.send((prompt) => copy(() => prompt))
+    await client.value[action]((prompt) => copy(() => prompt))
   } finally {
     retrying.value = false
   }
@@ -96,7 +96,7 @@ const label = computed(() => {
           data-slot="comment-send-action"
           :title="`Send ${waiting} that wait for an answer to your agent`"
           type="button"
-          @click="retry"
+          @click="attempt('send')"
         >
           <UIcon aria-hidden="true" class="vh-comment-send-icon" name="i-lucide-send" />
           Send
@@ -126,7 +126,8 @@ const label = computed(() => {
       :failure="shown"
       :prompt="prompt"
       :retrying="retrying"
-      @retry="retry"
+      @pair-again="attempt('pairAnother')"
+      @retry="attempt('send')"
     />
   </div>
 </template>

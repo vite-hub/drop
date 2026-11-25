@@ -377,6 +377,63 @@ test("Send on a server without VITEHUB_WEBHOOKS_KEY stays Send, explains itself 
   }
 }, 30_000)
 
+test("Send reopens setup after an Allow and send failure and requires confirmation again", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { tab, segment, control, errors } = await openFixture(browser, {})
+    const send = segment.getByRole("button", { name: "Send: 3 comments" })
+    const allow = segment.getByRole("button", { name: "Allow and send 3" })
+    const agent = { name: "T3 Code", logo: "t3", host: "relay.t3.codes" }
+    await send.click()
+    await segment.getByRole("button", { name: "Cancel connect" }).waitFor()
+    await control("pair", agent)
+    await allow.waitFor()
+    await control("unset", { problem: "unset", admin: false })
+    await allow.click()
+    const setup = tab.getByRole("dialog", { name: "Send isn't set up on this Drop" })
+    await setup.getByRole("button", { name: "Close" }).click()
+    await send.click()
+    await setup.getByRole("button", { name: "Close" }).click({ timeout: 4000 })
+
+    await control("setUp")
+    await send.click()
+    await segment.getByRole("button", { name: "Cancel connect" }).waitFor()
+    await control("pair", agent)
+    await allow.click()
+    await tab.waitForSelector('[data-slot="comment-send"][data-state="sent"]')
+    assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
+test("an unreadable receiver can be re-paired from the failure dialog", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { tab, segment, control, errors } = await openFixture(browser, {})
+    const agent = { name: "T3 Code", logo: "t3", host: "relay.t3.codes" }
+    await segment.getByRole("button", { name: "Send: 3 comments" }).click()
+    await segment.getByRole("button", { name: "Cancel connect" }).waitFor()
+    await control("pair", agent)
+    await segment.getByRole("button", { name: "Allow and send 3" }).click()
+    await control("finish")
+    await tab.evaluate(() => window.drop.comment("bob"))
+
+    await control("answer", { status: "failed", problem: "key-invalid", reason: "Cannot open receiver." })
+    await segment.getByRole("button", { name: "Send: 1 comment" }).click()
+    const reconnect = tab.getByRole("dialog", { name: "Reconnect your agent" })
+    await reconnect.getByRole("button", { name: "Pair again" }).click({ timeout: 4000 })
+    await segment.getByRole("button", { name: "Cancel connect" }).waitFor()
+    assert.match(await tab.evaluate(() => navigator.clipboard.readText()), /one-time setup code/)
+    await control("pair", agent)
+    await segment.getByRole("button", { name: "Allow and send 1" }).click()
+    await tab.waitForSelector('[data-slot="comment-send"][data-state="sent"]')
+    assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+  }
+}, 20_000)
+
 test.each([320, 390])(
   "pairing instructions and touch targets fit the marked dock at %ipx",
   async (width) => {

@@ -184,12 +184,13 @@ diff --git a/dist/client.js b/dist/client.js
  					return;
  				}
  				if (event.id === sendId && (state.status === "working" || state.status === "sent")) refresh().catch(working);
-@@ -1350,8 +1395,15 @@
+@@ -1350,18 +1395,28 @@
  			if (fetching) return;
  			if (state.status !== "idle" && state.status !== "failed" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
 +			if (state.status === "failed" && retry === "pair") return pair(copy);
 +			if (state.status === "failed" && retry === "choose") {
++				if (state.problem === "key-unset" || state.problem === "key-invalid") return pair(copy);
 +				idle();
 +				return refresh().catch(() => void 0);
 +			}
@@ -200,8 +201,11 @@ diff --git a/dist/client.js b/dist/client.js
 +			if (state.status === "failed") await refresh().catch(() => void 0);
  		},
  		async pairAnother(copy) {
- 			if (state.status !== "idle" || !state.canPairAnother) return;
-@@ -1361,7 +1413,9 @@
+-			if (state.status !== "idle" || !state.canPairAnother) return;
++			if (!(state.status === "idle" && state.canPairAnother) && !(state.status === "failed" && count > 0)) return;
+ 			return pair(copy);
+ 		},
+ 		async allow() {
  			if (state.status !== "confirm" || !code) return;
  			const used = code;
  			code = void 0;
@@ -212,7 +216,7 @@ diff --git a/dist/client.js b/dist/client.js
  		},
  		async copyAgain(copy) {
  			if (state.status !== "pairing" || !state.reason) return;
-@@ -1545,7 +1599,7 @@
+@@ -1545,7 +1600,7 @@
  		status: async () => (await request(`/send/status?page=${page()}`)).data,
  		startPairing: async () => (await request(`/send/start?page=${page()}`, post())).data,
  		pollPairing: async (value) => (await request(`/send/pair/${code(value)}`)).data,

@@ -3,7 +3,7 @@ import type { CopyValue } from "vite-hub/ui"
 import type { SendFailure } from "~/utils/comment-send"
 
 const props = defineProps<{ failure: SendFailure; count: number; prompt?: CopyValue; retrying: boolean }>()
-const emit = defineEmits<{ retry: [] }>()
+const emit = defineEmits<{ retry: []; pairAgain: [] }>()
 const open = defineModel<boolean>("open", { required: true })
 
 const host = useRequestURL().host
@@ -59,7 +59,8 @@ const docs = "/docs/self-host#github"
         paste it in your agent: it reads them through Drop's MCP.
       </template>
       <template v-else-if="failure.cause === 'reconnect'">
-        The server can no longer open this connection. Open Agents to reconnect, then send again; {{ comments }}.
+        The server can no longer open this connection. Pair again to get a new setup prompt without disconnecting your
+        other agents; {{ comments }}.
       </template>
       <template v-else> In Drop, {{ comments }}. </template>
     </template>
@@ -156,17 +157,27 @@ const docs = "/docs/self-host#github"
             Copy prompt instead
           </DropCopyButton>
           <UButton
-            v-if="failure.cause === 'agent' || failure.cause === 'reconnect'"
-            :autofocus="failure.cause === 'reconnect' || failure.tries > 1"
+            v-if="failure.cause === 'agent'"
+            :autofocus="failure.tries > 1"
             color="neutral"
             label="Open Agents"
             size="sm"
             target="_blank"
             to="/agents"
-            :variant="failure.cause === 'reconnect' || failure.tries > 1 ? 'solid' : 'ghost'"
+            :variant="failure.tries > 1 ? 'solid' : 'ghost'"
           />
           <UButton
-            v-if="failure.cause !== 'reconnect'"
+            v-if="failure.cause === 'reconnect'"
+            autofocus
+            color="neutral"
+            label="Pair again"
+            :loading="retrying"
+            size="sm"
+            variant="solid"
+            @click="emit('pairAgain')"
+          />
+          <UButton
+            v-else
             :autofocus="failure.cause !== 'agent' || failure.tries < 2"
             color="neutral"
             icon="i-mingcute-refresh-anticlockwise-1-line"
