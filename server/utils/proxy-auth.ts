@@ -5,6 +5,7 @@ import * as v from "valibot"
 import { type ForwardedIdentity, forwardAuth } from "vite-hub/auth/forward"
 import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
+import { authApiError, isAuthErrorCode } from "./auth-errors"
 import { authRequest, requestLog } from "./logs"
 import { isProxyMember, PROXY_TOKEN_HEADER, readAuthProxyConfig } from "./proxy-auth-config"
 export const authProxy = readAuthProxyConfig
@@ -32,9 +33,11 @@ export const proxyAuth = () =>
         if (!(await isProxyMember(token))) return null
       } catch (error) {
         if (!(error instanceof HTTPError)) throw error
+        const code = v.is(Coded, error.data) ? error.data.code : undefined
+        if (isAuthErrorCode(code)) throw authApiError(code)
         throw new APIError(
           error.status === 401 ? "UNAUTHORIZED" : error.status === 403 ? "FORBIDDEN" : "SERVICE_UNAVAILABLE",
-          { message: error.message, code: v.is(Coded, error.data) ? error.data.code : undefined },
+          { message: error.message, code },
         )
       }
       const identity = await cachedIdentity(token)
@@ -83,11 +86,7 @@ async function cachedIdentity(token: string): Promise<ForwardedIdentity> {
 
 async function githubIdentity(token: string): Promise<ForwardedIdentity> {
   const profile = v.safeParse(GitHubIdentity, await githubApi("user", token))
-  if (!profile.success)
-    throw new APIError("SERVICE_UNAVAILABLE", {
-      message: "GitHub identity is unavailable. Try again shortly.",
-      code: "GITHUB_IDENTITY_UNAVAILABLE",
-    })
+  if (!profile.success) throw authApiError("GITHUB_IDENTITY_UNAVAILABLE")
   const { id, login, name, avatar_url: image } = profile.output
   const accountId = String(id)
   const emails = v.safeParse(GitHubEmails, await githubApi("user/emails", token))
@@ -117,11 +116,7 @@ async function githubApi(path: string, token: string): Promise<unknown> {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "Drop" },
     signal: AbortSignal.timeout(5000),
   }).catch(failed)
-  if (response?.status === 401)
-    throw new APIError("UNAUTHORIZED", {
-      message: "GitHub sign-in expired or was revoked. Sign in again to Drop.",
-      code: "GITHUB_REAUTH_REQUIRED",
-    })
+  if (response?.status === 401) throw authApiError("GITHUB_REAUTH_REQUIRED")
   if (!response) return null
   if (!response.ok) return failed(`HTTP ${response.status}`)
   return response.json().catch(failed)

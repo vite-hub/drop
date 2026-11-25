@@ -1,6 +1,7 @@
 import { APIError } from "better-auth/api"
 import { applySetCookies } from "better-auth/cookies"
 import { defineHandler, type H3Event, HTTPError } from "h3"
+import { authError } from "../utils/auth-errors"
 import { sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
 import { oneSignInAtATime } from "../utils/proxy-auth"
@@ -15,12 +16,7 @@ export default defineHandler(async (event) => {
   const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return
   if (path !== "/signin/start" || sentPath(event) !== path) return withoutToken(event)
-  if (!(await isProxyMember(token)))
-    throw new HTTPError({
-      status: 403,
-      statusText: "Active organization membership required.",
-      data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
-    })
+  if (!(await isProxyMember(token))) throw authError("GITHUB_MEMBERSHIP_REQUIRED")
   const session = await oneSignInAtATime(token, () => sessionOf(event)).catch((error: unknown) => {
     if (!(error instanceof APIError)) throw error
     const code = typeof error.body?.code === "string" ? error.body.code : undefined
@@ -28,7 +24,7 @@ export default defineHandler(async (event) => {
   })
   if (!session) {
     requestLog(event)?.set({ auth: { signIn: "proxy failed", cause: "Better Auth refused the forwarded identity" } })
-    throw new HTTPError({ status: 403, statusText: "Proxy sign-in failed.", data: { code: "PROXY_SIGN_IN_FAILED" } })
+    throw authError("PROXY_SIGN_IN_FAILED")
   }
 
   withoutToken(event, event.context.dropSessionCookies)

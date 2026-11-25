@@ -18,7 +18,7 @@ const { evlogOptions } = await import("../../scripts/logging.ts")
 process.env.__EVLOG_CONFIG = JSON.stringify(evlogOptions({ version: "1.2.3", commit: "abc1234" }))
 const { default: evlogPlugin } = await import("../../node_modules/evlog/dist/nitro/v3/plugin.mjs")
 const { default: wideEvents } = await import("../../server/plugins/wide-events.ts")
-const { identify } = await import("../../server/utils/identity.ts")
+const { identify, requireIdentity } = await import("../../server/utils/identity.ts")
 const { default: patchDrop } = await import("../../server/api/drops/[id].patch.ts")
 const { default: deleteDropRoute } = await import("../../server/api/drops/[id].delete.ts")
 const { default: upload } = await import("../../server/api/uploads/[ticket].put.ts")
@@ -217,6 +217,13 @@ test("a refused or failed session says why on the event, and the request is stil
   session.current = Object.assign(new Error("GitHub is down"), { body: { code: "AUTH_GITHUB_UNAVAILABLE" } })
   const outage = await request("/api/me", identify)
   assert.equal(outage.failure.status, 503)
+})
+
+test("a refused sign-in names its code on the event", async () => {
+  const { event, failure } = await request("/api/drops", requireIdentity)
+  assert.equal(failure.status, 401)
+  assert.equal(event.status, 401)
+  assert.equal(event.error.data.code, "SIGN_IN_REQUIRED")
 })
 
 test("an agent accepted by ViteHub after its ban expires is not denied by Drop", async () => {

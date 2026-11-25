@@ -1,6 +1,6 @@
-import { HTTPError } from "h3"
 import { checkGitHubOrgMember } from "vite-hub/auth"
 import { useServerEnv } from "vite-hub/env"
+import { authError } from "./auth-errors"
 
 export const PROXY_TOKEN_HEADER = "x-auth-request-access-token"
 
@@ -27,22 +27,7 @@ export async function isProxyMember(token: string): Promise<boolean> {
   const [error] = await checkGitHubOrgMember(token, organization, { cacheMs: 300_000 })
   if (!error) return true
   if (error.code === "AUTH_GITHUB_NOT_ORG_MEMBER") return false
-  if (error.code === "AUTH_GITHUB_TOKEN_INVALID")
-    throw new HTTPError({
-      status: 401,
-      statusText: "GitHub sign-in expired or was revoked. Sign in again to Drop.",
-      data: { code: "GITHUB_REAUTH_REQUIRED" },
-    })
-  if (error.code === "AUTH_GITHUB_ORG_ACCESS_DENIED")
-    throw new HTTPError({
-      status: 403,
-      statusText:
-        "GitHub organization access could not be verified. Reauthorize Drop with read:org and any required organization SSO access.",
-      data: { code: "GITHUB_ORG_ACCESS_REQUIRED" },
-    })
-  throw new HTTPError({
-    status: 503,
-    statusText: "GitHub membership verification is unavailable. Try again shortly.",
-    data: { code: "GITHUB_MEMBERSHIP_UNAVAILABLE" },
-  })
+  if (error.code === "AUTH_GITHUB_TOKEN_INVALID") throw authError("GITHUB_REAUTH_REQUIRED")
+  if (error.code === "AUTH_GITHUB_ORG_ACCESS_DENIED") throw authError("GITHUB_ORG_ACCESS_REQUIRED")
+  throw authError("GITHUB_MEMBERSHIP_UNAVAILABLE")
 }

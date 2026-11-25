@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm"
-import { type H3Event, HTTPError } from "h3"
+import type { H3Event } from "h3"
 import { requireCaller, useAuth } from "vite-hub/auth/server"
 import { db } from "vite-hub/database"
 import { user as users } from "../databases/default/index"
+import { authError } from "./auth-errors"
 import { logActor, logDenied, logError, requestLog } from "./logs"
 import { isMember, rethrowMembershipOutage } from "./members"
 import { type TeamRole, teamsOf } from "./teams"
@@ -145,12 +146,11 @@ export async function requireIdentity(event: H3Event): Promise<Identity> {
   const who = await identify(event)
   if (who) return who
   event.res.headers.set("WWW-Authenticate", 'Bearer realm="drop"')
-  throw new HTTPError({ status: 401, statusText: "Sign in, or connect your agent through Drop's MCP server." })
+  throw authError("SIGN_IN_REQUIRED")
 }
 
 export async function requireAdmin(event: H3Event): Promise<Identity> {
   const who = await requireIdentity(event)
-  if (who.role !== "admin" || who.actorKind !== "browser")
-    throw new HTTPError({ status: 403, statusText: "Only admins, in the browser, can do that." })
+  if (who.role !== "admin" || who.actorKind !== "browser") throw authError("ADMIN_REQUIRED")
   return who
 }
