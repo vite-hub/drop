@@ -62,7 +62,7 @@ export default defineAuth(({ env, requestOrigin }) => {
         plans: teamPlans(billing),
       }
     : undefined
-  const password = import.meta.dev === true || env.drop.testSignin
+  const password = import.meta.dev || env.drop.testSignin
   const quotas = env.drop.quotas.enabled
   const { clientIpHeader } = useRuntimeConfig()
   return {
@@ -73,7 +73,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     ),
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
-    rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
+    rateLimit: { enabled: !import.meta.dev, storage: "database" },
     route: false,
     advanced: {
       ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),

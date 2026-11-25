@@ -12,8 +12,7 @@ const MARK_COLOR = { add: "#4ea96f", del: "#f7768e", ctx: "#565f89" }
       <span aria-hidden="true" class="shrink-0 text-[#4ea96f]">⏺</span>
       <span class="min-w-0 break-all"
         ><span class="text-[#c0caf5]">Update</span><span class="text-[#565f89]">(</span
-        ><span class="text-[#7dcfff]">{{ file }}</span
-        ><span class="text-[#565f89]">)</span></span
+        ><span class="text-[#7dcfff]">{{ file }}</span><span class="text-[#565f89]">)</span></span
       >
     </div>
     <div v-if="summary" class="flex min-w-0 items-baseline gap-2 text-[#8b8fa3]">

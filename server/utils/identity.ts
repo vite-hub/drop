@@ -34,7 +34,7 @@ export interface Identity {
 export const roleOf = (
   person: { email: string; emailVerified?: boolean | null },
   admins = useServerEnv().drop.admins.unseal(),
-): Role => roleFor(person, admins, import.meta.dev === true || useServerEnv().drop.testSignin)
+): Role => roleFor(person, admins, import.meta.dev || useServerEnv().drop.testSignin)
 
 export async function syncRole(userId: string) {
   const [row] = await db

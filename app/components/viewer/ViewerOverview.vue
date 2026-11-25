@@ -94,9 +94,7 @@ async function save() {
         </li>
         <li v-if="folder" class="flex min-w-0 items-center gap-2 text-muted">
           <UIcon name="i-mingcute-folder-line" class="size-4 shrink-0" />
-          <span class="truncate" :title="folder"
-            >In <span class="text-highlighted">{{ folder }}</span></span
-          >
+          <span class="truncate" :title="folder">In <span class="text-highlighted">{{ folder }}</span></span>
         </li>
       </ul>
     </section>

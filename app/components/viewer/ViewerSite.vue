@@ -145,15 +145,13 @@ function openHere(event: SubmitEvent) {
         <p v-if="addressError" id="site-address-error" class="text-sm text-pretty text-error">{{ addressError }}</p>
         <p v-else-if="drop.canComment" class="text-sm text-pretty text-muted">
           <template v-if="pattern">
-            Paste any preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span
-            >.
+            Paste any preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span>.
           </template>
           Open it here, then drag over anything to comment on it, or press <UKbd value="R" />. Your browser asks to
           share the screen only when you mark an area.
         </p>
         <p v-else-if="pattern" class="text-sm text-pretty text-muted">
-          Covers every preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span
-          >.
+          Covers every preview that matches <span class="font-mono text-default">{{ drop.siteUrl }}</span>.
         </p>
       </section>
 

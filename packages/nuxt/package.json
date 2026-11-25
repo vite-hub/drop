@@ -36,12 +36,12 @@
     "test": "vp test && vp pack && tsc -p test/types"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.1.0"
+    "@nuxt/kit": "^4.7.0"
   },
   "devDependencies": {
-    "@nuxt/schema": "4.6.2",
+    "@nuxt/schema": "4.7.0",
     "@vite-hub/forge": "https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@c3cfab681ec677a47348f620634d9efdafed8f90",
-    "nuxt": "npm:nuxt-nightly@5.0.0-2610292252-da55a91",
+    "nuxt": "npm:nuxt-nightly@5.0.0-2611241632-f471666",
     "typescript": "^6.0.3",
     "vite-plus": "catalog:"
   },
