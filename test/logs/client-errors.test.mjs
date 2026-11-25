@@ -1,17 +1,18 @@
 import assert from "node:assert/strict"
-import { test, vi } from "vite-plus/test"
+import { afterEach, test, vi } from "vite-plus/test"
 import * as v from "valibot"
 import { createFetch } from "ofetch"
+import { vitehub } from "vite-hub"
 import { sendFile } from "../../app/utils/send-file.ts"
 import { answerCode, answerError, createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
 
-const page = { path: "/d/abc123", online: true, leaving: false }
+const page = { online: true, leaving: false }
 
 function reporter() {
   const sent = []
   const events = []
   const report = createClientErrorReporter(
-    (body) => sent.push(body),
+    (error, options) => sent.push({ error, ...options }),
     (body) => events.push(body),
   )
   return { sent, events, report: (action, error, fields = {}, at = page) => report(action, error, fields, at) }
@@ -29,17 +30,105 @@ function fetchError({ status, data, headers = {}, cause } = {}) {
   })
 }
 
+const REPORTER = Symbol.for("vite-hub.browserErrors")
+
+// ViteHub's page script, as `observability.browserErrors` puts it in the page, run on a page at `/d/abc123` whose
+// `fetch` records each request.
+async function browserPage() {
+  const plugins = [vitehub({ host: "node", observability: { browserErrors: true } })].flat(Infinity)
+  const plugin = (await Promise.all(plugins)).flat(Infinity).find((entry) => entry?.name === "vite-hub/browser-errors")
+  const [{ children: source }] = plugin.transformIndexHtml()
+  const requests = []
+  const fetch = async (url, init) => {
+    requests.push({ url, ...init, body: JSON.parse(init.body) })
+    return new Response(null, { status: 204 })
+  }
+  const storage = new Map()
+  const sessionStorage = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+  }
+  new Function("fetch", "location", "addEventListener", "sessionStorage", source)(
+    fetch,
+    { pathname: "/d/abc123" },
+    () => {},
+    sessionStorage,
+  )
+  return requests
+}
+
+afterEach(() => {
+  delete globalThis[REPORTER]
+})
+
+test("a handled failure posts to ViteHub's browser-errors route with Drop's fields", async () => {
+  const requests = await browserPage()
+  const report = createClientErrorReporter()
+  report(
+    "notify",
+    fetchError({ status: 502, data: "<html>Bad gateway</html>", headers: { "cf-ray": "8f1e2d3c4b5a6978-AMS" } }),
+    { title: "Couldn't publish", drop: "abc123" },
+    page,
+  )
+  report("signin-switch", answerError("Couldn't sign out", 500, "provider/sign-out"), {}, page)
+  assert.equal(requests.length, 2)
+  const [{ url, method, body }] = requests
+  assert.match(url, /\/_vitehub\/browser-errors$/)
+  assert.equal(method, "POST")
+  assert.deepEqual(
+    { kind: body.kind, path: body.path, action: body.action, name: body.name },
+    { kind: "handled", path: "/d/abc123", action: "notify", name: "FetchError" },
+  )
+  assert.deepEqual(body.fields, {
+    title: "Couldn't publish",
+    drop: "abc123",
+    status: 502,
+    requestId: "8f1e2d3c4b5a6978-AMS",
+  })
+  assert.equal(body.droppedFields, undefined)
+  assert.deepEqual(requests[1].body.fields, { status: 500, code: "provider/sign-out" })
+})
+
+test("a refusal posts nothing", async () => {
+  const requests = await browserPage()
+  const report = createClientErrorReporter()
+  report("notify", fetchError({ status: 403, data: { status: 403, message: "No" } }), {}, page)
+  report("signin", { status: 401, statusText: "Unauthorized", message: "Invalid password" }, {}, page)
+  report("notify", fetchError({ status: 500, data: { status: 500, message: "Server Error" } }), {}, page)
+  assert.deepEqual(requests, [])
+})
+
+test("gateway retries with a different status are reported, but identical failures are not", async () => {
+  const requests = await browserPage()
+  const report = createClientErrorReporter()
+  const message = "Couldn't start GitHub sign-in."
+  for (const status of [502, 503, 502]) {
+    const error = answerError(message, status)
+    const stack = error.stack
+    report("signin", error, {}, page)
+    assert.equal(error.message, message)
+    assert.equal(requests.find(({ body }) => body.fields.status === status).body.stack.includes(message), true)
+    assert.equal(error.stack, stack)
+  }
+  assert.deepEqual(
+    requests.map(({ body }) => [body.action, body.fields.status]),
+    [
+      ["signin", 502],
+      ["signin", 503],
+    ],
+  )
+})
+
 test("a client exception and a network failure are reported", () => {
   const { sent, report } = reporter()
   report("board-load", new TypeError("Cannot read properties of undefined"))
   report("notify", fetchError({ cause: new TypeError("Failed to fetch") }), { title: "Couldn't publish" })
   assert.equal(sent.length, 2)
   assert.deepEqual(
-    { action: sent[0].action, name: sent[0].name, path: sent[0].path },
-    { action: "board-load", name: "TypeError", path: "/d/abc123" },
+    { action: sent[0].action, name: sent[0].error.name, fields: sent[0].fields },
+    { action: "board-load", name: "TypeError", fields: {} },
   )
-  assert.equal(sent[1].title, "Couldn't publish")
-  assert.equal(sent[1].status, undefined)
+  assert.deepEqual(sent[1].fields, { title: "Couldn't publish" })
 })
 
 test("an answer the server gave as a 4xx isn't reported", () => {
@@ -71,22 +160,26 @@ test("a sign-in or consent refusal is reported as its step's failure, with its c
   ])
   // The server logged the answers; only the exception without one is a client error.
   assert.deepEqual(
-    sent.map((body) => body.action),
+    sent.map(({ action }) => action),
     ["oauth-consent"],
   )
   report("notify", fetchError({ status: 401, data: { status: 401, data: { code: "SIGN_IN_REQUIRED" } } }))
   assert.equal(events.length, 6, "Other actions send no step")
 })
 
-test("a code outside the funnel schema is preserved only in the generic error report", () => {
-  const { sent, events, report } = reporter()
-  report("signin-switch", answerError("Couldn't sign out", 500, "provider/sign-out"))
-  report("signin-switch", answerError("Couldn't sign out", 500, "provider/other"))
+test("distinct codes outside the funnel schema are preserved only in the generic error reports", async () => {
+  const requests = await browserPage()
+  const events = []
+  const report = createClientErrorReporter(undefined, (body) => events.push(body))
+  for (const code of ["provider/sign-out", "provider/other", "provider/sign-out"]) {
+    report("signin-switch", answerError("Couldn't sign out", 500, code), {}, page)
+  }
   assert.deepEqual(
-    sent.map(({ code }) => code),
+    requests.map(({ body }) => body.fields.code),
     ["provider/sign-out", "provider/other"],
   )
   assert.deepEqual(events, [
+    { event: "signin.failed", status: 500 },
     { event: "signin.failed", status: 500 },
     { event: "signin.failed", status: 500 },
   ])
@@ -125,7 +218,7 @@ test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its statu
   report("upload", Object.assign(new Error("503"), { status: 503, requestId: "abc-123" }))
   report("notify", fetchError({ status: 524, data: "<html>A timeout occurred</html>" }))
   assert.deepEqual(
-    sent.map((body) => [body.status, body.requestId]),
+    sent.map(({ fields }) => [fields.status, fields.requestId]),
     [
       [502, "8f1e2d3c4b5a6978-AMS"],
       [503, "abc-123"],
@@ -153,28 +246,16 @@ test("aborted requests, offline browsers, and pages that are leaving aren't repo
   assert.deepEqual(sent, [])
 })
 
-test("each message is reported once, and at most ten times a page", () => {
-  const { sent, report } = reporter()
-  report("copy", new Error("Denied"))
-  report("copy", new Error("Denied"))
-  report("pdf", new Error("Denied"))
-  assert.equal(sent.length, 2)
-  for (let n = 0; n < 20; n++) report("vue", new Error(`Broke ${n}`))
-  assert.equal(sent.length, 10)
-})
-
-test("a thrown non-error is reported by its message or text, and the fields are cut to the schema's limits", () => {
+test("a thrown non-error is reported by its message or text, and string fields keep 300 characters", () => {
   const { sent, report } = reporter()
   report("unhandled", "plain string")
   report("notify", { status: 503, message: "Service unavailable" })
-  report("vue", new Error("x".repeat(2000)), { title: "t".repeat(400), source: "s".repeat(400) })
-  assert.equal(sent[0].message, "plain string")
-  assert.equal(sent[0].stack, undefined)
-  assert.equal(sent[1].message, "Service unavailable")
-  assert.equal(sent[1].status, 503)
-  assert.equal(sent[2].message.length, 1000)
-  assert.equal(sent[2].title.length, 200)
-  assert.equal(sent[2].source.length, 300)
+  report("vue", new Error("x"), { title: "t".repeat(400), source: "s".repeat(400) })
+  assert.equal(sent[0].error, "plain string")
+  assert.equal(sent[1].error, "[HTTP 503] Service unavailable")
+  assert.equal(sent[1].fields.status, 503)
+  assert.equal(sent[2].fields.title.length, 300)
+  assert.equal(sent[2].fields.source.length, 300)
 })
 
 test("httpStatus reads ofetch's, Better Auth's, and an upload's status, and none from a network failure", () => {
@@ -209,8 +290,8 @@ for (const status of [200, 500, 503])
       const { sent, report } = reporter()
       report("upload", error)
       assert.equal(sent.length, 1)
-      assert.equal(sent[0].status, status)
-      assert.equal(sent[0].requestId, "upload-123")
+      assert.equal(sent[0].fields.status, status)
+      assert.equal(sent[0].fields.requestId, "upload-123")
     } finally {
       vi.unstubAllGlobals()
     }
@@ -229,6 +310,6 @@ test("an ofetch HTML 500 from the edge keeps its cf-ray", async () => {
   const { sent, report } = reporter()
   report("notify", error)
   assert.equal(sent.length, 1)
-  assert.equal(sent[0].status, 500)
-  assert.equal(sent[0].requestId, "edge-500")
+  assert.equal(sent[0].fields.status, 500)
+  assert.equal(sent[0].fields.requestId, "edge-500")
 })
