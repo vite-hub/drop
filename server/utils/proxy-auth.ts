@@ -1,3 +1,4 @@
+import { APIError } from "better-auth/api"
 import { and, eq } from "drizzle-orm"
 import { HTTPError } from "h3"
 import * as v from "valibot"
@@ -31,8 +32,13 @@ export const proxyAuth = () =>
       try {
         if (!(await isProxyMember(token))) return null
       } catch (error) {
-        const code = HTTPError.isError(error) && v.is(Coded, error.data) ? error.data.code : undefined
-        throw isAuthErrorCode(code) ? authApiError(code) : error
+        if (!(error instanceof HTTPError)) throw error
+        const code = v.is(Coded, error.data) ? error.data.code : undefined
+        if (isAuthErrorCode(code)) throw authApiError(code)
+        throw new APIError(
+          error.status === 401 ? "UNAUTHORIZED" : error.status === 403 ? "FORBIDDEN" : "SERVICE_UNAVAILABLE",
+          { message: error.message, code },
+        )
       }
       const identity = await cachedIdentity(token)
       const stored = await storedAccount(identity)
