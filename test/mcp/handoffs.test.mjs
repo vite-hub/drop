@@ -26,10 +26,12 @@ const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 // would go out.
 const delivered = []
 let rejectDelivery = false
+let useRealDelivery = false
 const webhooks = {
   ...realWebhooks,
   sendToMemberEndpoint: async (owner, body, options) => {
     delivered.push({ owner, body, endpoint: options.endpointId })
+    if (useRealDelivery) return realWebhooks.sendToMemberEndpoint(owner, body, options)
     return [undefined, { id: `dl_${delivered.length}`, status: rejectDelivery ? "failed" : "inbox" }]
   },
 }
@@ -58,6 +60,7 @@ beforeEach(() => {
   )
   delivered.length = 0
   rejectDelivery = false
+  useRealDelivery = false
   state.who = agentOf(ana)
 })
 
@@ -449,6 +452,61 @@ test("a quote-only handoff stays working until the quoted threads are answered",
   assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
 })
 
+test("Send reports the attempted receiver's HTTP error without leaking the relay URL", async () => {
+  const { doc } = await reviewed()
+  state.who = ana
+  useRealDelivery = true
+  const key = process.env.VITEHUB_WEBHOOKS_KEY
+  const relay = "https://relay.t3.codes/hooks/private?token=private"
+  const fetch = vi.fn(async () => new Response("private reply", { status: 502 }))
+  vi.stubGlobal("navigator", { userAgent: "Cloudflare-Workers" })
+  vi.stubGlobal("fetch", fetch)
+  try {
+    const [error] = await realWebhooks.createMemberEndpoint({
+      owner: ana.userId,
+      name: "T3 Code thread",
+      agent: "t3",
+      address: "thread-p",
+      kind: "url",
+      url: relay,
+      secret: "test-signing-secret",
+    })
+    assert.equal(error, undefined)
+    await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+    const client = createCommentSend(transportFor(doc.id))
+    await client.refresh()
+
+    delete process.env.VITEHUB_WEBHOOKS_KEY
+    await client.send()
+    assert.equal(client.state.problem, "key-unset")
+    process.env.VITEHUB_WEBHOOKS_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(19)))
+    await client.send()
+    assert.equal(client.state.problem, "key-invalid")
+    assert.equal(fetch.mock.calls.length, 0)
+
+    process.env.VITEHUB_WEBHOOKS_KEY = key
+    await client.send()
+    assert.deepEqual(client.state, {
+      status: "failed",
+      count: 2,
+      problem: "delivery",
+      reason: "The receiver returned HTTP 502.",
+      agent: { name: "T3 Code", logo: "t3", host: "relay.t3.codes" },
+    })
+    assert.equal(fetch.mock.calls.length, 1)
+    assert.equal(fetch.mock.calls[0][0], relay)
+
+    fetch.mockRejectedValueOnce(new DOMException("private transport error", "TimeoutError"))
+    await client.send()
+    assert.equal(client.state.problem, "delivery")
+    assert.match(client.state.reason, /timed out.*may still have received/)
+    assert.equal(fetch.mock.calls.length, 2)
+  } finally {
+    process.env.VITEHUB_WEBHOOKS_KEY = key
+    vi.unstubAllGlobals()
+  }
+})
+
 test("pairing cannot send a changed selection and the copied prompt describes both inbox agents", async () => {
   const { doc, mine, theirs } = await reviewed()
   state.who = ana
@@ -458,7 +516,10 @@ test("pairing cannot send a changed selection and the copied prompt describes bo
   for (const inbox of ["Claude Code", "Codex"]) assert.ok(prompt.includes(JSON.stringify({ code, inbox })))
   await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
   const added = await comment(doc.id, ana, "One more question.")
-  assert.equal((await transport.allow(code, selection)).status, "failed")
+  assert.deepEqual(await transport.allow(code, selection), {
+    status: "failed",
+    reason: "Waiting comments changed. Choose Send or pair again to confirm the current comments.",
+  })
   assert.equal(delivered.length, 0)
   assert.equal(endpointOf(ana.userId), undefined)
   const next = await transport.startPairing()
