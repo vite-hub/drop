@@ -705,8 +705,10 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
     assert.equal(client.state.status, "failed")
     assert.equal(delivered.length, 1)
     assert.notEqual(delivered[0].endpoint, publishing.id)
+    const waiting = client.state.count
+    await comment(doc.id, ana, "Added after Allow failed.")
     await client.refresh()
-    assert.equal(client.state.status, "failed")
+    assert.deepEqual([client.state.status, client.state.count], ["failed", waiting + 1])
     await client.send()
     assert.equal(client.state.status, "idle")
     assert.equal(delivered.length, 1)
