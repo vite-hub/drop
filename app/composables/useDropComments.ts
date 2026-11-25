@@ -53,7 +53,7 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     get: async (input) => {
       const found = options
         .source()
-        .find((comment) => ("id" in input ? comment.id === input.id : comment.n === input.n))
+        .find((comment) => ("threadId" in input ? comment.id === input.threadId : comment.n === input.n))
       return found ? toThread(found, subject.value) : null
     },
     async create(input) {

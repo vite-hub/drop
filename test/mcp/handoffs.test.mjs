@@ -168,7 +168,7 @@ test("Send carries the drop, the version to build on, and the publishing session
   const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
   state.who = ana
   const status = (await send(`/status${page}`)).body.data
-  assert.deepEqual(status.sent, { id, inbox: true })
+  assert.deepEqual(status.sent, { id })
   assert.equal(status.working, undefined)
   assert.equal(delivered.length, 1)
   const [{ owner, body }] = delivered
@@ -458,20 +458,20 @@ test("pairing cannot send a changed selection and the copied prompt describes bo
   for (const inbox of ["Claude Code", "Codex"]) assert.ok(prompt.includes(JSON.stringify({ code, inbox })))
   await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
   const added = await comment(doc.id, ana, "One more question.")
-  assert.equal((await transport.allow(code, selection)).status, "failed")
+  const changed = await transport.allow(code, selection)
+  assert.equal(changed.status, "changed")
+  assert.equal(changed.count, 3)
   assert.equal(delivered.length, 0)
   assert.equal(endpointOf(ana.userId), undefined)
-  const next = await transport.startPairing()
-  assert.equal(next.count, 3)
-  await send("/pair", { method: "POST", body: { code: next.code, inbox: "Codex" }, origin: null })
-  assert.equal((await transport.allow(next.code, next.selection)).status, "sent")
+  // The code stays paired, so the member confirms the new selection.
+  assert.equal((await transport.allow(code, changed.selection)).status, "sent")
   assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, added.id].toSorted())
   assert.equal((await transport.status()).count, 0)
   state.who = bob
   assert.equal((await transport.status()).count, 3)
 })
 
-test("the real pill refreshes the batch both before and after pairing", async () => {
+test("the real pill confirms the batch as it is when the member allows", async () => {
   const { doc, mine, theirs } = await reviewed()
   state.who = ana
   const transport = transportFor(doc.id)
@@ -491,8 +491,6 @@ test("the real pill refreshes the batch both before and after pairing", async ()
     await client.refresh()
     await client.send()
     const third = await comment(doc.id, ana, "Added during pairing.")
-    await client.refresh()
-    assert.equal(client.state.count, 3)
 
     const confirmed = new Promise((resolve) => {
       const off = client.onChange(() => {
@@ -503,9 +501,12 @@ test("the real pill refreshes the batch both before and after pairing", async ()
     })
     await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
     await confirmed
+    // The pill shows the batch it started pairing with until Allow checks it.
+    assert.equal(client.state.count, 2)
     const fourth = await comment(doc.id, ana, "Added during confirmation.")
-    await client.refresh()
-    assert.equal(client.state.count, 4)
+    // Allow finds the selection changed and asks again with the new count.
+    await client.allow()
+    assert.deepEqual([client.state.status, client.state.count], ["confirm", 4])
     await client.allow()
     assert.equal(client.state.status, "sent")
     assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, third.id, fourth.id].toSorted())
@@ -567,7 +568,7 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   }
 }, 3000)
 
-test("a failed ordinary Send updates its count and clears when the comments are answered", async () => {
+test("after a failed ordinary Send, the pill counts what still waits and clears when the comments are answered", async () => {
   const { doc, mine, theirs } = await reviewed()
   await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
   state.who = ana
@@ -585,9 +586,10 @@ test("a failed ordinary Send updates its count and clears when the comments are 
       (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
       undefined,
     )
+    // A failure lives in the pill only; the next status shows what still waits.
     state.who = ana
     await client.refresh()
-    assert.equal(client.state.status, "failed")
+    assert.equal(client.state.status, "idle")
     assert.equal(client.state.count, 1)
 
     state.who = agentOf(bob)

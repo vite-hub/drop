@@ -18,7 +18,6 @@ import comments, { peopleByIds } from "../comments"
 import { commentCleanup, drops } from "../databases/default/index"
 import { attachmentsUnder, deleteImages, toAttachment } from "./comment-images"
 import type { DropRow } from "./drops"
-import { restoreReopenedHandoffs } from "./handoffs"
 import type { Identity } from "./identity"
 import { background } from "./logs"
 
@@ -400,7 +399,6 @@ export async function resolveComments(row: Commented, numbers: number[], who: Id
 export async function setResolved(thread: CommentThread, resolved: boolean, who: Identity | null) {
   if (resolved) return done(comments.resolve(thread.id, { by: authorOf(who, who?.name ?? "Guest") }))
   await done(comments.reopen(thread.id))
-  await restoreReopenedHandoffs(thread)
 }
 
 export async function replyTo(

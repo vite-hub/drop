@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm"
-import * as v from "valibot"
-import type { CommentSendData, CommentSubject, CommentThread } from "vite-hub/comments"
+import { HTTPError } from "h3"
+import type { CommentSendData, CommentSendView, CommentSubject, CommentThread } from "vite-hub/comments"
 import { commentMessages, commentSends, commentThreads } from "vite-hub/comments/database"
 import { db } from "vite-hub/database"
+import comments, { sendUser } from "../comments"
 import { findDrop, permissions } from "./drops"
 import type { DropRow } from "./drops/types"
 import type { Identity } from "./identity"
@@ -42,9 +43,7 @@ export async function publishingThread(subject: CommentSubject, sender: string):
   return drop ? (publishingSession(drop, sender)?.thread ?? null) : null
 }
 
-type SendRow = typeof commentSends.$inferSelect
-
-type HandoffState = SendRow["state"]
+type HandoffState = CommentSendView["send"]["state"]
 
 interface HandoffThread {
   id: string
@@ -60,110 +59,65 @@ export interface Handoff {
   createdAt: number
 }
 
-const SentThreads = v.array(v.object({ id: v.string(), role: v.fallback(v.picklist(["ask", "quote"]), "ask") }))
-
-function threadsOf(row: SendRow): HandoffThread[] {
-  const parsed = v.safeParse(SentThreads, JSON.parse(row.threads))
-  return parsed.success ? parsed.output : []
+async function handoffOf({ send, threads }: CommentSendView, who: Identity): Promise<Handoff | null> {
+  if (send.subject.kind !== "drop" && send.subject.kind !== "site") return null
+  const drop = await findDrop(send.subject.id)
+  if (!drop || !permissions(drop, who).view) return null
+  return {
+    id: send.id,
+    sender: who.userId,
+    state: send.state,
+    drop,
+    threads: threads.map(({ id, role }) => ({ id, role })),
+    createdAt: send.createdAt,
+  }
 }
 
-async function dropOf(row: SendRow, who: Identity) {
-  if (row.subjectKind !== "drop" && row.subjectKind !== "site") return null
-  const drop = await findDrop(row.subjectId)
-  return drop && permissions(drop, who).view ? drop : null
+function unavailable(error: Error & { code: string }) {
+  return new HTTPError({ status: 503, statusText: "Comments are temporarily unavailable.", cause: error })
 }
 
 export async function openHandoff(id: string, who: Identity): Promise<Handoff | null> {
-  const [row] = await db.select().from(commentSends).where(eq(commentSends.id, id)).limit(1)
-  if (!row || row.member !== who.userId || row.state === "failed") return null
-  const drop = await dropOf(row, who)
-  if (!drop) return null
-  let { state } = row
-  if (state === "sent") {
-    await db
-      .update(commentSends)
-      .set({ state: "working", updatedAt: Date.now() })
-      .where(and(eq(commentSends.id, row.id), eq(commentSends.state, "sent")))
-    state = "working"
-  }
-  return { id: row.id, sender: row.member, state, drop, threads: threadsOf(row), createdAt: row.createdAt }
+  const [error, opened] = await comments.readSend(sendUser(who), id)
+  if (error?.code === "COMMENTS_NOT_FOUND") return null
+  if (error) throw unavailable(error)
+  return handoffOf(opened, who)
 }
 
-const LISTED = 20
-
-function hasWaitingFeedback(reopenedId?: string) {
-  return sql`exists (
-      select 1 from json_each(${commentSends.threads}) as entry
-      join ${commentThreads} on ${commentThreads.id} = json_extract(entry.value, '$.id')
-      where ${commentThreads.status} = 'open'
-        ${reopenedId ? sql`and ${commentThreads.id} = ${reopenedId}` : sql``}
-        and (coalesce(json_extract(entry.value, '$.role'), 'ask') = 'ask' or not exists (
-          select 1 from json_each(${commentSends.threads}) as candidate
-          where coalesce(json_extract(candidate.value, '$.role'), 'ask') = 'ask'
-        ))
-        and (select nullif(${commentMessages.actor}, 'null') is null
-          ${reopenedId ? sql`and ${commentMessages.id} = json_extract(entry.value, '$.message')` : sql``}
-          from ${commentMessages}
-          where ${commentMessages.threadId} = ${commentThreads.id}
-          order by ${commentMessages.createdAt} desc, ${commentMessages.id} desc limit 1)
-    )`
-}
-
-export async function restoreReopenedHandoffs({ id, subject }: CommentThread) {
-  const restored = await db
-    .update(commentSends)
-    .set({ state: "sent", updatedAt: Date.now() })
+export async function waitsInFinishedHandoff({ id, subject }: CommentThread) {
+  const [row] = await db
+    .select({ id: commentSends.id })
+    .from(commentSends)
     .where(
       and(
         eq(commentSends.subjectKind, subject.kind),
         eq(commentSends.subjectId, subject.id),
         eq(commentSends.state, "done"),
-        hasWaitingFeedback(id),
+        sql`exists (
+          select 1 from json_each(${commentSends.threads}) as entry
+          join ${commentThreads} on ${commentThreads.id} = json_extract(entry.value, '$.id')
+          where ${commentThreads.id} = ${id}
+            and ${commentThreads.status} = 'open'
+            and (coalesce(json_extract(entry.value, '$.role'), 'ask') = 'ask' or not exists (
+              select 1 from json_each(${commentSends.threads}) as candidate
+              where coalesce(json_extract(candidate.value, '$.role'), 'ask') = 'ask'
+            ))
+            and (select nullif(${commentMessages.actor}, 'null') is null
+              and ${commentMessages.id} = json_extract(entry.value, '$.message')
+              from ${commentMessages}
+              where ${commentMessages.threadId} = ${commentThreads.id}
+              order by ${commentMessages.createdAt} desc, ${commentMessages.id} desc limit 1)
+        )`,
       ),
     )
-    .returning({ id: commentSends.id })
-  return restored.length > 0
-}
-
-async function finishAnsweredHandoffs(member: string) {
-  await db
-    .update(commentSends)
-    .set({ state: "done", updatedAt: Date.now() })
-    .where(
-      and(
-        eq(commentSends.member, member),
-        inArray(commentSends.state, ["sent", "working"]),
-        sql`not ${hasWaitingFeedback()}`,
-      ),
-    )
+    .limit(1)
+  return row !== undefined
 }
 
 export async function listHandoffs(who: Identity): Promise<Handoff[]> {
-  await finishAnsweredHandoffs(who.userId)
-  const rows = await db
-    .select()
-    .from(commentSends)
-    .where(and(eq(commentSends.member, who.userId), inArray(commentSends.state, ["sent", "working"])))
-    .orderBy(desc(commentSends.createdAt))
-    .limit(LISTED)
-  const listed = await Promise.all(
-    rows.map(async (row) => {
-      const drop = await dropOf(row, who)
-      return drop
-        ? [
-            {
-              id: row.id,
-              sender: row.member,
-              state: row.state,
-              drop,
-              threads: threadsOf(row),
-              createdAt: row.createdAt,
-            },
-          ]
-        : []
-    }),
-  )
-  return listed.flat()
+  const [error, sends] = await comments.listSends(sendUser(who))
+  if (error) throw unavailable(error)
+  return (await Promise.all(sends.map((send) => handoffOf(send, who)))).filter((handoff) => handoff !== null)
 }
 
 export async function lastSentAt(member: string): Promise<number | null> {
