@@ -13,7 +13,7 @@ import { htmlLanding, HTML_CONTENT_SECURITY_POLICY } from "../../shared/html-lan
 
 const skill = fileURLToPath(new URL("../../skills/code-along/", import.meta.url))
 const require = createRequire(import.meta.url)
-const lexer = readFileSync(require.resolve("es-module-lexer/js"), "utf8")
+const lexer = readFileSync(require.resolve("es-module-lexer/minimal/js"), "utf8")
 
 function build(source) {
   const dir = mkdtempSync(join(tmpdir(), "code-along-browser-"))
