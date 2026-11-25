@@ -43,11 +43,10 @@ overrides:
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@44d679002e86db7242d95175b461a44bfa0b92bc
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@44d679002e86db7242d95175b461a44bfa0b92bc
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy.
-  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
+  "@vite-hub/content>comark-ui": 0.14.3
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.28
   "@better-auth/oauth-provider": 1.7.28
-  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
   vite@*: "catalog:"
 
 patchedDependencies:
@@ -59,10 +58,6 @@ patchedDependencies:
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
   # basic auth without a Node request, and request middlewares registered only for features in use.
   nuxt-security@2.7.0: patches/nuxt-security@2.7.0.patch
-  # A note beside its point (side=top|bottom with `to` off to one side) could run up to 14rem past the screenshot's
-  # edge, so a ::compare's track (overflow-x: auto) scrolled sideways and clipped Before. The note now wraps within
-  # the room before the edge (onmax/comark-ui#488). Delete with the next comark-ui bump that includes it.
-  comark-annotate@0.14.2: patches/comark-annotate@0.14.2.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
@@ -120,8 +115,7 @@ minimumReleaseAgeExclude:
   - "@mdream/rust-wasm32-wasi@2.2.1"
   - "@mdream/rust-win32-arm64-msvc@2.2.1"
   - "@mdream/rust-win32-x64-msvc@2.2.1"
-  - "@types/node@25.9.11"
-  - "@types/node@26.6.10"
+  - "@types/node@25.9.11 || 26.6.10"
   - "@types/react@19.3.1"
   - isbot@5.2.4
   - mdream@2.2.1
@@ -135,6 +129,56 @@ minimumReleaseAgeExclude:
   - "@better-auth/stripe@1.7.28"
   - "@better-auth/telemetry@1.7.28"
   - better-auth@1.7.28
+  - comark-annotate@0.14.3
+  - comark-badge@0.14.3
+  - comark-bundle@0.14.3
+  - comark-cards@0.14.3
+  - comark-carousel@0.14.3
+  - comark-cast@0.14.3
+  - comark-charts@0.14.3
+  - comark-chips@0.14.3
+  - comark-cjk@0.14.3
+  - comark-code-notes@0.14.3
+  - comark-code@0.14.3
+  - comark-colors@0.14.3
+  - comark-comments@0.14.3
+  - comark-critic@0.14.3
+  - comark-deflist@0.14.3
+  - comark-details@0.14.3
+  - comark-diagrams@0.14.3
+  - comark-diff@0.14.3
+  - comark-embed@0.14.3
+  - comark-fields@0.14.3
+  - comark-figure@0.14.3
+  - comark-file-tree@0.14.3
+  - comark-footnotes@0.14.3
+  - comark-git-graph@0.14.3
+  - comark-github@0.14.3
+  - comark-icon@0.14.3
+  - comark-include@0.14.3
+  - comark-keys@0.14.3
+  - comark-links@0.14.3
+  - comark-linter@0.14.3
+  - comark-magic-move@0.14.3
+  - comark-mark@0.14.3
+  - comark-mathml@0.14.3
+  - comark-media@0.14.3
+  - comark-metrics@0.14.3
+  - comark-motion@0.14.3
+  - comark-outline@0.14.3
+  - comark-properties@0.14.3
+  - comark-qr@0.14.3
+  - comark-quiz@0.14.3
+  - comark-reading-time@0.14.3
+  - comark-sources@0.14.3
+  - comark-steps@0.14.3
+  - comark-table@0.14.3
+  - comark-tabs@0.14.3
+  - comark-tests@0.14.3
+  - comark-time@0.14.3
+  - comark-ui@0.14.3
+  - comark-xref@0.14.3
+  - comark-zoom@0.14.3
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
   vite-plus: 1.8.0
