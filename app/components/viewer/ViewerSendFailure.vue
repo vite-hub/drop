@@ -126,6 +126,7 @@ const docs = "/docs/self-host#github"
               icon="i-mingcute-copy-2-line"
               size="sm"
               :value="fixPrompt"
+              variant="solid"
               @click="fixCopied = true"
             >
               Copy fix prompt
@@ -144,6 +145,7 @@ const docs = "/docs/self-host#github"
             icon="i-mingcute-copy-2-line"
             size="sm"
             :value="prompt"
+            variant="solid"
           >
             Copy prompt
           </DropCopyButton>
