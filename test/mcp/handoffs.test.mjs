@@ -297,6 +297,38 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
 })
 
+test("the agent reads a handoff from inside its webhook delivery; another member still gets nothing", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  realDelivery = true
+  const reads = {}
+  // T3 opens the send as soon as the webhook comes, before its receiver answers and the delivery counts as sent.
+  const sent = await receiving(
+    async (body) => {
+      state.who = agentOf(bob)
+      reads.bob = await call(readDrop, { handoff: body.send })
+      state.who = agentOf(ana)
+      reads.ana = await call(readDrop, { handoff: body.send })
+      state.who = ana
+    },
+    () => pairThreadAndSend(doc, ana, "t3-thread://v2/laptop/thread-p"),
+  )
+  assert.equal(sent.status, "sent")
+  assert.equal(reads.bob.isError, true)
+  assert.match(reads.bob.message, new RegExp(`No handoff ${sent.id} of yours`))
+  assert.equal(reads.ana.isError, undefined, reads.ana.message)
+  assert.equal(reads.ana.structuredContent.id, doc.id)
+  assert.deepEqual(reads.ana.structuredContent.handoff, {
+    id: sent.id,
+    state: "working",
+    asks: [mine.n],
+    quotes: [theirs.n],
+  })
+  assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(sent.id).state, "working")
+  state.who = ana
+  const status = (await send(`/status?page=${encodeURIComponent(`/d/${doc.id}`)}`)).body.data
+  assert.equal(status.working.id, sent.id)
+})
+
 test("reopening a handoff skips asks resolved or answered in another session", async () => {
   const { doc, mine } = await reviewed()
   const answered = await comment(doc.id, ana, "What is the rollout plan?")
