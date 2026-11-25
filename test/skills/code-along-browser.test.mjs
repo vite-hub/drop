@@ -41,7 +41,7 @@ async function open(browser, html, layout = "standalone", markedGate) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url())
-    if (url.pathname.endsWith("/lexer.asm.js"))
+    if (url.pathname.endsWith("/lexer.minimal.asm.js"))
       return route.fulfill({
         contentType: "text/javascript",
         headers: { "access-control-allow-origin": "*" },
