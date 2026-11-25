@@ -9,14 +9,16 @@ const { signOut } = useUserSession(useNuxtApp().$auth)
 const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev
+const leave = (url: string) => navigateTo(url, { external: true })
 
 async function connect() {
   pending.value = true
   error.value = ""
+  const switchingProxyAccount = method.value?.proxy && !!me.value
   try {
     if (method.value?.proxy) {
       const start = signInPath(next.value, { proxy: true })
-      await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
+      await (switchingProxyAccount ? switchProxyAccount(start, { signOut, navigate: leave }) : leave(start))
       return
     }
     if (me.value) {
@@ -31,7 +33,10 @@ async function connect() {
     })
     if (result.error) throw answerError(result.error.message ?? "Couldn't start GitHub sign-in.", result.error.status)
   } catch (cause) {
-    reportClientError("signin", cause)
+    reportClientError(
+      switchingProxyAccount ? "signin-switch" : "signin",
+      cause instanceof SwitchSignOutError ? cause.cause : cause,
+    )
     error.value = errorText(cause)
     pending.value = false
   }

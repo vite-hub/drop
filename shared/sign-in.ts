@@ -16,6 +16,7 @@ export function signInPath(path: string, { proxy = false, choose = false } = {})
 
 export const RETURNING_COOKIE = "drop-returning"
 export const TRIED_COOKIE = "drop-signin-tried"
+export const PROXY_SIGN_OUT_HANDOFF_HEADER = "x-drop-proxy-sign-out-handoff"
 
 export const signInRightAway = (status: number, cookies: { returning: boolean; tried: boolean }) =>
   status === 404 && cookies.returning && !cookies.tried

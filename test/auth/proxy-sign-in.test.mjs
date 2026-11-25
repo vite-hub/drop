@@ -521,6 +521,63 @@ test("browsers of a proxy member who already has an account don't wait on each o
   await Promise.all(reads)
 })
 
+test("using another account signs the first one out of Drop before the second signs in", async () => {
+  github()
+  state.authProxyCookie = "__Host-drop-auth"
+  const instance = auth()
+  state.auth = instance
+  const first = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-first" },
+    }),
+  )
+  await proxySession(first)
+  const firstUser = sql.prepare("SELECT id FROM user WHERE email = 'maxi@example.com'").get().id
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 1)
+
+  const signOut = new H3Event(
+    new Request("https://drop.example/api/auth/sign-out", {
+      method: "POST",
+      headers: {
+        origin: "https://drop.example",
+        cookie: `${withCookies(first).get("cookie")}; __Host-drop-auth=proxy-ticket`,
+        "x-auth-request-access-token": "test-switch-first",
+        "x-drop-proxy-sign-out-handoff": "1",
+      },
+    }),
+  )
+  await proxySession(signOut)
+  const response = await instance.handler(signOut.req)
+  assert.equal(response.status, 200)
+  const cookies = [...signOut.res.headers.getSetCookie(), ...response.headers.getSetCookie()]
+  assert.ok(
+    cookies.every((cookie) => !cookie.startsWith("__Host-drop-auth=")),
+    "The proxy keeps its session ticket",
+  )
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 0)
+
+  github(
+    undefined,
+    () => Response.json({ id: 43, login: "other", name: "Other", email: "other@example.com" }),
+    () => Response.json([{ email: "other@example.com", primary: true, verified: true }]),
+  )
+  const second = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-second" },
+    }),
+  )
+  await proxySession(second)
+  const session = await instance.api.getSession({ headers: withCookies(second) })
+  assert.equal(session?.user.email, "other@example.com")
+  assert.deepEqual(
+    sql
+      .prepare("SELECT user_id FROM session")
+      .all()
+      .map((row) => row.user_id),
+    [session.user.id],
+  )
+})
+
 test("an expired proxy token can still sign out through Better Auth", async () => {
   github(() => Response.json({ message: "Bad credentials" }, { status: 401 }))
   state.authProxyCookie = "__Host-drop-auth"
