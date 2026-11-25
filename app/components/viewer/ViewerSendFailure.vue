@@ -75,10 +75,10 @@ const docs = "/docs/self-host#github"
           }}
         </p>
         <pre
-          class="max-h-44 overflow-auto rounded-md bg-muted px-3.5 py-3 font-mono text-xs/5 whitespace-pre-wrap text-toned"
+          class="-mx-3.5 max-h-44 overflow-auto rounded-md bg-accented px-3.5 py-3 font-mono text-xs/5 whitespace-pre-wrap text-default"
           >{{ fixPrompt }}</pre>
       </template>
-      <div v-else class="space-y-1.5 rounded-md bg-muted px-3.5 py-3 text-sm">
+      <div v-else class="-mx-3.5 space-y-1.5 rounded-md bg-accented px-3.5 py-3 text-sm">
         <p v-if="failure.cause === 'agent' && failure.agent?.host" class="font-mono text-xs text-muted">
           {{ failure.agent.host }}
         </p>
