@@ -1,5 +1,6 @@
 import type { CommentSendAgent, CommentSendTransport } from "vite-hub/comments/client"
 import { createCommentSendTransport } from "vite-hub/comments/client"
+import type { SendSetup } from "#shared/types"
 
 export interface SendEndpoint {
   agent: CommentSendAgent
@@ -10,11 +11,23 @@ export type SendTestResult =
   | { status: "delivered"; code: number | null; ms: number }
   | { status: "failed"; reason: string }
 
+/**
+ * Why the last Send failed, as the pill explains it: the server can't pair agents (`setup`), the agent's receiver didn't
+ * take the delivery (`agent`), or pairing failed some other way (`pairing`). `tries` counts the same failure in a row.
+ */
+export type SendFailure = { tries: number; at: number } & (
+  | { cause: "setup"; problem: "unset" | "invalid"; admin: boolean }
+  | { cause: "agent"; reason: string; agent: CommentSendAgent | null }
+  | { cause: "pairing"; reason: string }
+)
+
 export interface DropSend {
   transport: (drop: string) => CommentSendTransport
   endpoint: () => Promise<SendEndpoint | null>
   test: () => Promise<SendTestResult>
   remove: () => Promise<void>
+  /** Whether the server can pair an agent, asked after a Send fails before it paired one. */
+  setup: () => Promise<SendSetup>
   onChange: (listener: () => void) => () => void
 }
 
@@ -44,6 +57,7 @@ function createDropSend(): DropSend {
       await $fetch("/api/send/endpoint", { method: "DELETE" })
       changed()
     },
+    setup: () => $fetch<SendSetup>("/api/send/setup"),
     onChange: (listener) => {
       changes.add(listener)
       return () => changes.delete(listener)

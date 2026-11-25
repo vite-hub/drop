@@ -275,6 +275,13 @@ export interface SkillSummary {
   source: string
 }
 
+/** Whether this Drop can pair agents for Send: `problem` names a missing or bad VITEHUB_WEBHOOKS_KEY. */
+export interface SendSetup {
+  problem: "unset" | "invalid" | null
+  /** An admin can fix it; anyone else asks one. */
+  admin: boolean
+}
+
 export interface ConnectedAgent {
   id: string
   name: string

@@ -6,7 +6,7 @@ import type {
   CommentSendTransport,
 } from "vite-hub/comments/client"
 import { waitingForAnswer } from "../../shared/feedback"
-import type { DropComment } from "../../shared/types"
+import type { DropComment, SendSetup } from "../../shared/types"
 import type { DropSend, SendEndpoint, SendTestResult } from "../../app/utils/comment-send"
 
 // A Send server that keeps everything in the page, for the pill's browser test: its controls play the agent and the
@@ -40,6 +40,9 @@ export interface StubSendControls {
   /** Sends wait until `release`, so Sending stays on screen. */
   hold: () => void
   release: () => void
+  /** The server has no usable VITEHUB_WEBHOOKS_KEY, so pairing throws, as ViteHub's handler does, until `setUp`. */
+  unset: (setup: SendSetup) => void
+  setUp: () => void
 }
 
 export function createStubSend({ me, comments }: StubReader): DropSend & { controls: StubSendControls } {
@@ -58,6 +61,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
   let nextTest: SendTestResult | null = null
   let sends = 0
   let held: { promise: Promise<void>; release: () => void } | null = null
+  let setup: SendSetup = { problem: null, admin: false }
   const changes = new Set<() => void>()
   const events = new Set<{ owner: symbol; listener: (event: CommentSendEvent) => void }>()
   const changed = () => changes.forEach((listener) => listener())
@@ -111,6 +115,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         }
       },
       startPairing: async () => {
+        if (setup.problem) throw new Error('[POST] "/api/send/pairing": 500 Server Error')
         const code = crypto.randomUUID().slice(0, 7).toUpperCase()
         pairing = { code, expiresAt: Date.now() + PAIRING_MS, owner, batch: unsent() }
         return {
@@ -159,6 +164,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       endpoint = null
       changed()
     },
+    setup: async () => setup,
     onChange: (listener) => {
       changes.add(listener)
       return () => changes.delete(listener)
@@ -188,6 +194,8 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         held?.release()
         held = null
       },
+      unset: (next) => (setup = next),
+      setUp: () => (setup = { ...setup, problem: null }),
     },
   }
 }

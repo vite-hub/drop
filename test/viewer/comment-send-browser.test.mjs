@@ -21,7 +21,7 @@ let styles = `@layer theme, base, components, utilities; @layer base { ${readFil
 styles += readFileSync(root + "node_modules/@vite-hub/ui/dist/styles.css", "utf8")
 // styles.css @imports it into the components layer, which Vite resolves in the app.
 styles += `@layer components { ${readFileSync(root + "node_modules/@vite-hub/ui/dist/comment-send.css", "utf8")} }`
-for (const name of ["ViewerReviewDock", "ViewerCommentsSegment", "ViewerCommentSend"]) {
+for (const name of ["ViewerReviewDock", "ViewerCommentsSegment", "ViewerCommentSend", "ViewerSendFailure"]) {
   const { descriptor } = parse(readFileSync(`${root}app/components/viewer/${name}.vue`, "utf8"))
   const id = `data-v-${name}`
   let code = transpileModule(compileScript(descriptor, { id, inlineTemplate: true }).content, {
@@ -71,6 +71,8 @@ const icons = Object.fromEntries(
     "i-mingcute-close-line",
     "i-mingcute-file-line",
     "i-mingcute-list-check-line",
+    "i-mingcute-alert-octagon-line",
+    "i-mingcute-right-small-line",
   ].map((name) => [name, svg(name)]),
 )
 
@@ -80,9 +82,11 @@ const entry = `
   import Dock from "ViewerReviewDock"
   import Comments from "ViewerCommentsSegment"
   import Send from "ViewerCommentSend"
+  import SendFailure from "ViewerSendFailure"
   import { createStubSend } from "${root}test/viewer/stub-send.ts"
   Object.assign(window, Vue, VueUse)
   window.useHead = () => {}
+  window.useRequestURL = () => new URL(location.href)
   const icons = ${JSON.stringify(icons)}
   let at = 10
   const comment = (n, authorId, fields = {}) => ({
@@ -108,7 +112,7 @@ const entry = `
       toolbar: () => [
         button("Drop"),
         Vue.h(Comments, { on: false, count: 5, listOpen: false, canComment: true, canUseMode: true, pins: true, pinsShown: true }, {
-          tools: () => Vue.h(Send, { drop: "abc", comments: comments.value, send }),
+          tools: () => Vue.h(Send, { drop: "abc", comments: comments.value, send, prompt: "Address the comments on drop abc." }),
         }),
         button("Share"),
         button("+", { "aria-label": "More" }),
@@ -118,6 +122,31 @@ const entry = `
   const passthrough = { setup: (_, { slots }) => () => slots.default?.() }
   app.component("UTooltip", passthrough)
   app.component("UIcon", { props: ["name"], setup: (props) => () => Vue.h("span", { class: "iconify", style: "display:inline-flex", innerHTML: icons[props.name] ?? "" }) })
+  // Nuxt UI's button and modal as plain elements, so the dialog's words and actions are what the test reads.
+  app.component("UButton", {
+    props: ["label", "icon", "trailingIcon", "loading", "to", "color", "variant", "size"],
+    setup: (props, { slots }) => () => Vue.h(props.to ? "a" : "button", { href: props.to, type: props.to ? undefined : "button", disabled: props.loading || undefined, "data-color": props.color, "data-variant": props.variant },
+      [props.icon ? Vue.h("span", { class: "iconify", style: "display:inline-flex", innerHTML: icons[props.icon] ?? "" }) : null, slots.default?.() ?? props.label]),
+  })
+  app.component("DropCopyButton", {
+    inheritAttrs: false,
+    props: ["value"],
+    setup: (props, { slots, attrs }) => () => Vue.h("button", { type: "button", "data-variant": attrs.variant, onClick: async (event) => {
+      attrs.onClick?.(event)
+      await navigator.clipboard.writeText(typeof props.value === "function" ? await props.value() : props.value)
+    } }, slots.default?.()),
+  })
+  app.component("UModal", {
+    props: ["open", "title", "ui"],
+    emits: ["update:open"],
+    setup: (props, { slots, emit }) => () => Vue.h(Vue.Teleport, { to: "body" }, props.open
+      ? Vue.h("div", { role: "dialog", "aria-label": props.title }, [
+          Vue.h("h2", props.title), Vue.h("p", slots.description?.()), slots.body?.(), slots.footer?.(),
+          Vue.h("button", { type: "button", onClick: () => emit("update:open", false) }, "Close"),
+        ])
+      : null),
+  })
+  app.component("ViewerSendFailure", SendFailure)
   app.mount("#app")
 `
 const bundle = await build({
@@ -240,6 +269,22 @@ test("Send walks every In place state in the pill, one row each, through the stu
     await control("answer", { status: "failed", reason: "The relay answered 502." })
     await segment.getByRole("button", { name: "Send: 1 comment" }).click()
     await step("failed", "failed")
+    // The pill names the failure and opens a dialog with the receiver's answer.
+    const why = tab.getByRole("dialog", { name: "T3 Code didn't take the comments" })
+    await why.waitFor()
+    assert.equal(await why.getByText("The relay answered 502.").count(), 1)
+    assert.equal(await why.getByText("relay.t3.codes").count(), 1)
+    await why.getByRole("button", { name: "Close" }).click()
+    await segment.locator("..").getByRole("button", { name: "Not delivered: see why" }).click()
+    await why.waitFor()
+    // A second failure counts the tries and makes Agents the next step.
+    await control("answer", { status: "failed", reason: "The relay answered 502." })
+    await why.getByRole("button", { name: "Retry" }).click()
+    await why.getByText(/^Tried 2× · last at /).waitFor()
+    assert.equal(await why.getByRole("link", { name: "Open Agents" }).getAttribute("data-variant"), "solid")
+    assert.equal(await toolbar.getByRole("button", { name: "Not delivered · 2×: see why" }).count(), 1)
+    if (shots) await toolbar.screenshot({ path: `${shots}/failed-twice.png` })
+    await why.getByRole("button", { name: "Close" }).click()
     await segment.getByRole("button", { name: "Retry: send 1 comment again" }).click()
     await step("sent-again", "sent")
     await control("work", "https://app.example.com/threads/42")
@@ -264,6 +309,52 @@ test("Send walks every In place state in the pill, one row each, through the stu
     await browser.close()
   }
 }, 60_000)
+
+test("Send on a server without VITEHUB_WEBHOOKS_KEY says it needs setup, and the fix leads back to pairing", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { tab, segment, control, errors } = await openFixture(browser, {
+      viewport: { width: 1280, height: 720 },
+      deviceScaleFactor: 2,
+    })
+    const toolbar = tab.getByRole("group", { name: "Document tools" })
+    const clipboard = () => tab.evaluate(() => navigator.clipboard.readText())
+
+    // A member can't fix the server: they ask an admin, and hand their agent the comments another way.
+    await control("unset", { problem: "unset", admin: false })
+    await segment.getByRole("button", { name: "Send: 3 comments" }).click()
+    const member = tab.getByRole("dialog", { name: "Send isn't set up on this Drop" })
+    await member.waitFor()
+    await member.getByRole("button", { name: "Copy note for admin" }).click()
+    assert.match(await clipboard(), /drop\.test.*VITEHUB_WEBHOOKS_KEY/s)
+    await member.getByRole("button", { name: "Copy prompt" }).click()
+    assert.equal(await clipboard(), "Address the comments on drop abc.")
+    await member.getByRole("button", { name: "Close" }).click()
+
+    // An admin copies a prompt that fixes the host, retries, and pairs once the key is set.
+    await control("unset", { problem: "unset", admin: true })
+    await segment.getByRole("button", { name: "Retry: send 3 comments again" }).click()
+    const admin = tab.getByRole("dialog", { name: "Drop can't send to agents yet" })
+    await admin.waitFor()
+    assert.equal(await toolbar.getByRole("button", { name: "Send needs setup: see why" }).count(), 1)
+    if (shots) await toolbar.screenshot({ path: `${shots}/needs-setup.png` })
+    await admin.getByRole("button", { name: "Copy fix prompt" }).click()
+    assert.match(
+      await clipboard(),
+      /^Drop at drop\.test can't send review comments to agents: the server has no VITEHUB_WEBHOOKS_KEY/,
+    )
+    await admin.getByRole("button", { name: "Retry" }).click()
+    await admin.getByText(/^Tried 3× · last at /).waitFor()
+    await control("setUp")
+    await admin.getByRole("button", { name: "Retry" }).click()
+    await tab.waitForSelector('[data-slot="comment-send"][data-state="pairing"]')
+    await admin.waitFor({ state: "detached" })
+    assert.match(await clipboard(), /one-time setup code [A-F0-9-]{7}/)
+    assert.deepEqual(errors, [])
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
 
 test.each([320, 390])(
   "pairing instructions and touch targets fit the marked dock at %ipx",
