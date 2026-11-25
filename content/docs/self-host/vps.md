@@ -148,7 +148,7 @@ Drop checks membership again with the stored token every five minutes, and a fai
 
 If sign-in fails, check the response from `/signin/start`. A 401 means GitHub rejected the token. A 403 asking for organization access means the OAuth grant needs `read:org` or organization SSO authorization. A membership-required 403 means GitHub returned no active membership. A 503 means GitHub was unavailable, returned an invalid response, or rate-limited the request; retry later. The error's `data.code` tells these apart without including credentials.
 
-The [ViteHub Console](/docs/self-host#github) calls `POST /_vitehub/rpc` from its own server with a signature, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access.
+The [ViteHub Console](/docs/self-host#github) calls `POST /_vitehub/rpc` from its own server with a signature, and Drop refuses any call that its `VITEHUB_CONSOLE_KEY_<NAME>` doesn't verify. Forward the public `Host`, since the signature covers the URL. Drop then lets in only a Console person whose email is in `DROP_ADMINS`; organization membership alone does not grant Console access. Pass `/_vitehub/site` through too: the Console's Site access signs an admin in to the page tools there.
 
 ## Keep an existing D1 database {#d1}
 
