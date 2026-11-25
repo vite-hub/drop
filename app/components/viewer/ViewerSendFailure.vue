@@ -59,8 +59,8 @@ const docs = "/docs/self-host#github"
         paste it in your agent: it reads them through Drop's MCP.
       </template>
       <template v-else-if="failure.cause === 'reconnect'">
-        The server can no longer open this connection. Pair again to get a new setup prompt without disconnecting your
-        other agents; {{ comments }}.
+        The server can no longer open this connection, and {{ comments }}. Pair again and paste the new prompt in the
+        same agent thread to repair it. Another thread gets these comments, but later sends still go to the old one.
       </template>
       <template v-else> In Drop, {{ comments }}. </template>
     </template>
