@@ -333,7 +333,13 @@ test("Send on a server without VITEHUB_WEBHOOKS_KEY stays Send, explains itself 
     await member.getByRole("button", { name: "Copy prompt" }).click()
     assert.equal(await clipboard(), "Address the comments on drop abc.")
     await member.getByRole("button", { name: "Close" }).click()
-    assert.equal(await toolbar.getByText(/needs setup|Not delivered|Retry/).filter({ visible: true }).count(), 0)
+    assert.equal(
+      await toolbar
+        .getByText(/needs setup|Not delivered|Retry/)
+        .filter({ visible: true })
+        .count(),
+      0,
+    )
     if (shots) await toolbar.screenshot({ path: `${shots}/setup-send.png` })
 
     // An admin copies a prompt that fixes the host, retries, and pairs once the key is set.
