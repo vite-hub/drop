@@ -110,8 +110,7 @@ async function register(name, callback = redirectUri) {
   return { client_id, callback, event }
 }
 
-/** The authorization code flow with PKCE, approved (or denied) by the signed-in person the first time: the code and its verifier. */
-async function authorize(client_id, { callback = redirectUri, accept = true } = {}) {
+async function startAuthorization(client_id, callback) {
   const verifier = randomBytes(32).toString("base64url")
   const query = new URLSearchParams({
     response_type: "code",
@@ -125,6 +124,12 @@ async function authorize(client_id, { callback = redirectUri, accept = true } = 
   })
   const authorized = await call(`/oauth2/authorize?${query}`, { cookie })
   const consentPage = new URL(authorized.response.headers.get("location"), origin)
+  return { authorized, consentPage, verifier }
+}
+
+/** The authorization code flow with PKCE, approved (or denied) by the signed-in person the first time: the code and its verifier. */
+async function authorize(client_id, { callback = redirectUri, accept = true } = {}) {
+  const { authorized, consentPage, verifier } = await startAuthorization(client_id, callback)
   // Consent is asked once per client.
   if (consentPage.pathname !== "/oauth")
     return { code: consentPage.searchParams.get("code"), verifier, authorized: authorized.event }
@@ -295,6 +300,23 @@ test("denying consent logs access_denied though the response is 200", async () =
     status: 200,
     error: "access_denied",
   })
+})
+
+test("submitting consent without a session logs Better Auth's error code", async () => {
+  const client = await register("Signed-out consent")
+  const { consentPage } = await startAuthorization(client.client_id, redirectUri)
+  assert.equal(consentPage.pathname, "/oauth")
+  const { response, event } = await call("/oauth2/consent", {
+    body: { accept: true, oauth_query: consentPage.search.slice(1) },
+  })
+  assert.equal(response.status, 401)
+  const { code, message } = await response.json()
+  assert.equal(code, "UNAUTHORIZED")
+  assert.equal(event.oauth.endpoint, "/oauth2/consent")
+  assert.equal(event.oauth.status, 401)
+  assert.equal(event.oauth.error, code)
+  assert.ok(message)
+  assert.ok(!JSON.stringify(event.oauth).includes(message))
 })
 
 test("callback query values and provider error text stay out of the event", async () => {

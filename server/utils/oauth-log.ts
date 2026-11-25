@@ -190,7 +190,8 @@ export const oauthLog = () =>
       await quietly(async (log, event) => {
         if (!event.context.oauthEndpoint) return
         const json = response.status >= 400 && response.headers.get("content-type")?.includes("json")
-        const error = json ? errorCode(fields(await response.clone().json()).error) : undefined
+        const body = json ? fields(await response.clone().json()) : {}
+        const error = errorCode(text(body.error) ?? body.code)
         log.set({ oauth: { status: response.status, error } })
       })
     },
