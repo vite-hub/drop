@@ -28,9 +28,9 @@ import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 export default defineHandler(async (event) => {
+  const id = await routeId(event)
   const version = Number(event.url.searchParams.get("v")) || undefined
-  const drop = await findDropAt(await routeId(event), version, event)
-  const who = await identify(event)
+  const [drop, who] = await Promise.all([findDropAt(id, version, event), identify(event)])
   if (!drop || !permissions(drop, who).comment)
     return refuseSend(event, who, new HTTPError({ status: 404, statusText: "You can't comment on this drop." }))
   await requireRateLimit(event, "comment", { key: who?.userId, limit: 20, window: "1m", message: TOO_MANY_COMMENTS })
