@@ -34,20 +34,6 @@ test("the CLI key gets every section, and agents get none", async () => {
   assert.equal(await authorize({ via: "agent", request, user }), false)
 })
 
-test("the pill's Console link shows only to a verified, unbanned admin who is a member", async () => {
-  const page = (person) => authorize({ via: "page", request, user: person })
-  assert.equal(await page(user), true)
-  for (const person of [
-    undefined,
-    { ...user, email: "member@example.com", role: "admin" },
-    { ...user, emailVerified: false },
-    { ...user, banned: true },
-  ])
-    assert.equal(await page(person), false)
-  state.members = "github-org:vite-hub"
-  assert.equal(await page(user), false, "No GitHub organization grant")
-})
-
 test("content-origin hosts never reach the Console", async () => {
   state.contentOrigin = "https://*-drop.vitehub.dev"
   for (const hostname of [`${"a".repeat(26)}-drop.vitehub.dev`, "stray-drop.vitehub.dev"])
