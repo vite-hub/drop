@@ -5,7 +5,7 @@ import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { nextPath } from "#shared/sign-in"
 import { authFor, identify } from "../../utils/identity"
-import { logError } from "../../utils/logs"
+import { logError, requestLog } from "../../utils/logs"
 import { authProxy } from "../../utils/proxy-auth"
 
 const Started = v.object({ url: v.string() })
@@ -36,8 +36,14 @@ export default defineHandler(async (event) => {
       logError(event, error, { auth: { signIn: "start failed" } })
       return null
     })
-  const started = response?.ok ? v.safeParse(Started, await response.json().catch(() => null)) : null
-  if (!response || !started?.success) return redirect(page, 302)
+  if (!response) return redirect(page, 302)
+  const started = response.ok ? v.safeParse(Started, await response.json().catch(() => null)) : null
+  if (!started?.success) {
+    requestLog(event)?.warn("GitHub sign-in did not start", {
+      auth: { signIn: "start failed", status: response.status },
+    })
+    return redirect(page, 302)
+  }
   for (const cookie of response.headers.getSetCookie()) event.res.headers.append("Set-Cookie", cookie)
   event.res.headers.set("Cache-Control", "private, no-store")
   return redirect(started.output.url, 302)
