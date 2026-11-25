@@ -1,6 +1,7 @@
 import { APIError } from "better-auth/api"
 import { applySetCookies } from "better-auth/cookies"
 import { defineHandler, type H3Event, HTTPError } from "h3"
+import { PROXY_SIGN_OUT_HANDOFF_HEADER } from "../../shared/sign-in"
 import { authError } from "../utils/auth-errors"
 import { sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
@@ -11,7 +12,8 @@ export default defineHandler(async (event) => {
   const proxy = readAuthProxyConfig()
   if (!proxy.enabled) return
   const path = event.url.pathname
-  if (path === "/api/auth/sign-out" && event.req.method === "POST" && proxy.cookie)
+  const proxyWillSignOut = event.req.headers.get(PROXY_SIGN_OUT_HANDOFF_HEADER) === "1"
+  if (path === "/api/auth/sign-out" && event.req.method === "POST" && proxy.cookie && !proxyWillSignOut)
     event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
   const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return

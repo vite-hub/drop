@@ -476,6 +476,7 @@ test("requests of a proxy member who already has an account don't wait on each o
 
 test("using another account signs the first one out of Drop before the second signs in", async () => {
   github()
+  state.authProxyCookie = "__Host-drop-auth"
   const instance = auth()
   state.auth = instance
   const first = new H3Event(
@@ -492,13 +493,20 @@ test("using another account signs the first one out of Drop before the second si
       method: "POST",
       headers: {
         origin: "https://drop.example",
-        cookie: withCookies(first).get("cookie"),
+        cookie: `${withCookies(first).get("cookie")}; __Host-drop-auth=proxy-ticket`,
         "x-auth-request-access-token": "test-switch-first",
+        "x-drop-proxy-sign-out-handoff": "1",
       },
     }),
   )
   await proxySession(signOut)
-  assert.equal((await instance.handler(signOut.req)).status, 200)
+  const response = await instance.handler(signOut.req)
+  assert.equal(response.status, 200)
+  const cookies = [...signOut.res.headers.getSetCookie(), ...response.headers.getSetCookie()]
+  assert.ok(
+    cookies.every((cookie) => !cookie.startsWith("__Host-drop-auth=")),
+    "The proxy keeps its session ticket",
+  )
   assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 0)
 
   github(

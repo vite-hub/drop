@@ -10,15 +10,15 @@ const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev
 const leave = (url: string) => navigateTo(url, { external: true })
-const switchFailed = (cause: unknown) => reportClientError("signin-switch", cause)
 
 async function connect() {
   pending.value = true
   error.value = ""
+  const switchingProxyAccount = method.value?.proxy && !!me.value
   try {
     if (method.value?.proxy) {
       const start = signInPath(next.value, { proxy: true })
-      await (me.value ? switchProxyAccount(start, { signOut, navigate: leave, failed: switchFailed }) : leave(start))
+      await (switchingProxyAccount ? switchProxyAccount(start, { signOut, navigate: leave }) : leave(start))
       return
     }
     if (me.value) {
@@ -33,7 +33,7 @@ async function connect() {
     })
     if (result.error) throw answerError(result.error.message ?? "Couldn't start GitHub sign-in.", result.error.status)
   } catch (cause) {
-    reportClientError("signin", cause)
+    reportClientError(switchingProxyAccount ? "signin-switch" : "signin", cause)
     error.value = errorText(cause)
     pending.value = false
   }

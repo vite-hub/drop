@@ -8,8 +8,9 @@ const signedOut = `/oauth2/sign_out?rd=${encodeURIComponent(start)}`
 test("using another account in proxy mode ends the Drop session before leaving for the proxy's sign-out", async () => {
   const steps = []
   let finish
-  const signOut = () =>
+  const signOut = (options) =>
     new Promise((resolve) => {
+      assert.equal(options.fetchOptions.headers["x-drop-proxy-sign-out-handoff"], "1")
       steps.push("sign-out started")
       finish = () => {
         steps.push("sign-out finished")
@@ -19,7 +20,6 @@ test("using another account in proxy mode ends the Drop session before leaving f
   const switching = switchProxyAccount(start, {
     signOut,
     navigate: (url) => steps.push(`navigate ${url}`),
-    failed: (cause) => assert.fail(cause),
   })
   await Promise.resolve()
   assert.deepEqual(steps, ["sign-out started"], "Navigation waits for the sign-out")
@@ -29,7 +29,7 @@ test("using another account in proxy mode ends the Drop session before leaving f
 })
 
 for (const [label, signOut] of [
-  ["answers with an error", async () => ({ error: { message: "Server error", status: 500 } })],
+  ["answers with an error", async () => ({ error: { message: "Bad Gateway", status: 502 } })],
   [
     "throws",
     async () => {
@@ -37,15 +37,12 @@ for (const [label, signOut] of [
     },
   ],
 ]) {
-  test(`using another account still reaches the proxy's sign-out when the Drop sign-out ${label}`, async () => {
+  test(`using another account stays on the page when the Drop sign-out ${label}`, async () => {
     const visited = []
-    const failures = []
-    await switchProxyAccount(start, {
-      signOut,
-      navigate: (url) => visited.push(url),
-      failed: (cause) => failures.push(cause),
-    })
-    assert.deepEqual(visited, [signedOut])
-    assert.equal(failures.length, 1, "The failed sign-out is reported")
+    await assert.rejects(
+      () => switchProxyAccount(start, { signOut, navigate: (url) => visited.push(url) }),
+      label === "throws" ? /fetch failed/ : { message: "Bad Gateway", status: 502 },
+    )
+    assert.deepEqual(visited, [])
   })
 }
