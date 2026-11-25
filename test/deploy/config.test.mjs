@@ -53,6 +53,24 @@ test("Nuxt shares the legacy host override with ViteHub's build validator", asyn
 })
 
 test.each([
+  ["sqlite", { backup: true }],
+  ["d1", true],
+])("a Docker image on %s migrates before it listens", async (database, migrateOnStart) => {
+  vi.resetModules()
+  vi.stubGlobal("defineNuxtConfig", (config) => config)
+  vi.stubEnv("VITEHUB_HOST", "node")
+  vi.stubEnv("DROP_HOST", undefined)
+  vi.stubEnv("DROP_DATABASE", database)
+  try {
+    const { default: config } = await import("../../nuxt.config.ts")
+    assert.deepEqual(config.vitehub.database.migrateOnStart, migrateOnStart)
+  } finally {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  }
+})
+
+test.each([
   ["cloudflare", false],
   ["vercel", false],
   ["netlify", false],

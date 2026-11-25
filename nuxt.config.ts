@@ -107,9 +107,9 @@ const VITEHUB: Record<Host, NonNullable<NuxtConfig["vitehub"]>> = {
             connection: {
               url: env({ source: env.source("DROP_DATABASE_URL"), default: "file:.data/database/drop.db" }),
             },
-            migrateOnStart: true,
+            migrateOnStart: { backup: true },
           }
-        : d1("vitehub-drop-vps"),
+        : { ...d1("vitehub-drop-vps"), migrateOnStart: true },
     kv: { driver: "fs-lite", base: ".data/kv" },
     rateLimit: { driver: "memory" },
     schedule: { runtime: { driver: "process" } },

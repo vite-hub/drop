@@ -1,8 +1,21 @@
+import { spawnSync } from "node:child_process"
 import { readFile } from "node:fs/promises"
+import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { migrateD1 } from "./migrate-d1.mjs"
 
-export async function migrateWorkersBuild(env = process.env, configPath = ".output/server/wrangler.json") {
+function wrangler(args, env) {
+  const bin = join(dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin/wrangler.js")
+  const result = spawnSync(process.execPath, [bin, ...args], { env, stdio: "inherit" })
+  if (result.error) throw result.error
+  if (result.status !== 0) throw new Error(`wrangler ${args.join(" ")} exited with ${result.status ?? result.signal}`)
+}
+
+export async function migrateWorkersBuild(
+  env = process.env,
+  configPath = ".output/server/wrangler.json",
+  run = wrangler,
+) {
   const productionBranch = env.DROP_PRODUCTION_BRANCH
   if (env.WORKERS_CI !== "1" || !productionBranch || env.WORKERS_CI_BRANCH !== productionBranch) return
 
@@ -21,10 +34,10 @@ export async function migrateWorkersBuild(env = process.env, configPath = ".outp
     throw new Error("Set CLOUDFLARE_ACCOUNT_ID in Workers Builds to the account that owns DB")
 
   try {
-    await migrateD1({
-      CLOUDFLARE_ACCOUNT_ID: env.CLOUDFLARE_ACCOUNT_ID,
+    run(["d1", "migrations", "apply", "DB", "--remote", "--config", configPath], {
+      ...env,
+      CLOUDFLARE_ACCOUNT_ID: env.CLOUDFLARE_ACCOUNT_ID.trim(),
       CLOUDFLARE_API_TOKEN: token,
-      CLOUDFLARE_D1_DATABASE_ID: databaseId,
     })
   } catch (cause) {
     throw new Error(`Workers Builds D1 migration failed. If authorization failed: ${tokenHint}.`, { cause })
