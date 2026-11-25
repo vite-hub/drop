@@ -13,6 +13,7 @@ import { requireIdentity } from "../../utils/identity"
 import { isAttachment } from "../../utils/nodes"
 import { resourceList, ResourcesInput, saveResources } from "../../utils/resources"
 import { MAX_RESOURCE_URL } from "#shared/resources"
+import { embedSection, embedWarnings } from "../../utils/embed-access"
 import { dropLine, mcpDrop, SHARE_INPUT } from "../format"
 
 export default defineMcpTool({
@@ -125,19 +126,21 @@ export default defineMcpTool({
       throw new HTTPError({ status: 404, message: `No drop with id ${id}.` })
     if (links && drop.expired && trash !== false)
       throw new HTTPError({ status: 409, message: "This drop is in the Trash. Restore it first." })
-    const updated = mcpDrop(
-      Object.keys(change).length ? await updateDrop(drop, who, change, event) : toSummary(drop),
-      event.url.origin,
-      drop,
-    )
+    const changed = Object.keys(change).length ? await updateDrop(drop, who, change, event) : null
+    const updated = mcpDrop(changed ?? toSummary(drop), event.url.origin, drop)
     if (links) await saveResources(drop, links)
     const resolved = resolves?.length ? await resolveComments(drop, resolves, who) : []
-    const result = { ...updated, ...(resolved.length ? { resolved } : {}) }
+    const warnings = embedWarnings({
+      embeds: changed?.privateEmbeds ?? [],
+      unchecked: changed?.uncheckedEmbeds ?? null,
+      failed: changed?.embedCheckFailed,
+    })
+    const result = { ...updated, ...(resolved.length ? { resolved } : {}), ...(warnings.length ? { warnings } : {}) }
     return {
       content: [
         {
           type: "text" as const,
-          text: `Updated${links ? `, ${links.length ? `${links.length} ${links.length === 1 ? "link" : "links"}` : "no links"} at the top` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}`,
+          text: `Updated${links ? `, ${links.length ? `${links.length} ${links.length === 1 ? "link" : "links"}` : "no links"} at the top` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(updated)}${embedSection(warnings)}`,
         },
       ],
       structuredContent: result,

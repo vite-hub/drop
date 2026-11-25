@@ -21,6 +21,7 @@ import {
   toSummary,
 } from "./drops"
 import { updateDrop } from "./drop-update"
+import { embedSection, embedWarnings, privateEmbeds } from "./embed-access"
 import { requireFolder } from "./folders"
 import type { Identity } from "./identity"
 import { problemLine } from "./markdown-document"
@@ -432,19 +433,21 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
+  const embeds = embedWarnings(await privateEmbeds([fresh], who, event))
   const result = {
     ...drop,
     ...(pages.length ? { pages: pages.slice(0, MAX_LISTED_PAGES) } : {}),
     ...(resolved.length ? { resolved } : {}),
-    ...(warnings.length ? { warnings } : {}),
+    ...(warnings.length || embeds.length ? { warnings: [...warnings, ...embeds] } : {}),
   }
   const lead =
     fresh.kind === "markdown"
       ? "It published with these Comark lint warnings."
       : `These references point at nothing in the ${input.files ? "app" : "page"}.`
-  const check = warnings.length
-    ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
-    : ""
+  const check =
+    (warnings.length
+      ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
+      : "") + embedSection(embeds)
   return {
     text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${pages.length > 1 ? `\n\n${pagesSection(pages)}` : ""}${check}`,
     result,

@@ -205,6 +205,10 @@ function dropBox(link: string, height: unknown, title: string) {
   )
 }
 
+const EMBED_BOX = /<figure class="drop-embed" data-drop-embed="([0-9a-hjkmnp-tv-z]{12})"/g
+
+export const embeddedLinks = (html: string) => [...new Set(Array.from(html.matchAll(EMBED_BOX), ([, link]) => link!))]
+
 const renderEmbed: NodeHandler = (node, state) => {
   const [, attrs] = node
   const link = attrs.provider === "drop" ? textValue(attrs.src)?.match(DROP_LINK)?.[1] : undefined

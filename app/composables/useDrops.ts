@@ -4,6 +4,7 @@ import type { Lifetime } from "#shared/expiry"
 import { dropPath } from "#shared/links"
 import type { Share } from "#shared/share"
 import type { DropDetail, DropSummary, DropTree, Viewer } from "#shared/types"
+import type { EmbedCheck } from "~/utils/private-embeds"
 
 export const useDrops = () => useApi("/api/drops", { key: keys.drops, default: () => [] })
 
@@ -127,9 +128,12 @@ export function useDropActions() {
     form.append("file", file)
     if (folder) form.append("folder", folder.id)
     try {
-      const result = await sendFile("/api/files", form, v.object({ id: v.string() }), {
-        onProgress: options.onProgress,
-      })
+      const { privateEmbeds, uncheckedEmbeds, embedCheckFailed, ...result } = await sendFile(
+        "/api/files",
+        form,
+        v.object({ id: v.string(), ...EmbedCheckSchema }),
+        { onProgress: options.onProgress },
+      )
       await (folder ? refreshNuxtData([...LISTS, keys.usage, keys.folder(folder.id), keys.drop(folder.id)]) : refresh())
       notify.done(
         folder
@@ -138,6 +142,7 @@ export function useDropActions() {
             ? "Dropped for the team"
             : "Dropped privately",
       )
+      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds, embedCheckFailed })
       return result
     } catch (error) {
       notify.fail("Upload failed", error)
@@ -153,7 +158,10 @@ export function useDropActions() {
       ...(detail.sharedFrom ? { ownShare: share } : { share }),
     }))
     try {
-      const result = await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { share } })
+      const { privateEmbeds, uncheckedEmbeds, embedCheckFailed, ...result } = await $fetch<DropSummary & EmbedCheck>(
+        `/api/drops/${drop.id}`,
+        { method: "PATCH", body: { share } },
+      )
       patch(drop.id, result)
       editDetail(keys.drop(drop.id), (detail) => ({ ...detail, sharedFrom: undefined, ownShare: undefined, ...result }))
       void refreshNuxtData([
@@ -162,6 +170,7 @@ export function useDropActions() {
         ...folders(),
         ...(result.kind === "folder" ? [keys.drop(drop.id)] : []),
       ])
+      notify.privateEmbeds({ privateEmbeds, uncheckedEmbeds, embedCheckFailed })
       return true
     } catch (error) {
       if (before) patch(drop.id, { share: before })
@@ -376,10 +385,14 @@ export function useDropActions() {
     folder: Pick<DropSummary, "id" | "title"> | null,
   ) {
     try {
-      await $fetch<DropSummary>(`/api/drops/${drop.id}`, { method: "PATCH", body: { folder: folder?.id ?? null } })
+      const moved = await $fetch<DropSummary & EmbedCheck>(`/api/drops/${drop.id}`, {
+        method: "PATCH",
+        body: { folder: folder?.id ?? null },
+      })
       const around = [drop.parentId, folder?.id].flatMap((id) => (id == null ? [] : [keys.drop(id)]))
       await refreshNuxtData([...LISTS, keys.pinned, keys.drop(drop.id), ...around, ...folders()])
       notify.done(folder ? `Moved to ${folder.title}` : "Moved to the top")
+      notify.privateEmbeds(moved)
       return true
     } catch (error) {
       notify.fail("Couldn't move it", error)

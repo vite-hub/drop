@@ -3,6 +3,7 @@ import * as v from "valibot"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { joinFrontmatter, splitFrontmatter } from "#shared/frontmatter"
 import { createDocDrop, findDrop, permissions, readText, toSummary } from "../../../utils/drops"
+import { embedResponse, openedEmbeds } from "../../../utils/embed-access"
 import { identify } from "../../../utils/identity"
 import { deleteDrafts, readDraft } from "../../../utils/live-drafts"
 import { routeId } from "../../../utils/params"
@@ -43,6 +44,6 @@ export default defineValidatedHandler({
       event,
     )
     await deleteDrafts([edited])
-    return toSummary(next)
+    return { ...toSummary(next), ...embedResponse(await openedEmbeds(next.id, who, event)) }
   },
 })
