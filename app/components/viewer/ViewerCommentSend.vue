@@ -16,12 +16,8 @@ watch(
   () => void client.value.refresh().catch(() => undefined),
 )
 
-// ViteHub's segment says only Not delivered, with the reason in a tooltip. Drop finds out why: a failure while Sending
-// is the agent's receiver; one before is pairing, which fails on a server without VITEHUB_WEBHOOKS_KEY. It names that
-// in the pill and opens a dialog with the fix.
 const state = shallowRef<CommentSendState>(client.value.state)
 const failure = shallowRef<SendFailure | null>(null)
-// The dialog keeps its words while it closes.
 const shown = shallowRef<SendFailure | null>(null)
 const open = ref(false)
 let asked = 0
@@ -50,7 +46,6 @@ watch(
     onCleanup(
       current.onChange(() => {
         const next = current.state
-        // A new count keeps the failed state; only a new failure is explained again.
         const recount = last.status === "failed" && next.status === "failed" && last.count !== next.count
         if (next.status === "failed" && !recount) void explain(last.status, next.reason)
         if (next.status !== "failed" && next.status !== "sending") {

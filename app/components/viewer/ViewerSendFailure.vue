@@ -15,7 +15,6 @@ const tried = computed(() =>
   props.failure.tries > 1 ? `Tried ${props.failure.tries}× · last at ${time.format(props.failure.at)}` : "",
 )
 
-// Copying the fix turns Retry into the next step, until the dialog closes.
 const fixCopied = ref(false)
 watch(open, (value) => value || (fixCopied.value = false))
 
