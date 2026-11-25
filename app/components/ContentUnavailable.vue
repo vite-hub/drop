@@ -7,6 +7,10 @@ const [{ data: me }, { data: method }] = await Promise.all([useMe(), useSignInMe
 const message = computed(() =>
   contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview, Boolean(method.value?.proxy)),
 )
+const hydrating = useNuxtApp().isHydrating
+onMounted(() => {
+  if (!hydrating) reportClientEvent({ event: "card.shown", reason: message.value.reason })
+})
 const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\/([^/]+)\/?$/, "/d/$1"))
 </script>
 

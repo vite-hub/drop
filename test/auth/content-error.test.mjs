@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
-import { test } from "vite-plus/test"
+import { test, vi } from "vite-plus/test"
 import { H3Event, HTTPError } from "h3"
 // test/stubs.ts stubs Server Env, so the error page reads the proxy setting the way it does under Nitro.
 import { state } from "../cost/harness.mjs"
 const { default: contentError } = await import("../../server/handlers/content-error.ts")
+const { background } = await import("../../server/utils/logs.ts")
 
 const path = "/d/11111111-1111-4111-8111-111111111111"
 async function render(status, identity = null, data, cookie) {
@@ -92,6 +93,30 @@ test("a browser signed in before goes straight back through sign-in, once a minu
   assert.equal((await render(410, null, undefined, "drop-returning=1")).status, 410)
   assert.equal((await render(403, null, { shareReview: "pending" }, "drop-returning=1")).status, 403)
   assert.equal((await render(503, null, undefined, "drop-returning=1")).status, 503)
+})
+
+test("the card logs card.shown with its reason, and the redirect logs signin.redirected", async () => {
+  const info = vi.spyOn(background, "info").mockImplementation(() => {})
+  const logged = () => info.mock.calls.map(([fields]) => fields)
+  await render(404)
+  await render(404, { email: "viewer@example.test" })
+  await render(410)
+  await render(503)
+  assert.deepEqual(
+    logged().map(({ action, client, path: at, status }) => ({ action, client, path: at, status })),
+    [
+      { action: "client-event", client: { event: "card.shown", reason: "signed-out" }, path, status: 404 },
+      { action: "client-event", client: { event: "card.shown", reason: "no-access" }, path, status: 404 },
+      { action: "client-event", client: { event: "card.shown", reason: "expired" }, path, status: 410 },
+      { action: "client-event", client: { event: "card.shown", reason: "unavailable" }, path, status: 503 },
+    ],
+  )
+  info.mockClear()
+  assert.equal((await render(404, null, undefined, "drop-returning=1")).status, 302)
+  assert.deepEqual(
+    logged().map(({ client, status }) => ({ client, status })),
+    [{ client: { event: "signin.redirected", mode: "github" }, status: 404 }],
+  )
 })
 
 test("sign-in comes back only to a path on this Drop", async () => {

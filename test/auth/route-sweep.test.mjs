@@ -10,6 +10,7 @@ import { migrate, reset, state } from "../cost/harness.mjs"
 const OPEN = {
   "* /api/auth/x/y": "Better Auth's sign-in and sign-up; its admin routes stay gated",
   "GET /api/sign-in": "starts sign-in",
+  "POST /api/client-events": "sign-in steps from signed-out browsers: a closed list of names and codes, rate-limited",
   "GET /api/mcp": "MCP discovery; MCP calls carry an OAuth token",
   "GET /api/favicons/x": "site icons, fetched only from public icon services",
   "GET /api/me": "answers who is signed in, or nobody",

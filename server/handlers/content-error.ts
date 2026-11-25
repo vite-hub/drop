@@ -23,6 +23,16 @@ function fellBack(event: H3Event, step: string, error: unknown) {
   })
 }
 
+function shown(event: H3Event, client: Record<string, string>, status: number) {
+  background.info({
+    action: "client-event",
+    client,
+    path: event.url.pathname,
+    status,
+    requestId: event.req.context?.log ? useLogger(event).getContext().requestId : undefined,
+  })
+}
+
 async function signedIn(event: H3Event) {
   if (event.context.dropIdentity) return event.context.dropIdentity
   const { identify } = await import("../utils/identity")
@@ -72,15 +82,18 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
       returning: Boolean(getCookie(event, RETURNING_COOKIE)),
       tried: Boolean(getCookie(event, TRIED_COOKIE)),
     })
-  )
+  ) {
+    const proxy = authProxy().enabled
+    shown(event, { event: "signin.redirected", mode: proxy ? "proxy" : "github" }, status)
     return new Response(null, {
       status: 302,
       headers: {
-        Location: signInPath(`${path}${event.url.search}`, { proxy: authProxy().enabled }),
+        Location: signInPath(`${path}${event.url.search}`, { proxy }),
         "Set-Cookie": `${TRIED_COOKIE}=1; Path=/; Max-Age=60; SameSite=Lax${event.url.protocol === "https:" ? "; Secure" : ""}`,
         "Cache-Control": "private, no-store",
       },
     })
+  }
   const message = drop
     ? missingInDrop(drop, identity?.email)
     : contentUnavailable(
@@ -90,6 +103,7 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
         error.data?.shareReview === "pending",
         authProxy().enabled,
       )
+  shown(event, { event: "card.shown", reason: message.reason }, status)
   const card = path.startsWith("/d/")
     ? `<meta property="og:site_name" content="Drop"><meta property="og:title" content="Shared on Drop"><meta property="og:image" content="${escapeHtml(event.url.origin)}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">`
     : ""

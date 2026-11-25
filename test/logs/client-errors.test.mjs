@@ -3,14 +3,18 @@ import { test, vi } from "vite-plus/test"
 import * as v from "valibot"
 import { createFetch } from "ofetch"
 import { sendFile } from "../../app/utils/send-file.ts"
-import { createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
+import { answerError, createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
 
 const page = { path: "/d/abc123", online: true, leaving: false }
 
 function reporter() {
   const sent = []
-  const report = createClientErrorReporter((body) => sent.push(body))
-  return { sent, report: (action, error, fields = {}, at = page) => report(action, error, fields, at) }
+  const events = []
+  const report = createClientErrorReporter(
+    (body) => sent.push(body),
+    (body) => events.push(body),
+  )
+  return { sent, events, report: (action, error, fields = {}, at = page) => report(action, error, fields, at) }
 }
 
 // ofetch's FetchError: `status` and `data` from the answer, `response` with its headers, `cause` when there was none.
@@ -46,6 +50,32 @@ test("an answer the server gave as a 4xx isn't reported", () => {
   report("notify", { status: 403, statusText: "Forbidden", message: "Not allowed" })
   report("upload", Object.assign(new Error("413"), { status: 413 }))
   assert.deepEqual(sent, [])
+})
+
+test("a sign-in or consent refusal is reported as its step's failure, with its code", () => {
+  const { sent, events, report } = reporter()
+  // Better Auth's client error, kept by answerError, and an h3 answer through ofetch.
+  report("signin", answerError("Sign in again", 401, "GITHUB_REAUTH_REQUIRED"))
+  report("oauth-signin", { status: 403, statusText: "Forbidden", message: "No", code: "GITHUB_ORG_ACCESS_REQUIRED" })
+  report("signin-switch", fetchError({ status: 403, data: { status: 403, data: { code: "BANNED_USER" } } }))
+  report("oauth-consent", answerError("This authorization link is invalid", 401, "invalid_request"))
+  report("oauth-consent", new Error("The agent didn't get an answer."))
+  report("oauth-consent", answerError("Not allowed", 403, "Free text, not a code"))
+  assert.deepEqual(events, [
+    { event: "signin.failed", code: "GITHUB_REAUTH_REQUIRED", status: 401 },
+    { event: "signin.failed", code: "GITHUB_ORG_ACCESS_REQUIRED", status: 403 },
+    { event: "signin.failed", code: "BANNED_USER", status: 403 },
+    { event: "consent.failed", code: "invalid_request", status: 401 },
+    { event: "consent.failed" },
+    { event: "consent.failed", status: 403 },
+  ])
+  // The server logged the answers; only the exception without one is a client error.
+  assert.deepEqual(
+    sent.map((body) => body.action),
+    ["oauth-consent"],
+  )
+  report("notify", fetchError({ status: 401, data: { status: 401, data: { code: "SIGN_IN_REQUIRED" } } }))
+  assert.equal(events.length, 6, "Other actions send no step")
 })
 
 test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its status and request id, unless Drop wrote it", () => {

@@ -26,6 +26,7 @@ const deployment = () => (host ? { deployment: { host } } : {})
 
 export const background = {
   logger: (fields: Record<string, unknown>) => createLogger({ ...fields, ...deployment() }),
+  info: (fields: Record<string, unknown>) => log.info({ ...fields, ...deployment() }),
   warn: (fields: Record<string, unknown>) => log.warn({ ...fields, ...deployment() }),
   error: (fields: Record<string, unknown>) => log.error({ ...fields, ...deployment() }),
 }
