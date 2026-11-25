@@ -17,7 +17,15 @@ import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
 import type { CommandPaletteItem } from "@nuxt/ui"
-import type { DropComment, DropKind, DropSummary, DropVersion, RelatedDrop, SiteReviewItem } from "#shared/types"
+import type {
+  DropComment,
+  DropKind,
+  DropRuntimeError,
+  DropSummary,
+  DropVersion,
+  RelatedDrop,
+  SiteReviewItem,
+} from "#shared/types"
 import {
   AvatarStack,
   CommentSelectionBar,
@@ -371,8 +379,8 @@ const pinBubbleStyle = computed(() => {
   const height = bubbleHeight.value || Math.min(448, windowHeight.value * 0.6)
   const inWindow = (top: number) => Math.max(56, Math.min(top, windowHeight.value - 12 - height))
   if (spot?.rail) {
-    const width = Math.min(Math.max(THREAD_WIDTH, rect.right - rect.left), windowWidth.value - 24)
-    const left = Math.max(12, Math.min(rect.right - width, windowWidth.value - 12 - width))
+    const width = Math.min(rect.right - rect.left, windowWidth.value - 24)
+    const left = Math.max(12, Math.min(rect.left, windowWidth.value - 12 - width))
     return { width: `${width}px`, left: `${left}px`, top: `${inWindow(rect.top)}px`, transformOrigin: "100% 0" }
   }
   const width = Math.min(pinDraft.value ? PIN_BUBBLE_WIDTH : THREAD_WIDTH, windowWidth.value - 24)
@@ -475,6 +483,12 @@ watch(zen, (on) => on && (detailsOpen.value = false))
 const gallery = useGallery(drop, publicView)
 const { items: galleryItems, at: galleryAt, prev: prevImage, next: nextImage } = gallery
 
+const pageErrors = ref<DropRuntimeError[]>([])
+watch(
+  () => drop.value.errors,
+  (errors) => (pageErrors.value = errors ?? []),
+  { immediate: true },
+)
 const frame = useTemplateRef<HTMLIFrameElement>("frame")
 const { bottom: frameBottom } = useElementBounding(frame)
 const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unplaced, openPath, picker, whenHeld } =
@@ -525,6 +539,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     palette: usePaletteOpener(),
     toggleZen,
     escape: leaveZen,
+    errors: pageErrors,
   })
 const canvasShown = computed(() => prototypeCanvas.value && !editing.value && !lightbox.value && !shownVersion.value)
 function canvasTool(command: "move" | "hand") {
@@ -884,7 +899,18 @@ watch(
   () => copied("markdown"),
   (on) => on && docHeader.value && send({ type: "doc-copied" }),
 )
-const feedback = () => feedbackMarkdown(drop.value.title, link.value, comments.value, drop.value.version)
+const feedbackLink = useShareUrl(drop, () =>
+  pageErrors.value.length && drop.value.kind === "html" ? drop.value.version : undefined,
+)
+const feedback = () =>
+  feedbackMarkdown(
+    drop.value.title,
+    feedbackLink.value,
+    comments.value,
+    drop.value.version,
+    drop.value.kind,
+    pageErrors.value,
+  )
 const readerId = computed(
   () =>
     me.value?.id ??
@@ -893,8 +919,7 @@ const readerId = computed(
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
 const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const loadingScreenshots = computed(() => siteReview?.status.value === "pending")
-const prompt = () => promptMarkdown(drop.value, link.value, waiting.value, screenshots.value)
+const prompt = () => promptMarkdown(drop.value, feedbackLink.value, waiting.value, pageErrors.value.length)
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -1449,6 +1474,7 @@ usePaletteOffer("drop", () => {
           { label: "Zoom in", icon: "i-mingcute-zoom-in-line", kbds: ["+"], onSelect: () => picker("zoom-in") },
           { label: "Fit", icon: "i-mingcute-fullscreen-2-line", kbds: ["shift", "1"], onSelect: () => picker("fit") },
           { label: "Reset zoom", icon: "i-mingcute-refresh-2-line", kbds: ["0"], onSelect: () => picker("reset") },
+          { label: "Reset layout", icon: "i-mingcute-layout-grid-line", onSelect: () => picker("layout") },
         ]
       : [
           { label: "Previous item", icon: "i-mingcute-left-line", kbds: ["←"], onSelect: () => picker("prev") },
@@ -1886,7 +1912,7 @@ watch(
               @focus="focusComment"
             >
               <template #actions>
-                <UTooltip v-if="comments.length && !popover" text="Copy feedback for your agent">
+                <UTooltip v-if="(comments.length || pageErrors.length) && !popover" text="Copy feedback for your agent">
                   <DropCopyButton aria-label="Copy feedback for your agent" size="sm" :value="feedback" />
                 </UTooltip>
                 <UButton
@@ -2038,23 +2064,13 @@ watch(
                     :drop="drop.id"
                     :send="dropSend"
                   />
-                  <UTooltip
-                    v-else-if="waiting.length && !lightbox && !commentMode"
-                    :text="`Copy a prompt with ${waiting.length === 1 ? 'the comment' : `the ${waiting.length} comments`} that wait for an answer, for your agent`"
-                  >
-                    <DropCopyButton
-                      aria-label="Copy prompt for your agent"
-                      class="[animation:pop-in_200ms_var(--ease-out)]"
-                      color="neutral"
-                      :disabled="loadingScreenshots"
-                      icon="i-mingcute-copy-2-line"
-                      size="xs"
-                      :value="prompt"
-                      variant="ghost"
-                    >
-                      <span class="hidden sm:inline">Copy prompt</span>
-                    </DropCopyButton>
-                  </UTooltip>
+                  <ViewerCopyPrompt
+                    v-if="(pageErrors.length || (!canSend && waiting.length)) && !lightbox && !commentMode"
+                    :count="waiting.length"
+                    :errors="pageErrors.length"
+                    :signed-in="Boolean(me)"
+                    :value="prompt"
+                  />
                 </template>
               </ViewerCommentsSegment>
             </template>

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict"
-import { test } from "vite-plus/test"
+import { test, vi } from "vite-plus/test"
 import { H3Event, HTTPError } from "h3"
 // test/stubs.ts stubs Server Env, so the error page reads the proxy setting the way it does under Nitro.
 import { state } from "../cost/harness.mjs"
 const { default: contentError } = await import("../../server/handlers/content-error.ts")
+const { background } = await import("../../server/utils/logs.ts")
 
 const path = "/d/11111111-1111-4111-8111-111111111111"
 async function render(status, identity = null, data, cookie) {
@@ -22,7 +23,7 @@ test("signed-out content errors lead with sign-in, which comes back to the origi
   assert.doesNotMatch(html, /private|deleted/)
   assert.match(html, /Sign in with GitHub/)
   // Pressing it lets GitHub offer every account (`choose`).
-  assert.ok(html.includes(`href="/signin/start?redirect=${encodeURIComponent(path)}&amp;choose=1"`))
+  assert.ok(html.includes(`href="/signin/start?redirect=${encodeURIComponent(path)}&amp;choose=1&amp;via=card"`))
   assert.doesNotMatch(html, /Internal details must not appear/)
   // A pasted link unfurls as Drop's card, not as the error.
   assert.match(html, /<meta property="og:image" content="https:\/\/drop\.example\/og\.png">/)
@@ -68,11 +69,12 @@ test("behind the auth proxy, signed-in content errors don't send people back thr
     assert.doesNotMatch(html, /Use another account|\/signin/)
     assert.equal(html.match(/href="\/drops"/g)?.length, 1)
     // Signed out, a fresh proxy login, whose token may have been revoked, then the guarded hop that makes Drop's session.
-    const start = `/oauth2/start?rd=${encodeURIComponent(`/signin/start?redirect=${encodeURIComponent(path)}`)}`
+    const start = (via) =>
+      `/oauth2/start?rd=${encodeURIComponent(`/signin/start?redirect=${encodeURIComponent(path)}&via=${via}`)}`
     const signedOut = await (await render(404)).text()
     assert.match(signedOut, /Sign in with GitHub/)
-    assert.ok(signedOut.includes(`href="${start}"`))
-    assert.equal((await render(404, null, undefined, "drop-returning=1")).headers.get("location"), start)
+    assert.ok(signedOut.includes(`href="${start("card")}"`))
+    assert.equal((await render(404, null, undefined, "drop-returning=1")).headers.get("location"), start("auto"))
   } finally {
     Object.assign(state, { authProxy: false, members: "" })
   }
@@ -81,7 +83,7 @@ test("behind the auth proxy, signed-in content errors don't send people back thr
 test("a browser signed in before goes straight back through sign-in, once a minute", async () => {
   const back = await render(404, null, undefined, "drop-returning=1")
   assert.equal(back.status, 302)
-  assert.equal(back.headers.get("location"), `/signin/start?redirect=${encodeURIComponent(path)}`)
+  assert.equal(back.headers.get("location"), `/signin/start?redirect=${encodeURIComponent(path)}&via=auto`)
   assert.match(back.headers.get("set-cookie"), /^drop-signin-tried=1; Path=\/; Max-Age=60; SameSite=Lax; Secure$/)
   assert.equal(back.headers.get("cache-control"), "private, no-store")
   // Tried a minute ago: the sign-in didn't open it, so the page says why.
@@ -92,6 +94,30 @@ test("a browser signed in before goes straight back through sign-in, once a minu
   assert.equal((await render(410, null, undefined, "drop-returning=1")).status, 410)
   assert.equal((await render(403, null, { shareReview: "pending" }, "drop-returning=1")).status, 403)
   assert.equal((await render(503, null, undefined, "drop-returning=1")).status, 503)
+})
+
+test("the card logs card.shown with its reason, and the redirect logs signin.redirected", async () => {
+  const info = vi.spyOn(background, "info").mockImplementation(() => {})
+  const logged = () => info.mock.calls.map(([fields]) => fields)
+  await render(404)
+  await render(404, { email: "viewer@example.test" })
+  await render(410)
+  await render(503)
+  assert.deepEqual(
+    logged().map(({ action, client, path: at, status }) => ({ action, client, path: at, status })),
+    [
+      { action: "client-event", client: { event: "card.shown", reason: "signed-out" }, path, status: 404 },
+      { action: "client-event", client: { event: "card.shown", reason: "no-access" }, path, status: 404 },
+      { action: "client-event", client: { event: "card.shown", reason: "expired" }, path, status: 410 },
+      { action: "client-event", client: { event: "card.shown", reason: "unavailable" }, path, status: 503 },
+    ],
+  )
+  info.mockClear()
+  assert.equal((await render(404, null, undefined, "drop-returning=1")).status, 302)
+  assert.deepEqual(
+    logged().map(({ client, status }) => ({ client, status })),
+    [{ client: { event: "signin.redirected", mode: "github" }, status: 404 }],
+  )
 })
 
 test("sign-in comes back only to a path on this Drop", async () => {

@@ -3,14 +3,18 @@ import { test, vi } from "vite-plus/test"
 import * as v from "valibot"
 import { createFetch } from "ofetch"
 import { sendFile } from "../../app/utils/send-file.ts"
-import { createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
+import { answerCode, answerError, createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
 
 const page = { path: "/d/abc123", online: true, leaving: false }
 
 function reporter() {
   const sent = []
-  const report = createClientErrorReporter((body) => sent.push(body))
-  return { sent, report: (action, error, fields = {}, at = page) => report(action, error, fields, at) }
+  const events = []
+  const report = createClientErrorReporter(
+    (body) => sent.push(body),
+    (body) => events.push(body),
+  )
+  return { sent, events, report: (action, error, fields = {}, at = page) => report(action, error, fields, at) }
 }
 
 // ofetch's FetchError: `status` and `data` from the answer, `response` with its headers, `cause` when there was none.
@@ -46,6 +50,67 @@ test("an answer the server gave as a 4xx isn't reported", () => {
   report("notify", { status: 403, statusText: "Forbidden", message: "Not allowed" })
   report("upload", Object.assign(new Error("413"), { status: 413 }))
   assert.deepEqual(sent, [])
+})
+
+test("a sign-in or consent refusal is reported as its step's failure, with its code", () => {
+  const { sent, events, report } = reporter()
+  // Better Auth's client error, kept by answerError, and an h3 answer through ofetch.
+  report("signin", answerError("Sign in again", 401, "GITHUB_REAUTH_REQUIRED"))
+  report("oauth-signin", { status: 403, statusText: "Forbidden", message: "No", code: "GITHUB_ORG_ACCESS_REQUIRED" })
+  report("signin-switch", fetchError({ status: 403, data: { status: 403, data: { code: "BANNED_USER" } } }))
+  report("oauth-consent", answerError("This authorization link is invalid", 401, "invalid_request"))
+  report("oauth-consent", new Error("The agent didn't get an answer."))
+  report("oauth-consent", answerError("Not allowed", 403, "Free text, not a code"))
+  assert.deepEqual(events, [
+    { event: "signin.failed", code: "GITHUB_REAUTH_REQUIRED", status: 401 },
+    { event: "signin.failed", code: "GITHUB_ORG_ACCESS_REQUIRED", status: 403 },
+    { event: "signin.failed", code: "BANNED_USER", status: 403 },
+    { event: "consent.failed", code: "invalid_request", status: 401 },
+    { event: "consent.failed" },
+    { event: "consent.failed", status: 403 },
+  ])
+  // The server logged the answers; only the exception without one is a client error.
+  assert.deepEqual(
+    sent.map((body) => body.action),
+    ["oauth-consent"],
+  )
+  report("notify", fetchError({ status: 401, data: { status: 401, data: { code: "SIGN_IN_REQUIRED" } } }))
+  assert.equal(events.length, 6, "Other actions send no step")
+})
+
+test("a code outside the funnel schema is preserved only in the generic error report", () => {
+  const { sent, events, report } = reporter()
+  report("signin-switch", answerError("Couldn't sign out", 500, "provider/sign-out"))
+  report("signin-switch", answerError("Couldn't sign out", 500, "provider/other"))
+  assert.deepEqual(
+    sent.map(({ code }) => code),
+    ["provider/sign-out", "provider/other"],
+  )
+  assert.deepEqual(events, [
+    { event: "signin.failed", status: 500 },
+    { event: "signin.failed", status: 500 },
+  ])
+})
+
+test("an OAuth provider's refusal keeps its error identifier, without the description", () => {
+  const { events, report } = reporter()
+  const expired = {
+    status: 400,
+    statusText: "Bad Request",
+    error: "invalid_signature",
+    error_description: "The signature for client abc123 is invalid",
+  }
+  assert.equal(answerCode(expired), "invalid_signature")
+  assert.equal(answerCode({ status: 401, code: "UNAUTHORIZED", error: "invalid_request" }), "UNAUTHORIZED")
+  assert.equal(answerCode({ status: 400, error: "free text with spaces" }), undefined)
+  assert.equal(answerCode({ status: 400, message: "No identifier" }), undefined)
+  report("oauth-consent", answerError("This authorization link has expired.", expired.status, answerCode(expired)))
+  report("oauth-signin", answerError("Couldn't start GitHub sign-in.", 400, answerCode({ error: "invalid_client" })))
+  assert.deepEqual(events, [
+    { event: "consent.failed", code: "invalid_signature", status: 400 },
+    { event: "signin.failed", code: "invalid_client", status: 400 },
+  ])
+  assert.doesNotMatch(JSON.stringify(events), /client abc123/)
 })
 
 test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its status and request id, unless Drop wrote it", () => {

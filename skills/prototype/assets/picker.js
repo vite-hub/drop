@@ -10,8 +10,13 @@
 //   the bottom-right corner shows the items and the screen: click it to jump, drag the screen's box to move.
 // - Focus: one item fills the page, the same element as on the canvas, so what you typed stays. ← and → step, 1–9
 //   jump, Esc or C go back to the canvas, centred on that item.
-// `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live.
-// The page remembers the canvas camera and item positions (never content); the URL hash (#v-…) names the item in focus.
+// `<body data-layout="single">` opens in focus instead. A section with `data-src="https://…"` shows that page live: it
+// loads once the item comes near the screen, two at a time, and sleeps (empty, its name shown) after a while far away.
+// In an item, a control with `data-go="<screen id>"` and `data-label` gets an arrow from it to that `[data-screen]`.
+// `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in rows to the right,
+// a new row once one passes 5600px. The page remembers the canvas camera and where the reader moved items (never
+// content); Reset layout forgets the moves. ⌘Z or Ctrl+Z takes back a move or a Reset layout, ⇧⌘Z or Ctrl+Y redoes it.
+// The URL hash (#v-…) names the item in focus.
 // Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
@@ -34,18 +39,28 @@
   const nameOf = (el) => el.dataset.variant || el.id;
   const several = variants.length > 1;
 
-  // A live page as an item: the URL fills its section in a frame. Same-site pages keep the reader's login.
+  // A live page as an item: the URL fills its section in a frame. Same-site pages keep the reader's login. The frame
+  // starts empty and gets its URL once the item comes near the screen (rest).
+  const lives = new Map();
   for (const el of variants) {
     if (!el.dataset.src || el.querySelector(":scope > iframe[data-prototype-src]")) continue;
     let url;
     try { url = new URL(el.dataset.src, location.href); } catch { continue; }
     if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+    const live = { url: url.href, frame: null, state: "asleep", timer: 0, slow: 0 };
+    lives.set(el, live);
+    blank(el, live);
+  }
+  // An empty frame holds the item's place. Each sleep makes a new one, so a page that goes leaves no history entry.
+  function blank(el, live) {
     const frame = document.createElement("iframe");
-    frame.src = url.href;
     frame.title = nameOf(el);
     frame.setAttribute("data-prototype-src", "");
     frame.style.cssText = "display:block;width:100%;height:100%;border:0;background:#fff";
-    el.append(frame);
+    if (live.frame) live.frame.replaceWith(frame);
+    else el.append(frame);
+    live.frame = frame;
+    el.setAttribute("data-prototype-asleep", "");
   }
 
   // A variant's own `display` (an id rule with grid, say) beats the hidden attribute's default style. In the canvas
@@ -53,6 +68,13 @@
   const css = document.createElement("style");
   css.textContent = `body > [data-variant][hidden] { display: none !important; }
     body > [data-variant][data-src] { padding: 0; }
+    body > [data-variant][data-prototype-asleep] { position: relative; }
+    body > [data-variant][data-prototype-asleep]::after { content: attr(data-variant); position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+      background: #f5f5f5; color: #737373; font: 500 14px/1.4 ui-sans-serif, system-ui, sans-serif; text-align: center; pointer-events: none; }
+    body > [data-variant][data-prototype-stalled]::after { padding-block: 0 40px; }
+    body > [data-variant] > [data-prototype-retry] { position: absolute; z-index: 1; top: 50%; left: 50%; transform: translateX(-50%);
+      border: 1px solid #737373; border-radius: 6px; padding: 4px 8px; background: #fff; color: #171717;
+      font: 500 14px/1.4 ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
     html[data-prototype-layout="canvas"], html[data-prototype-layout="canvas"] body { overflow: hidden !important; overscroll-behavior: none !important; height: 100% !important; }
     html[data-prototype-layout="canvas"] body { margin: 0 !important; cursor: default; }
     html[data-prototype-layout="canvas"] body > [data-variant] { cursor: auto; }
@@ -65,7 +87,7 @@
   shadow.innerHTML = `<style>
     :host { all: initial; }
     .bar { position: fixed; z-index: 2147483000; bottom: 16px; left: calc((100vw - var(--drop-inset, 0px)) / 2); transform: translateX(-50%);
-      display: flex; align-items: center; gap: 2px; max-width: calc(100vw - var(--drop-inset, 0px) - 32px); padding: 4px;
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 2px; max-width: calc(100vw - var(--drop-inset, 0px) - 32px); padding: 4px;
       border: 1px solid rgb(255 255 255 / .12); border-radius: 12px; background: rgb(17 17 17 / .92); color: #fafafa;
       font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; box-shadow: 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: blur(8px); }
     button { all: unset; box-sizing: border-box; height: 28px; padding: 0 10px; border-radius: 8px; color: #a3a3a3; cursor: pointer; white-space: nowrap; }
@@ -82,9 +104,9 @@
     .tags.on { display: block; }
     .shield { position: absolute; inset: 0; display: none; cursor: grab; touch-action: none; }
     .tags.hand .shield { display: block; pointer-events: auto; }
-    .tags.hand .tag { pointer-events: none; }
+    .tags:not(.hand) .tag > :is(button, .tnote) { pointer-events: auto; }
     .tags.grabbing .shield { cursor: grabbing; }
-    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: auto;
+    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: none;
       color: #171717; font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
     .tag button:hover { background: none; }
@@ -92,6 +114,8 @@
     .tag > .name, .tag > .tnote { min-width: 0; white-space: nowrap; }
     .tag > .tnote { box-sizing: border-box; grid-column: 1 / -1; width: 100%; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .tag > .tnote:empty, .tag.narrow > .tnote { display: none; }
+    .tag.tight > .tnote { position: absolute; left: 0; top: 100%; visibility: hidden; }
+    .tag.hide, .tag.nohandle > .handle { visibility: hidden; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
     .handle { touch-action: none; opacity: 0; }
     .tag:hover .handle, .handle:focus-visible { opacity: 1; }
@@ -119,6 +143,7 @@
     <button class="cam in" aria-label="Zoom in" title="Zoom in (+)">+</button>
     <button class="cam fit" title="Fit all (Shift+1)">Fit</button>
     <button class="cam reset" title="Reset camera (0)">Reset</button>
+    <button class="cam layout" title="Put every item back where the page places it">Reset layout</button>
     <i class="cam sep"></i>
     <button class="cam move" aria-pressed="true" title="Move (V)">Move</button>
     <button class="cam hand" aria-pressed="false" title="Hand: drag anywhere to pan (H, or hold Space)">Hand</button>
@@ -136,26 +161,38 @@
   $(".count").textContent = variants.length + " items";
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
-  const GAP = 160, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
+  const GAP = 160, ROW = 5600, ROW_GAP = 240, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
+  const NAME_H = 22, HANDLE_W = 20, LABEL_GAP = 6, LABEL_CLEAR = 4;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
+  const coord = (v) => { const n = v && v.trim() ? Number(v) : 0; return finite(n) ? n : null; };
+  const at = (el) => { const { x, y } = el.dataset; if (x == null && y == null) return null; const p = [coord(x), coord(y)]; return p.includes(null) ? null : p; };
   // Drop names the version it shows; a new version opens fitted, as a first visit, and keeps where the items were moved.
   const version = typeof self.__dropVersion === "string" ? self.__dropVersion : null;
-  const saved = { camera: null, positions: {} };
+  const saved = { camera: null };
+  let legacy = null, moves = new Map();
+  const hasAuthored = variants.some((el) => at(el) !== null);
   try {
     const doc = JSON.parse(localStorage.getItem(canvasKey) || "null");
     if (doc && doc.v === 1) {
       const c = (doc.version ?? null) === version ? doc.camera : null;
       if (c && finite(c.x) && finite(c.y) && finite(c.z) && c.z >= MIN_Z && c.z <= MAX_Z) saved.camera = { x: c.x, y: c.y, z: c.z };
       const ids = new Set(variants.map((el) => el.id));
-      for (const [id, p] of Object.entries(doc.positions || {})) if (ids.has(id) && Array.isArray(p) && finite(p[0]) && finite(p[1])) saved.positions[id] = [p[0], p[1]];
+      const moved = new Set(Array.isArray(doc.moved) ? doc.moved : []), positions = new Map();
+      for (const [id, p] of Object.entries(doc.positions || {})) {
+        if (!ids.has(id) || !Array.isArray(p) || !finite(p[0]) || !finite(p[1])) continue;
+        positions.set(id, [p[0], p[1]]);
+        if (moved.has(id)) moves.set(id, [p[0], p[1]]);
+      }
+      const oneRow = doc.rows !== true && positions.size && [...positions].every(([id, p]) => moved.has(id) || p[1] === 0);
+      if (!hasAuthored && doc.authored !== true && oneRow) legacy = positions;
     }
   } catch {}
 
   const items = variants.map((el, i) => {
     const width = size(el.dataset.width, 120, 8000), height = size(el.dataset.height, 80, 8000), src = Boolean(el.querySelector(":scope > iframe[data-prototype-src]"));
-    const it = { el, i, name: nameOf(el), width, height, src, w: width || 1280, h: height || (src ? URL_HEIGHT : null), mw: 0, mh: 0, authored: el.getAttribute("style") };
+    const it = { el, i, name: nameOf(el), width, height, src, w: width || 1280, h: height || (src ? URL_HEIGHT : null), mw: 0, mh: 0, authored: el.getAttribute("style"), at: at(el) };
     const tag = document.createElement("div");
     tag.className = "tag";
     tag.innerHTML = `<button class="handle" aria-describedby="move-help"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/><circle cx="2" cy="7" r="1.4"/><circle cx="8" cy="7" r="1.4"/><circle cx="2" cy="12" r="1.4"/><circle cx="8" cy="12" r="1.4"/></svg></button><button class="name"></button><button class="open"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M7 1.5h3.5V5M5 10.5H1.5V7M10.5 1.5 7 5M1.5 10.5 5 7"/></svg></button><span class="done" role="status"></span><span class="tnote"></span>`;
@@ -165,9 +202,11 @@
     open.title = "Open (" + (i < 9 ? i + 1 : "double-click the name") + ")";
     name.textContent = it.name;
     name.title = "Click to copy “" + it.name + "” · double-click to open";
-    tag.querySelector(".tnote").textContent = el.dataset.note || "";
-    tag.querySelector(".tnote").title = el.dataset.note || "";
+    const note = tag.querySelector(".tnote");
+    note.textContent = el.dataset.note || "";
+    note.title = note.textContent;
     it.tag = tag;
+    it.note = note;
     let timer = 0;
     name.onclick = async () => {
       clearTimeout(timer);
@@ -191,7 +230,7 @@
       e.preventDefault();
       handle.focus();
       try { handle.setPointerCapture(e.pointerId); } catch {}
-      gesture = { kind: "move", id: e.pointerId, it, x: e.clientX, y: e.clientY, moved: false };
+      gesture = { kind: "move", id: e.pointerId, it, x: e.clientX, y: e.clientY, moved: false, before: snap() };
     });
     handle.addEventListener("keydown", (e) => {
       const step = e.shiftKey ? 64 : 8;
@@ -199,47 +238,121 @@
       if (!d) return;
       e.preventDefault();
       e.stopPropagation();
+      if (gesture?.kind === "move") return;
+      record(snap());
       place(it, it.x + d[0], it.y + d[1]);
       settle();
     });
     tags.append(tag);
     return it;
   });
-  // Saved positions first; new items go in the empty space to the right of the rest.
-  let right = -Infinity;
-  for (const it of items) {
-    const p = saved.positions[it.el.id];
-    if (p) { [it.x, it.y] = p; right = Math.max(right, it.x + it.w); }
+  // Keep legacy positions on unauthored canvases. Otherwise lay out the page before applying reader moves.
+  const start = (it) => it.at || legacy?.get(it.el.id);
+  function arrange() {
+    let right = -Infinity;
+    for (const it of items) {
+      const p = start(it);
+      if (p) { [it.x, it.y] = p; right = Math.max(right, it.x + it.w); }
+    }
+    // The rest follow in rows, each as tall as its tallest item; heights are known once measured.
+    const left = right === -Infinity ? 0 : right + GAP;
+    let x = left, y = 0, tall = 0;
+    for (const it of items) {
+      if (start(it)) continue;
+      if (!legacy && x > left && x + it.w > left + ROW) { x = left; y += tall + ROW_GAP; tall = 0; }
+      it.x = x; it.y = y;
+      x += it.w + GAP; tall = Math.max(tall, it.mh || it.h || 0);
+    }
+    for (const it of items) {
+      const position = moves.get(it.el.id);
+      if (position) [it.x, it.y] = position;
+    }
   }
-  for (const it of items) {
-    if (saved.positions[it.el.id]) continue;
-    it.x = right === -Infinity ? 0 : right + GAP;
-    it.y = 0;
-    right = it.x + it.w;
+  arrange();
+  const place = (it, x, y) => {
+    it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT);
+    moves.set(it.el.id, [it.x, it.y]);
+    fitted = null; schedule();
+  };
+  // Undo and redo: each step keeps the layout from before a move or a Reset layout, and goes back saved as a drag is.
+  const undos = [], redos = [];
+  const snap = () => ({ moves: new Map(moves), legacy });
+  const record = (before) => { undos.push(before); if (undos.length > 100) undos.shift(); redos.length = 0; };
+  function rewind(from, to) {
+    const s = from.pop();
+    if (!s) return false;
+    to.push(snap());
+    ({ moves, legacy } = s);
+    updateArrangement();
+    return true;
   }
-  const place = (it, x, y) => { it.x = clamp(x, -LIMIT, LIMIT); it.y = clamp(y, -LIMIT, LIMIT); schedule(); };
 
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
   let dockBottom = 72, fitted = null;
+  let labelFocusFrame = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
 
-  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size.
+  function setDockBottom(bottom) {
+    if (bottom === dockBottom) return;
+    dockBottom = bottom;
+    if (mode === "canvas" && fitted) fit(fitted);
+  }
+  function dockMinimap() {
+    if (mode !== "canvas" || !bar.isConnected) return;
+    const toolbar = bar.getBoundingClientRect(), minimap = map.getBoundingClientRect();
+    const overlaps = toolbar.right > minimap.left && toolbar.left < minimap.right;
+    const raisedBottom = innerHeight - toolbar.top + 8;
+    map.style.bottom = overlaps ? raisedBottom + "px" : "";
+    setDockBottom(overlaps ? Math.max(72, raisedBottom + minimap.height + 8) : 72);
+  }
+
+  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size while
+  // the gaps between items shrink with the zoom, so a label shows only the rows that fit above its item without
+  // touching another: name and note, then the name alone, then nothing. The handle, in the gap to the left, goes the same way.
   function render() {
     frame = 0;
     if (mode !== "canvas") return;
-    for (const it of items) {
-      const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
-      it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
+    const rects = items.map((it) => {
+      const b = box(it), l = cam.x + it.x * cam.z, t = cam.y + it.y * cam.z;
+      return { l, t, r: l + b.w * cam.z, b: t + b.h * cam.z };
+    });
+    const clear = (self, l, t, r, b) => rects.every((o) => o === self || o.l >= r || o.r <= l || o.t >= b || o.b + LABEL_CLEAR <= t);
+    const focused = document.hasFocus() ? tags.getRootNode().activeElement : null;
+    let watchLabelFocus = false;
+    for (const [i, it] of items.entries()) {
+      const width = rects[i].r - rects[i].l;
+      it.tag.style.width = width + LABEL_INSET + "px";
+      it.tag.classList.toggle("narrow", width < 160);
+    }
+    const noteHeights = items.map((it) => it.note.getBoundingClientRect().height);
+    for (const [i, it] of items.entries()) {
+      const s = rects[i], bottom = s.t - LABEL_GAP, noteHeight = noteHeights[i];
+      it.el.style.setProperty("transform", `translate(${s.l}px, ${s.t}px) scale(${cam.z})`, "important");
       // The handle sits in the gap left of the item, so the name and note start at the item's edge and end with it.
-      const w = box(it).w * cam.z;
-      it.tag.style.transform = `translate(${sx - LABEL_INSET}px, ${sy - 6}px) translateY(-100%)`;
-      it.tag.style.width = w + LABEL_INSET + "px";
-      it.tag.classList.toggle("narrow", w < 160);
+      it.tag.style.transform = `translate(${s.l - LABEL_INSET}px, ${bottom}px) translateY(-100%)`;
+      const note = noteHeight > 0 && clear(s, s.l, bottom - NAME_H - noteHeight, s.r, bottom);
+      const top = bottom - NAME_H - (note ? noteHeight : 0);
+      // A label someone is using with the keyboard stays, so its focus isn't lost mid-move.
+      const kept = Boolean(focused) && it.tag.contains(focused);
+      const hide = !note && !clear(s, s.l, bottom - NAME_H, s.r, bottom);
+      const left = s.l - LABEL_INSET;
+      const noHandle = !clear(s, left, top, left + HANDLE_W, top + NAME_H);
+      it.tag.classList.toggle("tight", noteHeight > 0 && !note);
+      it.tag.classList.toggle("hide", !kept && hide);
+      it.tag.classList.toggle("nohandle", !kept && noHandle);
+      watchLabelFocus ||= kept && (hide || noHandle);
+    }
+    if (watchLabelFocus && !labelFocusFrame) {
+      labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    } else if (!watchLabelFocus && labelFocusFrame) {
+      cancelAnimationFrame(labelFocusFrame);
+      labelFocusFrame = 0;
     }
     drawMap();
+    rest();
     const zoom = Math.round(cam.z * 100);
     zoomText.textContent = zoom + "%";
     if (zoom !== reportedZoom) report();
@@ -247,6 +360,97 @@
     document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
+  function checkLabelFocus() {
+    labelFocusFrame = 0;
+    if (mode !== "canvas") return;
+    if (document.hasFocus()) labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    else schedule();
+  }
+  tags.addEventListener("focusout", (event) => {
+    const tag = event.target.closest(".tag");
+    if (tag && !tag.contains(event.relatedTarget)) schedule();
+  });
+  window.addEventListener("blur", schedule);
+  window.addEventListener("focus", schedule);
+  // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
+  // further away for SLEEP ms. A page still loading after STALL ms is stopped and tried again only once its item has
+  // left and come back near or the reader clicks Retry. The item in focus never sleeps (it's the only one near), nor
+  // the one being typed in, nor any while Drop's comment tools are on or a thread is open.
+  const NEAR = 600, LOADING = 2, SLEEP = 5000, STALL = 15000;
+  let commenting = false, openThread = null, markers = [];
+  let draftItem = null;
+  document.addEventListener("drop:area-draft", (event) => {
+    draftItem = event.detail instanceof Element ? event.detail.closest("[data-variant]") : null;
+  });
+  function near(it, v) {
+    if (mode !== "canvas") return mode === "focus" && it.i === current;
+    const b = box(it), x = cam.x + b.x * cam.z, y = cam.y + b.y * cam.z;
+    return x < v.w + NEAR && y < v.h + NEAR && x + b.w * cam.z > -NEAR && y + b.h * cam.z > -NEAR;
+  }
+  function rest() {
+    if (!lives.size) return;
+    const v = view();
+    let loading = [...lives.values()].filter((live) => live.state === "loading").length;
+    for (const it of items) {
+      const live = lives.get(it.el);
+      if (!live) continue;
+      if (near(it, v)) {
+        clearTimeout(live.timer); live.timer = 0;
+        if (live.state === "asleep" && loading < LOADING) { load(it, live); loading++; }
+      } else if (live.state === "stalled") resetStall(it, live);
+      else if (live.state !== "asleep" && !live.timer) {
+        live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP);
+      }
+    }
+  }
+  function load(it, live) {
+    const frame = live.frame;
+    // The turn ends with the frame's load, which an error page fires too, with its sleep, or after STALL ms, when a new
+    // empty frame takes its place and so stops the navigation. A frame being edited or reviewed checks again later.
+    live.state = "loading";
+    frame.addEventListener("load", () => { if (live.frame === frame && live.state === "loading") { clearTimeout(live.slow); live.state = "awake"; rest(); } }, { once: true });
+    const stall = () => {
+      if (live.frame !== frame || live.state !== "loading") return;
+      if (document.activeElement === frame || draftItem === it.el || reviewedItem() === it.el) { live.slow = setTimeout(stall, SLEEP); return; }
+      live.state = "stalled"; blank(it.el, live);
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Retry preview";
+      retry.setAttribute("aria-label", "Retry preview: " + nameOf(it.el));
+      retry.setAttribute("data-prototype-retry", "");
+      const retryPreview = () => { if (live.retry === retry) { resetStall(it, live); rest(); } };
+      retry.addEventListener("click", retryPreview);
+      retry.addEventListener("drop:retry-preview", retryPreview);
+      live.retry = retry;
+      it.el.setAttribute("data-prototype-stalled", "");
+      it.el.append(retry);
+      rest();
+    };
+    live.slow = setTimeout(stall, STALL);
+    frame.src = live.url;
+    it.el.removeAttribute("data-prototype-asleep");
+  }
+  function resetStall(it, live) {
+    live.state = "asleep";
+    live.retry.remove(); live.retry = null;
+    it.el.removeAttribute("data-prototype-stalled");
+  }
+  function reviewedItem() {
+    if (openThread === null) return null;
+    const selector = markers.find((marker) => marker?.id === openThread)?.selector;
+    if (typeof selector !== "string") return null;
+    try { return document.querySelector(selector)?.closest("[data-variant]"); } catch { return null; }
+  }
+  const kept = (it) => commenting || openThread !== null || draftItem === it.el || it.el.contains(document.activeElement);
+  // Focus moving between two frames tells this page nothing, so a kept frame checks again later.
+  function sleep(it, live) {
+    if (near(it, view())) return;
+    if (kept(it)) { live.timer = setTimeout(() => { live.timer = 0; sleep(it, live); }, SLEEP); return; }
+    clearTimeout(live.slow);
+    live.state = "asleep";
+    blank(it.el, live);
+    rest();
+  }
   // The fence. Each item gives the camera a box of places where the screen still shows KEEP px of it, or all of it
   // when it's smaller; the camera may stand in any of them, so the plane never pans into emptiness. A pan (`from` is
   // where it started) slides along the box it's in rather than jumping across an empty gap to another item's; a jump
@@ -356,7 +560,7 @@
   function save() {
     const positions = {};
     for (const it of items) positions[it.el.id] = [Math.round(it.x), Math.round(it.y)];
-    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, version };
+    const doc = { v: 1, camera: mode === "canvas" || saved.camera ? { x: Math.round(cam.x * 100) / 100, y: Math.round(cam.y * 100) / 100, z: Math.round(cam.z * 1e4) / 1e4 } : null, positions, moved: [...moves.keys()], authored: hasAuthored, version, rows: !legacy };
     try { localStorage.setItem(canvasKey, JSON.stringify(doc)); } catch {}
   }
   function zoomAt(z, px, py) {
@@ -369,7 +573,7 @@
   const box = (it) => ({ x: it.x, y: it.y, w: it.mw || it.w, h: it.mh || it.h || 1 });
   // Fits the given items between the top labels and the bottom bar, at 100% or less.
   function fit(list = items) {
-    const v = view(), top = 56, bottom = dockBottom, side = 32, b = extent(list);
+    const v = view(), top = 56, bottom = dockBottom, side = 64, b = extent(list);
     if (!b) return;
     fitted = list;
     const { x0, y0, x1, y1 } = b;
@@ -380,6 +584,12 @@
     bound(); schedule(); settle();
   }
   function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; fitted = null; bound(); schedule(); settle(); }
+  // Reset layout: forget this reader's moves, so every item stands where the page places it, and fit them all.
+  function relayout() {
+    if (gesture?.kind === "move") return;
+    if (moves.size || legacy) record(snap());
+    legacy = null; moves.clear(); arrange(); fit();
+  }
   // Centres an item at the current zoom, or fits it when it's bigger than the screen.
   function reveal(it) {
     const v = view(), b = box(it);
@@ -389,8 +599,22 @@
     cam.y = Math.max(56, (v.h - dockBottom - b.h * cam.z) / 2) - b.y * cam.z;
     bound(); schedule(); settle();
   }
+  function measure() {
+    let changed = false;
+    for (const it of items) {
+      const width = it.el.offsetWidth, height = it.el.offsetHeight;
+      if (width && width !== it.mw) { it.mw = width; changed = true; }
+      if (height && height !== it.mh) { it.mh = height; changed = true; }
+    }
+    return changed;
+  }
+  function updateArrangement() {
+    arrange();
+    if (fitted) fit(fitted);
+    else { bound(); schedule(); settle(); }
+  }
   const sizes = new ResizeObserver(() => {
-    for (const it of items) { if (it.el.offsetWidth) it.mw = it.el.offsetWidth; if (it.el.offsetHeight) it.mh = it.el.offsetHeight; }
+    if (mode === "canvas" && measure() && gesture?.kind !== "move") updateArrangement();
   });
 
   // Every switch starts from the author's own style attribute, so nothing from the other mode lingers.
@@ -410,6 +634,7 @@
       if (it.h) set(it.el, [["height", it.h + "px"], ["overflow", it.src ? "hidden" : "auto"]]);
       sizes.observe(it.el);
     }
+    measure(); arrange();
     scrollTo(0, 0);
     tags.classList.add("on");
     bar.classList.add("canvas");
@@ -417,7 +642,7 @@
     schedule();
     // Coming back from focus centres that item; the first visit fits everything, unless a camera is saved.
     const go = () => requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (mode !== "canvas") return;
+      if (mode !== "canvas" || gesture?.kind === "move") return;
       if (from) reveal(from);
       else if (!saved.camera && !touched) fit();
       else { bound(); schedule(); }
@@ -460,6 +685,7 @@
     noteText.hidden = !it.el.dataset.note;
     try { localStorage.setItem(key, it.el.id); } catch {}
     hash(it.el.id);
+    rest();
     // Comment pins measure their anchors on resize, so they follow the item that just appeared.
     window.dispatchEvent(new Event("resize"));
     announce();
@@ -497,6 +723,7 @@
     "zoom-out": () => mode === "canvas" && zoomCenter(1 / 1.25),
     fit: () => mode === "canvas" && fit(),
     reset: () => mode === "canvas" && reset(),
+    layout: () => mode === "canvas" && relayout(),
     move: () => pick("move"),
     hand: () => pick("hand"),
     // Space held while Drop's window has focus.
@@ -507,11 +734,11 @@
     const m = e.data;
     if (e.source !== parent || !m || m.__drop !== true) return;
     if (m.type === "inset" && Number.isFinite(m.bottom)) {
-      const bottom = Math.max(72, m.bottom + 4);
-      if (bottom === dockBottom) return;
-      dockBottom = bottom;
-      if (mode === "canvas" && fitted) fit(fitted);
-    } else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
+      setDockBottom(Math.max(72, m.bottom + 4));
+    } else if (m.type === "tool" && typeof m.tool === "string") { commenting = m.tool !== "browse"; rest(); }
+    else if (m.type === "active") { openThread = typeof m.id === "string" ? m.id : null; rest(); }
+    else if (m.type === "markers" && Array.isArray(m.markers)) markers = m.markers;
+    else if (m.type === "picker" && Object.hasOwn(commands, m.do)) commands[m.do](m);
   });
 
   $(".prev").onclick = () => toFocus(current - 1);
@@ -521,6 +748,7 @@
   $(".in").onclick = () => zoomCenter(1.25);
   $(".fit").onclick = () => fit();
   $(".reset").onclick = reset;
+  $(".layout").onclick = relayout;
   moveButton.onclick = () => pick("move");
   handButton.onclick = () => pick("hand");
   window.addEventListener("hashchange", () => { const i = find(location.hash.slice(1)); if (i >= 0) toFocus(i); });
@@ -530,6 +758,12 @@
   const digit = (e) => /^[1-9]$/.test(e.key) && Number(e.key) <= variants.length;
   window.addEventListener("keydown", (e) => {
     const t = e.target;
+    // ⌘Z or Ctrl+Z takes back the last move, ⇧⌘Z or Ctrl+Y redoes it. A field keeps its own undo, and Drop's Marker its own.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && mode === "canvas" && !e.defaultPrevented && !commenting && !typing(e.composedPath()[0])) {
+      const k = e.key.toLowerCase(), again = k === "y" ? e.ctrlKey && !e.metaKey : k === "z" && e.shiftKey;
+      if ((k === "z" || again) && (gesture?.kind === "move" || (again ? rewind(redos, undos) : rewind(undos, redos)))) e.preventDefault();
+      return;
+    }
     if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || typing(t) || !several) return;
     // With text selected, C is Drop's: it comments on the selection.
     if ((e.key === "c" || e.key === "C") && !String(getSelection() || "")) { if (mode === "canvas") toFocus(Math.max(current, 0)); else toCanvas(); e.preventDefault(); return; }
@@ -569,8 +803,10 @@
     hand();
     report();
   }
+  // A pan keeps the Hand up until the drag ends, even once Space is let go: Drop's comment tools stand aside only while
+  // the root carries data-prototype-hand, and the rest of the drag has to reach the picker.
   function hand() {
-    const on = mode === "canvas" && (tool === "hand" || space), grabbing = on && gesture && gesture.kind === "pan";
+    const grabbing = mode === "canvas" && Boolean(gesture && gesture.kind === "pan"), on = grabbing || (mode === "canvas" && (tool === "hand" || space));
     tags.classList.toggle("hand", on);
     tags.classList.toggle("grabbing", Boolean(grabbing));
     if (on) root.dataset.prototypeHand = grabbing ? "grabbing" : "";
@@ -584,9 +820,12 @@
   function endGesture() {
     if (!gesture) return;
     if (gesture.moved) suppressUntil = performance.now() + 400;
+    const moving = gesture.kind === "move";
+    if (moving && gesture.moved) record(gesture.before);
     gesture = null;
     hand();
-    settle();
+    if (moving && mode === "canvas") updateArrangement();
+    else settle();
   }
   window.addEventListener("pointerdown", (e) => {
     if (mode !== "canvas" || gesture) return;
@@ -604,7 +843,7 @@
     gesture.x = e.clientX; gesture.y = e.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 0) gesture.moved = true;
     if (gesture.kind === "pan") pan(dx, dy);
-    else place(gesture.it, gesture.it.x + dx / cam.z, gesture.it.y + dy / cam.z);
+    else if (dx || dy) place(gesture.it, gesture.it.x + dx / cam.z, gesture.it.y + dy / cam.z);
   }, true);
   for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) window.addEventListener(type, (e) => { if (gesture && e.pointerId === gesture.id) endGesture(); }, true);
   // After a pan or a move, the release doesn't click, copy, follow a link, or start middle-click autoscroll.
@@ -616,22 +855,34 @@
   document.addEventListener("visibilitychange", () => { if (document.hidden) drop(); });
 
   // A nested scroller that can still scroll in the wheel's direction keeps the wheel; otherwise the plane pans.
-  function scrolls(t, dx, dy) {
-    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) {
-      const s = getComputedStyle(el);
-      if (dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0)) return true;
-      if (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)) return true;
-    }
-    return false;
+  function room(el, dx, dy) {
+    const s = getComputedStyle(el);
+    return Boolean((dy && /auto|scroll/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 1 && (dy > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0))
+      || (dx && /auto|scroll/.test(s.overflowX) && el.scrollWidth > el.clientWidth + 1 && (dx > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0)));
   }
+  function scrolls(t, dx, dy) {
+    for (let el = t; el && el !== document.body && el !== root; el = el.parentElement) if (room(el, dx, dy)) return el;
+    return null;
+  }
+  // One wheel gesture stays with what it started on, as a browser latches scrolling: a scroll inside an item stops at
+  // the end of its list instead of carrying on into the plane, and a pan keeps panning when an item slides under the
+  // pointer. A pause of LATCH ms starts a new gesture.
+  const LATCH = 250;
+  let latched = null, latchedAt = -Infinity;
   window.addEventListener("wheel", (e) => {
     if (mode !== "canvas" || e.composedPath().includes(bar)) return;
     if (e.composedPath().includes(map)) { e.preventDefault(); return; }
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;
     let dx = e.deltaX * unit, dy = e.deltaY * unit;
-    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); latched = null; zoomAt(cam.z * Math.exp(-clamp(dy, -30, 30) / 100), e.clientX, e.clientY); return; }
     if (e.shiftKey && !dx) { dx = dy; dy = 0; }
-    if (scrolls(e.target, dx, dy)) return;
+    if (e.timeStamp - latchedAt > LATCH || !latched) latched = scrolls(e.target, dx, dy) || "plane";
+    latchedAt = e.timeStamp;
+    if (latched !== "plane") {
+      // At the end of its list the wheel does nothing, as it does at the end of a page.
+      if (!latched.isConnected || !room(latched, dx, dy)) e.preventDefault();
+      return;
+    }
     e.preventDefault();
     pan(-dx, -dy); settle();
   }, { passive: false, capture: true });
@@ -660,11 +911,109 @@
     if (r.top + dy < 56) dy = 56 - r.top;
     if (dx || dy) { pan(dx, dy); settle(); }
   });
-  window.addEventListener("resize", () => { if (mode === "canvas") bound(); schedule(); });
+  window.addEventListener("resize", () => { if (mode === "canvas") { dockMinimap(); bound(); } schedule(); });
   window.addEventListener("pagehide", () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; save(); } });
+
+  // Arrows between screens. In an item, a control with data-go="<id>" draws an arrow from its right edge to the element
+  // with that id in the same item, with its data-label beside it. The arrow leaves the [data-screen] that holds the
+  // control and takes the way the target lies: a curve to a screen on the right, down the gap to one in a lower row,
+  // over the top back to one on the left. Hovering a screen or a control lights its arrows and dims the rest.
+  const flowCss = document.createElement("style");
+  flowCss.textContent = `body > [data-variant]:has([data-go]) { position: relative; }
+    [data-drop-flow] { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; }
+    [data-drop-flow] svg { position: absolute; left: 0; top: 0; overflow: visible; }
+    [data-drop-flow] g path, [data-drop-flow] g circle { fill: none; stroke: #a1a1aa; stroke-width: 1.75; transition: stroke .15s, opacity .15s; }
+    [data-drop-flow] g circle { fill: #fff; }
+    [data-drop-flow] g.on path, [data-drop-flow] g.on circle { stroke: #2563eb; }
+    [data-drop-flow] .off { opacity: .12; }
+    [data-drop-flow] span { position: absolute; transform: translate(-50%, -50%); padding: 4px 10px; border: 1px solid #e4e4e7; border-radius: 99px; background: #fff;
+      color: #52525b; font: 600 13px/1.2 ui-sans-serif, system-ui, sans-serif; white-space: nowrap; transition: opacity .15s, color .15s, border-color .15s; }
+    [data-drop-flow] span.on { color: #2563eb; border-color: #93b4f5; }
+    [data-go] { outline: 5px solid rgb(37 99 235 / .4); outline-offset: 3px; }
+    [data-go][data-go-on] { outline-color: #2563eb; }
+    @media (prefers-reduced-motion: reduce) { [data-drop-flow] * { transition: none !important; } }`;
+  document.head.append(flowCss);
+  const layers = new Map();
+  const curveAt = (p0, p1, p2, p3, t) => [0, 1].map((n) => (1 - t) ** 3 * p0[n] + 3 * (1 - t) ** 2 * t * p1[n] + 3 * (1 - t) * t * t * p2[n] + t ** 3 * p3[n]);
+  function route(f, fs, t) {
+    const x1 = Math.min(Math.max(f.x + f.w + 6, fs.x + 16), fs.x + fs.w + 6), y1 = f.y + f.h / 2;
+    if (t.y >= fs.y + fs.h) {
+      const xg = fs.x + fs.w + 26, yg = t.y - 34, x2 = t.x + t.w / 2, r = 14, d = x2 < xg ? 1 : -1;
+      return { d: `M${x1} ${y1}L${xg - r} ${y1}Q${xg} ${y1} ${xg} ${y1 + r}L${xg} ${yg - r}Q${xg} ${yg} ${xg - d * r} ${yg}L${x2 + d * r} ${yg}Q${x2} ${yg} ${x2} ${yg + r}L${x2} ${t.y - 8}`, l: [xg, (y1 + yg) / 2] };
+    }
+    if (t.x >= fs.x + fs.w) {
+      const x2 = t.x - 8, y2 = clamp(y1, t.y + 30, Math.max(t.y + 30, t.y + t.h - 30)), dx = Math.max(40, (x2 - x1) * 0.45);
+      const c1 = [x1 + dx, y1], c2 = [x2 - dx, y2], mid = curveAt([x1, y1], c1, c2, [x2, y2], 0.5);
+      return { d: `M${x1} ${y1}C${c1} ${c2} ${x2} ${y2}`, l: [Math.max(mid[0], fs.x + fs.w + 72), mid[1]] };
+    }
+    const xs = fs.x + fs.w + 10, top = Math.min(fs.y, t.y) - 30, x2 = t.x + t.w * 0.72, r = 12;
+    return { d: `M${x1} ${y1}C${xs + 50} ${y1} ${xs + 50} ${top} ${xs} ${top}L${x2 + r} ${top}Q${x2} ${top} ${x2} ${top + r}L${x2} ${t.y - 8}`, l: [(xs + x2) / 2, top] };
+  }
+  function drawFlow(el) {
+    let layer = layers.get(el);
+    const controls = [...el.querySelectorAll("[data-go]")];
+    if (!controls.length && !layer) return;
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.setAttribute("data-drop-flow", "");
+      layer.setAttribute("aria-hidden", "true");
+      layers.set(el, layer);
+    }
+    if (layer.parentNode !== el) el.append(layer);
+    layer.links = [];
+    if (!el.offsetWidth) return;
+    const s = el.getBoundingClientRect(), k = s.width / el.offsetWidth || 1;
+    const at = (n) => { const r = n.getBoundingClientRect(); return { x: (r.left - s.left) / k - el.clientLeft + el.scrollLeft, y: (r.top - s.top) / k - el.clientTop + el.scrollTop, w: r.width / k, h: r.height / k }; };
+    const head = "drop-flow-head-" + variants.indexOf(el);
+    let paths = "", labels = "";
+    for (const a of controls) {
+      const to = document.getElementById(a.dataset.go), from = a.closest("[data-screen]") || a;
+      if (!to || !el.contains(to) || !a.getClientRects().length || !to.getClientRects().length) continue;
+      const f = at(a), fs = at(from), rt = route(f, fs, at(to)), n = layer.links.length;
+      layer.links.push({ a, from, to });
+      paths += `<g data-n="${n}"><path d="${rt.d}" marker-end="url(#${head})"/><circle cx="${Math.min(Math.max(f.x + f.w + 2, fs.x + 12), fs.x + fs.w + 2)}" cy="${f.y + f.h / 2}" r="4"/></g>`;
+      if (a.dataset.label) labels += `<span data-n="${n}" style="left:${rt.l[0]}px;top:${rt.l[1]}px"></span>`;
+    }
+    layer.innerHTML = `<svg width="${el.scrollWidth}" height="${el.scrollHeight}"><defs><marker id="${head}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" style="fill:none;stroke:context-stroke;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"/></marker></defs>${paths}</svg>${labels}`;
+    for (const span of layer.querySelectorAll("span")) span.textContent = layer.links[span.dataset.n].a.dataset.label;
+  }
+  function lightFlow(el, target) {
+    const layer = layers.get(el);
+    if (!layer || !layer.links) return;
+    const control = target && target.closest && target.closest("[data-go]"), screen = target && target.closest && target.closest("[data-screen]");
+    const lit = layer.links.map((l) => (control ? l.a === control : screen ? l.from === screen || l.to === screen : false));
+    const any = lit.some(Boolean);
+    for (const node of layer.querySelectorAll("[data-n]")) { const on = lit[node.dataset.n]; node.classList.toggle("on", on); node.classList.toggle("off", any && !on); }
+    layer.links.forEach((l, n) => l.a.toggleAttribute("data-go-on", lit[n]));
+  }
+  const dirty = new Set();
+  let flowFrame = 0;
+  const redrawFlow = (el) => {
+    if (!el) return;
+    dirty.add(el);
+    flowFrame ||= requestAnimationFrame(() => { flowFrame = 0; for (const d of dirty) drawFlow(d); dirty.clear(); });
+  };
+  const itemOf = (n) => variants.find((el) => el.contains(n));
+  const flowSizes = new ResizeObserver((entries) => { for (const e of entries) redrawFlow(itemOf(e.target)); });
+  const flowChanges = new MutationObserver((records) => {
+    for (const r of records) {
+      const el = itemOf(r.target);
+      if (el && !(layers.get(el) && layers.get(el).contains(r.target))) redrawFlow(el);
+    }
+  });
+  for (const el of variants) {
+    if (el.dataset.src) continue;
+    flowSizes.observe(el);
+    flowChanges.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-go", "data-label", "data-screen", "hidden"] });
+    el.addEventListener("pointerover", (e) => lightFlow(el, e.target));
+    el.addEventListener("pointerleave", () => lightFlow(el, null));
+    redrawFlow(el);
+  }
+  if (document.fonts) document.fonts.ready.then(() => variants.forEach(redrawFlow));
 
   if (hosted || !several) bar.remove();
   document.body.append(host);
+  if (bar.isConnected) new ResizeObserver(dockMinimap).observe(bar);
   // A hash names an item to open in focus; otherwise two or more items open on the canvas.
   const named = find(location.hash.slice(1));
   current = Math.max(find(remembered()), 0);

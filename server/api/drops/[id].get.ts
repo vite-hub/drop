@@ -13,6 +13,7 @@ import { recordVisit } from "../../utils/expiry"
 import { identify } from "../../utils/identity"
 import { requestLog } from "../../utils/logs"
 import { routeId } from "../../utils/params"
+import { runtimeErrors } from "../../utils/runtime-errors"
 import { countView } from "../../utils/views"
 
 export default defineHandler(async (event) => {
@@ -46,12 +47,14 @@ export default defineHandler(async (event) => {
             return undefined
           })
       : undefined
-  const [detail, install] = await Promise.all([
+  const [detail, install, errors] = await Promise.all([
     dropDetail(drop, who, event.url.origin, event, served ? "none" : "all"),
     hub,
+    drop.kind === "app" || drop.kind === "html" ? runtimeErrors(drop.id, drop.version) : undefined,
     visited,
   ])
   if (install) detail.install = install
+  if (errors?.length) detail.errors = errors
   if (!frameOrigin) return detail
   return {
     ...detail,

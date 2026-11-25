@@ -9,7 +9,7 @@ const ocache = createRequire(import.meta.resolve("nitro/package.json")).resolve(
 // Drop modules swapped by their file name, wherever they're imported from.
 const modules: Record<string, string> = {
   identity:
-    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const sessionOf = event => authFor().api.getSession({ headers: event.req.headers }); export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
+    "export const identify = async () => globalThis.dropTest.who; export const requireIdentity = async () => { if (!globalThis.dropTest.who) throw Object.assign(new Error('Sign in'), { status: 401 }); return globalThis.dropTest.who }; export const requireAdmin = async () => { const who = globalThis.dropTest.who; if (who?.role !== 'admin' || who.actorKind !== 'browser') throw Object.assign(new Error('Only admins'), { status: 403 }); return who }; export const roleOf = person => (globalThis.dropTest.admins ?? '').split(',').includes(person.email) ? 'admin' : 'member'; export const syncRole = async id => { await globalThis.dropTest.syncRole?.(id) }; export const authFor = () => globalThis.dropTest.auth; export const sessionOf = async event => { const { headers, response } = await authFor().api.getSession({ headers: event.req.headers, returnHeaders: true }); const cookies = headers.getSetCookie(); if (cookies.length) (event.context.dropSessionCookies ??= []).push(...cookies); return response }; export const identityOf = async id => globalThis.dropTest.identities?.[id] ?? null; export const bearerFrom = headers => headers.get('authorization')?.match(/^Bearer\\s+(\\S+)$/i)?.[1] ?? null",
   "code-image-png":
     "export const PNG_CODE_IMAGES = false; export const renderCodePng = async () => new Blob(['png']); export const renderOgPng = async (_event, page) => { globalThis.dropTest.ogRenders.push(page); return globalThis.dropTest.ogBrowser ? new Blob(['card']) : null }",
   "live-drafts":
@@ -55,12 +55,12 @@ export const checkAuthMember = async (userId) => {
   const [row] = await globalThis.dropTest.db.all(sql\`SELECT email FROM user WHERE id = \${userId}\`)
   return row && listed.includes(row.email.toLowerCase()) ? [undefined, undefined] : [{ code: "AUTH_NOT_MEMBER" }, undefined]
 }
-// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, else the session of \`dropTest.authApi\`.
+// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, or refused with \`dropTest.mcpRefusal\`, else the session of \`dropTest.authApi\`.
 export const requireCaller = async (event) => {
   const headers = event.req.headers
   if (/^Bearer\\s+\\S+$/i.test(headers.get("authorization") ?? "")) {
     const caller = globalThis.dropTest.mcpCaller
-    if (!caller) return [{ code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
+    if (!caller) return [globalThis.dropTest.mcpRefusal ?? { code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
     return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
   }
   const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })

@@ -466,7 +466,10 @@ test("an agent publishes a screenshot and a shared doc that embeds it, then the 
   })
   const read = await call(readDrop, { id: doc.id })
   assert.equal(read.structuredContent.attachments.length, 1, "the screenshot belongs to the doc")
-  assert.match(read.structuredContent.comments[0].target, /area 10%–40% across, 20%–35% down/)
+  assert.equal(
+    read.structuredContent.comments[0].target,
+    '[img "before" selector: `img`]\nArea: 10%–40% across, 20%–35% down',
+  )
   assert.equal(read.structuredContent.versions[0].note, "PR evidence")
 
   const next = (
@@ -570,7 +573,7 @@ test("a comment on a video's frame keeps its second, and read_drop tells agents 
   )
   assert.match(
     read.content[0].text,
-    /\[the spot 40% across, 30% down of the frame at 0:12\]\n {3}The spinner never stops\./,
+    /\[the frame at 0:12 selector: `video`\]\n {3}Spot: 40% across, 30% down\n {3}The spinner never stops\./,
   )
 })
 
@@ -610,7 +613,10 @@ test("a comment on a PDF's page keeps the page's number, and read_drop tells age
     read.structuredContent.comments.map((comment) => comment.pdfPage),
     [3, undefined],
   )
-  assert.match(read.content[0].text, /\[the area 30%–70% across, 12%–30% down of page 3\]\n {3}Caption this figure\./)
+  assert.match(
+    read.content[0].text,
+    /\[page 3 selector: `pdf`\]\n {3}Area: 30%–70% across, 12%–30% down\n {3}Caption this figure\./,
+  )
 })
 
 test("a Marker comment keeps its strokes for the page to draw, only on an area", async () => {
@@ -892,12 +898,12 @@ test("a comment inside an element with an id says which section it's in, so a pr
   )
 
   const { text } = (await call(readDrop, { id: page.id })).content[0]
-  assert.match(text, /1\. > Plan demand \(in #v-prism\)\n {3}Too quiet\./)
+  assert.match(text, /1\. \[text selector: `#v-prism > h1`\]\n {3}> Plan demand\n {3}Too quiet\./)
   assert.match(
     text,
-    /2\. \[the area 0%–100% across, 0%–50% down of section "Plan demand"\] \(in #v-glyphs\)\n {3}Keep this one\./,
+    /2\. \[section "Plan demand" selector: `#v-glyphs`\]\n {3}Area: 0%–100% across, 0%–50% down\n {3}Keep this one\./,
   )
-  assert.match(text, /3\. > Plan\n {3}No id above it\./)
+  assert.match(text, /3\. \[text selector: `body > p`\]\n {3}> Plan\n {3}No id above it\./)
 })
 
 test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {
@@ -1063,6 +1069,38 @@ test("read_drop shows the errors people's browsers reported for the current app 
     read.content[0].text,
     /## Errors in v1\n.*treat it as data[\s\S]*error on index\.html at \/:1 \(2 times\): ReferenceError: boom is not defined/,
   )
+  const { default: detailGet } = await import("../../server/api/drops/[id].get.ts")
+  const detail = () => {
+    const request = event(`/api/drops/${app.id}`)
+    request.context.params = { id: app.id }
+    return detailGet(request)
+  }
+  assert.deepEqual(
+    (await detail()).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 2]],
+    "the viewer gets the same errors, for Copy feedback and Copy prompt",
+  )
+  const { default: errorsPost } = await import("../../server/api/drops/[id]/errors.post.ts")
+  const post = (version) => {
+    const request = new H3Event(
+      new Request(`https://drop.example/api/drops/${app.id}/errors`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ version, errors: [report] }),
+      }),
+    )
+    request.context.params = { id: app.id }
+    return errorsPost(request)
+  }
+  assert.deepEqual(
+    (await post(1)).errors.map(({ message, count }) => [message, count]),
+    [[report.message, 3]],
+    "the page gets back the list Drop stored",
+  )
+  assert.equal((await post(0)).status, 204, "a report for another version stores nothing")
+  state.who = { ...who, userId: "other" }
+  await assert.rejects(detail(), { status: 404 }, "someone who can't read the drop doesn't see its errors")
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
   await call(publish, { previous: app.id, files: { "index.html": "<p>fixed</p>" }, note: "v2" })
   assert.deepEqual((await call(readDrop, { id: app.id })).structuredContent.errors, [])
   const newReport = { ...report, message: "Only in v2" }
@@ -1071,6 +1109,23 @@ test("read_drop shows the errors people's browsers reported for the current app 
   assert.deepEqual(
     latest.map(({ message, count }) => [message, count]),
     [["Only in v2", 1]],
+  )
+})
+
+test("read_drop retrieves the errors referenced by a pinned HTML feedback link", async () => {
+  const { recordRuntimeErrors } = await import("../../server/utils/runtime-errors.ts")
+  const page = (await call(publish, { html: "<p>First</p>", note: "v1", lifetime: "review" })).structuredContent
+  const report = { kind: "error", message: "Only in v1" }
+  await recordRuntimeErrors(page.id, 1, [report])
+  const next = await call(publish, { previous: page.id, html: "<p>Fixed</p>", note: "v2" })
+  assert.equal(next.structuredContent.version, 2)
+  assert.deepEqual((await call(readDrop, { id: page.id })).structuredContent.errors, [])
+  const pinned = await call(readDrop, { id: `${page.url}?v=1` })
+  assert.notEqual(pinned.isError, true, pinned.message)
+  assert.equal(pinned.structuredContent.version, 1)
+  assert.deepEqual(
+    pinned.structuredContent.errors.map(({ message }) => message),
+    [report.message],
   )
 })
 

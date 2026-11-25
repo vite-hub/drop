@@ -1,3 +1,4 @@
+import { decodeHTMLAttribute } from "entities"
 import { lookup } from "mrmime"
 import { prependToHead } from "./plan-runtime.ts"
 
@@ -203,16 +204,35 @@ export function buildProjectDocument(files: ProjectFiles, page: string): string 
 const PACKAGE = /^(?:@[a-z0-9][\w.~-]*\/)?[a-z0-9][\w.~-]*(?:\/[\w.~@-]+)*$/i
 
 const LINK_TAGS: [RegExp, string][] = [
-  [/<script\b[^>]*\bsrc=["']([^"']+)["']/gi, "script"],
   [/<link\b[^>]*\bhref=["']([^"']+)["']/gi, "stylesheet or icon"],
   [/<(?:img|source|image|use|video|audio|iframe)\b[^>]*?\s(?:src|href)=["']([^"']+)["']/gi, "image or media"],
 ]
+
+const SCRIPT_OR_COMMENT =
+  /<!--[\s\S]*?-->|<script(?=[\t\n\f\r />])((?:"[^"]*"|'[^']*'|[^'">])*)>([\s\S]*?)<\/script[\t\n\f\r ]*>/gi
+const SCRIPT_TYPES =
+  /^(?:|module|importmap|speculationrules|application\/(?:x-)?(?:java|ecma)script|text\/(?:(?:x-)?(?:java|ecma)script|javascript1\.[0-5]|jscript|livescript))$/i
+
+function scriptAttributes(attributes: string) {
+  const values = new Map<string, string>()
+  for (const [, name, double, single, bare] of attributes.matchAll(
+    /([^\t\n\f\r /=>]+)(?:[\t\n\f\r ]*=[\t\n\f\r ]*(?:"([^"]*)"|'([^']*)'|([^\t\n\f\r >]+)))?/g,
+  )) {
+    const key = name!.toLowerCase()
+    if (!values.has(key)) values.set(key, decodeHTMLAttribute(double ?? single ?? bare ?? ""))
+  }
+  return values
+}
 
 export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
   const all = new Set(paths)
   const pages = paths.filter((path) => path.endsWith(".html"))
   const importMap = Object.entries(sent).some(
-    ([path, text]) => path.endsWith(".html") && /<script\b[^>]*type=["']?importmap/i.test(text),
+    ([path, text]) =>
+      /\.html?$/i.test(path) &&
+      [...text.matchAll(SCRIPT_OR_COMMENT)].some(
+        ([, attrs]) => attrs !== undefined && scriptAttributes(attrs).get("type")?.toLowerCase() === "importmap",
+      ),
   )
   const issues = new Set<string>()
   const check = (from: string, ref: string, what: string, page = false) => {
@@ -226,11 +246,19 @@ export function appLinkIssues(sent: ProjectFiles, paths: string[]): string[] {
   }
   for (const [path, text] of Object.entries(sent)) {
     if (path.endsWith(".html") || path.endsWith(".htm")) {
-      const html = text.replace(/<!--[\s\S]*?-->/g, "")
+      const html = text.replace(SCRIPT_OR_COMMENT, (_tag, attrs: string | undefined, body: string) => {
+        if (attrs === undefined) return ""
+        const attributes = scriptAttributes(attrs)
+        const type = attributes.get("type") ?? ""
+        const ess = type.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, "")
+        if (!SCRIPT_TYPES.test(ess)) return ""
+        const src = attributes.get("src")
+        if (src) check(path, src, "script")
+        else if (src === undefined && !/^(?:importmap|speculationrules)$/i.test(ess)) scanScript(path, body)
+        return ""
+      })
       for (const [pattern, what] of LINK_TAGS) for (const match of html.matchAll(pattern)) check(path, match[1]!, what)
       for (const match of html.matchAll(/<a\b[^>]*\bhref=["']([^"']+)["']/gi)) check(path, match[1]!, "", true)
-      for (const match of html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi))
-        scanScript(path, match[1]!)
     } else if (path.endsWith(".css")) {
       for (const match of text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g))
         if (!match[2]!.startsWith("data:")) check(path, match[2]!, "a file")

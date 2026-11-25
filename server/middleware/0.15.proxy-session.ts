@@ -1,60 +1,65 @@
-import { and, eq } from "drizzle-orm"
-import { defineHandler, HTTPError } from "h3"
-import { db } from "vite-hub/database"
-import { account } from "../databases/default/index"
-import { authFor, sessionOf } from "../utils/identity"
+import { APIError } from "better-auth/api"
+import { applySetCookies, getSessionCookie } from "better-auth/cookies"
+import { defineHandler, type H3Event, HTTPError } from "h3"
+import { PROXY_SIGN_OUT_HANDOFF_HEADER } from "../../shared/sign-in"
+import { authError } from "../utils/auth-errors"
+import { sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
-import { authProxy } from "../utils/proxy-auth"
-import { isProxyMember } from "../utils/proxy-auth-config"
+import { oneSignInAtATime, oneSignInPerIdentity } from "../utils/proxy-auth"
+import {
+  DROP_SECURE_COOKIE_PREFIX,
+  isProxyMember,
+  PROXY_TOKEN_HEADER,
+  readAuthProxyConfig,
+} from "../utils/proxy-auth-config"
 
 export default defineHandler(async (event) => {
-  const proxy = authProxy()
+  const proxy = readAuthProxyConfig()
   if (!proxy.enabled) return
   const path = event.url.pathname
-  if (path === "/signin" || path === "/api/sign-in") return
-  if (path === "/api/auth/sign-out" && event.req.method === "POST") {
-    if (proxy.cookie)
-      event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
-    return
-  }
-  const token = event.req.headers.get("x-auth-request-access-token")
+  const proxyWillSignOut = event.req.headers.get(PROXY_SIGN_OUT_HANDOFF_HEADER) === "1"
+  if (path === "/api/auth/sign-out" && event.req.method === "POST" && proxy.cookie && !proxyWillSignOut)
+    event.res.headers.append("Set-Cookie", `${proxy.cookie}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`)
+  const token = event.req.headers.get(PROXY_TOKEN_HEADER)
   if (!token) return
-  if (!(await isProxyMember(token)))
-    throw new HTTPError({
-      status: 403,
-      statusText: "Active organization membership required.",
-      data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
-    })
-  const auth = authFor(event)
-  const current = await sessionOf(event).catch((error: unknown) => {
-    requestLog(event)?.warn("Session lookup failed", {
-      identity: { session: error instanceof Error ? error.message : String(error) },
-    })
-    return null
+  if (path !== "/signin/start" || sentPath(event) !== path) return withoutToken(event)
+  if (!(await isProxyMember(token))) throw authError("GITHUB_MEMBERSHIP_REQUIRED")
+  const session = await proxySignIn(event, token).catch((error: unknown) => {
+    if (!(error instanceof APIError)) throw error
+    const code = typeof error.body?.code === "string" ? error.body.code : undefined
+    throw new HTTPError({ status: error.statusCode, statusText: error.message, ...(code ? { data: { code } } : {}) })
   })
-  if (current) {
-    const [github] = await db
-      .select({ token: account.accessToken })
-      .from(account)
-      .where(and(eq(account.userId, current.user.id), eq(account.providerId, "github")))
-      .limit(1)
-    if (github?.token === token) return
+  if (!session) {
+    requestLog(event)?.set({ auth: { signIn: "proxy failed", cause: "Better Auth refused the forwarded identity" } })
+    throw authError("PROXY_SIGN_IN_FAILED")
   }
-  const response = await auth.api.proxySignIn({ headers: event.req.headers, asResponse: true })
-  if (!response.ok) throw new HTTPError({ status: response.status, statusText: "Proxy sign-in failed." })
-  const cookies = response.headers.getSetCookie()
-  for (const cookie of cookies) event.res.headers.append("Set-Cookie", cookie)
-  const pairs = cookies.map((cookie) => cookie.split(";")[0]!)
-  const replaced = new Set(pairs.map((cookie) => cookie.split("=")[0]))
-  const previous = (event.req.headers.get("cookie") ?? "")
-    .split(";")
-    .filter((cookie) => !replaced.has(cookie.trim().split("=")[0]))
-  const cookie = [...previous, ...pairs].filter(Boolean).join("; ")
-  try {
-    event.req.headers.set("cookie", cookie)
-  } catch {
-    const headers = new Headers(event.req.headers)
-    headers.set("cookie", cookie)
-    Object.defineProperty(event.req, "headers", { value: headers, configurable: true })
-  }
+
+  withoutToken(event, event.context.dropSessionCookies)
 })
+
+async function proxySignIn(event: H3Event, token: string) {
+  const { headers } = event.req
+  if (getSessionCookie(headers, { cookiePrefix: DROP_SECURE_COOKIE_PREFIX }) || getSessionCookie(headers))
+    return oneSignInPerIdentity(token, () => sessionOf(event))
+
+  let ranHere = false
+  const { session, cookies } = await oneSignInAtATime(token, async () => {
+    ranHere = true
+    const before = event.context.dropSessionCookies?.length ?? 0
+    const signedIn = await sessionOf(event)
+    return { session: signedIn, cookies: event.context.dropSessionCookies?.slice(before) ?? [] }
+  })
+  if (!ranHere) (event.context.dropSessionCookies ??= []).push(...cookies)
+  return session
+}
+
+function sentPath(event: H3Event) {
+  return event.runtime?.node?.req.url?.split("?")[0] ?? event.url.pathname
+}
+
+function withoutToken(event: H3Event, cookies?: string[]) {
+  const headers = new Headers(event.req.headers)
+  if (cookies?.length) applySetCookies(headers, cookies)
+  headers.delete(PROXY_TOKEN_HEADER)
+  Object.defineProperty(event.req, "headers", { value: headers, configurable: true })
+}

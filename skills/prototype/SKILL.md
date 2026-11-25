@@ -30,12 +30,61 @@ One self-contained HTML page. Each item is a `<section>` directly inside `<body>
 
 - `id` is `v-` and the name in lowercase words and dashes. Every other id inside an item starts with the item's id (`v-pricing-tiers-cta`), so each comment's anchor names its item.
 - `data-width` is the item's real width in pixels (default 1280). `data-height` fixes its height and scrolls the rest; leave it out and the item is as tall as its content.
+- `data-x` and `data-y` place an item on the canvas, in canvas pixels from the top-left. Items without them follow in rows to the right, 160px apart, with 240px between rows and a new row once one passes 5600px (four 1280px items). Set them to lay the canvas out yourself, such as a desktop item with its mobile item beside it and the next pair in a row below; every reader opens that layout until they drag an item. Names and notes stay readable at any zoom: zoomed out, a label shows only what fits in the gap above its item, the note going first and then the name, so leave no extra room for them.
 - Use the product's real copy and plausible data in every item. Lorem ipsum hides the question.
 - Make the items live: real inputs, hovers, menus. Load libraries from a CDN such as `https://esm.sh/three`.
 - Drop listens for keys on the page too: Esc closes what Drop has open, and C, E and single letters pick its tools. When an item uses one of those keys itself, such as Esc to close its own menu, call `event.preventDefault()` in that handler so Drop leaves the key alone.
 - Put everything visible inside a section. Draw no switcher, bar, or picker of your own, and paste no picker script: Drop runs its own on every page with `data-variant` items.
 
-Canvas details (URL items for live previews, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item shows a deployed page, has a popover, or animates.
+### One frame for every item
+
+Paste this shell as the page's first `<style>`, before any item's own styles. It gives every item the same font, size, leading, background, padding and colors, so two items differ only in the idea they try:
+
+```html
+<style>
+  :root {
+    color-scheme: light;
+    --prototype-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --prototype-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --prototype-bg: #fff; --prototype-surface: #fafafa; --prototype-fg: #171717; --prototype-muted: #737373;
+    --prototype-line: rgb(0 0 0 / .08); --prototype-accent: #2563eb;
+    --prototype-radius: 8px; --prototype-pad: 32px;
+  }
+  :root[data-theme="dark"], body > [data-variant][data-theme="dark"] {
+    color-scheme: dark;
+    --prototype-bg: #171717; --prototype-surface: #1f1f1f; --prototype-fg: #fafafa; --prototype-muted: #a3a3a3;
+    --prototype-line: #2a2a2a; --prototype-accent: #60a5fa;
+  }
+  body > [data-variant] {
+    box-sizing: border-box; padding: var(--prototype-pad);
+    background: var(--prototype-bg); color: var(--prototype-fg);
+    font: 16px/1.5 var(--prototype-font); font-synthesis: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  body > [data-variant] * { box-sizing: border-box; }
+  body > [data-variant] :is(h1, h2, h3, h4) { line-height: 1.15; text-wrap: balance; }
+  body > [data-variant] :is(button, input, select, textarea) { font: inherit; color: inherit; }
+</style>
+```
+
+- **For a real product**, set the tokens in `:root` to its font, colors and radius, once. Keep the defaults only when there is no product yet.
+- **Item styles use the tokens** (`var(--prototype-line)`, `var(--prototype-muted)`), never a raw hex, so the whole page changes in one place.
+- **An item overrides a token only when its direction is about that property**, scoped to its id: `#v-hero-editorial { --prototype-font: Georgia, serif; }`. A whole-page item with its own header sets `--prototype-pad: 0`.
+- **Dark mode**: `data-theme="dark"` on `<html>` turns every item dark; on one section, it shows that item's dark version beside the light ones.
+- Live items (`data-src`) draw their own page; Drop removes their padding.
+
+### A flow: rows of screens with arrows
+
+When the question is how someone moves through screens (an app's session, a checkout), show it as one item that holds the screens in rows, next to one live item to try it:
+
+- One row per path through the screens, such as "Pay with card" or "Card declined". A short title above each row is the only text.
+- Arrows start at the button you press and end at the screen it opens. Give each one a label of a word or two: the button's own text, or what happens ("time's up").
+- Show real states in every screen: the numbers, timers and toasts that screen would show at that moment.
+- No captions under screens, no intro heading or paragraph, no legend. When a row needs a sentence to explain it, the screens are wrong.
+
+Drop draws the arrows: mark each screen `data-screen` and give the button `data-go` with the id of the screen it leads to, and `data-label`. The markup and a row layout are in [references/canvas.md](references/canvas.md#flows-rows-of-screens-with-arrows).
+
+Canvas details (flows, URL items for live previews, every page of a preview, variants as routes in the real app, tooltips and menus Drop can hold open, animation, opting out) are in [references/canvas.md](references/canvas.md). Read it when an item is a flow, shows a deployed page or an app route, has a popover, or animates.
 
 If you can open a browser, open the page and check every item renders and the console is clean.
 
@@ -47,7 +96,7 @@ Give the user that link first, then tell reviewers how to answer: the page opens
 
 ## 5. Read the round
 
-Call `read_drop`. Sort every open comment into its item: an anchor shows `in #v-…`, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
+Call `read_drop`. Sort every open comment into its item: the item's id shows as `#v-…` at the start of the selector, and otherwise the quoted text or the element's first words are in that item's section of your source. A comment on the whole page that names no item gets a `reply` asking which one it means.
 
 For each item decide: keep, drop, change, or try another. Done when every open comment sits under an item or has a question waiting for an answer.
 

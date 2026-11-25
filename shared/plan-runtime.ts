@@ -1,6 +1,7 @@
 import PICKER from "../skills/prototype/assets/picker.js?raw"
 import THEME from "./theme.css?raw"
 import { CAPTURE } from "./viewport-capture"
+import { MEASURE, MEASURE_CSS, measureColors } from "./measure"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 import { MAX_INK_POINTS, MAX_INK_STROKES } from "./schemas"
 import COMMENTS_CSS from "comark-comments/style.css?raw"
@@ -22,13 +23,14 @@ When the page reads them, Drop injects its theme as CSS custom properties on :ro
 Readers comment by selecting text, or with the Comment tool by clicking an element or drawing a rectangle over any part of the page; clicks stay your page's own. Prefer real text, lists, and tables over text baked into images.
 These are the same tokens T3 Code injects into HTML renders, so a page built for T3 looks the same here.`
 
-export const ELEMENT_NAMING = String.raw`function pathOf(el) {
+export const ELEMENT_NAMING = String.raw`function pathOf(el, article) {
     const parts = [];
     while (el && el.nodeType === 1 && el !== document.documentElement && parts.length < 10) {
       let part = el.tagName.toLowerCase();
       if (el.id && /^[a-z][\w-]*$/i.test(el.id)) { parts.unshift("#" + el.id); break; }
       const same = el.parentElement ? Array.from(el.parentElement.children).filter((c) => c.tagName === el.tagName) : [];
-      if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
+      if (part === "table" && article && el.parentElement === article) part += ":nth-child(" + (same.indexOf(el) + 1) + " of table)";
+      else if (same.length > 1) part += ":nth-of-type(" + (same.indexOf(el) + 1) + ")";
       parts.unshift(part);
       el = el.parentElement;
     }
@@ -392,16 +394,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // The tools' drawings (setTool below), in Mesurer's look: its highlight and guide hues for lines, the same hues darker
     // (4.7:1 under white) behind labels, its white card and rulers in light mode and their dark cut in dark, and the box
     // model in DevTools' colors.
-    ':host{--hi:oklch(0.62 0.18 255);--hi-fill:oklch(0.56 0.18 255);--gd:oklch(0.63 0.26 29.23);--gd-fill:oklch(0.58 0.22 29.23);' +
-    (DARK ? '--sf:#18181b;--ink:#fafafa;--ink-muted:#a1a1aa;--tick:#52525b;--float:0 0 0 .5px rgb(255 255 255/.16),0 1px 1px rgb(0 0 0/.125),0 2px 5px rgb(0 0 0/.125),0 3px 8px rgb(0 0 0/.125)}'
-      : '--sf:#fff;--ink:#18181b;--ink-muted:#71717a;--tick:#cbd5e1;--float:0 0 0 .5px rgb(0 0 0/.18),0 1px 1px rgb(0 0 0/.06),0 3px 9px rgb(0 0 0/.06),0 6px 18px rgb(0 0 0/.03)}') +
-    '.fx>*{position:fixed;box-sizing:border-box;pointer-events:none}.hl{outline:1.5px solid var(--hi);outline-offset:-.75px}.hl.sel{outline-width:2px;background:color-mix(in oklab,var(--hi) 8%,transparent)}' +
-    '.mb{background:rgb(246 178 107/.35)}.pb{background:rgb(147 196 125/.4)}.ln{background:var(--gd)}.ln.dash{background:none;border:0 dashed var(--gd)}' +
-    '.tag{padding:2px 4px;border-radius:4px;background:var(--hi-fill);color:#fff;font:500 10px/14px ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}.tag.d{background:var(--gd-fill)}' +
-    '.card{width:15rem;box-sizing:border-box;padding:8px;border:1px solid transparent;border-radius:8px;background:var(--sf);color:var(--ink);font:11px/16px ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;box-shadow:var(--float)}' +
-    '.card b{display:block;margin-bottom:6px;font:500 11px/16px ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.card div{display:flex;justify-content:space-between;gap:12px}.card span:first-child{color:var(--ink-muted)}.card span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.sw{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:3px;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgb(128 128 128/.35)}' +
+    ':host{' + (DARK ? ${JSON.stringify(measureColors(true))} : ${JSON.stringify(measureColors(false))}) + '}' +
+    ${JSON.stringify(MEASURE_CSS)} +
     '.ru{position:fixed;z-index:1;display:block;background:var(--sf);box-shadow:0 0 0 .5px rgb(128 128 128/.35)}.ru.x{left:18px;top:0;cursor:row-resize}.ru.y{left:0;top:18px;cursor:col-resize}.ru.c{left:0;top:0;width:18px;height:18px;cursor:default}' +
     '.gd{position:absolute;background:var(--gd)}.gd::before{content:"";position:absolute;inset:-3px}.gd.h{height:1px;left:0}.gd.h::before{cursor:row-resize}.gd.v{width:1px;top:0}.gd.v::before{cursor:col-resize}' +
     ${JSON.stringify(PRESENCE_CURSOR_STYLE)} +
@@ -472,7 +466,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   pageStyle.textContent = MARKS_CSS + ":root{--vh-ui-comment-ink:" + (THEMED ? "var(--foreground)" : "#808080") + "}" + (AUTHORED ? "" : "img:not(a[href] img){cursor:zoom-in}") +
     // Drop's review dock floats over the frame's bottom edge (--drop-bottom), out of reach of the page's own layers, so
     // Comark's zoom ends above it and its thumbnails stay clickable. Its backdrop still runs under the dock.
-    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}";
+    ".cz-dialog{padding-bottom:var(--drop-bottom,0px)}" +
+    // A prototype canvas's Hand (EVENT_HOLD): the tools' layer lets the pointer through to the picker, which shows grab.
+    "html[data-prototype-hand] drop-comments{pointer-events:none!important}";
   // comark-comments' speech bubble, in a given color.
   const bubbleIcon = (color) => "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='" + color.replace("#", "%23") + "' stroke-width='2.2' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z'/%3E%3C/svg%3E\")";
   // A margin comment's bubble is the package's, in the page's own text after its quote, so it takes its room in the
@@ -638,7 +634,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // The zoomed screenshot under a point: an area drawn on it is a comment on the image, like the ones Drop's lightbox takes.
   function shotAt(x, y) {
     if (!zoom) return null;
-    return Array.from(zoom.content.querySelectorAll("img")).find((img) => {
+    const images = zoom.content.matches("img") ? [zoom.content] : Array.from(zoom.content.querySelectorAll("img"));
+    return images.find((img) => {
       const r = img.getBoundingClientRect();
       return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
     }) || null;
@@ -652,7 +649,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     [top, bottom] = [top, bottom].map((y) => Math.min(r.bottom, Math.max(r.top, y)));
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     if (right > left || bottom > top) zoomDraft(left, top, right, bottom); else zoomDraft();
-    post({ type: "area", kind: "image", selector: pathOf(img), label: img.getAttribute("alt") || "image", ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
+    post({ type: "area", kind: "image", selector: pathOf(img, article), label: img.getAttribute("alt") || "image", ox, oy, ow: thousandths(right, r.left, r.width) - ox, oh: thousandths(bottom, r.top, r.height) - oy, rect: { left, top, right, bottom } });
   }
   /**
    * Whether an element still is what a comment from an earlier version pointed at. The selector is a position in the
@@ -661,6 +658,34 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function sameAnchor(el, m) {
     if (!m.label) return true;
     return m.kind === "image" ? (el.getAttribute("alt") || "image") === m.label : labelOf(el) === m.label;
+  }
+
+  function elementForMarker(marker) {
+    if (!marker) return null;
+    const exact = query(marker.selector);
+    const wrapper = "div:is([data-wide], [data-fit]):has(> table)";
+    const legacy = article && /^(.*\barticle) > table(?::nth-of-type\((\d+)\))?( > .+)?$/.exec(marker.selector || "");
+    if (!legacy || query(legacy[1]) !== article || !article.querySelector(":scope > " + wrapper)) {
+      return exact && (!marker.earlier || sameAnchor(exact, marker)) ? exact : null;
+    }
+    const [, parent, index, tail = ""] = legacy;
+    if (!marker.label) return null;
+    const siblings = Array.from(article.children);
+    const tables = siblings.filter((entry) => entry.matches("table, " + wrapper));
+    const bareCount = tables.filter((entry) => entry.localName === "table").length;
+    const ordinal = index ? Number(index) : 1;
+    const matches = [];
+    let bareBefore = 0;
+    tables.forEach((table, position) => {
+      const bare = table.localName === "table";
+      const firstPossible = bareBefore + 1;
+      if (bare) bareBefore++;
+      if (ordinal < firstPossible || ordinal > position + 1 || (!index && bareCount > Number(bare))) return;
+      const prefix = parent + " > " + table.localName + ":nth-child(" + (siblings.indexOf(table) + 1) + ")";
+      const candidate = query(prefix + (bare ? "" : " > table") + tail);
+      if (candidate && sameAnchor(candidate, marker)) matches.push(candidate);
+    });
+    return matches.length === 1 ? matches[0] : null;
   }
 
   /**
@@ -900,24 +925,24 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       let x, y, into = marks;
       if (m.kind === "image" || m.kind === "area") {
         // Placed from the anchor's current box, so areas and pins follow reflow.
-        const el = query(m.selector);
-        if (!el || (m.earlier && !sameAnchor(el, m))) { unplaced.push(m.id); continue; }
+        const el = elementForMarker(m);
+        if (!el) { unplaced.push(m.id); continue; }
         if (!shown.includes(m)) continue;
         resized.observe(el);
-        const r = el.getBoundingClientRect();
+        const copy = zoom && zoomMarks && copyOf(el);
+        if (zoom && (!copy || !shows(copy))) continue;
         // A hidden anchor keeps a pin, without its area, on what stands in for it until it shows again.
-        if (!shows(el)) {
-          const stand = !zoom && standIn(el);
+        if (!zoom && !shows(el)) {
+          const stand = standIn(el);
           if (!stand) continue;
           // Side by side when several wait on the same element, so each can be clicked.
           pinOnStand(m, stand);
           continue;
         }
         // While zoomed, only what the zoom shows draws, on its copy: the page's pins would float over the zoom.
-        const copy = zoom && zoomMarks && copyOf(el);
-        if (zoom && !copy) continue;
+        const r = (copy || el).getBoundingClientRect();
         const beside = copy && asideMarks && zoom.aside.contains(copy);
-        const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(copy.getBoundingClientRect()) : inLayer(copy.getBoundingClientRect());
+        const b = !copy ? { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height } : beside ? inAside(r) : inLayer(r);
         if (copy) into = beside ? asideMarks : zoomMarks;
         x = b.left + (m.ox / 1000) * b.width; y = b.top + (m.oy / 1000) * b.height;
         if (m.ow || m.oh) {
@@ -1024,6 +1049,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
 
   // The rectangle or spot a comment is being written on (finishArea), as a share of the element it's on.
   let drawn = null;
+  function setDrawn(next) {
+    drawn = next;
+    if (self.__dropPickerOn) document.dispatchEvent(new CustomEvent("drop:area-draft", { detail: next?.el || null }));
+  }
   /** Draws it where its element is now, in viewport pixels too; hidden while its element doesn't show. */
   function placeDrawn() {
     const r = drawn.el.getBoundingClientRect(), node = drawn.node;
@@ -1257,7 +1286,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     e.preventDefault(); e.stopPropagation();
     // The viewport rect lets Drop zoom the image out of the page instead of popping it open.
     const r = img.getBoundingClientRect();
-    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img), label: labelOf(img), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    post({ type: "image", src: img.currentSrc || img.src, alt: img.alt || "", selector: pathOf(img, article), label: labelOf(img), rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   }, true);
 
   /**
@@ -1273,6 +1302,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const view = { rulers: false, xray: false, pins: true, style: "card", me: null, only: new Set() };
   const fx = document.createElement("div");
   fx.className = "fx";
+  ${MEASURE}
+  const { draw: drawMeasure, px, tag } = measureTool(fx, () => (view.rulers ? RULER : 0));
   /**
    * On a canvas (a prototype's), a rectangle across two items is held only by the page, which stays put while the plane
    * pans under it. It goes on the item it covers most instead, cut to that item, so it moves with the item.
@@ -1303,18 +1334,18 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     // Keep the drawn rectangle, or the clicked spot, on the page or the zoom while the comment is written; Drop clears it.
     // On the page it's kept as a share of what it's on, like a saved area, so it moves with that and not with the screen.
-    draft.innerHTML = ""; drawn = null;
-    if (zoom) zoomDraft(left, top, right, bottom);
+    draft.innerHTML = "";
+    if (zoom) { setDrawn(null); zoomDraft(left, top, right, bottom); }
     else {
       const node = right > left ? areaBox(draft, 0, 0, 0, 0) : draft.appendChild(Object.assign(document.createElement("div"), { className: "dp" }));
       const w = r.width || 1, h = r.height || 1;
-      drawn = { el: under, node, x: (left - r.left) / w, y: (top - r.top) / h, w: (right - left) / w, h: (bottom - top) / h };
+      setDrawn({ el: under, node, x: (left - r.left) / w, y: (top - r.top) / h, w: (right - left) / w, h: (bottom - top) / h });
       placeDrawn();
     }
     const ow = right > left ? thousandths(right, r.left, r.width) - ox : 0, oh = right > left ? thousandths(bottom, r.top, r.height) - oy : 0;
     // Every comment on the page keeps a picture of its box, so whoever reads it later (an agent too) sees what it's about.
     const n = zoom ? undefined : ++shots;
-    post({ type: "area", selector: pathOf(el), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
+    post({ type: "area", selector: pathOf(el, article), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, shot: n });
     placeDraft();
     if (n !== undefined) {
       const around = under.closest(TRANSIENT);
@@ -1368,134 +1399,6 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   function elementAt(x, y) {
     return document.elementsFromPoint(x, y).find((el) => el !== host && el !== document.documentElement && el.localName !== "drop-comments" && el.localName !== "drop-bubble" && el.localName !== "drop-ins") || document.body;
   }
-  const px = (n) => String(Math.round(n * 10) / 10);
-  const num = (value) => parseFloat(value) || 0;
-  function nameOf(el) {
-    const classes = typeof el.className === "string" ? el.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
-    return el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + classes.map((c) => "." + c).join("");
-  }
-  function hex(color) {
-    const m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/.exec(color);
-    if (!m) return color;
-    const out = "#" + [m[1], m[2], m[3]].map((c) => Number(c).toString(16).padStart(2, "0")).join("");
-    return m[4] !== undefined && m[4] !== "1" ? out + " " + Math.round(Number(m[4]) * 100) + "%" : out;
-  }
-  const clear = (color) => !color || color === "transparent" || /^rgba\(.*,\s*0\)$/.test(color);
-
-  function fixedBox(className, left, top, width, height) {
-    const el = document.createElement("div");
-    el.className = className;
-    el.style.cssText = "left:" + left + "px;top:" + top + "px;width:" + Math.max(0, width) + "px;height:" + Math.max(0, height) + "px";
-    fx.appendChild(el);
-    return el;
-  }
-  // A label kept on screen; with center, centered on x.
-  function tag(text, x, y, className, center) {
-    const el = document.createElement("div");
-    el.className = "tag" + (className ? " " + className : "");
-    el.textContent = text;
-    fx.appendChild(el);
-    const w = el.offsetWidth, h = el.offsetHeight;
-    el.style.left = Math.max(2, Math.min(innerWidth - w - 2, center ? x - w / 2 : x)) + "px";
-    el.style.top = Math.max(2, Math.min(innerHeight - h - 2, y)) + "px";
-    return el;
-  }
-  function outline(el, strong) {
-    const r = el.getBoundingClientRect();
-    fixedBox("hl" + (strong ? " sel" : ""), r.left, r.top, r.width, r.height);
-    return r;
-  }
-  // Margin outside the border box, padding inside it, as DevTools colors them.
-  function boxModel(el) {
-    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-    const m = [s.marginTop, s.marginRight, s.marginBottom, s.marginLeft].map((v) => Math.max(0, num(v)));
-    const b = [s.borderTopWidth, s.borderRightWidth, s.borderBottomWidth, s.borderLeftWidth].map(num);
-    const p = [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft].map(num);
-    fixedBox("mb", r.left - m[3], r.top - m[0], r.width + m[1] + m[3], m[0]);
-    fixedBox("mb", r.left - m[3], r.bottom, r.width + m[1] + m[3], m[2]);
-    fixedBox("mb", r.left - m[3], r.top, m[3], r.height);
-    fixedBox("mb", r.right, r.top, m[1], r.height);
-    const inner = { left: r.left + b[3], top: r.top + b[0], right: r.right - b[1], bottom: r.bottom - b[2] };
-    fixedBox("pb", inner.left, inner.top, inner.right - inner.left, p[0]);
-    fixedBox("pb", inner.left, inner.bottom - p[2], inner.right - inner.left, p[2]);
-    fixedBox("pb", inner.left, inner.top + p[0], p[3], inner.bottom - inner.top - p[0] - p[2]);
-    fixedBox("pb", inner.right - p[1], inner.top + p[0], p[1], inner.bottom - inner.top - p[0] - p[2]);
-  }
-  function hLine(y, x1, x2) {
-    if (x2 - x1 < 0.5) return;
-    fixedBox("ln", x1, y, x2 - x1, 1);
-    tag(px(x2 - x1), (x1 + x2) / 2, y + 4, "d", true);
-  }
-  function vLine(x, y1, y2) {
-    if (y2 - y1 < 0.5) return;
-    fixedBox("ln", x, y1, 1, y2 - y1);
-    tag(px(y2 - y1), x + 5, (y1 + y2) / 2 - 9, "d");
-  }
-  // Figma's way: the gaps between two boxes side by side, or from a box to the one that holds it.
-  function distances(a, b) {
-    const holds = (o, i) => i.left >= o.left && i.right <= o.right && i.top >= o.top && i.bottom <= o.bottom;
-    if (holds(a, b) || holds(b, a)) {
-      const [o, i] = holds(a, b) ? [a, b] : [b, a];
-      const cx = i.left + i.width / 2, cy = i.top + i.height / 2;
-      vLine(cx, o.top, i.top); vLine(cx, i.bottom, o.bottom); hLine(cy, o.left, i.left); hLine(cy, i.right, o.right);
-      return;
-    }
-    const apartX = b.left >= a.right || a.left >= b.right, apartY = b.top >= a.bottom || a.top >= b.bottom;
-    if (apartX) {
-      const [l, r] = b.left >= a.right ? [a, b] : [b, a];
-      const top = Math.max(a.top, b.top), bottom = Math.min(a.bottom, b.bottom);
-      hLine(top < bottom ? (top + bottom) / 2 : a.top + a.height / 2, l.right, r.left);
-    }
-    if (apartY) {
-      const [t, u] = b.top >= a.bottom ? [a, b] : [b, a];
-      const left = Math.max(a.left, b.left), right = Math.min(a.right, b.right);
-      vLine(left < right ? (left + right) / 2 : a.left + a.width / 2, t.bottom, u.top);
-    }
-    // Overlapping without one holding the other: how far their left and top edges are apart.
-    if (!apartX && !apartY) {
-      hLine(Math.max(a.top, b.top) + 4, Math.min(a.left, b.left), Math.max(a.left, b.left));
-      vLine(Math.max(a.left, b.left) + 4, Math.min(a.top, b.top), Math.max(a.top, b.top));
-    }
-  }
-  // What a designer asks about an element: its size, type, colors, spacing, and corners.
-  function infoCard(el) {
-    const r = el.getBoundingClientRect(), s = getComputedStyle(el);
-    const rows = [["Size", px(r.width) + " × " + px(r.height)]];
-    const sides = (values) => { const v = values.map((x) => px(num(x))); return v.every((x) => x === v[0]) ? v[0] : v[0] === v[2] && v[1] === v[3] ? v[0] + " " + v[1] : v.join(" "); };
-    const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.data.trim());
-    if (own || !el.children.length) {
-      rows.push(["Font", s.fontFamily.split(",")[0].replace(/["']/g, "").trim()]);
-      rows.push(["Type", px(num(s.fontSize)) + (s.lineHeight === "normal" ? "" : " / " + px(num(s.lineHeight))) + " · " + s.fontWeight]);
-      rows.push(["Color", s.color]);
-    }
-    if (!clear(s.backgroundColor)) rows.push(["Fill", s.backgroundColor]);
-    const padding = [s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft];
-    if (padding.some(num)) rows.push(["Padding", sides(padding)]);
-    const margin = [s.marginTop, s.marginRight, s.marginBottom, s.marginLeft];
-    if (margin.some(num)) rows.push(["Margin", sides(margin)]);
-    if (/flex|grid/.test(s.display) && s.gap && s.gap !== "normal" && num(s.gap)) rows.push(["Gap", s.gap.split(" ").map((g) => px(num(g))).join(" ")]);
-    const radius = [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius];
-    if (radius.some(num)) rows.push(["Radius", sides(radius)]);
-    const card = document.createElement("div");
-    card.className = "card";
-    const title = document.createElement("b");
-    title.textContent = nameOf(el);
-    card.appendChild(title);
-    for (const [key, value] of rows) {
-      const row = document.createElement("div"), k = document.createElement("span"), v = document.createElement("span");
-      k.textContent = key;
-      if (key === "Color" || key === "Fill") { const sw = document.createElement("i"); sw.className = "sw"; sw.style.background = value; v.appendChild(sw); v.appendChild(document.createTextNode(hex(value))); }
-      else v.textContent = value;
-      row.append(k, v);
-      card.appendChild(row);
-    }
-    fx.appendChild(card);
-    // Below the element, else above it, else in the bottom corner, always on screen.
-    const w = card.offsetWidth, h = card.offsetHeight, gap = 10;
-    const top = r.bottom + gap + h < innerHeight ? r.bottom + gap : r.top - gap - h > 0 ? r.top - gap - h : innerHeight - h - 12;
-    card.style.left = Math.max(view.rulers ? RULER + 8 : 8, Math.min(innerWidth - w - 8, r.left)) + "px";
-    card.style.top = Math.max(view.rulers ? RULER + 8 : 8, top) + "px";
-  }
 
   let toolFrame = 0;
   function drawTools() {
@@ -1503,16 +1406,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     fx.innerHTML = "";
     if (hovered && !hovered.isConnected) hovered = null;
     if (picked && !picked.isConnected) picked = null;
-    if (tool === "measure") {
-      const over = hovered && hovered !== picked ? hovered : null;
-      if (picked) boxModel(picked);
-      else if (over) boxModel(over);
-      const a = picked && outline(picked, true), b = over && outline(over);
-      if (a && b) distances(a, b);
-      const sized = a || b;
-      if (sized && !(a && b)) tag(px(sized.width) + " × " + px(sized.height), sized.left + sized.width / 2, sized.bottom + 6, "", true);
-      if (picked || over) infoCard(picked || over);
-    }
+    if (tool === "measure") drawMeasure(picked, hovered && hovered !== picked ? hovered : null);
     drawRulers();
   }
   const redraw = () => { if (!toolFrame) toolFrame = requestAnimationFrame(drawTools); };
@@ -1595,12 +1489,13 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
       // In Comments mode a finger still scrolls and zooms the page: the browser takes the drag and cancels the pointer,
       // so only a tap comments. A mouse still drags out an area.
       if (tool === "comment" && clickComments) layer.style.touchAction = "pan-x pan-y pinch-zoom";
+      const retryAt = (x, y) => self.__dropPickerOn && elementAt(x, y).closest("button[data-prototype-retry]");
       let start = null, box = null;
       layer.onpointerdown = (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
         layer.setPointerCapture(e.pointerId);
-        start = { x: e.clientX, y: e.clientY };
+        start = { x: e.clientX, y: e.clientY, retry: tool === "comment" && retryAt(e.clientX, e.clientY) };
       };
       layer.onpointermove = (e) => {
         if (!start || tool !== "comment") { hovered = elementAt(e.clientX, e.clientY); return redraw(); }
@@ -1622,7 +1517,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
         if (box) {
           box.remove(); box = null;
           finishArea(Math.min(s.x, e.clientX), Math.min(s.y, e.clientY), Math.max(s.x, e.clientX), Math.max(s.y, e.clientY));
-        } else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
+        } else if (s.retry && s.retry === retryAt(e.clientX, e.clientY)) s.retry.dispatchEvent(new Event("drop:retry-preview"));
+        else if (pointComments) finishArea(e.clientX, e.clientY, e.clientX, e.clientY);
         else if (clickComments) { const r = elementAt(e.clientX, e.clientY).getBoundingClientRect(); finishArea(r.left, r.top, r.right, r.bottom); }
         redraw();
       };
@@ -1842,13 +1738,15 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     [top, bottom] = [Math.max(0, top), Math.min(innerHeight, bottom)];
     // The layer steps aside, so the hit tests reach the page under it.
     layer.style.pointerEvents = "none";
-    const under = anchorFor(left, top, right, bottom, host), quote = markedText(list);
+    const under = shotAt((left + right) / 2, (top + bottom) / 2) || anchorFor(left, top, right, bottom, host), quote = markedText(list);
     layer.style.pointerEvents = "";
+    const anchor = zoom ? originalOf(under) : under;
+    if (!anchor) { finishing = false; post({ type: "mark-retry" }); return; }
     const r = under.getBoundingClientRect();
     const ox = thousandths(left, r.left, r.width), oy = thousandths(top, r.top, r.height);
     const ow = Math.max(1, Math.min(1000 - ox, thousandths(right, r.left, r.width) - ox));
     const oh = Math.max(1, Math.min(1000 - oy, thousandths(bottom, r.top, r.height) - oy));
-    draft.innerHTML = ""; drawn = null;
+    draft.innerHTML = ""; setDrawn(null);
     const kept = document.createElementNS(SVG, "svg");
     const onZoomed = host.hasAttribute("data-zoomed");
     kept.setAttribute("class", onZoomed ? "inkp zink" : "inkp");
@@ -1864,7 +1762,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (session !== markSession || tool !== "mark") return;
     finishing = false;
     const n = ++shots;
-    post({ type: "area", selector: pathOf(under), label: labelOf(under), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
+    post({ type: "area", selector: pathOf(anchor, article), label: labelOf(anchor), ox, oy, ow, oh, rect: { left, top, right, bottom }, quote: quote || undefined, ink: inkOf(list, r.left + (ox / 1000) * r.width, r.top + (oy / 1000) * r.height, (ow / 1000) * r.width, (oh / 1000) * r.height), shot: n });
     post({ type: "area-shot", shot: n, image: marked });
   }
 
@@ -2044,11 +1942,33 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   const keyScroll = keyScroller(() => tool === "mark");
   ${PALETTE_KEY}
 
+  let pendingFocus;
+  let focusTimer;
+  const focusMarker = (m) => {
+    const marker = markers.find((entry) => entry.id === m.id);
+    const range = marker?.kind === "text" && marker.quote ? findRange(marker.selector, marker.quote) : null;
+    const node = marker?.kind === "text" ? range?.startContainer : elementForMarker(marker);
+    const anchor = node?.nodeType === 1 ? node : node?.parentElement;
+    if (anchor) anchor.dispatchEvent(new Event("drop:reveal-anchor", { bubbles: true }));
+    active = m.id; render();
+    const pinOf = () => (typeof m.id === "string" && (marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
+    const dot = pinOf();
+    pendingFocus = anchor || dot ? null : m;
+    if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
+    if (dot && m.open) setTimeout(() => {
+      const pin = pinOf();
+      if (pin && active === m.id) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top, focused: true }); }
+    }, 500);
+    clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => { active = null; render(); }, 2200);
+  };
+  document.addEventListener("drop:anchors-ready", () => { if (pendingFocus) focusMarker(pendingFocus); });
+
   window.addEventListener("message", (e) => {
     const m = e.data;
     if (!m || !m.__drop || e.source !== parent) return;
-    if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } render(); }
-    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; drawn = null; zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
+    if (m.type === "markers") { markers = m.markers; if (!pinsPrimed) { pinsPrimed = true; for (const x of markers) seenPins.add(x.id); } if (pendingFocus) focusMarker(pendingFocus); else render(); }
+    if (m.type === "clear-selection") { getSelection().removeAllRanges(); lastQuote = ""; draft.innerHTML = ""; setDrawn(null); zoomDraft(); if (highlights) CSS.highlights.delete("vh-comment-draft"); if (drafted) { drafted = null; quietUntil = Date.now() + 3000; render(); } }
     if (m.type === "hold-selection" && lastRange) { drafted = lastRange; if (highlights) CSS.highlights.set("vh-comment-draft", new Highlight(drafted)); render(); }
     // Answered once the page is held, so Drop can take focus without the page seeing it go (EVENT_HOLD).
     if (m.type === "tool" && /^(browse|comment|measure|mark)$/.test(m.tool)) { pointComments = m.pointComments === true; clickComments = m.clickComments === true; if (m.pen) setPen(m.pen); setTool(m.tool); post({ type: "tool", tool }); }
@@ -2063,7 +1983,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "mark" && m.do === "undo") undoMark();
     if (m.type === "mark" && m.do === "done") finishMark();
     if (m.type === "view") setView(m);
-    if (m.type === "clear-area") { draft.innerHTML = ""; drawn = null; zoomDraft(); }
+    if (m.type === "clear-area") { draft.innerHTML = ""; setDrawn(null); zoomDraft(); }
     // How much of the right edge Drop's floating panel covers. Drop's own documents read it to stay clear.
     if (m.type === "inset") {
       document.documentElement.style.setProperty("--drop-inset", (Number(m.right) || 0) + "px");
@@ -2078,7 +1998,11 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     // A root class hides the outline in Zen and tells comark-outline to recalculate its placement.
     if (m.type === "zen") { document.documentElement.classList.toggle("drop-zen", m.on === true); render(); }
     // The comment whose thread Drop shows, if any: its card stays raised and its text marked while it's open.
-    if (m.type === "active") { opened = typeof m.id === "string" ? m.id : null; covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft(); }
+    if (m.type === "active") {
+      opened = typeof m.id === "string" ? m.id : null;
+      if (pendingFocus && pendingFocus.id !== opened) pendingFocus = null;
+      covered = m.covered === true; emphasise(); if (pinMode()) render(); else placeDraft();
+    }
     // Pin style: the composer opened below the fold scrolls the page until it shows.
     // The drop's own link: each heading's # points at it with the section's #id (see the click handler).
     if (m.type === "page-link" && typeof m.href === "string" && /^https?:\/\//.test(m.href)) {
@@ -2094,20 +2018,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (m.type === "heading" && typeof m.id === "string") { const to = document.getElementById(m.id); if (to) to.scrollIntoView({ block: "start" }); }
     if (m.type === "scroll-by" && typeof m.y === "number") scrollBy({ top: m.y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     if (m.type === "scroll-key") keyScroll(m.key, m.shift === true);
-    if (m.type === "focus") {
-      active = m.id; render();
-      // A pin, or a margin comment's bubble.
-      const pinOf = () => (typeof m.id === "string" && (marks.querySelector('[data-slot="comment-mark-pin"][data-id="' + CSS.escape(m.id) + '"]') || bubbles.get(m.id))) || null;
-      const dot = pinOf();
-      if (dot) scrollTo({ top: Math.max(0, dot.getBoundingClientRect().top + scrollY - innerHeight / 3), behavior: "smooth" });
-      // With open: once the scroll settles, report the pin like a click, so Drop opens its thread beside it. Marked
-      // focused, so Drop can drop the report if Escape or another comment came first.
-      if (dot && m.open) setTimeout(() => {
-        const pin = pinOf();
-        if (pin) { const r = pin.getBoundingClientRect(); post({ type: "marker", id: m.id, clientX: r.right, clientY: r.top, focused: true }); }
-      }, 500);
-      setTimeout(() => { active = null; render(); }, 2200);
-    }
+    if (m.type === "focus") focusMarker(m);
   });
   // Escape under a tool unpicks the measured element, else goes to Drop, which closes what's open or puts the tool down.
   // Caught first, so Comark's zoom under the layer stays open.
@@ -2201,7 +2112,9 @@ const EVENT_HOLD = String.raw`(() => {
   Object.defineProperty(self, "__dropHold", { value: (fn) => { hold = typeof fn === "function" ? fn : null; } });
   const POINTER = ["pointerdown", "pointerup", "pointermove", "pointerover", "pointerout", "pointerenter", "pointerleave", "pointercancel", "gotpointercapture", "lostpointercapture",
     "mousedown", "mouseup", "mousemove", "mouseover", "mouseout", "mouseenter", "mouseleave", "click", "dblclick", "auxclick", "contextmenu", "focus", "blur", "focusin", "focusout"];
-  const stop = (e) => { if (!hold) return; e.stopImmediatePropagation(); hold(e); };
+  // While a prototype canvas's Hand is up (Space held, or a pan under way), its picker takes the pointer, so Space and a
+  // drag pan under the comment tools too.
+  const stop = (e) => { if (!hold || document.documentElement.hasAttribute("data-prototype-hand")) return; e.stopImmediatePropagation(); hold(e); };
   for (const type of POINTER) addEventListener(type, stop, true);
   // Passive, so scrolling never waits on them; Drop's layer takes pointer events, not these.
   for (const type of ["touchstart", "touchmove", "touchend", "touchcancel"]) addEventListener(type, stop, { capture: true, passive: true });

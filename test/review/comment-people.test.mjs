@@ -11,7 +11,7 @@ import { insertDrop, migrate, reset, sql, state, threads, who } from "../cost/ha
 const { default: comments } = await import("../../server/comments.ts")
 const { default: commentsPost } = await import("../../server/api/drops/[id]/comments.post.ts")
 const { default: replyPost } = await import("../../server/api/comments/[id]/replies.post.ts")
-const { default: messagePatch } = await import("../../server/api/messages/[id].patch.ts")
+const { default: messagePatch } = await import("../../server/api/comments/[id]/messages/[messageId].patch.ts")
 const { storeCommentFile } = await import("../../server/utils/comment-images.ts")
 
 migrate()
@@ -128,13 +128,18 @@ test("its author edits a comment's words; nobody else does", async () => {
   insertDrop("shared")
   state.who = who
   const posted = await comment("shared", { ...page, body: "Frist" })
-  const edit = (body) =>
+  const edit = (body, thread = posted.id) =>
     messagePatch(
-      request(`/api/messages/${posted.messageId}`, { method: "PATCH", body, params: { id: posted.messageId } }),
+      request(`/api/comments/${thread}/messages/${posted.messageId}`, {
+        method: "PATCH",
+        body,
+        params: { id: thread, messageId: posted.messageId },
+      }),
     )
   state.who = bo
   await assert.rejects(edit({ body: "Mine now" }), { status: 404 })
   state.who = who
+  await assert.rejects(edit({ body: "Elsewhere" }, "thread_other"), { status: 404 })
   const edited = await edit({ body: "First" })
   assert.equal(edited.body, "First")
   assert.ok(edited.editedAt)

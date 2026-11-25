@@ -26,7 +26,7 @@ export const useApi = createUseFetch((defaults) => {
 })
 
 export function useMe() {
-  return useApi("/api/me", { key: keys.me, default: () => null })
+  return useApi("/api/me", { key: keys.me, default: () => null, transform: (viewer) => viewer || null })
 }
 
 export function useSignInMethod() {

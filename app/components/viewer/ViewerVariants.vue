@@ -31,16 +31,23 @@ useEventListener("hashchange", () => {
   if (at >= 0) emit("command", "show", at)
 })
 
+let navigating = false
+let clicked: EventTarget | null = null
+useEventListener("keydown", (event: KeyboardEvent) => (navigating = /^(Tab|Arrow)/.test(event.key)), { capture: true })
+useEventListener("pointerdown", () => (navigating = false), { capture: true })
+useEventListener("focusin", (event: FocusEvent) => {
+  clicked = !navigating && event.target instanceof HTMLButtonElement ? event.target : null
+})
 useEventListener("keydown", (event: KeyboardEvent) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
   const target = event.target
   const inBar = target instanceof Node && Boolean(group.value?.contains(target))
-  if (target !== document.body && !inBar) return
-  if (event.key === " " && props.state.canvas && target === document.body) {
+  if (event.key === " " && props.state.canvas && (target === document.body || target === clicked)) {
     if (!holding) emit("command", "hold")
     holding = true
     return event.preventDefault()
   }
+  if (target !== document.body && !inBar) return
   const n = Number(event.key)
   if (/^[1-9]$/.test(event.key) && n <= count.value) emit("command", "show", n - 1)
   else if (props.state.canvas) return
@@ -56,7 +63,11 @@ const release = () => {
   if (holding) emit("command", "release")
   holding = false
 }
-useEventListener("keyup", (event: KeyboardEvent) => event.key === " " && release())
+useEventListener("keyup", (event: KeyboardEvent) => {
+  if (event.key !== " " || !holding) return
+  event.preventDefault()
+  release()
+})
 useEventListener("blur", release)
 
 const tool = computed(() => props.state.tool ?? "move")
@@ -71,6 +82,7 @@ const zoomItems = computed<DropdownMenuItem[][]>(() => [
     { label: "Zoom out", icon: "i-mingcute-zoom-out-line", kbds: ["−"], onSelect: () => emit("command", "zoom-out") },
     { label: "Zoom to fit", kbds: ["shift", "1"], onSelect: () => emit("command", "fit") },
     { label: "Zoom to 100%", kbds: ["0"], onSelect: () => emit("command", "reset") },
+    { label: "Reset layout", onSelect: () => emit("command", "layout") },
   ],
   [
     {

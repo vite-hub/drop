@@ -42,7 +42,7 @@ export async function recordRuntimeErrors(
           .values({ dropId, ...row })
           .onConflictDoNothing()
           .returning(returning)
-    if (written.length) return
+    if (written.length) return row.errors
   }
 }
 

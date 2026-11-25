@@ -1,5 +1,5 @@
 import { defineHandler } from "h3"
-import PRESENCE_CLIENT from "virtual:review-presence"
+import { default as PRESENCE_CLIENT } from "@vite-hub/realtime/client/browser.js?raw"
 
 export default defineHandler(
   () =>

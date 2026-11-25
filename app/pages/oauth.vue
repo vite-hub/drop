@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { signInPath } from "#shared/sign-in"
+
 useSeoMeta({ title: "Connect an agent", robots: "noindex" })
 
 const route = useRoute("oauth")
 const { $auth } = useNuxtApp()
 const { loggedIn, user, signIn, ready: sessionKnown } = useUserSession($auth)
+const { data: method } = await useSignInMethod()
 const mounted = useMounted()
 const ready = computed(() => mounted.value && sessionKnown.value)
 
@@ -40,12 +43,20 @@ const destination = computed(() => {
 const pending = ref<"github" | "allow" | "deny" | null>(null)
 const error = ref("")
 
+onMounted(() => {
+  if (!valid.value) reportClientEvent({ event: "consent.invalid_link" })
+})
+
 async function signInWithGitHub() {
   pending.value = "github"
   error.value = ""
+  reportSignInClicked(method.value?.proxy ? "proxy" : "github")
   try {
+    if (method.value?.proxy)
+      return void (await navigateTo(signInPath(route.fullPath, { proxy: true }), { external: true }))
     const { error: failure } = await signIn.social({ provider: "github", callbackURL: "/drops" })
-    if (failure) throw answerError(failure.message || "Couldn't start GitHub sign-in.", failure.status)
+    if (failure)
+      throw answerError(failure.message || "Couldn't start GitHub sign-in.", failure.status, answerCode(failure))
   } catch (cause) {
     reportClientError("oauth-signin", cause)
     error.value = errorText(cause)
@@ -62,8 +73,10 @@ async function answer(accept: boolean) {
       throw answerError(
         failure.message || "This authorization link is invalid or has expired. Start again from your agent.",
         failure.status,
+        answerCode(failure),
       )
     if (!data?.url) throw new Error("The agent didn't get an answer. Start again from your agent.")
+    reportClientEvent({ event: accept ? "consent.allowed" : "consent.denied" })
   } catch (cause) {
     reportClientError("oauth-consent", cause)
     error.value = errorText(cause)

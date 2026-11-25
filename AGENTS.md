@@ -17,3 +17,4 @@ Drop runs on ViteHub. Before writing auth, migrations, storage, realtime, skills
 - **When ViteHub falls short**, fix it in [vite-hub/vitehub](https://github.com/vite-hub/vitehub) and move Drop onto the fix.
 - **A workaround Drop needs meanwhile** names its issue in a comment, `// Workaround: vite-hub/vitehub#NNNN`, so the next ViteHub bump finds it.
 - **Before pushing**, run `pnpm run doctor`, which includes ViteHub's rules. Plain `pnpm doctor` is pnpm's own install check.
+- **Drop's MCP server is not ViteHub's.** `server/mcp/tools/**` and `server/mcp/prompts/**` use `defineMcpTool` and `defineMcpPrompt` from `nitro-mcp-toolkit`, and `server/mcp/index.ts` registers each one by hand. ViteHub's `vite-hub/mcp` docs use the same folder names, but their tools don't work here.

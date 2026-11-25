@@ -44,11 +44,11 @@ overrides:
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@c3cfab681ec677a47348f620634d9efdafed8f90
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@c3cfab681ec677a47348f620634d9efdafed8f90
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy and its patches apply to it.
-  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@755ebda929bfb0d4ac41313aa06c2122c6c10b96
+  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.15
   "@better-auth/oauth-provider": 1.7.15
-  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@755ebda
+  comark-zoom: https://pkg.pr.new/onmax/comark-ui/comark-zoom@d99e4d126b2ae44a99bbc37fb263a0ab6cd73665
   # Nuxt and Nuxt UI must share one Vue instance. 3.5.42+ fixes an SSR attribute-name XSS (@vue/server-renderer).
   vue: 3.5.44
   # Keep older consumers on the patched v5 serializer without downgrading Nuxt's v6.
@@ -66,6 +66,7 @@ patchedDependencies:
   # Content-Location keeps the query string. Not upstream yet.
   "@vite-hub/content@0.0.0-preview-c3cfab6": patches/@vite-hub__content@0.0.0-preview-c3cfab6.patch
   # Restore offline delivery UI on the preview that also carries Send.
+  # Edit a comment in the row field, one field per thread (vite-hub/vitehub#5445).
   "@vite-hub/ui@0.0.0-preview-c3cfab6": patches/@vite-hub__ui@0.0.0-preview-c3cfab6.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
@@ -79,6 +80,10 @@ patchedDependencies:
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
+  # A note beside its point (side=top|bottom with `to` off to one side) could run up to 14rem past the screenshot's
+  # edge, so a ::compare's track (overflow-x: auto) scrolled sideways and clipped Before. The note now wraps within
+  # the room before the edge (onmax/comark-ui#488). Delete with the next comark-ui bump that includes it.
+  comark-annotate@0.14.2: patches/comark-annotate@0.14.2.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:

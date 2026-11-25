@@ -10,6 +10,7 @@ import { commentAttachmentUrl } from "vite-hub/comments/client"
 import type { CommentAttachment } from "#shared/types"
 import { textValue } from "#shared/utils/text"
 import { commentAttachments, drops } from "../databases/default/index"
+import { authError } from "./auth-errors"
 import { readFormWithin } from "./params"
 import { type DropRow, deleteDrop, findDrop, permissions, storageFailure } from "./drops"
 import type { Identity } from "./identity"
@@ -88,8 +89,7 @@ export async function readCommentBody<T extends v.GenericSchema>(
 }
 
 export function requireSender(who: Identity | null, as: string | undefined) {
-  if (as !== undefined && as !== who?.userId)
-    throw new HTTPError({ status: 401, statusText: "Sign in again to send this comment." })
+  if (as !== undefined && as !== who?.userId) throw authError("SENDER_CHANGED")
 }
 
 export async function refuseSend(event: H3Event, who: Identity | null, refusal: HTTPError): Promise<never> {

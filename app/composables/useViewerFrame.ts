@@ -2,7 +2,7 @@ import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
 import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
-import type { DropComment, DropDetail } from "#shared/types"
+import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { Presence } from "~/composables/usePresence"
@@ -24,6 +24,7 @@ export type PickerCommand =
   | "zoom-out"
   | "fit"
   | "reset"
+  | "layout"
   | "move"
   | "hand"
   | "hold"
@@ -54,6 +55,7 @@ export function useViewerFrame(options: {
   palette?: () => void
   toggleZen?: () => void
   escape?: () => boolean
+  errors?: Ref<DropRuntimeError[]>
 }) {
   const {
     drop,
@@ -174,16 +176,23 @@ export function useViewerFrame(options: {
 
   const unplaced = ref(new Set<string>())
 
-  let runtimeReports: RuntimeReport[] = []
-  const flushRuntimeReports = useDebounceFn(() => {
-    const errors = runtimeReports.splice(0, 20)
-    runtimeReports = []
-    if (errors.length)
-      $fetch(`/api/drops/${drop.value.id}/errors`, {
-        method: "POST",
-        body: { version: drop.value.version, errors },
-      }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: drop.value.id }))
-  }, 2000)
+  let runtimeReports: { id: string; version: number; errors: RuntimeReport[] } | null = null
+  async function postRuntimeReports({ id, version, errors }: { id: string; version: number; errors: RuntimeReport[] }) {
+    const stored = await $fetch<{ errors: DropRuntimeError[] } | undefined>(`/api/drops/${id}/errors`, {
+      method: "POST",
+      body: { version, errors: errors.slice(0, 20) },
+    }).catch((error: unknown) => reportClientError("runtime-errors", error, { drop: id }))
+    if (stored && options.errors && drop.value.id === id && drop.value.version === version)
+      options.errors.value = stored.errors
+  }
+  let runtimeReportQueue = Promise.resolve()
+  function sendRuntimeReports() {
+    const batch = runtimeReports
+    runtimeReports = null
+    if (batch) runtimeReportQueue = runtimeReportQueue.then(() => postRuntimeReports(batch))
+    return runtimeReportQueue
+  }
+  const flushRuntimeReports = useDebounceFn(sendRuntimeReports, 2000)
 
   const embedLinks = computed(() => {
     if (drop.value.kind !== "markdown") return new Set<string>()
@@ -228,7 +237,11 @@ export function useViewerFrame(options: {
             ...(message.source ? { source: message.source } : {}),
           })
         if ((isApp.value || drop.value.kind === "html") && !trashed.value && message.message) {
-          runtimeReports.push({
+          const { id, version } = drop.value
+          if (runtimeReports && (runtimeReports.id !== id || runtimeReports.version !== version))
+            void sendRuntimeReports()
+          runtimeReports ??= { id, version, errors: [] }
+          runtimeReports.errors.push({
             kind: message.kind,
             message: message.message.slice(0, 500),
             source: message.source?.slice(0, 300),
@@ -339,6 +352,7 @@ export function useViewerFrame(options: {
       case "area-shot":
       case "marker":
       case "marks":
+      case "mark-retry":
       case "draft-place":
       case "page-click":
         annotations.receive(message, box)

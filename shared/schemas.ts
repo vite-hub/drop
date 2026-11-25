@@ -1,4 +1,5 @@
 import * as v from "valibot"
+import { CARD_REASONS } from "./content-unavailable"
 import { LIFETIMES, MAX_KEEP_REASON } from "./expiry"
 import { MAX_SLUG, slugify } from "./links"
 import { MIB } from "./quotas"
@@ -258,6 +259,24 @@ export const RuntimeErrorSchema = v.object({
   page: v.optional(v.pipe(v.string(), v.maxLength(300))),
 })
 
+export const SIGN_IN_MODES = ["proxy", "github"] as const
+const failure = {
+  code: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z][\w.]{0,59}$/))),
+  status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
+}
+export const ClientEventSchema = v.variant("event", [
+  v.strictObject({ event: v.literal("card.shown"), reason: v.picklist(CARD_REASONS) }),
+  v.strictObject({
+    event: v.literal("signin.clicked"),
+    mode: v.picklist(SIGN_IN_MODES),
+    via: v.picklist(["button", "card"]),
+  }),
+  v.strictObject({
+    event: v.picklist(["signin.switch_account", "consent.allowed", "consent.denied", "consent.invalid_link"]),
+  }),
+  v.strictObject({ event: v.picklist(["signin.failed", "consent.failed"]), ...failure }),
+])
+
 export const ClientErrorSchema = v.object({
   action: v.pipe(v.string(), v.maxLength(60)),
   path: v.pipe(v.string(), v.maxLength(600)),
@@ -265,6 +284,7 @@ export const ClientErrorSchema = v.object({
   message: v.pipe(v.string(), v.maxLength(1000)),
   stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
   status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
+  code: v.optional(v.pipe(v.string(), v.maxLength(120))),
   requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   drop: v.optional(v.pipe(v.string(), v.maxLength(40))),
   title: v.optional(v.pipe(v.string(), v.maxLength(200))),
