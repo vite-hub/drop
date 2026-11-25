@@ -4,7 +4,7 @@ import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { installComments } from "vite-hub/comments/server"
 import { createCommentSend, createCommentSendTransport } from "vite-hub/comments/client"
-import { createCommentsHandler } from "vite-hub/comments/runtime"
+import { createCommentsHandler, defineCommentsPlugin } from "vite-hub/comments/runtime"
 import * as realWebhooks from "vite-hub/webhooks"
 import { createDrizzleWebhookEndpointStore, createDrizzleWebhookStore } from "vite-hub/webhooks/database"
 import { installWebhooks } from "vite-hub/webhooks/runtime"
@@ -46,6 +46,9 @@ installWebhooks({
   store: createDrizzleWebhookStore(state.db),
   endpoints: createDrizzleWebhookEndpointStore(state.db),
 })
+// The reader of the ViteHub Console's Site access cookie, as an app with the Console installs it for Comments.
+let siteVisitor
+defineCommentsPlugin({ comments, database: () => state.db, overlay: false, siteVisitor: async () => siteVisitor })({})
 installComments(comments, { database: state.db, webhooks: async () => webhooks })
 const handler = createCommentsHandler({ comments, realtime: false })
 
@@ -61,6 +64,7 @@ beforeEach(() => {
   delivered.length = 0
   rejectDelivery = false
   realDelivery = false
+  siteVisitor = undefined
   state.who = agentOf(ana)
 })
 
@@ -835,4 +839,35 @@ test("Send stays off the ViteHub toolbar's page threads and off pages that aren'
   assert.deepEqual((await session.json()).data.subject, { kind: "page", id: `/d/${doc.id}` })
   // Send doesn't use ordinary toolbar pages as subjects.
   assert.equal((await send(`/status?page=${encodeURIComponent("/drops")}`)).body.data.count, 0)
+})
+
+test("a ViteHub Console Site access cookie signs nobody in to Drop's comments or Send", async () => {
+  const { doc } = await reviewed()
+  // A Console member with every Comments role, whose email is the owner's.
+  siteVisitor = {
+    id: "console-person",
+    name: "Console Admin",
+    email: "owner@example.com",
+    roles: ["console", "comments-read", "comments-write", "comments-resolve", "comments-delete"],
+    kind: "member",
+  }
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  const session = async () =>
+    (await (await handler.fetch(new Request(`https://drop.example/_vitehub/comments/session${page}`))).json()).data
+  const post = () =>
+    handler.fetch(
+      new Request("https://drop.example/_vitehub/comments/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://drop.example" },
+        body: JSON.stringify({ page: `/d/${doc.id}`, body: "From the Console" }),
+      }),
+    )
+
+  state.who = null
+  assert.equal((await session()).user, null)
+  assert.equal((await send(`/start${page}`, { method: "POST" })).status, 403)
+  assert.equal((await post()).status, 403)
+
+  state.who = bob
+  assert.equal((await session()).user.id, "bob", "a signed-in member stays themselves")
 })
