@@ -21,10 +21,25 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..1780adfeffded39b7a66a64f841221cf
    status: "limited";
    count: number;
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..36c46457fcf0182d894b231d82e11ff7405e2c91 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..096d2887d57d5247fd22ee518d5193dab16d3bbf 100644
 --- a/dist/client.js
 +++ b/dist/client.js
-@@ -1281,7 +1281,9 @@ function createCommentSend(transport, options = {}) {
+@@ -1254,6 +1254,14 @@ function createCommentSend(transport, options = {}) {
+ 			if (!canApply()) return;
+ 			if (revision === countRevision) count = status.count;
+ 			selection = status.selection ?? "";
++			if (state.status === "failed" && lastStep === "send" && count > 0) {
++				agent = status.agent;
++				if (count !== state.count) set({
++					...state,
++					count
++				});
++				return;
++			}
+ 			apply(status);
+ 		} catch (error) {
+ 			if (!onError) throw error;
+@@ -1281,7 +1289,9 @@ function createCommentSend(transport, options = {}) {
  		if (result.status === "failed") return set({
  			status: "failed",
  			count,
@@ -35,7 +50,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..36c46457fcf0182d894b231d82e11ff7
  		});
  		if (paired) agent = paired.agent;
  		if (result.status === "limited") return limited(result.retryAt);
-@@ -1469,13 +1471,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1469,13 +1479,14 @@ function createCommentSend(transport, options = {}) {
  			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
  			if (state.status === "failed" && lastStep === "pair") return pair(copy);

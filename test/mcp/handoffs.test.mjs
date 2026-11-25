@@ -713,7 +713,7 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   }
 }, 3000)
 
-test("after a failed ordinary Send, the pill counts what still waits and clears when the comments are answered", async () => {
+test("a failed ordinary Send stays failed with its count updated while comments wait, and clears when they are answered", async () => {
   const { doc, mine, theirs } = await reviewed()
   await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
   state.who = ana
@@ -731,11 +731,12 @@ test("after a failed ordinary Send, the pill counts what still waits and clears 
       (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
       undefined,
     )
-    // A failure lives in the pill only; the next status shows what still waits.
+    // The failure and its reason stay while a comment still waits.
     state.who = ana
     await client.refresh()
-    assert.equal(client.state.status, "idle")
+    assert.equal(client.state.status, "failed")
     assert.equal(client.state.count, 1)
+    assert.equal(client.state.problem, "delivery")
 
     state.who = agentOf(bob)
     assert.equal(
