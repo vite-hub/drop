@@ -24,7 +24,7 @@ const keyProblem = computed(() =>
     : "has no VITEHUB_WEBHOOKS_KEY",
 )
 const fixPrompt = computed(
-  () => `Drop at ${host} can't send review comments to agents: the server ${keyProblem.value}, so pairing an agent fails.
+  () => `Drop at ${host} can't send review comments to agents: the server ${keyProblem.value}.
 
 Set VITEHUB_WEBHOOKS_KEY on the host that runs this Drop, as a secret, to 32 random bytes in base64 from \`openssl rand -base64 32\`. On Cloudflare Workers that's \`wrangler secret put VITEHUB_WEBHOOKS_KEY\`; on a VPS or in Docker, the server's environment. Don't print the value. A later change of key disconnects every agent.
 
@@ -39,8 +39,9 @@ const title = computed(() => {
   const failure = props.failure
   if (failure.cause === "setup")
     return failure.admin ? "Drop can't send to agents yet" : "Send isn't set up on this Drop"
-  if (failure.cause === "agent") return `${failure.agent?.name ?? "Your agent"} didn't take the comments`
-  return "Send couldn't start"
+  if (failure.cause === "agent" && failure.agent) return `Delivery to ${failure.agent.name} not confirmed`
+  if (failure.cause === "reconnect") return "Reconnect your agent"
+  return "Send not completed"
 })
 const docs = "/docs/self-host#github"
 </script>
@@ -50,17 +51,17 @@ const docs = "/docs/self-host#github"
     <template #description>
       <template v-if="failure.cause === 'setup' && failure.admin">
         This Drop {{ failure.problem === "invalid" ? "has a bad" : "has no" }}
-        <code class="font-mono text-[0.85em] text-highlighted">VITEHUB_WEBHOOKS_KEY</code>, so it can't pair an agent.
-        Nothing was sent, and {{ comments }}.
+        <code class="font-mono text-[0.85em] text-highlighted">VITEHUB_WEBHOOKS_KEY</code>, so it can't open or pair a
+        webhook receiver. Nothing was sent, and {{ comments }}.
       </template>
       <template v-else-if="failure.cause === 'setup'">
         An admin has to finish setting it up. Nothing was sent, and {{ comments }}. Until then, copy the prompt and
         paste it in your agent: it reads them through Drop's MCP.
       </template>
-      <template v-else-if="failure.cause === 'agent'">
-        The delivery didn't go through, so nothing reached it, and {{ comments }}.
+      <template v-else-if="failure.cause === 'reconnect'">
+        The server can no longer open this connection. Open Agents to reconnect, then send again; {{ comments }}.
       </template>
-      <template v-else> Drop couldn't get a setup code for your agent. Nothing was sent, and {{ comments }}. </template>
+      <template v-else> In Drop, {{ comments }}. </template>
     </template>
 
     <template v-if="failure.cause !== 'setup' || failure.admin" #body>
@@ -126,7 +127,7 @@ const docs = "/docs/self-host#github"
               size="sm"
               :value="fixPrompt"
               variant="solid"
-              @click="fixCopied = true"
+              @copy="fixCopied = true"
             >
               Copy fix prompt
             </DropCopyButton>
@@ -155,16 +156,17 @@ const docs = "/docs/self-host#github"
             Copy prompt instead
           </DropCopyButton>
           <UButton
-            v-if="failure.cause === 'agent'"
-            :autofocus="failure.tries > 1"
+            v-if="failure.cause === 'agent' || failure.cause === 'reconnect'"
+            :autofocus="failure.cause === 'reconnect' || failure.tries > 1"
             color="neutral"
             label="Open Agents"
             size="sm"
             target="_blank"
             to="/agents"
-            :variant="failure.tries > 1 ? 'solid' : 'ghost'"
+            :variant="failure.cause === 'reconnect' || failure.tries > 1 ? 'solid' : 'ghost'"
           />
           <UButton
+            v-if="failure.cause !== 'reconnect'"
             :autofocus="failure.cause !== 'agent' || failure.tries < 2"
             color="neutral"
             icon="i-mingcute-refresh-anticlockwise-1-line"

@@ -88,7 +88,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       if (nextAnswer) {
         const answer = nextAnswer
         nextAnswer = null
-        return answer
+        return answer.status === "failed" && answer.problem === "delivery" ? { ...answer, agent } : answer
       }
       const sent = carried.get(drop) ?? new Map<string, number>()
       for (const [id, at] of batch) sent.set(id, Math.max(sent.get(id) ?? -1, at))

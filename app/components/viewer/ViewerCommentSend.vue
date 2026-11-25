@@ -2,7 +2,7 @@
 import { CommentSend, useCopy, type CopyValue } from "vite-hub/ui"
 import { createCommentSend, type CommentSendState } from "vite-hub/comments/client"
 import type { DropComment } from "#shared/types"
-import type { DropSend, SendFailure } from "~/utils/comment-send"
+import type { DropSend, SendFailure, SendFailureDetails } from "~/utils/comment-send"
 
 const props = defineProps<{ drop: string; comments: DropComment[]; send: DropSend; prompt?: CopyValue }>()
 const make = () => createCommentSend(props.send.transport(props.drop))
@@ -22,16 +22,16 @@ const shown = shallowRef<SendFailure | null>(null)
 const open = ref(false)
 let asked = 0
 
-async function explain(from: CommentSendState["status"], reason: string) {
+async function explain(from: CommentSendState["status"], result: Extract<CommentSendState, { status: "failed" }>) {
   const ask = ++asked
-  const next =
-    from === "sending"
-      ? ({ cause: "agent", reason, agent: (await props.send.endpoint().catch(() => null))?.agent ?? null } as const)
-      : await props.send.setup().then(
-          ({ problem, admin }) =>
-            problem ? ({ cause: "setup", problem, admin } as const) : ({ cause: "pairing", reason } as const),
-          () => ({ cause: "pairing", reason }) as const,
-        )
+  const { reason, problem, agent } = result
+  let next: SendFailureDetails = { cause: "request", reason }
+  if (problem === "delivery") next = { cause: "agent", reason, agent: agent ?? null }
+  else if (problem || from !== "sending") {
+    const setup = await props.send.setup().catch(() => null)
+    if (setup?.problem) next = { cause: "setup", problem: setup.problem, admin: setup.admin }
+    else if (setup && problem === "key-invalid") next = { cause: "reconnect", reason }
+  }
   if (ask !== asked || client.value.state.status !== "failed") return
   const tries = failure.value?.cause === next.cause ? failure.value.tries + 1 : 1
   failure.value = shown.value = { ...next, tries, at: Date.now() }
@@ -41,13 +41,16 @@ async function explain(from: CommentSendState["status"], reason: string) {
 watch(
   client,
   (current, _, onCleanup) => {
+    asked++
+    failure.value = null
+    open.value = false
     let last = current.state
     state.value = last
     onCleanup(
       current.onChange(() => {
         const next = current.state
         const recount = last.status === "failed" && next.status === "failed" && last.count !== next.count
-        if (next.status === "failed" && !recount) void explain(last.status, next.reason)
+        if (next.status === "failed" && !recount) void explain(last.status, next)
         if (next.status !== "failed" && next.status !== "sending") {
           asked++
           failure.value = null
@@ -76,6 +79,8 @@ const label = computed(() => {
   const current = explained.value
   if (!current) return ""
   if (current.cause === "setup") return "Send needs setup"
+  if (current.cause === "reconnect") return "Reconnect agent"
+  if (current.cause === "request") return "Send failed"
   return current.tries > 1 ? `Not delivered · ${current.tries}×` : "Not delivered"
 })
 </script>

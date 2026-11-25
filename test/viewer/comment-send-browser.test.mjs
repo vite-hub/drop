@@ -131,9 +131,12 @@ const entry = `
   app.component("DropCopyButton", {
     inheritAttrs: false,
     props: ["value"],
-    setup: (props, { slots, attrs }) => () => Vue.h("button", { type: "button", "data-variant": attrs.variant, onClick: async (event) => {
-      attrs.onClick?.(event)
-      await navigator.clipboard.writeText(typeof props.value === "function" ? await props.value() : props.value)
+    emits: ["copy"],
+    setup: (props, { slots, attrs, emit }) => () => Vue.h("button", { type: "button", "data-variant": attrs.variant, onClick: async () => {
+      try {
+        await navigator.clipboard.writeText(typeof props.value === "function" ? await props.value() : props.value)
+        emit("copy")
+      } catch {}
     } }, slots.default?.()),
   })
   app.component("UModal", {
@@ -266,19 +269,19 @@ test("Send walks every In place state in the pill, one row each, through the stu
 
     // Bob comments: Send 1 is back, and its first try isn't delivered.
     await tab.evaluate(() => window.drop.comment("bob"))
-    await control("answer", { status: "failed", reason: "The relay answered 502." })
+    await control("answer", { status: "failed", problem: "delivery", reason: "The receiver returned HTTP 502." })
     await segment.getByRole("button", { name: "Send: 1 comment" }).click()
     await step("failed", "failed")
     // The pill names the failure and opens a dialog with the receiver's answer.
-    const why = tab.getByRole("dialog", { name: "T3 Code didn't take the comments" })
+    const why = tab.getByRole("dialog", { name: "Delivery to T3 Code not confirmed" })
     await why.waitFor()
-    assert.equal(await why.getByText("The relay answered 502.").count(), 1)
+    assert.equal(await why.getByText("The receiver returned HTTP 502.").count(), 1)
     assert.equal(await why.getByText("relay.t3.codes").count(), 1)
     await why.getByRole("button", { name: "Close" }).click()
     await segment.locator("..").getByRole("button", { name: "Not delivered: see why" }).click()
     await why.waitFor()
     // A second failure counts the tries and makes Agents the next step.
-    await control("answer", { status: "failed", reason: "The relay answered 502." })
+    await control("answer", { status: "failed", problem: "delivery", reason: "The receiver returned HTTP 502." })
     await why.getByRole("button", { name: "Retry" }).click()
     await why.getByText(/^Tried 2× · last at /).waitFor()
     assert.equal(await why.getByRole("link", { name: "Open Agents" }).getAttribute("data-variant"), "solid")
@@ -338,6 +341,17 @@ test("Send on a server without VITEHUB_WEBHOOKS_KEY says it needs setup, and the
     await admin.waitFor()
     assert.equal(await toolbar.getByRole("button", { name: "Send needs setup: see why" }).count(), 1)
     if (shots) await toolbar.screenshot({ path: `${shots}/needs-setup.png` })
+    await tab.evaluate(() =>
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: async () => {
+          throw new DOMException("Permission denied", "NotAllowedError")
+        },
+      }),
+    )
+    await admin.getByRole("button", { name: "Copy fix prompt" }).click()
+    assert.equal(await admin.getByRole("button", { name: "Copy again" }).count(), 0)
+    await tab.evaluate(() => Reflect.deleteProperty(navigator.clipboard, "writeText"))
     await admin.getByRole("button", { name: "Copy fix prompt" }).click()
     assert.match(
       await clipboard(),

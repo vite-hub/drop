@@ -11,11 +11,12 @@ export type SendTestResult =
   | { status: "delivered"; code: number | null; ms: number }
   | { status: "failed"; reason: string }
 
-export type SendFailure = { tries: number; at: number } & (
+export type SendFailureDetails =
   | { cause: "setup"; problem: "unset" | "invalid"; admin: boolean }
   | { cause: "agent"; reason: string; agent: CommentSendAgent | null }
-  | { cause: "pairing"; reason: string }
-)
+  | { cause: "reconnect" | "request"; reason: string }
+
+export type SendFailure = SendFailureDetails & { tries: number; at: number }
 
 export interface DropSend {
   transport: (drop: string) => CommentSendTransport
