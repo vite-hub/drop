@@ -1,11 +1,16 @@
 import { APIError } from "better-auth/api"
-import { applySetCookies } from "better-auth/cookies"
+import { applySetCookies, getSessionCookie } from "better-auth/cookies"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import { authError } from "../utils/auth-errors"
 import { sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
-import { oneSignInAtATime } from "../utils/proxy-auth"
-import { isProxyMember, PROXY_TOKEN_HEADER, readAuthProxyConfig } from "../utils/proxy-auth-config"
+import { oneSignInAtATime, oneSignInPerIdentity } from "../utils/proxy-auth"
+import {
+  DROP_SECURE_COOKIE_PREFIX,
+  isProxyMember,
+  PROXY_TOKEN_HEADER,
+  readAuthProxyConfig,
+} from "../utils/proxy-auth-config"
 
 export default defineHandler(async (event) => {
   const proxy = readAuthProxyConfig()
@@ -31,6 +36,10 @@ export default defineHandler(async (event) => {
 })
 
 async function proxySignIn(event: H3Event, token: string) {
+  const { headers } = event.req
+  if (getSessionCookie(headers, { cookiePrefix: DROP_SECURE_COOKIE_PREFIX }) || getSessionCookie(headers))
+    return oneSignInPerIdentity(token, () => sessionOf(event))
+
   let ranHere = false
   const { session, cookies } = await oneSignInAtATime(token, async () => {
     ranHere = true

@@ -70,7 +70,7 @@ export async function oneSignInAtATime<T>(token: string, signIn: () => Promise<T
   }
 }
 
-async function oneSignInPerIdentity<T>(token: string, signIn: () => Promise<T>): Promise<T> {
+export async function oneSignInPerIdentity<T>(token: string, signIn: () => Promise<T>): Promise<T> {
   const identity = await cachedIdentity(token)
   if (await storedAccount(identity)) return signIn()
   const key = `${identity.providerId}\n${identity.accountId}`

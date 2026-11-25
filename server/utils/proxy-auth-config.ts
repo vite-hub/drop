@@ -3,6 +3,7 @@ import { useServerEnv } from "vite-hub/env"
 import { authError } from "./auth-errors"
 
 export const PROXY_TOKEN_HEADER = "x-auth-request-access-token"
+export const DROP_SECURE_COOKIE_PREFIX = "__Host-drop"
 
 const proxyOrganization = () =>
   useServerEnv()

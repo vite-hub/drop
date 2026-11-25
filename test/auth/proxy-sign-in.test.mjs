@@ -133,12 +133,13 @@ function signIn(instance, token) {
   )
 }
 
-function auth(databaseHooks = {}) {
+function auth(databaseHooks = {}, advanced) {
   return betterAuth({
     baseURL: "https://drop.example",
     secret: "test-only-secret-at-least-thirty-two-characters",
     database: drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }),
     databaseHooks,
+    advanced,
     plugins: [proxyAuth(), admin()],
   })
 }
@@ -461,6 +462,7 @@ test("two requests of one browser that arrive together get one session", async (
   sql.prepare("DELETE FROM session").run()
   Object.defineProperty(state, "auth", { get: () => auth(), configurable: true })
   const events = Array.from({ length: 2 }, () => new H3Event(startRequest("test-same-browser")))
+  for (const event of events) event.req.headers.set("cookie", "__Host-drop-auth=proxy-cookie")
   await Promise.all(events.map((event) => proxySession(event)))
   assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 1)
   const [first, second] = events.map(
@@ -468,6 +470,36 @@ test("two requests of one browser that arrive together get one session", async (
   )
   assert.match(first ?? "", /session_token=/)
   assert.equal(second, first)
+})
+
+test("overlapping requests with and without a Drop cookie keep separate sessions", async () => {
+  github()
+  const token = "test-mixed-cookies"
+  const newAuth = () => auth({}, { useSecureCookies: false, cookiePrefix: "__Host-drop" })
+  const started = await signIn(newAuth(), token)
+  assert.equal(started.status, 200)
+  const existingCookie = started.headers
+    .getSetCookie()
+    .find((cookie) => cookie.startsWith("__Host-drop.session_token="))
+  assert.ok(existingCookie)
+  const existingPair = existingCookie.split(";")[0]
+  Object.defineProperty(state, "auth", { get: newAuth, configurable: true })
+
+  const request = startRequest(token)
+  request.headers.set("cookie", existingPair)
+  const existing = new H3Event(request)
+  const fresh = new H3Event(startRequest(token))
+  await Promise.all([proxySession(existing), proxySession(fresh)])
+
+  assert.equal(existing.req.headers.get("cookie"), existingPair)
+  assert.equal(existing.context.dropSessionCookies, undefined)
+  assert.match(fresh.req.headers.get("cookie") ?? "", /__Host-drop\.session_token=/)
+  assert.notEqual(fresh.req.headers.get("cookie"), existingPair)
+  for (const event of [existing, fresh]) {
+    assert.equal(event.req.headers.get("x-auth-request-access-token"), null)
+    assert.equal((await newAuth().api.getSession({ headers: event.req.headers }))?.user.email, "maxi@example.com")
+  }
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 2)
 })
 
 test("browsers of a proxy member who already has an account don't wait on each other", async () => {
