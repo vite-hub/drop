@@ -313,7 +313,7 @@ test("Send walks every In place state in the pill, one row each, through the stu
   }
 }, 60_000)
 
-test("Send on a server without VITEHUB_WEBHOOKS_KEY says it needs setup, and the fix leads back to pairing", async () => {
+test("Send on a server without VITEHUB_WEBHOOKS_KEY stays Send, explains itself when pressed, and the fix leads back to pairing", async () => {
   const browser = await chromium.launch()
   try {
     const { tab, segment, control, errors } = await openFixture(browser, {
@@ -333,13 +333,14 @@ test("Send on a server without VITEHUB_WEBHOOKS_KEY says it needs setup, and the
     await member.getByRole("button", { name: "Copy prompt" }).click()
     assert.equal(await clipboard(), "Address the comments on drop abc.")
     await member.getByRole("button", { name: "Close" }).click()
+    assert.equal(await toolbar.getByText(/needs setup|Not delivered|Retry/).filter({ visible: true }).count(), 0)
+    if (shots) await toolbar.screenshot({ path: `${shots}/setup-send.png` })
 
     // An admin copies a prompt that fixes the host, retries, and pairs once the key is set.
     await control("unset", { problem: "unset", admin: true })
-    await segment.getByRole("button", { name: "Retry: send 3 comments again" }).click()
+    await segment.getByRole("button", { name: "Send: 3 comments" }).click()
     const admin = tab.getByRole("dialog", { name: "Drop can't send to agents yet" })
     await admin.waitFor()
-    assert.equal(await toolbar.getByRole("button", { name: "Send needs setup: see why" }).count(), 1)
     if (shots) await toolbar.screenshot({ path: `${shots}/needs-setup.png` })
     await tab.evaluate(() =>
       Object.defineProperty(navigator.clipboard, "writeText", {

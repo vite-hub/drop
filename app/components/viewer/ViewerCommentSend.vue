@@ -75,10 +75,11 @@ async function retry() {
 }
 
 const explained = computed(() => (state.value.status === "failed" ? failure.value : null))
+const setup = computed(() => explained.value?.cause === "setup")
+const waiting = computed(() => `${state.value.count} ${state.value.count === 1 ? "comment" : "comments"}`)
 const label = computed(() => {
   const current = explained.value
   if (!current) return ""
-  if (current.cause === "setup") return "Send needs setup"
   if (current.cause === "reconnect") return "Reconnect agent"
   if (current.cause === "request") return "Send failed"
   return current.tries > 1 ? `Not delivered · ${current.tries}×` : "Not delivered"
@@ -87,12 +88,28 @@ const label = computed(() => {
 
 <template>
   <div class="flex items-center" :data-explained="explained ? '' : undefined">
+    <div v-if="setup" class="text-xs font-medium" data-slot="comment-send">
+      <span data-slot="comment-send-content">
+        <button
+          :aria-label="`Send: ${waiting}`"
+          data-action="send"
+          data-slot="comment-send-action"
+          :title="`Send ${waiting} that wait for an answer to your agent`"
+          type="button"
+          @click="retry"
+        >
+          <UIcon aria-hidden="true" class="vh-comment-send-icon" name="i-lucide-send" />
+          Send
+          <span data-slot="comment-send-count">{{ state.count }}</span>
+        </button>
+      </span>
+    </div>
     <UButton
-      v-if="explained"
+      v-else-if="explained"
       :aria-label="`${label}: see why`"
       aria-haspopup="dialog"
       class="[animation:pop-in_200ms_var(--ease-out)]"
-      :color="explained.cause === 'setup' ? 'warning' : 'error'"
+      color="error"
       icon="i-mingcute-alert-octagon-line"
       size="xs"
       trailing-icon="i-mingcute-right-small-line"
@@ -101,7 +118,7 @@ const label = computed(() => {
     >
       <span class="max-sm:hidden">{{ label }}</span>
     </UButton>
-    <CommentSend :client="client" class="text-xs font-medium" />
+    <CommentSend v-show="!setup" :client="client" class="text-xs font-medium" />
     <ViewerSendFailure
       v-if="shown"
       v-model:open="open"
@@ -115,7 +132,8 @@ const label = computed(() => {
 </template>
 
 <style scoped>
-/* Drop's button above says why, so ViteHub's Not delivered goes; its Retry stays. */
+/* Drop's button above says why, so ViteHub's Not delivered goes; its Retry stays. When the server isn't set up,
+   Drop draws a plain Send in its place, and pressing it tries again and opens the dialog. */
 [data-explained] :deep([data-slot="comment-send-status"]) {
   display: none;
 }
