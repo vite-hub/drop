@@ -282,6 +282,31 @@ test("/mcp names a batch's methods, and an unreadable body leaves the method out
   assert.deepEqual(garbled.event.mcp.auth, { presented: false, result: "challenge" })
 })
 
+test("/mcp keeps the methods and tool log for an authenticated mixed batch", async () => {
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const { event, response } = await mcpCall({ authorization: "Bearer good-access" }, [
+    { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_drops", arguments: {} } },
+  ])
+  assert.equal(response.status, 200)
+  assert.equal(event.mcp.method, "tools/list,tools/call")
+  assert.deepEqual(
+    event.mcp.calls.map(({ tool, isError }) => ({ tool, isError })),
+    [{ tool: "list_drops", isError: false }],
+  )
+})
+
+test("/mcp handles a body above the logging cap without Content-Length", async () => {
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const { event, response } = await mcpCall(
+    { authorization: "Bearer good-access", "content-type": "application/json" },
+    JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) + " ".repeat(16_384),
+  )
+  assert.equal(response.status, 200)
+  assert.deepEqual(event.mcp.auth, { presented: true, result: "ok" })
+  assert.equal(event.mcp.method, undefined)
+})
+
 test("a token's reason comes from ViteHub's error.data first, else from its message", () => {
   assert.equal(
     mcpTokenReason({ message: "anything", data: { reason: "client_disabled", clientId: "c" } }),

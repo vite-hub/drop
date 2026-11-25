@@ -44,7 +44,7 @@ async function smallBody(request: Request): Promise<string | undefined> {
   for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
     size += chunk.value.byteLength
     if (size > CHEAP_BODY_BYTES) {
-      await reader.cancel()
+      void reader.cancel().catch(() => {})
       return
     }
     text += decoder.decode(chunk.value, { stream: true })
@@ -140,7 +140,12 @@ export function mcpFor(origin: string) {
         const drop = named.success ? named.output.id : event.context.loggedDrop
         event.context.loggedDrop = undefined
         const call = { tool: name, durationMs: Math.round(durationMs), isError: failed, drop, error }
-        log.set({ mcp: { method: "tools/call", tool: name, isError: failed, calls: [call] } })
+        const logged = log.getContext().mcp
+        const method =
+          logged && typeof logged === "object" && "method" in logged && typeof logged.method === "string"
+            ? logged.method
+            : "tools/call"
+        log.set({ mcp: { method, tool: name, isError: failed, calls: [call] } })
         if (failed) log.warn(`MCP tool ${name} failed`)
       },
     },
