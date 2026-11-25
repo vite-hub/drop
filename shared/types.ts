@@ -275,6 +275,11 @@ export interface SkillSummary {
   source: string
 }
 
+export interface SendSetup {
+  problem: "unset" | "invalid" | null
+  admin: boolean
+}
+
 export interface ConnectedAgent {
   id: string
   name: string

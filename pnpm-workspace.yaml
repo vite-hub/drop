@@ -50,6 +50,10 @@ overrides:
   vite@*: "catalog:"
 
 patchedDependencies:
+  # A failed Send says why (drop#301): `problem` ("delivery", "key-unset", "key-invalid") and the receiver's `agent` on
+  # the failed result, the receiver's HTTP status or timeout from the webhook delivery, and Send or Pair again re-pairs
+  # after a key problem. No upstream issue yet. Delete when ViteHub ships drop#301's Send failure details.
+  "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.

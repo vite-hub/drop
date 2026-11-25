@@ -1,0 +1,130 @@
+diff --git a/dist/client.d.ts b/dist/client.d.ts
+index 216e02722e027b793a4f66542c859c09dd6be51c..1780adfeffded39b7a66a64f841221cfad1e42a0 100644
+--- a/dist/client.d.ts
++++ b/dist/client.d.ts
+@@ -477,6 +477,8 @@ type CommentSendResult = {
+ } | {
+   status: "failed";
+   reason: string;
++  problem?: "delivery" | "key-unset" | "key-invalid";
++  agent?: CommentSendAgent;
+ } | {
+   status: "limited";
+   retryAt: number;
+@@ -547,6 +549,8 @@ type CommentSendState = {
+   status: "failed";
+   count: number;
+   reason: string;
++  problem?: "delivery" | "key-unset" | "key-invalid";
++  agent?: CommentSendAgent;
+ } | {
+   status: "limited";
+   count: number;
+diff --git a/dist/client.js b/dist/client.js
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..36c46457fcf0182d894b231d82e11ff7405e2c91 100644
+--- a/dist/client.js
++++ b/dist/client.js
+@@ -1281,7 +1281,9 @@ function createCommentSend(transport, options = {}) {
+ 		if (result.status === "failed") return set({
+ 			status: "failed",
+ 			count,
+-			reason: result.reason
++			reason: result.reason,
++			...result.problem ? { problem: result.problem } : {},
++			...result.agent ? { agent: result.agent } : {}
+ 		});
+ 		if (paired) agent = paired.agent;
+ 		if (result.status === "limited") return limited(result.retryAt);
+@@ -1469,13 +1471,14 @@ function createCommentSend(transport, options = {}) {
+ 			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
+ 			if (state.status !== "failed" && count === 0) return;
+ 			if (state.status === "failed" && lastStep === "pair") return pair(copy);
++			if (needsStatus() && (state.problem === "key-unset" || state.problem === "key-invalid")) return pair(copy);
+ 			if (needsStatus()) return refresh(() => void 0);
+ 			if (!agent) return pair(copy);
+ 			lastStep = "send";
+ 			return deliver(() => transport.send());
+ 		},
+ 		async pairAnother(copy) {
+-			if (state.status !== "idle" || !state.canPairAnother) return;
++			if (!(state.status === "idle" && state.canPairAnother) && !(state.status === "failed" && count > 0)) return;
+ 			return pair(copy);
+ 		},
+ 		async allow() {
+diff --git a/dist/install-w6CCgGFV.js b/dist/install-w6CCgGFV.js
+index d1d94c0b7ca495ef0f073c4f2ce46f1805f1b166..334e2f6584953c3d506fa396e8cc7c563b95ecb1 100644
+--- a/dist/install-w6CCgGFV.js
++++ b/dist/install-w6CCgGFV.js
+@@ -1371,6 +1371,10 @@ function agentOf(endpoint) {
+ 		...endpoint?.host ? { host: endpoint.host } : {}
+ 	};
+ }
++function keyProblem(error) {
++	if (error?.code === "WEBHOOKS_KEY_UNSET") return "key-unset";
++	if (error?.code === "WEBHOOKS_KEY_INVALID") return "key-invalid";
++}
+ const lastOf = (thread) => thread.messages.at(-1);
+ function verifiedEmail(user) {
+ 	const email = user.email;
+@@ -1710,14 +1714,15 @@ function createCommentSendService(options) {
+ 				reason: deliveryFailed
+ 			};
+ 		}
+-		const fail = async (reason) => {
++		const fail = async (reason, details = {}) => {
+ 			if (!await store.setSendState(id, ["pending"], "failed", Date.now(), { error: reason })) {
+ 				const current = await store.send(id);
+ 				if (current) return resultOf(current);
+ 			}
+ 			return {
+ 				status: "failed",
+-				reason
++				reason,
++				...details
+ 			};
+ 		};
+ 		let data = null;
+@@ -1760,7 +1765,18 @@ function createCommentSendService(options) {
+ 			sealBody: true,
+ 			hosts
+ 		});
+-		if (error || delivered.status === "failed") return fail(error?.why ?? deliveryFailed);
++		const attempt = delivered && (delivered.status === "failed" || delivered.status === "pending") ? (await (await import("@vite-hub/webhooks/runtime")).getWebhookDelivery(delivered.id))[1] : void 0;
++		if (error || delivered.status === "failed" || attempt?.state === "dead") {
++			const answered = attempt?.lastStatus;
++			const timeout = /^no answer within \d+ seconds$/.test(attempt?.lastError ?? "");
++			const reason = error ? error.why : answered ? `The receiver returned HTTP ${answered}.` : timeout ? "The receiver did not answer before the request timed out. It may still have received the comments." : "Drop could not confirm delivery to the receiver.";
++			const problem = keyProblem(error) ?? (error ? void 0 : "delivery");
++			const agent = agentOf(endpoint);
++			return fail(reason, {
++				...problem ? { problem } : {},
++				...problem === "delivery" && agent ? { agent } : {}
++			});
++		}
+ 		const status = delivered.status === "pending" ? "pending" : "sent";
+ 		if (!await store.setSendState(id, ["pending"], status, Date.now(), { delivery: delivered.id })) {
+ 			const current = await store.send(id);
+@@ -1915,14 +1931,17 @@ function createCommentSendService(options) {
+ 				...email ? { ownerEmail: email } : {},
+ 				hosts
+ 			});
+-			if (error) return [void 0, {
+-				status: "failed",
+-				reason: error.why
+-			}];
++			if (error) {
++				const problem = keyProblem(error);
++				return [void 0, {
++					status: "failed",
++					reason: error.why,
++					...problem ? { problem } : {}
++				}];
++			}
+ 			if (allowed.status !== "allowed") return allowed.status === "not-owner" ? forbidden() : [commentsErrors.COMMENTS_SEND_CODE_EXPIRED(), void 0];
+ 			return [void 0, await deliver(caller, user, {
+-				id: allowed.endpoint.id,
+-				kind: allowed.endpoint.kind,
++				...allowed.endpoint,
+ 				thread: allowed.pairing.address
+ 			}, confirmed)];
+ 		},

@@ -2062,6 +2062,7 @@ watch(
                     v-show="!lightbox && !commentMode"
                     :comments="publishedComments"
                     :drop="drop.id"
+                    :prompt="prompt"
                     :send="dropSend"
                   />
                   <ViewerCopyPrompt
