@@ -12,6 +12,7 @@ import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { authRequest, logAudit, requestLog } from "./utils/logs"
+import { oauthLog } from "./utils/oauth-log"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import {
@@ -195,6 +196,7 @@ export default defineAuth(({ env, requestOrigin }) => {
           enforcePerClientResources: false,
         },
       }),
+      oauthLog(),
     ],
   }
 })
