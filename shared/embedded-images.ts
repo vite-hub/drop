@@ -27,10 +27,14 @@ export const embeddedMediaPaths = (sources: string[], host: string, attachments:
 
 const ONE_FILE_LINK = new RegExp(`^${FILE_LINK.source}$`, "i")
 
+export function pdfFile(src: string) {
+  const path = src.match(ONE_FILE_LINK)?.[1]
+  return path && PDF_FILE.test(path) ? path : undefined
+}
+
 export function localPdf(src: string, host: string) {
-  const [link, path] = src.match(ONE_FILE_LINK) ?? []
-  if (!link || !path || !PDF_FILE.test(path)) return
-  return link.startsWith("http") && new URL(link).host !== host ? undefined : path
+  const path = pdfFile(src)
+  return path && src.startsWith("http") && new URL(src).host !== host ? undefined : path
 }
 
 const PDF_BOX = /<figure\b[^>]*?\sdata-drop-src="([^"]*)"/gi

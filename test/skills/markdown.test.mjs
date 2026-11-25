@@ -268,9 +268,12 @@ test("an attached PDF written as an image becomes the PDF's box in the doc, or a
     new RegExp(`<figure class="drop-embed" data-drop-src="https://other.example.com${pdf}" data-kind="pdf"`),
   )
   assert.doesNotMatch(html, /data-drop-file/)
-  assert.match(html, new RegExp(`<p>Read <a href="https://drop.example.com${pdf}">the CV</a> first.</p>`))
+  assert.match(
+    html,
+    new RegExp(`<p>\\s*Read <a class="cm-pdf" href="https://drop.example.com${pdf}">the CV</a> first.\\s*</p>`),
+  )
   // Alone in a list item it isn't a paragraph of its own, so it stays a link too.
-  assert.match(html, new RegExp(`<li><a href="${pdf}\\?raw">Old CV</a></li>`))
+  assert.match(html, new RegExp(`<li>\\s*<a class="cm-pdf" href="${pdf}\\?raw">Old CV</a>\\s*</li>`))
   assert.doesNotMatch(html, /<img|<p><figure|render-error/)
   assert.deepEqual(await lintMarkdown(markdown), [])
 })

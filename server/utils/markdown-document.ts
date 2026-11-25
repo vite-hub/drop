@@ -23,6 +23,7 @@ import outline, { scripts as outlineScripts } from "comark-outline/html"
 import { scripts as propertiesScripts } from "comark-properties/html"
 import { describeTime } from "comark-time"
 import type { DropResource } from "#shared/types"
+import { pdfFile } from "#shared/embedded-images"
 
 const DROP_LINK = /^(?:(?:https?:\/\/[^/]+)?\/d\/)?([0-9a-hjkmnp-tv-z]{12})(?:[/?#].*)?$/
 
@@ -205,36 +206,30 @@ function dropBox(link: string, height: unknown, title: string) {
   )
 }
 
-const PDF_FILE = /^(?:https?:\/\/[^/\s]+)?\/f\/[0-9a-f-]{36}\.pdf(?:\?raw)?$/i
-
-function pdfImage(node: MarkdownNode | undefined) {
-  if (!Array.isArray(node) || node[0] !== "img") return
-  const src = textValue(node[1].src)
-  return src && PDF_FILE.test(src) ? { src, alt: textValue(node[1].alt)?.trim() || "PDF" } : undefined
-}
-
-function boxAttachedPdfs(nodes: MarkdownNode[]): void {
+function boxLonePdfs(nodes: MarkdownNode[]): void {
   nodes.forEach((node, index) => {
     if (!Array.isArray(node) || node[0] === null) return
     const [tag, , ...children] = node
     const content = children.filter((child) => typeof child !== "string" || child.trim())
-    const lone = tag === "p" && content.length === 1 ? pdfImage(content[0]) : undefined
-    const inline = pdfImage(node)
-    if (lone) nodes[index] = ["drop-pdf", lone]
-    else if (inline) nodes[index] = ["a", { href: inline.src }, inline.alt]
+    const [media] = content
+    const pdf =
+      tag === "p" && content.length === 1 && Array.isArray(media) && media[0] === "media" && media[1].kind === "pdf"
+    if (pdf && pdfFile(textValue(media[1].src) ?? "")) nodes[index] = ["media", { ...media[1], box: true }]
     else {
-      boxAttachedPdfs(children)
+      boxLonePdfs(children)
       node.splice(2, children.length, ...children)
     }
   })
 }
 
-const renderPdfBox: NodeHandler = ([, attrs]) => {
-  const src = textValue(attrs.src) ?? ""
-  const title = textValue(attrs.alt) ?? "PDF"
+const renderMedia: NodeHandler = (node, state) => {
+  const [, attrs] = node
+  if (!attrs.box) return preset.components.media?.(node, state) ?? ""
+  const src = escapeHtml(textValue(attrs.src) ?? "")
+  const title = escapeHtml(textValue(attrs.label)?.trim() || "PDF")
   return (
-    `<figure class="drop-embed" data-drop-src="${escapeHtml(src)}" data-kind="pdf" data-title="${escapeHtml(title)}">` +
-    `<a class="drop-embed-link" href="${escapeHtml(src)}">${escapeHtml(title)}</a></figure>`
+    `<figure class="drop-embed" data-drop-src="${src}" data-kind="pdf" data-title="${title}">` +
+    `<a class="drop-embed-link" href="${src}">${title}</a></figure>`
   )
 }
 
@@ -336,7 +331,7 @@ async function renderMarkdownBody(
 ): Promise<{ title: string; html: string; retry?: true; failed?: true }> {
   try {
     const document = await parseForReaders(renameLegacyProps(markdown))
-    boxAttachedPdfs(document.nodes)
+    boxLonePdfs(document.nodes)
     capProseImageWidths(document.nodes)
     markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
@@ -352,10 +347,10 @@ async function renderMarkdownBody(
         callout: renderCallout,
         caution: renderCallout,
         drop: renderDropEmbed,
-        "drop-pdf": renderPdfBox,
         embed: renderEmbed,
         important: renderCallout,
         info: renderCallout,
+        media: renderMedia,
         note: renderCallout,
         tip: renderCallout,
         warning: renderCallout,
