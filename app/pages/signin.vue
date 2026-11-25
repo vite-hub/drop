@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { signInPath } from "#shared/sign-in"
-import { switchProxyAccount, SwitchSignOutError } from "~/utils/switch-account"
 
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
