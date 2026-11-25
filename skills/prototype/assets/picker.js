@@ -290,6 +290,7 @@
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
   let dockBottom = 72, fitted = null;
+  let labelFocusFrame = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
@@ -320,6 +321,7 @@
     });
     const clear = (self, l, t, r, b) => rects.every((o) => o === self || o.l >= r || o.r <= l || o.t >= b || o.b + LABEL_CLEAR <= t);
     const focused = document.hasFocus() ? tags.getRootNode().activeElement : null;
+    let watchLabelFocus = false;
     for (const [i, it] of items.entries()) {
       const width = rects[i].r - rects[i].l;
       it.tag.style.width = width + LABEL_INSET + "px";
@@ -335,10 +337,19 @@
       const top = bottom - NAME_H - (note ? noteHeight : 0);
       // A label someone is using with the keyboard stays, so its focus isn't lost mid-move.
       const kept = Boolean(focused) && it.tag.contains(focused);
-      it.tag.classList.toggle("tight", noteHeight > 0 && !note);
-      it.tag.classList.toggle("hide", !kept && !note && !clear(s, s.l, bottom - NAME_H, s.r, bottom));
+      const hide = !note && !clear(s, s.l, bottom - NAME_H, s.r, bottom);
       const left = s.l - LABEL_INSET;
-      it.tag.classList.toggle("nohandle", !kept && !clear(s, left, top, left + HANDLE_W, top + NAME_H));
+      const noHandle = !clear(s, left, top, left + HANDLE_W, top + NAME_H);
+      it.tag.classList.toggle("tight", noteHeight > 0 && !note);
+      it.tag.classList.toggle("hide", !kept && hide);
+      it.tag.classList.toggle("nohandle", !kept && noHandle);
+      watchLabelFocus ||= kept && (hide || noHandle);
+    }
+    if (watchLabelFocus && !labelFocusFrame) {
+      labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    } else if (!watchLabelFocus && labelFocusFrame) {
+      cancelAnimationFrame(labelFocusFrame);
+      labelFocusFrame = 0;
     }
     drawMap();
     rest();
@@ -349,6 +360,12 @@
     document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
+  function checkLabelFocus() {
+    labelFocusFrame = 0;
+    if (mode !== "canvas") return;
+    if (document.hasFocus()) labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    else schedule();
+  }
   tags.addEventListener("focusout", (event) => {
     const tag = event.target.closest(".tag");
     if (tag && !tag.contains(event.relatedTarget)) schedule();

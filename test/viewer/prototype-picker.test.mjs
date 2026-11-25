@@ -348,6 +348,7 @@ test("an overlapping canvas label hides when focus moves from the Firefox iframe
   const browser = await firefox.launch()
   try {
     const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    tab.setDefaultTimeout(5000)
     const html = injectRuntime(`<!doctype html><html><body>${focusSections}</body></html>`, false, 0, true)
     await tab.route("https://viewer.test/", (route) =>
       route.fulfill({
@@ -361,24 +362,25 @@ test("an overlapping canvas label hides when focus moves from the Firefox iframe
       localStorage.setItem("drop-prototype-canvas:/labels", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z: 1 } }))
     })
     await tab.goto("https://viewer.test/")
+    const frame = tab.frame({ url: "https://picker.test/labels" })
     const prototype = tab.frameLocator("iframe")
     const handle = prototype.getByRole("button", { name: "Move Lower" })
     const name = prototype.locator("prototype-picker .tag .name").nth(1)
     await handle.click()
     await tab.keyboard.press("ArrowUp")
     await tab.keyboard.press("ArrowUp")
-    await tab
-      .frame({ url: "https://picker.test/labels" })
-      .waitForFunction(
-        () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
-      )
+    await frame.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
+    )
+    assert.equal(await frame.evaluate(() => document.hasFocus()), true)
     assert.equal(await name.isVisible(), true)
     await tab.getByRole("button", { name: "Viewer control" }).click()
+    await frame.waitForFunction(() => !document.hasFocus())
     await name.waitFor({ state: "hidden", timeout: 3000 })
   } finally {
     await browser.close()
   }
-})
+}, 20000)
 
 test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {
   const browser = await chromium.launch()
