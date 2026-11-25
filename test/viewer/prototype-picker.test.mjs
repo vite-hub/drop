@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { chromium } from "playwright"
+import { chromium, firefox } from "playwright"
 import { test } from "vite-plus/test"
 const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
 const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
@@ -321,29 +321,63 @@ test("a hidden canvas handle lets clicks reach a live item underneath", async ()
   )
 })
 
+const focusSections = `<section id="v-upper" data-variant="Upper" data-width="240" data-height="80" data-x="0" data-y="0"></section>
+    <section id="v-lower" data-variant="Lower" data-width="240" data-height="100" data-x="0" data-y="116"></section>`
+
 test("an overlapping canvas label hides as soon as keyboard focus leaves it", async () => {
-  await withLabelCanvas(
-    `<section id="v-upper" data-variant="Upper" data-width="240" data-height="80" data-x="0" data-y="0"></section>
-    <section id="v-lower" data-variant="Lower" data-width="240" data-height="100" data-x="0" data-y="116"></section>`,
-    1,
-    async (tab, tag) => {
-      const handle = tag.locator(".handle")
-      const name = tag.locator(".name")
-      await handle.focus()
-      await tab.keyboard.press("ArrowUp")
-      await tab.keyboard.press("ArrowUp")
-      await tab.waitForFunction(
+  await withLabelCanvas(focusSections, 1, async (tab, tag) => {
+    const handle = tag.locator(".handle")
+    const name = tag.locator(".name")
+    await handle.focus()
+    await tab.keyboard.press("ArrowUp")
+    await tab.keyboard.press("ArrowUp")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
+    )
+    assert.equal(await name.isVisible(), true)
+    await tab.keyboard.press("Tab")
+    await tab.keyboard.press("Tab")
+    assert.equal(await name.isVisible(), true)
+    await tab.keyboard.press("Tab")
+    await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    assert.equal(await name.isVisible(), false)
+  })
+})
+
+test("an overlapping canvas label hides when focus moves from the Firefox iframe to the viewer", async () => {
+  const browser = await firefox.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(`<!doctype html><html><body>${focusSections}</body></html>`, false, 0, true)
+    await tab.route("https://viewer.test/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: '<button>Viewer control</button><br><iframe src="https://picker.test/labels" width="900" height="600"></iframe>',
+      }),
+    )
+    await tab.route("https://picker.test/labels", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.addInitScript(() => {
+      if (location.origin !== "https://picker.test") return
+      localStorage.setItem("drop-prototype-canvas:/labels", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z: 1 } }))
+    })
+    await tab.goto("https://viewer.test/")
+    const prototype = tab.frameLocator("iframe")
+    const handle = prototype.getByRole("button", { name: "Move Lower" })
+    const name = prototype.locator("prototype-picker .tag .name").nth(1)
+    await handle.click()
+    await tab.keyboard.press("ArrowUp")
+    await tab.keyboard.press("ArrowUp")
+    await tab
+      .frame({ url: "https://picker.test/labels" })
+      .waitForFunction(
         () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
       )
-      assert.equal(await name.isVisible(), true)
-      await tab.keyboard.press("Tab")
-      await tab.keyboard.press("Tab")
-      assert.equal(await name.isVisible(), true)
-      await tab.keyboard.press("Tab")
-      await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-      assert.equal(await name.isVisible(), false)
-    },
-  )
+    assert.equal(await name.isVisible(), true)
+    await tab.getByRole("button", { name: "Viewer control" }).click()
+    await name.waitFor({ state: "hidden", timeout: 3000 })
+  } finally {
+    await browser.close()
+  }
 })
 
 test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {

@@ -319,7 +319,7 @@
       return { l, t, r: l + b.w * cam.z, b: t + b.h * cam.z };
     });
     const clear = (self, l, t, r, b) => rects.every((o) => o === self || o.l >= r || o.r <= l || o.t >= b || o.b + LABEL_CLEAR <= t);
-    const focused = tags.getRootNode().activeElement;
+    const focused = document.hasFocus() ? tags.getRootNode().activeElement : null;
     for (const [i, it] of items.entries()) {
       const width = rects[i].r - rects[i].l;
       it.tag.style.width = width + LABEL_INSET + "px";
@@ -353,6 +353,8 @@
     const tag = event.target.closest(".tag");
     if (tag && !tag.contains(event.relatedTarget)) schedule();
   });
+  window.addEventListener("blur", schedule);
+  window.addEventListener("focus", schedule);
   // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
   // further away for SLEEP ms. A page still loading after STALL ms is stopped and tried again only once its item has
   // left and come back near or the reader clicks Retry. The item in focus never sleeps (it's the only one near), nor
