@@ -9,19 +9,24 @@ const { signOut } = useUserSession(useNuxtApp().$auth)
 const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev
+const leave = (url: string) => navigateTo(url, { external: true })
 
 async function connect() {
   pending.value = true
   error.value = ""
+  const switchingProxyAccount = method.value?.proxy && !!me.value
+  reportSignInClicked(method.value?.proxy ? "proxy" : "github")
+  if (me.value) reportClientEvent({ event: "signin.switch_account" })
   try {
     if (method.value?.proxy) {
       const start = signInPath(next.value, { proxy: true })
-      await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
+      await (switchingProxyAccount ? switchProxyAccount(start, { signOut, navigate: leave }) : leave(start))
       return
     }
     if (me.value) {
       const result = await signOut()
-      if (result.error) throw answerError(result.error.message ?? "Couldn't sign out.", result.error.status)
+      if (result.error)
+        throw answerError(result.error.message ?? "Couldn't sign out.", result.error.status, answerCode(result.error))
       clearNuxtData()
     }
     const result = await signIn.social({
@@ -29,9 +34,17 @@ async function connect() {
       callbackURL: next.value,
       additionalParams: { prompt: "select_account" },
     })
-    if (result.error) throw answerError(result.error.message ?? "Couldn't start GitHub sign-in.", result.error.status)
+    if (result.error)
+      throw answerError(
+        result.error.message ?? "Couldn't start GitHub sign-in.",
+        result.error.status,
+        answerCode(result.error),
+      )
   } catch (cause) {
-    reportClientError("signin", cause)
+    reportClientError(
+      switchingProxyAccount ? "signin-switch" : "signin",
+      cause instanceof SwitchSignOutError ? cause.cause : cause,
+    )
     error.value = errorText(cause)
     pending.value = false
   }

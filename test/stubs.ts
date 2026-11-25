@@ -55,12 +55,12 @@ export const checkAuthMember = async (userId) => {
   const [row] = await globalThis.dropTest.db.all(sql\`SELECT email FROM user WHERE id = \${userId}\`)
   return row && listed.includes(row.email.toLowerCase()) ? [undefined, undefined] : [{ code: "AUTH_NOT_MEMBER" }, undefined]
 }
-// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, else the session of \`dropTest.authApi\`.
+// requireCaller: a bearer token is \`dropTest.mcpCaller\`'s, or refused with \`dropTest.mcpRefusal\`, else the session of \`dropTest.authApi\`.
 export const requireCaller = async (event) => {
   const headers = event.req.headers
   if (/^Bearer\\s+\\S+$/i.test(headers.get("authorization") ?? "")) {
     const caller = globalThis.dropTest.mcpCaller
-    if (!caller) return [{ code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
+    if (!caller) return [globalThis.dropTest.mcpRefusal ?? { code: "AUTH_MCP_TOKEN_INVALID", message: "invalid token" }, undefined]
     return [undefined, { kind: "agent", user: caller.user, client: { id: caller.clientId ?? "client", name: caller.clientName }, scopes: caller.scopes ?? [] }]
   }
   const { headers: responseHeaders, response: session } = await useAuth(event).api.getSession({ headers, returnHeaders: true })

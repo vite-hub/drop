@@ -15,6 +15,8 @@ import { authRequest, logAudit, requestLog } from "./utils/logs"
 import { oauthLog } from "./utils/oauth-log"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
+import { DROP_SECURE_COOKIE_PREFIX } from "./utils/proxy-auth-config"
+import { logSignedIn } from "./utils/sign-in-attempt"
 import {
   authorizeBilling,
   billingConfig,
@@ -77,7 +79,11 @@ export default defineAuth(({ env, requestOrigin }) => {
     advanced: {
       ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
       ...(requestOrigin.startsWith("https://")
-        ? { useSecureCookies: false, cookiePrefix: "__Host-drop", defaultCookieAttributes: { secure: true } }
+        ? {
+            useSecureCookies: false,
+            cookiePrefix: DROP_SECURE_COOKIE_PREFIX,
+            defaultCookieAttributes: { secure: true },
+          }
         : {}),
     },
     disabledPaths: [
@@ -155,8 +161,9 @@ export default defineAuth(({ env, requestOrigin }) => {
       },
       session: {
         create: {
-          after: async (session) => {
+          after: async (session, context) => {
             await syncRole(session.userId)
+            logSignedIn(authRequest.getStore(), context)
           },
         },
       },

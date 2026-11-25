@@ -13,6 +13,7 @@ export const authProxy = readAuthProxyConfig
 const IDENTITY_TTL_MS = 300_000
 const identities = new Map<string, { identity: ForwardedIdentity; expiresAt: number }>()
 const signIns = new Map<string, Promise<void>>()
+const tokenSignIns = new Map<string, Promise<unknown>>()
 
 const GitHubIdentity = v.object({
   id: v.number(),
@@ -56,6 +57,20 @@ async function storedAccount({ providerId, accountId }: ForwardedIdentity) {
 }
 
 export async function oneSignInAtATime<T>(token: string, signIn: () => Promise<T>): Promise<T> {
+  const key = await tokenKey(token)
+  const running = tokenSignIns.get(key)
+  // SAFETY: the proxy-session middleware is the one caller, so a running sign-in for a token resolves to its own result type.
+  if (running) return running as Promise<T>
+  const run = oneSignInPerIdentity(token, signIn)
+  tokenSignIns.set(key, run)
+  try {
+    return await run
+  } finally {
+    if (tokenSignIns.get(key) === run) tokenSignIns.delete(key)
+  }
+}
+
+export async function oneSignInPerIdentity<T>(token: string, signIn: () => Promise<T>): Promise<T> {
   const identity = await cachedIdentity(token)
   if (await storedAccount(identity)) return signIn()
   const key = `${identity.providerId}\n${identity.accountId}`
@@ -72,6 +87,11 @@ export async function oneSignInAtATime<T>(token: string, signIn: () => Promise<T
     release?.()
     if (signIns.get(key) === turn) signIns.delete(key)
   }
+}
+
+async function tokenKey(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")
 }
 
 async function cachedIdentity(token: string): Promise<ForwardedIdentity> {

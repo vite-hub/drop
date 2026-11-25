@@ -6,7 +6,7 @@ import { RETURNING_COOKIE, TRIED_COOKIE, signInPath, signInRightAway } from "../
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
-import { background } from "../utils/logs.ts"
+import { background, logClientEvent } from "../utils/logs.ts"
 import { isMembershipOutage } from "../utils/members.ts"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
@@ -72,15 +72,18 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
       returning: Boolean(getCookie(event, RETURNING_COOKIE)),
       tried: Boolean(getCookie(event, TRIED_COOKIE)),
     })
-  )
+  ) {
+    const proxy = authProxy().enabled
+    logClientEvent(event, { event: "signin.redirected", mode: proxy ? "proxy" : "github" }, status)
     return new Response(null, {
       status: 302,
       headers: {
-        Location: signInPath(`${path}${event.url.search}`, { proxy: authProxy().enabled }),
+        Location: signInPath(`${path}${event.url.search}`, { proxy, via: "auto" }),
         "Set-Cookie": `${TRIED_COOKIE}=1; Path=/; Max-Age=60; SameSite=Lax${event.url.protocol === "https:" ? "; Secure" : ""}`,
         "Cache-Control": "private, no-store",
       },
     })
+  }
   const message = drop
     ? missingInDrop(drop, identity?.email)
     : contentUnavailable(
@@ -90,6 +93,7 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
         error.data?.shareReview === "pending",
         authProxy().enabled,
       )
+  logClientEvent(event, { event: "card.shown", reason: message.reason }, status)
   const card = path.startsWith("/d/")
     ? `<meta property="og:site_name" content="Drop"><meta property="og:title" content="Shared on Drop"><meta property="og:image" content="${escapeHtml(event.url.origin)}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">`
     : ""

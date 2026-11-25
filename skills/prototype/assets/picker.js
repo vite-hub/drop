@@ -104,9 +104,9 @@
     .tags.on { display: block; }
     .shield { position: absolute; inset: 0; display: none; cursor: grab; touch-action: none; }
     .tags.hand .shield { display: block; pointer-events: auto; }
-    .tags.hand .tag { pointer-events: none; }
+    .tags:not(.hand) .tag > :is(button, .tnote) { pointer-events: auto; }
     .tags.grabbing .shield { cursor: grabbing; }
-    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: auto;
+    .tag { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) 20px; align-items: center; min-height: 22px; pointer-events: none;
       color: #171717; font: 500 12px/1 ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
     .tag button { height: 22px; border-radius: 5px; color: inherit; cursor: default; }
     .tag button:hover { background: none; }
@@ -114,6 +114,8 @@
     .tag > .name, .tag > .tnote { min-width: 0; white-space: nowrap; }
     .tag > .tnote { box-sizing: border-box; grid-column: 1 / -1; width: 100%; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .tag > .tnote:empty, .tag.narrow > .tnote { display: none; }
+    .tag.tight > .tnote { position: absolute; left: 0; top: 100%; visibility: hidden; }
+    .tag.hide, .tag.nohandle > .handle { visibility: hidden; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
     .handle { touch-action: none; opacity: 0; }
     .tag:hover .handle, .handle:focus-visible { opacity: 1; }
@@ -160,6 +162,7 @@
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
   const GAP = 160, ROW = 5600, ROW_GAP = 240, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
+  const NAME_H = 22, HANDLE_W = 20, LABEL_GAP = 6, LABEL_CLEAR = 4;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
@@ -199,9 +202,11 @@
     open.title = "Open (" + (i < 9 ? i + 1 : "double-click the name") + ")";
     name.textContent = it.name;
     name.title = "Click to copy “" + it.name + "” · double-click to open";
-    tag.querySelector(".tnote").textContent = el.dataset.note || "";
-    tag.querySelector(".tnote").title = el.dataset.note || "";
+    const note = tag.querySelector(".tnote");
+    note.textContent = el.dataset.note || "";
+    note.title = note.textContent;
     it.tag = tag;
+    it.note = note;
     let timer = 0;
     name.onclick = async () => {
       clearTimeout(timer);
@@ -285,6 +290,7 @@
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
   let synced = false, reportedZoom = 0;
   let dockBottom = 72, fitted = null;
+  let labelFocusFrame = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
   const inset = () => parseFloat(getComputedStyle(root).getPropertyValue("--drop-inset")) || 0;
   const view = () => ({ w: Math.max(1, innerWidth - inset()), h: Math.max(1, innerHeight) });
@@ -303,18 +309,47 @@
     setDockBottom(overlaps ? Math.max(72, raisedBottom + minimap.height + 8) : 72);
   }
 
-  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size.
+  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size while
+  // the gaps between items shrink with the zoom, so a label shows only the rows that fit above its item without
+  // touching another: name and note, then the name alone, then nothing. The handle, in the gap to the left, goes the same way.
   function render() {
     frame = 0;
     if (mode !== "canvas") return;
-    for (const it of items) {
-      const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
-      it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
+    const rects = items.map((it) => {
+      const b = box(it), l = cam.x + it.x * cam.z, t = cam.y + it.y * cam.z;
+      return { l, t, r: l + b.w * cam.z, b: t + b.h * cam.z };
+    });
+    const clear = (self, l, t, r, b) => rects.every((o) => o === self || o.l >= r || o.r <= l || o.t >= b || o.b + LABEL_CLEAR <= t);
+    const focused = document.hasFocus() ? tags.getRootNode().activeElement : null;
+    let watchLabelFocus = false;
+    for (const [i, it] of items.entries()) {
+      const width = rects[i].r - rects[i].l;
+      it.tag.style.width = width + LABEL_INSET + "px";
+      it.tag.classList.toggle("narrow", width < 160);
+    }
+    const noteHeights = items.map((it) => it.note.getBoundingClientRect().height);
+    for (const [i, it] of items.entries()) {
+      const s = rects[i], bottom = s.t - LABEL_GAP, noteHeight = noteHeights[i];
+      it.el.style.setProperty("transform", `translate(${s.l}px, ${s.t}px) scale(${cam.z})`, "important");
       // The handle sits in the gap left of the item, so the name and note start at the item's edge and end with it.
-      const w = box(it).w * cam.z;
-      it.tag.style.transform = `translate(${sx - LABEL_INSET}px, ${sy - 6}px) translateY(-100%)`;
-      it.tag.style.width = w + LABEL_INSET + "px";
-      it.tag.classList.toggle("narrow", w < 160);
+      it.tag.style.transform = `translate(${s.l - LABEL_INSET}px, ${bottom}px) translateY(-100%)`;
+      const note = noteHeight > 0 && clear(s, s.l, bottom - NAME_H - noteHeight, s.r, bottom);
+      const top = bottom - NAME_H - (note ? noteHeight : 0);
+      // A label someone is using with the keyboard stays, so its focus isn't lost mid-move.
+      const kept = Boolean(focused) && it.tag.contains(focused);
+      const hide = !note && !clear(s, s.l, bottom - NAME_H, s.r, bottom);
+      const left = s.l - LABEL_INSET;
+      const noHandle = !clear(s, left, top, left + HANDLE_W, top + NAME_H);
+      it.tag.classList.toggle("tight", noteHeight > 0 && !note);
+      it.tag.classList.toggle("hide", !kept && hide);
+      it.tag.classList.toggle("nohandle", !kept && noHandle);
+      watchLabelFocus ||= kept && (hide || noHandle);
+    }
+    if (watchLabelFocus && !labelFocusFrame) {
+      labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    } else if (!watchLabelFocus && labelFocusFrame) {
+      cancelAnimationFrame(labelFocusFrame);
+      labelFocusFrame = 0;
     }
     drawMap();
     rest();
@@ -325,6 +360,18 @@
     document.dispatchEvent(new Event("canvasmove"));
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(render); };
+  function checkLabelFocus() {
+    labelFocusFrame = 0;
+    if (mode !== "canvas") return;
+    if (document.hasFocus()) labelFocusFrame = requestAnimationFrame(checkLabelFocus);
+    else schedule();
+  }
+  tags.addEventListener("focusout", (event) => {
+    const tag = event.target.closest(".tag");
+    if (tag && !tag.contains(event.relatedTarget)) schedule();
+  });
+  window.addEventListener("blur", schedule);
+  window.addEventListener("focus", schedule);
   // Live pages load when their item is within NEAR px of the screen, LOADING at a time, and sleep once it has been
   // further away for SLEEP ms. A page still loading after STALL ms is stopped and tried again only once its item has
   // left and come back near or the reader clicks Retry. The item in focus never sleeps (it's the only one near), nor

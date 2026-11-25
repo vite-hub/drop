@@ -19,7 +19,7 @@ migrate()
 beforeEach(() => {
   reset()
   state.authProxy = true
-  state.members = "github-org:quiverdk"
+  state.members = "github-org:example-org"
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -133,12 +133,13 @@ function signIn(instance, token) {
   )
 }
 
-function auth(databaseHooks = {}) {
+function auth(databaseHooks = {}, advanced) {
   return betterAuth({
     baseURL: "https://drop.example",
     secret: "test-only-secret-at-least-thirty-two-characters",
     database: drizzleAdapter(state.db, { provider: "sqlite", schema: schema.schema }),
     databaseHooks,
+    advanced,
     plugins: [proxyAuth(), admin()],
   })
 }
@@ -455,7 +456,53 @@ test("overlapping first proxy requests through separate auth instances provision
   for (const event of events) assert.match(event.req.headers.get("cookie") ?? "", /session_token=/)
 })
 
-test("requests of a proxy member who already has an account don't wait on each other", async () => {
+test("two requests of one browser that arrive together get one session", async () => {
+  github()
+  assert.equal((await signIn(auth(), "test-same-browser")).status, 200)
+  sql.prepare("DELETE FROM session").run()
+  Object.defineProperty(state, "auth", { get: () => auth(), configurable: true })
+  const events = Array.from({ length: 2 }, () => new H3Event(startRequest("test-same-browser")))
+  for (const event of events) event.req.headers.set("cookie", "__Host-drop-auth=proxy-cookie")
+  await Promise.all(events.map((event) => proxySession(event)))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 1)
+  const [first, second] = events.map(
+    (event) => event.context.dropSessionCookies?.find((cookie) => cookie.includes("session_token="))?.split(";")[0],
+  )
+  assert.match(first ?? "", /session_token=/)
+  assert.equal(second, first)
+})
+
+test("overlapping requests with and without a Drop cookie keep separate sessions", async () => {
+  github()
+  const token = "test-mixed-cookies"
+  const newAuth = () => auth({}, { useSecureCookies: false, cookiePrefix: "__Host-drop" })
+  const started = await signIn(newAuth(), token)
+  assert.equal(started.status, 200)
+  const existingCookie = started.headers
+    .getSetCookie()
+    .find((cookie) => cookie.startsWith("__Host-drop.session_token="))
+  assert.ok(existingCookie)
+  const existingPair = existingCookie.split(";")[0]
+  Object.defineProperty(state, "auth", { get: newAuth, configurable: true })
+
+  const request = startRequest(token)
+  request.headers.set("cookie", existingPair)
+  const existing = new H3Event(request)
+  const fresh = new H3Event(startRequest(token))
+  await Promise.all([proxySession(existing), proxySession(fresh)])
+
+  assert.equal(existing.req.headers.get("cookie"), existingPair)
+  assert.equal(existing.context.dropSessionCookies, undefined)
+  assert.match(fresh.req.headers.get("cookie") ?? "", /__Host-drop\.session_token=/)
+  assert.notEqual(fresh.req.headers.get("cookie"), existingPair)
+  for (const event of [existing, fresh]) {
+    assert.equal(event.req.headers.get("x-auth-request-access-token"), null)
+    assert.equal((await newAuth().api.getSession({ headers: event.req.headers }))?.user.email, "maxi@example.com")
+  }
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 2)
+})
+
+test("browsers of a proxy member who already has an account don't wait on each other", async () => {
   github()
   assert.equal((await signIn(auth(), "test-concurrent-reads")).status, 200)
   let started = 0
@@ -463,8 +510,8 @@ test("requests of a proxy member who already has an account don't wait on each o
   const gate = new Promise((resolve) => {
     open = resolve
   })
-  const reads = Array.from({ length: 2 }, () =>
-    oneSignInAtATime("test-concurrent-reads", async () => {
+  const reads = ["test-concurrent-reads-a", "test-concurrent-reads-b"].map((token) =>
+    oneSignInAtATime(token, async () => {
       started++
       await gate
     }),
@@ -472,6 +519,63 @@ test("requests of a proxy member who already has an account don't wait on each o
   await vi.waitFor(() => assert.equal(started, 2))
   open()
   await Promise.all(reads)
+})
+
+test("using another account signs the first one out of Drop before the second signs in", async () => {
+  github()
+  state.authProxyCookie = "__Host-drop-auth"
+  const instance = auth()
+  state.auth = instance
+  const first = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-first" },
+    }),
+  )
+  await proxySession(first)
+  const firstUser = sql.prepare("SELECT id FROM user WHERE email = 'maxi@example.com'").get().id
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 1)
+
+  const signOut = new H3Event(
+    new Request("https://drop.example/api/auth/sign-out", {
+      method: "POST",
+      headers: {
+        origin: "https://drop.example",
+        cookie: `${withCookies(first).get("cookie")}; __Host-drop-auth=proxy-ticket`,
+        "x-auth-request-access-token": "test-switch-first",
+        "x-drop-proxy-sign-out-handoff": "1",
+      },
+    }),
+  )
+  await proxySession(signOut)
+  const response = await instance.handler(signOut.req)
+  assert.equal(response.status, 200)
+  const cookies = [...signOut.res.headers.getSetCookie(), ...response.headers.getSetCookie()]
+  assert.ok(
+    cookies.every((cookie) => !cookie.startsWith("__Host-drop-auth=")),
+    "The proxy keeps its session ticket",
+  )
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 0)
+
+  github(
+    undefined,
+    () => Response.json({ id: 43, login: "other", name: "Other", email: "other@example.com" }),
+    () => Response.json([{ email: "other@example.com", primary: true, verified: true }]),
+  )
+  const second = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-second" },
+    }),
+  )
+  await proxySession(second)
+  const session = await instance.api.getSession({ headers: withCookies(second) })
+  assert.equal(session?.user.email, "other@example.com")
+  assert.deepEqual(
+    sql
+      .prepare("SELECT user_id FROM session")
+      .all()
+      .map((row) => row.user_id),
+    [session.user.id],
+  )
 })
 
 test("an expired proxy token can still sign out through Better Auth", async () => {

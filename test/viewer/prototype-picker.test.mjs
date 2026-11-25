@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { chromium } from "playwright"
+import { chromium, firefox } from "playwright"
 import { test } from "vite-plus/test"
 const { parseFrameMessage } = await import("../../shared/frame-messages.ts")
 const { embedDocument, injectRuntime, withVariantBar } = await import("../../shared/plan-runtime.ts")
@@ -201,6 +201,186 @@ test("canvas labels align with their items and hide notes below 160 screen pixel
     await browser.close()
   }
 })
+
+test("zoomed out, a canvas label shows only what fits above its item and never covers another", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const sections = [0, 1, 2]
+      .flatMap((row) => [0, 1].map((col) => [row, col]))
+      .map(
+        ([row, col]) =>
+          `<section id="v-r${row}c${col}" data-variant="Item ${row}${col}" data-note="${"A note long enough to wrap. ".repeat(6)}" data-width="1200" data-height="1200" data-x="${col * 1360}" data-y="${row * 1400}"></section>`,
+      )
+      .join("")
+    const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
+    // [zoom, rows below the first that show their name, and their note]
+    for (const [zoom, names, notes] of [
+      [0.5, true, true],
+      [0.2, true, false],
+      [0.08, false, false],
+    ]) {
+      const tab = await context.newPage()
+      await tab.route("https://picker.test/stack", (route) => route.fulfill({ contentType: "text/html", body: html }))
+      await tab.addInitScript((z) => {
+        localStorage.setItem("drop-prototype-canvas:/stack", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z } }))
+      }, zoom)
+      await tab.goto("https://picker.test/stack")
+      await tab.waitForFunction(() =>
+        [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")].every(
+          (tag) => tag.style.width,
+        ),
+      )
+      const labels = await tab.evaluate(() => {
+        const items = [...document.querySelectorAll("body > [data-variant]")].map((el) => el.getBoundingClientRect())
+        const tags = [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")]
+        return tags.map((tag, i) => {
+          const shown = (el) => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden"
+          const parts = [".handle", ".name", ".tnote"].map((s) => tag.querySelector(s)).filter(shown)
+          const covered = parts.some((el) => {
+            const r = el.getBoundingClientRect()
+            return items.some(
+              (o, j) => j !== i && o.left < r.right && o.right > r.left && o.top < r.bottom && o.bottom > r.top,
+            )
+          })
+          return { name: shown(tag.querySelector(".name")), note: shown(tag.querySelector(".tnote")), covered }
+        })
+      })
+      for (const [i, label] of labels.entries()) {
+        const top = i < 2
+        assert.equal(label.covered, false, `label ${i} at ${zoom} covers no other item`)
+        assert.equal(label.name, top || names, `label ${i} at ${zoom} shows its name only when it fits`)
+        assert.equal(
+          label.note,
+          label.name && (top ? zoom * 1200 >= 160 : notes),
+          `label ${i} at ${zoom} shows its note only when it fits`,
+        )
+      }
+      await tab.close()
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+async function withLabelCanvas(sections, zoom, check) {
+  const browser = await chromium.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
+    await tab.route("https://picker.test/labels", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.addInitScript((z) => {
+      localStorage.setItem("drop-prototype-canvas:/labels", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z } }))
+    }, zoom)
+    await tab.goto("https://picker.test/labels")
+    await tab.waitForFunction(
+      () => document.querySelector("prototype-picker").shadowRoot.querySelector(".tag")?.style.width,
+    )
+    await check(tab, tab.locator("prototype-picker .tag").nth(1))
+  } finally {
+    await browser.close()
+  }
+}
+
+test("a short canvas note stays visible when its single line fits", async () => {
+  await withLabelCanvas(
+    `<section id="v-upper" data-variant="Upper" data-width="1200" data-height="1200" data-x="0" data-y="0"></section>
+    <section id="v-lower" data-variant="Lower" data-note="Short note" data-width="1200" data-height="1200" data-x="0" data-y="1400"></section>`,
+    0.28,
+    async (_tab, tag) => assert.equal(await tag.locator(".tnote").isVisible(), true),
+  )
+})
+
+test("a short canvas note puts its handle collision check on the rendered row", async () => {
+  await withLabelCanvas(
+    `<section id="v-left" data-variant="Left" data-width="196" data-height="80" data-x="0" data-y="162"></section>
+    <section id="v-right" data-variant="Right" data-note="Short note" data-width="240" data-height="100" data-x="200" data-y="200"></section>`,
+    1,
+    async (_tab, tag) => {
+      assert.equal(await tag.locator(".tnote").isVisible(), true)
+      assert.equal(await tag.locator(".handle").isVisible(), false)
+    },
+  )
+})
+
+test("a hidden canvas handle lets clicks reach a live item underneath", async () => {
+  await withLabelCanvas(
+    `<section id="v-left" data-variant="Left" data-width="196" data-height="80" data-x="0" data-y="170">
+      <button style="width:100%;height:100%" onclick="this.textContent='Clicked'">Live button</button>
+    </section>
+    <section id="v-right" data-variant="Right" data-width="240" data-height="100" data-x="200" data-y="200"></section>`,
+    1,
+    async (tab, tag) => {
+      assert.equal(await tag.locator(".handle").isVisible(), false)
+      const bounds = await tag.boundingBox()
+      await tab.mouse.click(bounds.x + 10, bounds.y + 10)
+      assert.equal(await tab.locator("#v-left button").textContent(), "Clicked")
+      await tag.locator(".open").click()
+      assert.deepEqual((await look(tab)).shown, ["v-right"])
+    },
+  )
+})
+
+const focusSections = `<section id="v-upper" data-variant="Upper" data-width="240" data-height="80" data-x="0" data-y="0"></section>
+    <section id="v-lower" data-variant="Lower" data-width="240" data-height="100" data-x="0" data-y="116"></section>`
+
+test("an overlapping canvas label hides as soon as keyboard focus leaves it", async () => {
+  await withLabelCanvas(focusSections, 1, async (tab, tag) => {
+    const handle = tag.locator(".handle")
+    const name = tag.locator(".name")
+    await handle.focus()
+    await tab.keyboard.press("ArrowUp")
+    await tab.keyboard.press("ArrowUp")
+    await tab.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
+    )
+    assert.equal(await name.isVisible(), true)
+    await tab.keyboard.press("Tab")
+    await tab.keyboard.press("Tab")
+    assert.equal(await name.isVisible(), true)
+    await tab.keyboard.press("Tab")
+    await tab.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    assert.equal(await name.isVisible(), false)
+  })
+})
+
+test("an overlapping canvas label hides when focus moves from the Firefox iframe to the viewer", async () => {
+  const browser = await firefox.launch()
+  try {
+    const tab = await browser.newPage({ viewport: { width: 1000, height: 700 } })
+    tab.setDefaultTimeout(5000)
+    const html = injectRuntime(`<!doctype html><html><body>${focusSections}</body></html>`, false, 0, true)
+    await tab.route("https://viewer.test/", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: '<button>Viewer control</button><br><iframe src="https://picker.test/labels" width="900" height="600"></iframe>',
+      }),
+    )
+    await tab.route("https://picker.test/labels", (route) => route.fulfill({ contentType: "text/html", body: html }))
+    await tab.addInitScript(() => {
+      if (location.origin !== "https://picker.test") return
+      localStorage.setItem("drop-prototype-canvas:/labels", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z: 1 } }))
+    })
+    await tab.goto("https://viewer.test/")
+    const frame = tab.frame({ url: "https://picker.test/labels" })
+    const prototype = tab.frameLocator("iframe")
+    const handle = prototype.getByRole("button", { name: "Move Lower" })
+    const name = prototype.locator("prototype-picker .tag .name").nth(1)
+    await handle.click()
+    await tab.keyboard.press("ArrowUp")
+    await tab.keyboard.press("ArrowUp")
+    await frame.waitForFunction(
+      () => JSON.parse(localStorage.getItem("drop-prototype-canvas:/labels")).positions?.["v-lower"]?.[1] === 100,
+    )
+    assert.equal(await frame.evaluate(() => document.hasFocus()), true)
+    assert.equal(await name.isVisible(), true)
+    await tab.getByRole("button", { name: "Viewer control" }).click()
+    await frame.waitForFunction(() => !document.hasFocus())
+    await name.waitFor({ state: "hidden", timeout: 3000 })
+  } finally {
+    await browser.close()
+  }
+}, 20000)
 
 test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {
   const browser = await chromium.launch()
