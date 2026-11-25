@@ -52,7 +52,7 @@ overrides:
 patchedDependencies:
   # A failed Send says why (drop#301): `problem` ("delivery", "key-unset", "key-invalid") and the receiver's `agent` on
   # the failed result, the receiver's HTTP status or timeout from the webhook delivery, and Send or Pair again re-pairs
-  # after a key problem. A status refresh keeps a failed Send, pairing or Allow failed, with its count updated, while
+  # after a key problem. A status refresh keeps a failed Send, pairing or Allow failed, with the newest count, while
   # comments still wait, without cancelling a retry in flight (vite-hub/vitehub#5526). Delete when ViteHub ships it.
   "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the

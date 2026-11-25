@@ -673,12 +673,14 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   const transport = transportFor(doc.id)
   let pairCode
   let gate
+  let read
   const client = createCommentSend(
     {
       ...transport,
       status: async () => {
         const wait = gate
         const status = await transport.status()
+        read?.()
         await wait
         return status
       },
@@ -713,12 +715,20 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
     assert.equal(delivered.length, 1)
     assert.notEqual(delivered[0].endpoint, publishing.id)
     const waiting = client.state.count
+    let releaseOlder
+    gate = new Promise((resolve) => (releaseOlder = resolve))
+    const stale = new Promise((resolve) => (read = resolve))
+    const older = client.refresh()
+    await stale
+    gate = undefined
     await comment(doc.id, ana, "Added after Allow failed.")
     const routine = client.refresh()
     let release
     gate = new Promise((resolve) => (release = resolve))
     const retry = client.send()
     await routine
+    releaseOlder()
+    await older
     assert.deepEqual([client.state.status, client.state.count], ["failed", waiting + 1])
     release()
     await retry
