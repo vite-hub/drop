@@ -52,8 +52,8 @@ overrides:
 
 patchedDependencies:
   # The Send pill holds Sent/In inbox until the agent reads the send (vite-hub/vitehub#5475) and Retry repeats the failed step (#5477). Drop when they ship.
-  '@vite-hub/comments@0.0.0-preview-78114ab': patches/@vite-hub__comments@0.0.0-preview-78114ab.patch
-  '@vite-hub/ui@0.0.0-preview-78114ab': patches/@vite-hub__ui@0.0.0-preview-78114ab.patch
+  "@vite-hub/comments@0.0.0-preview-78114ab": patches/@vite-hub__comments@0.0.0-preview-78114ab.patch
+  "@vite-hub/ui@0.0.0-preview-78114ab": patches/@vite-hub__ui@0.0.0-preview-78114ab.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.
