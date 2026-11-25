@@ -20,6 +20,7 @@ const GitHubIdentity = v.object({
   email: v.nullish(v.string()),
   avatar_url: v.nullish(v.string()),
 })
+const Coded = v.object({ code: v.string() })
 const GitHubEmails = v.array(v.object({ email: v.string(), primary: v.boolean(), verified: v.boolean() }))
 
 export const proxyAuth = () =>
@@ -33,7 +34,7 @@ export const proxyAuth = () =>
         if (!(error instanceof HTTPError)) throw error
         throw new APIError(
           error.status === 401 ? "UNAUTHORIZED" : error.status === 403 ? "FORBIDDEN" : "SERVICE_UNAVAILABLE",
-          { message: error.message },
+          { message: error.message, code: v.is(Coded, error.data) ? error.data.code : undefined },
         )
       }
       const identity = await cachedIdentity(token)
@@ -83,7 +84,10 @@ async function cachedIdentity(token: string): Promise<ForwardedIdentity> {
 async function githubIdentity(token: string): Promise<ForwardedIdentity> {
   const profile = v.safeParse(GitHubIdentity, await githubApi("user", token))
   if (!profile.success)
-    throw new APIError("SERVICE_UNAVAILABLE", { message: "GitHub identity is unavailable. Try again shortly." })
+    throw new APIError("SERVICE_UNAVAILABLE", {
+      message: "GitHub identity is unavailable. Try again shortly.",
+      code: "GITHUB_IDENTITY_UNAVAILABLE",
+    })
   const { id, login, name, avatar_url: image } = profile.output
   const accountId = String(id)
   const emails = v.safeParse(GitHubEmails, await githubApi("user/emails", token))
@@ -114,7 +118,10 @@ async function githubApi(path: string, token: string): Promise<unknown> {
     signal: AbortSignal.timeout(5000),
   }).catch(failed)
   if (response?.status === 401)
-    throw new APIError("UNAUTHORIZED", { message: "GitHub sign-in expired or was revoked. Sign in again to Drop." })
+    throw new APIError("UNAUTHORIZED", {
+      message: "GitHub sign-in expired or was revoked. Sign in again to Drop.",
+      code: "GITHUB_REAUTH_REQUIRED",
+    })
   if (!response) return null
   if (!response.ok) return failed(`HTTP ${response.status}`)
   return response.json().catch(failed)

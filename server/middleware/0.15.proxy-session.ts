@@ -2,6 +2,7 @@ import { APIError } from "better-auth/api"
 import { applySetCookies } from "better-auth/cookies"
 import { defineHandler, type H3Event, HTTPError } from "h3"
 import { sessionOf } from "../utils/identity"
+import { requestLog } from "../utils/logs"
 import { oneSignInAtATime } from "../utils/proxy-auth"
 import { isProxyMember, PROXY_TOKEN_HEADER, readAuthProxyConfig } from "../utils/proxy-auth-config"
 
@@ -21,10 +22,14 @@ export default defineHandler(async (event) => {
       data: { code: "GITHUB_MEMBERSHIP_REQUIRED" },
     })
   const session = await oneSignInAtATime(token, () => sessionOf(event)).catch((error: unknown) => {
-    if (error instanceof APIError) throw new HTTPError({ status: error.statusCode, statusText: error.message })
-    throw error
+    if (!(error instanceof APIError)) throw error
+    const code = typeof error.body?.code === "string" ? error.body.code : undefined
+    throw new HTTPError({ status: error.statusCode, statusText: error.message, ...(code ? { data: { code } } : {}) })
   })
-  if (!session) throw new HTTPError({ status: 403, statusText: "Proxy sign-in failed." })
+  if (!session) {
+    requestLog(event)?.set({ auth: { signIn: "proxy failed", cause: "Better Auth refused the forwarded identity" } })
+    throw new HTTPError({ status: 403, statusText: "Proxy sign-in failed.", data: { code: "PROXY_SIGN_IN_FAILED" } })
+  }
 
   withoutToken(event, event.context.dropSessionCookies)
 })

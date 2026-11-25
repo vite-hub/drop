@@ -2,7 +2,8 @@ import assert from "node:assert/strict"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin } from "better-auth/plugins"
-import { H3Event } from "h3"
+import { createRequestLogger } from "evlog"
+import { H3, H3Event } from "h3"
 import { afterEach, beforeEach, test, vi } from "vite-plus/test"
 import { migrate, queries, reset, roundTrips, sql, state } from "../cost/harness.mjs"
 
@@ -11,6 +12,8 @@ const { oneSignInAtATime, proxyAuth } = await import("../../server/utils/proxy-a
 const { identify } = await import("../../server/utils/identity.ts")
 const { isProxyMember, readAuthProxyConfig } = await import("../../server/utils/proxy-auth-config.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
+vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({}) }))
+const { default: signInStart } = await import("../../server/routes/signin/start.get.ts")
 
 migrate()
 beforeEach(() => {
@@ -56,30 +59,41 @@ function withCookies(event) {
   return headers
 }
 
+const startRequest = (token) =>
+  new Request("https://drop.example/signin/start?redirect=%2Freview%2Fconnect", {
+    headers: { "x-auth-request-access-token": token },
+  })
+
 function connect(token) {
-  return proxySession(
-    new H3Event(
-      new Request("https://drop.example/signin/start?redirect=%2Freview%2Fconnect", {
-        headers: { "x-auth-request-access-token": token },
-      }),
-    ),
-  )
+  return proxySession(new H3Event(startRequest(token)))
 }
 
-for (const [label, upstream, status, message] of [
-  ["expired token", () => Response.json({ message: "Bad credentials" }, { status: 401 }), 401, /sign in again/i],
+/** The response a browser gets when the middleware refuses it, through h3's error handling. */
+const app = new H3().use(proxySession).get("/signin/start", () => "signed in")
+
+const unavailable = "GITHUB_MEMBERSHIP_UNAVAILABLE"
+for (const [label, upstream, status, message, code] of [
+  [
+    "expired token",
+    () => Response.json({ message: "Bad credentials" }, { status: 401 }),
+    401,
+    /sign in again/i,
+    "GITHUB_REAUTH_REQUIRED",
+  ],
   [
     "missing scope",
     () => Response.json({}, { status: 403, headers: { "x-oauth-scopes": "user:email" } }),
     403,
     /read:org/i,
+    "GITHUB_ORG_ACCESS_REQUIRED",
   ],
-  ["GitHub outage", () => Response.json({}, { status: 502 }), 503, /try again/i],
+  ["GitHub outage", () => Response.json({}, { status: 502 }), 503, /try again/i, unavailable],
   [
     "rate limit",
     () => Response.json({}, { status: 403, headers: { "x-ratelimit-remaining": "0" } }),
     503,
     /try again/i,
+    unavailable,
   ],
   [
     "network failure",
@@ -88,19 +102,26 @@ for (const [label, upstream, status, message] of [
     },
     503,
     /try again/i,
+    unavailable,
   ],
-  ["invalid response", () => Response.json({ unexpected: true }), 503, /try again/i],
+  ["invalid response", () => Response.json({ unexpected: true }), 503, /try again/i, unavailable],
 ]) {
-  test(`review connection distinguishes ${label} from non-membership`, async () => {
+  test(`review connection distinguishes ${label} from non-membership, and says its code`, async () => {
     github(upstream)
     await assert.rejects(connect(`test-${label}`), (error) => {
       assert.equal(error.status, status)
       assert.match(error.message, message)
+      assert.equal(error.data?.code, code)
       return true
     })
+    const browser = await app.fetch(startRequest(`test-browser-${label}`))
+    assert.equal(browser.status, status)
+    assert.equal((await browser.json()).data?.code, code)
     const response = await signIn(auth(), `test-api-${label}`)
     assert.equal(response.status, status)
-    assert.match((await response.json()).message, message)
+    const body = await response.json()
+    assert.match(body.message, message)
+    assert.equal(body.code, code)
   })
 }
 
@@ -122,11 +143,18 @@ function auth(databaseHooks = {}) {
   })
 }
 
-for (const [label, profile, status, message] of [
-  ["revoked token", () => Response.json({ message: "Bad credentials" }, { status: 401 }), 401, /sign in again/i],
-  ["GitHub outage", () => Response.json({}, { status: 502 }), 503, /try again/i],
-  ["rate limit", () => Response.json({}, { status: 429 }), 503, /try again/i],
-  ["malformed identity", () => Response.json({ login: "maxi" }), 503, /try again/i],
+const identityUnavailable = "GITHUB_IDENTITY_UNAVAILABLE"
+for (const [label, profile, status, message, code] of [
+  [
+    "revoked token",
+    () => Response.json({ message: "Bad credentials" }, { status: 401 }),
+    401,
+    /sign in again/i,
+    "GITHUB_REAUTH_REQUIRED",
+  ],
+  ["GitHub outage", () => Response.json({}, { status: 502 }), 503, /try again/i, identityUnavailable],
+  ["rate limit", () => Response.json({}, { status: 429 }), 503, /try again/i, identityUnavailable],
+  ["malformed identity", () => Response.json({ login: "maxi" }), 503, /try again/i, identityUnavailable],
   [
     "network failure",
     () => {
@@ -134,6 +162,7 @@ for (const [label, profile, status, message] of [
     },
     503,
     /try again/i,
+    identityUnavailable,
   ],
 ]) {
   test(`proxy sign-in reports ${label} during identity lookup after caching membership`, async () => {
@@ -146,8 +175,10 @@ for (const [label, profile, status, message] of [
     state.auth = instance
     const response = await signIn(instance, token)
     assert.equal(response.status, status)
-    assert.match((await response.json()).message, message)
-    await assert.rejects(connect(token), (error) => error.status === status)
+    const body = await response.json()
+    assert.match(body.message, message)
+    assert.equal(body.code, code)
+    await assert.rejects(connect(token), (error) => error.status === status && error.data?.code === code)
     assert.equal(membership.mock.calls.length, 0)
     assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 0)
     assert.equal(sql.prepare("SELECT count(*) AS n FROM account").get().n, 0)
@@ -264,8 +295,8 @@ test("proxy sign-in runs Better Auth user and account creation hooks", async () 
   sql.prepare("DELETE FROM session WHERE user_id=?").run(session.user.id)
   await assert.rejects(
     connect("test-banned"),
-    (error) => error.status === 403,
-    "The Better Auth admin plugin refuses a banned user",
+    (error) => error.status === 403 && error.data?.code === "BANNED_USER",
+    "The Better Auth admin plugin refuses a banned user, and its code reaches the client",
   )
   for (const membership of [() => Response.json({}, { status: 404 }), () => Response.json({ state: "pending" })]) {
     github(membership)
@@ -344,11 +375,21 @@ test("request session reads write the GitHub account only when its token rotates
   }
 })
 
-test("a Better Auth user policy rejection leaves no proxy user or account", async () => {
+test("a Better Auth user policy rejection leaves no proxy user or account, and says why", async () => {
   github()
   const instance = auth({ user: { create: { before: async () => false } } })
   state.auth = instance
-  await assert.rejects(connect("test-rejected"), (error) => error.status === 403)
+  const event = new H3Event(startRequest("test-rejected"))
+  event.context.log = createRequestLogger()
+  await assert.rejects(proxySession(event), (error) => {
+    assert.equal(error.status, 403)
+    assert.equal(error.data?.code, "PROXY_SIGN_IN_FAILED")
+    return true
+  })
+  assert.deepEqual(event.context.log.getContext().auth, {
+    signIn: "proxy failed",
+    cause: "Better Auth refused the forwarded identity",
+  })
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE email='maxi@example.com'").get().n, 0)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM account WHERE account_id='42'").get().n, 0)
 })
@@ -512,3 +553,19 @@ test("the forwarded header signs nobody in outside /signin/start", async () => {
   assert.equal(fetch.mock.calls.length, 0, "Drop never asks GitHub about a header outside sign-in")
   assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 0)
 })
+
+for (const [label, started, status] of [
+  ["an error response", () => Response.json({ message: "Provider not found" }, { status: 404 }), 404],
+  ["a response it can't read", () => new Response("<html>", { status: 200 }), 200],
+]) {
+  test(`a sign-in start that gets ${label} still goes back to the sign-in page, and the log says why`, async () => {
+    state.authProxy = false
+    state.auth = { api: { signInSocial: async () => started() } }
+    const event = new H3Event(new Request("https://drop.example/signin/start?redirect=%2Fdrops"))
+    event.context.log = createRequestLogger()
+    const response = await signInStart(event)
+    assert.equal(response.status, 302)
+    assert.equal(response.headers.get("location"), "/signin?redirect=%2Fdrops")
+    assert.deepEqual(event.context.log.getContext().auth, { signIn: "start failed", status })
+  })
+}
