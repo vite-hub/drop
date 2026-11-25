@@ -1,5 +1,6 @@
 import { defineValidatedHandler, HTTPError } from "h3"
 import { ReviewOpenSchema } from "#shared/schemas"
+import { authError } from "../../utils/auth-errors"
 import { dropPageUrl, findDrop } from "../../utils/drops"
 import { identify } from "../../utils/identity"
 import { openable, openDoc, readReviewToken } from "../../utils/review"
@@ -10,7 +11,7 @@ export default defineValidatedHandler({
     const who = await identify(event)
     const body = await event.req.json()
     if ("doc" in body) {
-      if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the document." })
+      if (!who) throw authError("DOCUMENT_SIGN_IN_REQUIRED")
       const doc = await openDoc(event, body.doc, who)
       if (!doc)
         throw new HTTPError({
@@ -23,7 +24,7 @@ export default defineValidatedHandler({
     }
     const claims = await readReviewToken(event, body.token)
     const site = claims ? await findDrop(claims.d, event) : null
-    if (!who) throw new HTTPError({ status: 401, statusText: "Sign in to open the review." })
+    if (!who) throw authError("REVIEW_SIGN_IN_REQUIRED")
     if (!site || site.kind !== "site" || !openable(site, who))
       throw new HTTPError({
         status: 404,

@@ -1,23 +1,18 @@
-import { type H3Event, HTTPError } from "h3"
+import type { H3Event } from "h3"
 import { checkAuthMember } from "vite-hub/auth/server"
 import { useServerEnv } from "vite-hub/env"
 import * as v from "valibot"
+import { authError } from "./auth-errors"
 
 export const membersOnly = () => Boolean(useServerEnv().drop.members?.unseal().trim())
 
 export async function isMember(userId: string, event?: H3Event | Request) {
   const [error] = await checkAuthMember(userId, event)
-  if (error?.code === "AUTH_GITHUB_UNAVAILABLE")
-    throw new HTTPError({
-      status: 503,
-      statusText: "GitHub membership verification is unavailable. Try again shortly.",
-      data: { code: error.code },
-    })
+  if (error?.code === "AUTH_GITHUB_UNAVAILABLE") throw authError("AUTH_GITHUB_UNAVAILABLE")
   return !error
 }
 
-const membershipOutageCode = "AUTH_GITHUB_UNAVAILABLE"
-const MembershipOutage = v.object({ body: v.object({ code: v.literal(membershipOutageCode) }) })
+const MembershipOutage = v.object({ body: v.object({ code: v.literal("AUTH_GITHUB_UNAVAILABLE") }) })
 const WrappedMembershipOutage = v.object({
   code: v.literal("AUTH_PROVIDER_OPERATION_FAILED"),
   cause: MembershipOutage,
@@ -28,10 +23,5 @@ export function isMembershipOutage(error: unknown) {
 }
 
 export function rethrowMembershipOutage(error: unknown) {
-  if (!isMembershipOutage(error)) return
-  throw new HTTPError({
-    status: 503,
-    statusText: "GitHub membership verification is unavailable. Try again shortly.",
-    data: { code: membershipOutageCode },
-  })
+  if (isMembershipOutage(error)) throw authError("AUTH_GITHUB_UNAVAILABLE")
 }
