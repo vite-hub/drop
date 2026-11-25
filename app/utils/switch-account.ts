@@ -1,4 +1,4 @@
-import { PROXY_SIGN_OUT_HANDOFF_HEADER } from "../../shared/sign-in"
+import { PROXY_SIGN_OUT_HANDOFF_HEADER } from "#shared/sign-in"
 
 type SignOutError = { message?: string; status: number; code?: string }
 type SwitchAccount = {
@@ -6,18 +6,18 @@ type SwitchAccount = {
   navigate: (url: string) => unknown
 }
 
-const STILL_SIGNED_IN = "Couldn't sign you out, so you're still signed in. Try again."
+export class SwitchSignOutError extends Error {
+  constructor(cause: unknown) {
+    super("Couldn't confirm sign-out. Try again.", { cause })
+  }
+}
 
 export async function switchProxyAccount(start: string, { signOut, navigate }: SwitchAccount) {
   const { error } = await signOut({ fetchOptions: { headers: { [PROXY_SIGN_OUT_HANDOFF_HEADER]: "1" } } }).catch(
     (cause: unknown) => {
-      throw new Error(STILL_SIGNED_IN, { cause })
+      throw new SwitchSignOutError(cause)
     },
   )
-  if (error)
-    throw Object.assign(new Error(STILL_SIGNED_IN, { cause: error }), {
-      status: error.status,
-      ...(error.code ? { code: error.code } : {}),
-    })
+  if (error) throw new SwitchSignOutError(error)
   return navigate(`/oauth2/sign_out?rd=${encodeURIComponent(start)}`)
 }

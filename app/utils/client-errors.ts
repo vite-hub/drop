@@ -12,7 +12,7 @@ const Failure = v.object({
   name: optional(v.string()),
   message: optional(v.string()),
   status: optional(v.pipe(v.number(), v.integer(), v.minValue(100))),
-  code: Code,
+  code: optional(v.string()),
   requestId: optional(v.string()),
   cause: optional(v.object({ name: optional(v.string()) })),
   data: optional(
@@ -54,16 +54,20 @@ export function createClientErrorReporter(
   return (action: string, error: unknown, fields: ClientErrorFields, page: Page) => {
     const parsed = parse(error)
     if (parsed.name === "AbortError" || parsed.cause?.name === "AbortError" || !page.online || page.leaving) return
-    const { status } = parsed
+    const { status, code } = parsed
     const step = STEPS[action]
     if (step) {
-      const code = parsed.code ?? parsed.data?.code ?? parsed.data?.data?.code
-      sendEvent({ event: step, ...(code ? { code } : {}), ...(status && status <= 599 ? { status } : {}) })
+      const stepCode = v.parse(Code, code) ?? parsed.data?.code ?? parsed.data?.data?.code
+      sendEvent({
+        event: step,
+        ...(stepCode ? { code: stepCode } : {}),
+        ...(status && status <= 599 ? { status } : {}),
+      })
     }
     if (status && serverLogged(parsed, status)) return
     const failure =
       error instanceof Error ? error : { name: "Error", message: parsed.message ?? String(error), stack: undefined }
-    const key = `${action}:${failure.message}`
+    const key = JSON.stringify([action, failure.message, status, code])
     if (sent.has(key) || sent.size >= 10) return
     sent.add(key)
     const requestId =
@@ -80,6 +84,7 @@ export function createClientErrorReporter(
       stack: failure.stack?.slice(0, 4000),
       ...fields,
       ...(status ? { status } : {}),
+      ...(code ? { code: code.slice(0, 120) } : {}),
       ...(requestId ? { requestId: requestId.slice(0, 100) } : {}),
       ...(fields.title ? { title: fields.title.slice(0, 200) } : {}),
       ...(fields.source ? { source: fields.source.slice(0, 300) } : {}),

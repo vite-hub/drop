@@ -41,7 +41,10 @@ async function connect() {
         answerCode(result.error),
       )
   } catch (cause) {
-    reportClientError(switchingProxyAccount ? "signin-switch" : "signin", cause)
+    reportClientError(
+      switchingProxyAccount ? "signin-switch" : "signin",
+      cause instanceof SwitchSignOutError ? cause.cause : cause,
+    )
     error.value = errorText(cause)
     pending.value = false
   }

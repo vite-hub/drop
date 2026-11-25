@@ -78,7 +78,12 @@ test("a GitHub session counts the return wherever the callback lands, with the a
   assert.deepEqual(clients(), [{ event: "signin.returned", mode: "github" }], "A session with no mark still counts")
 })
 
-test("a proxy session from a card link counts its return once, and an existing session counts nothing", async () => {
+test.each([
+  ["&via=card", "card"],
+  ["&via=auto", "auto"],
+  ["", "button"],
+  ["&via=unknown", "button"],
+])("a proxy handoff (%s) attributes the new session to %s and clears the marker", async (query, via) => {
   state.authProxy = true
   state.members = "github-org:example"
   vi.stubGlobal(
@@ -102,13 +107,14 @@ test("a proxy session from a card link counts its return once, and an existing s
   })
   const back = (cookie) =>
     new H3Event(
-      new Request("https://drop.example/signin/start?redirect=%2Fd%2Fabc&via=card", {
+      new Request(`https://drop.example/signin/start?redirect=%2Fd%2Fabc${query}`, {
         headers: { "x-auth-request-access-token": "test-card", ...(cookie ? { cookie } : {}) },
       }),
     )
-  current = back()
+  current = back("drop-signin-attempt=button")
   await proxySession(current)
-  assert.deepEqual(clients(), [{ event: "signin.returned", mode: "proxy", via: "card" }])
+  assert.deepEqual(clients(), [{ event: "signin.returned", mode: "proxy", via }])
+  assert.ok(current.res.headers.getSetCookie().some((cookie) => /^drop-signin-attempt=; .*Max-Age=0/.test(cookie)))
 
   const cookie = current.context.dropSessionCookies.map((value) => value.split(";")[0]).join("; ")
   current = back(cookie)

@@ -78,6 +78,20 @@ test("a sign-in or consent refusal is reported as its step's failure, with its c
   assert.equal(events.length, 6, "Other actions send no step")
 })
 
+test("a code outside the funnel schema is preserved only in the generic error report", () => {
+  const { sent, events, report } = reporter()
+  report("signin-switch", answerError("Couldn't sign out", 500, "provider/sign-out"))
+  report("signin-switch", answerError("Couldn't sign out", 500, "provider/other"))
+  assert.deepEqual(
+    sent.map(({ code }) => code),
+    ["provider/sign-out", "provider/other"],
+  )
+  assert.deepEqual(events, [
+    { event: "signin.failed", status: 500 },
+    { event: "signin.failed", status: 500 },
+  ])
+})
+
 test("an OAuth provider's refusal keeps its error identifier, without the description", () => {
   const { events, report } = reporter()
   const expired = {

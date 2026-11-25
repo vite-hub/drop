@@ -18,7 +18,9 @@ export function logSignedIn(event: H3Event | undefined, context: { path?: string
   const mode = readAuthProxyConfig().enabled ? "proxy" : context?.path?.startsWith("/callback/") ? "github" : "password"
   const marked = signInVia(getCookie(event, ATTEMPT_COOKIE))
   const via =
-    marked ?? (event.url.pathname === "/signin/start" ? signInVia(event.url.searchParams.get("via")) : undefined)
+    (mode === "proxy" && event.url.pathname === "/signin/start"
+      ? signInVia(event.url.searchParams.get("via"))
+      : undefined) ?? marked
   logClientEvent(event, { event: "signin.returned", mode, ...(via ? { via } : {}) })
   if (marked) attemptCookie(event, "", 0)
 }
