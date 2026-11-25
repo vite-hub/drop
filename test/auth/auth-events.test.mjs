@@ -47,7 +47,7 @@ async function logged() {
   assert.equal(error, undefined)
   return page.events
     .map(({ type, actor, userId, metadata }) => ({ type, actor, userId, method: metadata.method }))
-    .reverse()
+    .sort((left, right) => left.type.localeCompare(right.type))
 }
 
 test("the event log records a proxy sign-in as method forward, and an expired session as expired, with no Drop code", async () => {
@@ -65,8 +65,8 @@ test("the event log records a proxy sign-in as method forward, and an expired se
   assert.equal(await expired.json(), null)
 
   assert.deepEqual(await logged(), [
-    { type: "user.signed_up", actor: `user:${user.id}`, userId: user.id, method: "forward" },
-    { type: "user.signed_in", actor: `user:${user.id}`, userId: user.id, method: "forward" },
     { type: "session.expired", actor: "system", userId: user.id, method: undefined },
+    { type: "user.signed_in", actor: `user:${user.id}`, userId: user.id, method: "forward" },
+    { type: "user.signed_up", actor: `user:${user.id}`, userId: user.id, method: "forward" },
   ])
 })

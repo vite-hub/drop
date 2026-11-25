@@ -5,6 +5,7 @@ import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs
 
 // Drop's own identity module, with Better Auth's session lookup answering for the test (test/stubs.ts `authApi`).
 const session = { current: null }
+const mcpJwt = "test.header.signature"
 state.authApi = {
   getSession: async () => {
     if (session.current instanceof Error) throw session.current
@@ -192,15 +193,22 @@ test("a person in the browser is their id on the event, never their name; an age
     user: { id: "owner", name: "Ada Realname", email: "owner@example.com", emailVerified: true },
     clientName: "Claude Code",
   }
-  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  const agent = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
   assert.ok(!JSON.stringify(agent.event).includes("Realname"))
 
   // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
   state.mcpCaller = null
-  const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  const refused = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.deepEqual(refused.event.mcp.auth, { presented: true, result: "rejected", reason: "malformed" })
   assert.equal(refused.event.user, undefined)
+})
+
+test("a plain bearer without a session is signed out without a structured refusal", async () => {
+  const { event, failure } = await request("/mcp", requireIdentity, { headers: { authorization: "Bearer token" } })
+  assert.equal(failure.status, 401)
+  assert.equal(event.mcp?.auth?.reason, undefined)
+  assert.equal(event.identity.cookie, "absent")
 })
 
 /** A JSON-RPC call to the /mcp route, with the response h3-mcp answered and the request's wide event. */
@@ -249,7 +257,7 @@ test("a rejected token logs ViteHub's reason and client, under no key evlog woul
     message: "The access token is not valid: the session does not exist or has expired.",
     data: { reason: "session_ended", clientId: "client-1" },
   }
-  const { event } = await request("/mcp", identify, { headers: { authorization: "Bearer stale-access" } })
+  const { event } = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.deepEqual(event.mcp.auth, {
     presented: true,
     result: "rejected",
@@ -257,6 +265,7 @@ test("a rejected token logs ViteHub's reason and client, under no key evlog woul
     clientId: "client-1",
   })
   assert.equal(event.token, undefined)
+  assert.ok(!JSON.stringify(event).includes(mcpJwt))
   assert.deepEqual(
     JSON.stringify(event).match(/"[^"]*token"\s*:/gi),
     null,
@@ -355,7 +364,7 @@ test("an agent accepted by ViteHub after its ban expires is not denied by Drop",
     user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true, banExpires: new Date(0) },
     clientName: "Claude Code",
   }
-  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  const agent = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.equal(agent.event.user?.id, "owner")
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
 })

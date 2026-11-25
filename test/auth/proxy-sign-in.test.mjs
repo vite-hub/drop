@@ -491,6 +491,26 @@ test("overlapping first proxy requests through separate auth instances provision
   for (const event of events) assert.match(event.req.headers.get("cookie") ?? "", /session_token=/)
 })
 
+test.each([false, true])("overlapping proxy refusals reach both logs (throws: %s)", async (throws) => {
+  github()
+  let attempts = 0
+  const before = async () => {
+    attempts++
+    if (throws) throw new APIError("FORBIDDEN", { code: "AUTH_NOT_MEMBER", message: "Not a member" })
+    return false
+  }
+  state.auth = auth(throws ? { session: { create: { before } } } : { user: { create: { before } } })
+  const token = `test-overlap-refusal-${throws}`
+  const requests = await Promise.all([handoff(token), handoff(token)])
+  assert.equal(attempts, 1)
+  const refusal = throws ? { refused: "denied", denied: "AUTH_NOT_MEMBER" } : { refused: "unable_to_create_user" }
+  for (const { failure, logged } of requests) {
+    assert.equal(failure.status, 403)
+    assert.equal(failure.data?.code, throws ? "AUTH_NOT_MEMBER" : "PROXY_SIGN_IN_FAILED")
+    assert.deepEqual(logged.auth?.proxy, refusal)
+  }
+})
+
 test("two requests of one browser that arrive together get one session", async () => {
   github()
   assert.equal((await signIn(auth(), "test-same-browser")).status, 200)

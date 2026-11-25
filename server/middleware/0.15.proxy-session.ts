@@ -38,14 +38,19 @@ async function proxySignIn(event: H3Event, token: string) {
     return oneSignInPerIdentity(token, () => sessionOf(event))
 
   let ranHere = false
-  const { session, cookies } = await oneSignInAtATime(token, async () => {
+  const { outcome, refusal } = await oneSignInAtATime(token, async () => {
     ranHere = true
     const before = event.context.dropSessionCookies?.length ?? 0
-    const signedIn = await sessionOf(event)
-    return { session: signedIn, cookies: event.context.dropSessionCookies?.slice(before) ?? [] }
+    const sessionResult = await sessionOf(event).then(
+      (session) => ({ session, cookies: event.context.dropSessionCookies?.slice(before) ?? [] }),
+      (error: unknown) => ({ error }),
+    )
+    return { outcome: sessionResult, refusal: event.context.dropProxyRefusal }
   })
-  if (!ranHere) (event.context.dropSessionCookies ??= []).push(...cookies)
-  return session
+  if (!ranHere && refusal) requestLog(event)?.set({ auth: { proxy: refusal } })
+  if ("error" in outcome) throw outcome.error
+  if (!ranHere) (event.context.dropSessionCookies ??= []).push(...outcome.cookies)
+  return outcome.session
 }
 
 function sentPath(event: H3Event) {
