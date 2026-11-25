@@ -80,6 +80,10 @@ patchedDependencies:
   # so ViteHub's verifyMcpRequest (and Better Auth's own introspection) refused every renewed MCP token. The refresh
   # grant now drops a dead session's id, as validateRefreshToken already does. Not reported upstream yet.
   "@better-auth/oauth-provider@1.7.15": patches/@better-auth__oauth-provider@1.7.15.patch
+  # A note beside its point (side=top|bottom with `to` off to one side) could run up to 14rem past the screenshot's
+  # edge, so a ::compare's track (overflow-x: auto) scrolled sideways and clipped Before. The note now wraps within
+  # the room before the edge (onmax/comark-ui#488). Delete with the next comark-ui bump that includes it.
+  comark-annotate@0.14.2: patches/comark-annotate@0.14.2.patch
 
 # Only workerd (local Workers runtime) needs its install script.
 allowBuilds:
