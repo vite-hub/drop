@@ -212,7 +212,7 @@ export const threads = () =>
     }))
 export function event(path, method = "GET") {
   const request = new H3Event(new Request(`https://drop.example${path}`, { method, headers: { accept: "text/html" } }))
-  request.context.log = { set() {}, error() {}, warn() {} }
+  request.context.log = { set() {}, error() {}, warn() {}, getContext: () => ({}) }
   return request
 }
 /** A request to the Blob serve route at /f, with the raw catch-all Nitro gives the route as `params._`. */

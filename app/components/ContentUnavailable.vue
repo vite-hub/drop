@@ -7,6 +7,12 @@ const [{ data: me }, { data: method }] = await Promise.all([useMe(), useSignInMe
 const message = computed(() =>
   contentUnavailable(props.status, props.path, me.value?.email, props.waitingForReview, Boolean(method.value?.proxy)),
 )
+const hydrating = useNuxtApp().isHydrating
+if (import.meta.server) countCardShown(message.value.reason, { context: useRequestEvent()?.context ?? {} })
+onMounted(() => countCardShown(message.value.reason, { hydrating }))
+function acted() {
+  if (message.value.action.to.startsWith("/oauth2/start")) reportSignInClicked("proxy", "card")
+}
 const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\/([^/]+)\/?$/, "/d/$1"))
 </script>
 
@@ -33,7 +39,12 @@ const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\
           Signed in as <bdi>{{ message.email }}</bdi>
         </p>
         <nav class="content-unavailable-actions" aria-label="Content recovery">
-          <NuxtLink class="content-unavailable-action" :to="message.action.to" :external="message.action.to === path">
+          <NuxtLink
+            class="content-unavailable-action"
+            :to="message.action.to"
+            :external="message.action.to === path"
+            @click="acted"
+          >
             <UIcon
               v-if="message.action.to.startsWith('/signin')"
               name="i-simple-icons-github"

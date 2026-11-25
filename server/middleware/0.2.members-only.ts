@@ -18,7 +18,7 @@ export default defineHandler(async (event) => {
   if (!membersOnly()) return
   const path = event.url.pathname
   if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/admin/")) return
-  if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in") return
+  if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in" || path === "/api/client-events") return
   if (path.startsWith("/api/favicons/")) return
   if (REVIEW_SCRIPT.test(path) || PRESENCE_ROOM.test(path) || SEND_PAIR.test(path)) return
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return

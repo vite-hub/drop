@@ -1,15 +1,34 @@
 import { signInPath } from "./sign-in"
 
+export const CARD_REASONS = [
+  "signed-out",
+  "no-access",
+  "expired",
+  "review-pending",
+  "unavailable",
+  "rate-limited",
+  "missing-page",
+] as const
+export type CardReason = (typeof CARD_REASONS)[number]
+type CardMessage = {
+  reason: CardReason
+  title: string
+  description: string
+  email: string | null
+  action: { label: string; to: string }
+}
+
 export function contentUnavailable(
   status: number,
   path: string,
   email?: string | null,
   waitingForReview = false,
   authProxy = false,
-) {
-  const signIn = signInPath(path, { proxy: authProxy, choose: true })
+): CardMessage {
+  const signIn = signInPath(path, { proxy: authProxy, choose: true, via: "card" })
   if (status >= 500 || status === 429)
     return {
+      reason: status === 429 ? "rate-limited" : "unavailable",
       title: status === 429 ? "Too many requests." : "Could not open this content.",
       description: "Try again in a moment.",
       email: null,
@@ -17,6 +36,7 @@ export function contentUnavailable(
     }
   if (status === 410)
     return {
+      reason: "expired",
       title: "This drop expired.",
       description:
         "Nobody opened it for a while, so it stopped being served. Its owner can still renew it for a few days.",
@@ -25,6 +45,7 @@ export function contentUnavailable(
     }
   if (waitingForReview)
     return {
+      reason: "review-pending",
       title: "Waiting for review",
       description: "This share is waiting for the instance operator to review it.",
       email: null,
@@ -33,6 +54,7 @@ export function contentUnavailable(
   const thing = path.startsWith("/f/") ? "file" : "drop"
   if (email)
     return {
+      reason: "no-access",
       title: `You can't open this ${thing}`,
       description: `It isn't shared with this account, or it was deleted. Ask whoever sent the link to share it with you.`,
       email,
@@ -41,6 +63,7 @@ export function contentUnavailable(
         : { label: "Use another account", to: `/signin?redirect=${encodeURIComponent(path)}` },
     }
   return {
+    reason: "signed-out",
     title: `Sign in to open this ${thing}`,
     description: `${thing === "file" ? "Files" : "Drops"} shared with you or your team open right after you sign in.`,
     email: null,
@@ -48,7 +71,8 @@ export function contentUnavailable(
   }
 }
 
-export const missingInDrop = (drop: string, email?: string | null) => ({
+export const missingInDrop = (drop: string, email?: string | null): CardMessage => ({
+  reason: "missing-page",
   title: "Nothing is at this address in the drop.",
   description: "The drop is here, and you can open it, but it has no page at this address.",
   email: email ?? null,
