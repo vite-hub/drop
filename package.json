@@ -111,7 +111,7 @@
     "yjs": "13.6.33"
   },
   "devDependencies": {
-    "@types/node": "^25.9.11",
+    "@types/node": "^26.6.10",
     "@types/react": "19.3.1",
     "@types/react-dom": "19.3.0",
     "drizzle-kit": "1.0.0-rc.6",
