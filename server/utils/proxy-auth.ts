@@ -7,7 +7,9 @@ import { db } from "vite-hub/database"
 import { account } from "../databases/default/index"
 import { authApiError, isAuthErrorCode } from "./auth-errors"
 import { authRequest, requestLog } from "./logs"
-import { isProxyMember, PROXY_TOKEN_HEADER, readAuthProxyConfig } from "./proxy-auth-config"
+import { isProxyMember, readAuthProxyConfig } from "./proxy-auth-config"
+
+export const PROXY_TOKEN_HEADER = "x-auth-request-access-token"
 export const authProxy = readAuthProxyConfig
 
 const IDENTITY_TTL_MS = 300_000

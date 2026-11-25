@@ -5,13 +5,8 @@ import { PROXY_SIGN_OUT_HANDOFF_HEADER } from "../../shared/sign-in"
 import { authError } from "../utils/auth-errors"
 import { sessionOf } from "../utils/identity"
 import { requestLog } from "../utils/logs"
-import { oneSignInAtATime, oneSignInPerIdentity } from "../utils/proxy-auth"
-import {
-  DROP_SECURE_COOKIE_PREFIX,
-  isProxyMember,
-  PROXY_TOKEN_HEADER,
-  readAuthProxyConfig,
-} from "../utils/proxy-auth-config"
+import { oneSignInAtATime, oneSignInPerIdentity, PROXY_TOKEN_HEADER } from "../utils/proxy-auth"
+import { DROP_SECURE_COOKIE_PREFIX, isProxyMember, readAuthProxyConfig } from "../utils/proxy-auth-config"
 
 export default defineHandler(async (event) => {
   const proxy = readAuthProxyConfig()
