@@ -113,7 +113,8 @@
     .tag button:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
     .tag > .name, .tag > .tnote { min-width: 0; white-space: nowrap; }
     .tag > .tnote { box-sizing: border-box; grid-column: 1 / -1; width: 100%; padding: 2px 0 0 24px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-    .tag > .tnote:empty, .tag.narrow > .tnote { display: none; }
+    .tag > .tnote:empty, .tag.narrow > .tnote, .tag.tight > .tnote { display: none; }
+    .tag.hide, .tag.nohandle > .handle { visibility: hidden; }
     .handle, .open { width: 20px; padding: 0; display: grid; place-items: center; color: #a3a3a3 !important; }
     .handle { touch-action: none; opacity: 0; }
     .tag:hover .handle, .handle:focus-visible { opacity: 1; }
@@ -160,6 +161,8 @@
 
   // Canvas state. Positions and the camera are in plane pixels; screen = camera + plane × zoom.
   const GAP = 160, ROW = 5600, ROW_GAP = 240, MIN_Z = 0.05, MAX_Z = 4, LIMIT = 1e6, URL_HEIGHT = 900, LABEL_INSET = 24, KEEP = 160;
+  // A label's rows on screen: the name, then up to two lines of note; it sits LABEL_GAP above its item.
+  const NAME_H = 22, NOTE_H = 35, LABEL_GAP = 6, LABEL_CLEAR = 4;
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const finite = (n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= LIMIT;
   const size = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? clamp(n, lo, hi) : null; };
@@ -303,18 +306,33 @@
     setDockBottom(overlaps ? Math.max(72, raisedBottom + minimap.height + 8) : 72);
   }
 
-  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size.
+  // One transform write per item per frame; previews never re-render for the camera. Labels stay at screen size while
+  // the gaps between items shrink with the zoom, so a label shows only the rows that fit above its item without
+  // touching another: name and note, then the name alone, then nothing. The handle, in the gap to the left, goes the same way.
   function render() {
     frame = 0;
     if (mode !== "canvas") return;
-    for (const it of items) {
-      const sx = cam.x + it.x * cam.z, sy = cam.y + it.y * cam.z;
-      it.el.style.setProperty("transform", `translate(${sx}px, ${sy}px) scale(${cam.z})`, "important");
+    const rects = items.map((it) => {
+      const b = box(it), l = cam.x + it.x * cam.z, t = cam.y + it.y * cam.z;
+      return { l, t, r: l + b.w * cam.z, b: t + b.h * cam.z };
+    });
+    const clear = (self, l, t, r, b) => rects.every((o) => o === self || o.l >= r || o.r <= l || o.t >= b || o.b + LABEL_CLEAR <= t);
+    const focused = tags.getRootNode().activeElement;
+    for (const [i, it] of items.entries()) {
+      const s = rects[i], w = s.r - s.l, bottom = s.t - LABEL_GAP;
+      it.el.style.setProperty("transform", `translate(${s.l}px, ${s.t}px) scale(${cam.z})`, "important");
       // The handle sits in the gap left of the item, so the name and note start at the item's edge and end with it.
-      const w = box(it).w * cam.z;
-      it.tag.style.transform = `translate(${sx - LABEL_INSET}px, ${sy - 6}px) translateY(-100%)`;
+      it.tag.style.transform = `translate(${s.l - LABEL_INSET}px, ${bottom}px) translateY(-100%)`;
       it.tag.style.width = w + LABEL_INSET + "px";
-      it.tag.classList.toggle("narrow", w < 160);
+      const narrow = w < 160, noted = !narrow && Boolean(it.el.dataset.note);
+      const note = noted && clear(s, s.l, bottom - NAME_H - NOTE_H, s.r, bottom);
+      const top = bottom - NAME_H - (note ? NOTE_H : 0);
+      // A label someone is using with the keyboard stays, so its focus isn't lost mid-move.
+      const kept = Boolean(focused) && it.tag.contains(focused);
+      it.tag.classList.toggle("narrow", narrow);
+      it.tag.classList.toggle("tight", noted && !note);
+      it.tag.classList.toggle("hide", !kept && !note && !clear(s, s.l, bottom - NAME_H, s.r, bottom));
+      it.tag.classList.toggle("nohandle", !kept && !clear(s, s.l - LABEL_INSET, top, s.l, top + NAME_H));
     }
     drawMap();
     rest();

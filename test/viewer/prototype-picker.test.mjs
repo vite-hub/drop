@@ -202,6 +202,67 @@ test("canvas labels align with their items and hide notes below 160 screen pixel
   }
 })
 
+test("zoomed out, a canvas label shows only what fits above its item and never covers another", async () => {
+  const browser = await chromium.launch()
+  try {
+    const context = await browser.newContext({ viewport: { width: 1000, height: 700 } })
+    const sections = [0, 1, 2]
+      .flatMap((row) => [0, 1].map((col) => [row, col]))
+      .map(
+        ([row, col]) =>
+          `<section id="v-r${row}c${col}" data-variant="Item ${row}${col}" data-note="${"A note long enough to wrap. ".repeat(6)}" data-width="1200" data-height="1200" data-x="${col * 1360}" data-y="${row * 1400}"></section>`,
+      )
+      .join("")
+    const html = injectRuntime(`<!doctype html><html><body>${sections}</body></html>`, false, 0, true)
+    // [zoom, rows below the first that show their name, and their note]
+    for (const [zoom, names, notes] of [
+      [0.5, true, true],
+      [0.2, true, false],
+      [0.08, false, false],
+    ]) {
+      const tab = await context.newPage()
+      await tab.route("https://picker.test/stack", (route) => route.fulfill({ contentType: "text/html", body: html }))
+      await tab.addInitScript((z) => {
+        localStorage.setItem("drop-prototype-canvas:/stack", JSON.stringify({ v: 1, camera: { x: 48, y: 120, z } }))
+      }, zoom)
+      await tab.goto("https://picker.test/stack")
+      await tab.waitForFunction(() =>
+        [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")].every(
+          (tag) => tag.style.width,
+        ),
+      )
+      const labels = await tab.evaluate(() => {
+        const items = [...document.querySelectorAll("body > [data-variant]")].map((el) => el.getBoundingClientRect())
+        const tags = [...document.querySelector("prototype-picker").shadowRoot.querySelectorAll(".tag")]
+        return tags.map((tag, i) => {
+          const shown = (el) => getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden"
+          const parts = [".handle", ".name", ".tnote"].map((s) => tag.querySelector(s)).filter(shown)
+          const covered = parts.some((el) => {
+            const r = el.getBoundingClientRect()
+            return items.some(
+              (o, j) => j !== i && o.left < r.right && o.right > r.left && o.top < r.bottom && o.bottom > r.top,
+            )
+          })
+          return { name: shown(tag.querySelector(".name")), note: shown(tag.querySelector(".tnote")), covered }
+        })
+      })
+      for (const [i, label] of labels.entries()) {
+        const top = i < 2
+        assert.equal(label.covered, false, `label ${i} at ${zoom} covers no other item`)
+        assert.equal(label.name, top || names, `label ${i} at ${zoom} shows its name only when it fits`)
+        assert.equal(
+          label.note,
+          label.name && (top ? zoom * 1200 >= 160 : notes),
+          `label ${i} at ${zoom} shows its note only when it fits`,
+        )
+      }
+      await tab.close()
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
 test("a prototype opens on the canvas; an item opens in focus and comes back as it was", async () => {
   const browser = await chromium.launch()
   try {
