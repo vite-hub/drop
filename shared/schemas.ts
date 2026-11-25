@@ -265,6 +265,7 @@ export const ClientErrorSchema = v.object({
   message: v.pipe(v.string(), v.maxLength(1000)),
   stack: v.optional(v.pipe(v.string(), v.maxLength(4000))),
   status: v.optional(v.pipe(v.number(), v.integer(), v.minValue(100), v.maxValue(599))),
+  code: v.optional(v.pipe(v.string(), v.maxLength(120))),
   requestId: v.optional(v.pipe(v.string(), v.maxLength(100))),
   drop: v.optional(v.pipe(v.string(), v.maxLength(40))),
   title: v.optional(v.pipe(v.string(), v.maxLength(200))),

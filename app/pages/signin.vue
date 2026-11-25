@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { signInPath } from "#shared/sign-in"
+import { switchProxyAccount, SwitchSignOutError } from "~/utils/switch-account"
 
 useSeoMeta({ title: "Sign in", robots: "noindex, nofollow" })
 
@@ -33,7 +34,10 @@ async function connect() {
     })
     if (result.error) throw answerError(result.error.message ?? "Couldn't start GitHub sign-in.", result.error.status)
   } catch (cause) {
-    reportClientError(switchingProxyAccount ? "signin-switch" : "signin", cause)
+    reportClientError(
+      switchingProxyAccount ? "signin-switch" : "signin",
+      cause instanceof SwitchSignOutError ? cause.cause : cause,
+    )
     error.value = errorText(cause)
     pending.value = false
   }
