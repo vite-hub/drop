@@ -33,7 +33,11 @@ writeFileSync(
   }).outputText,
 )
 writeFileSync(`${root}composer.css`, descriptor.styles.map((style) => style.content).join("\n"))
-writeFileSync(`${root}index.html`, '<div id="app"></div><script type="module" src="/main.js"></script>')
+// The pictures fan out above the box, as they do over a page, so leave them room.
+writeFileSync(
+  `${root}index.html`,
+  '<div id="app" style="padding-top: 12rem"></div><script type="module" src="/main.js"></script>',
+)
 writeFileSync(
   `${root}main.js`,
   `import * as Vue from "vue"
@@ -156,6 +160,8 @@ test(
       await field.focus()
       await field.press("End")
       await field.pressSequentially(" edits during waiting")
+      // The pictures sit in a stack beside the text; hovering it fans the cards out to their Remove buttons.
+      await page.locator('[data-slot="comment-image-stack"]').hover()
       await page
         .getByRole("button", { name: /^Remove / })
         .first()
@@ -176,6 +182,7 @@ test(
       })
       await field.press("End")
       await field.pressSequentially(" retry")
+      await page.locator('[data-slot="comment-image-stack"]').hover()
       await page
         .getByRole("button", { name: /^Remove / })
         .first()
