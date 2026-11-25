@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { betterAuth } from "better-auth"
+import { APIError } from "better-auth/api"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin } from "better-auth/plugins"
 import { createRequestLogger } from "evlog"
@@ -10,6 +11,7 @@ import { migrate, queries, reset, roundTrips, sql, state } from "../cost/harness
 const { default: schema } = await import("../../server/databases/default/index.ts")
 const { oneSignInAtATime, proxyAuth } = await import("../../server/utils/proxy-auth.ts")
 const { identify } = await import("../../server/utils/identity.ts")
+const { authRequest } = await import("../../server/utils/logs.ts")
 const { isProxyMember, readAuthProxyConfig } = await import("../../server/utils/proxy-auth-config.ts")
 const { default: proxySession } = await import("../../server/middleware/0.15.proxy-session.ts")
 vi.mock("nitro/runtime-config", () => ({ useRuntimeConfig: () => ({}) }))
@@ -376,23 +378,56 @@ test("request session reads write the GitHub account only when its token rotates
   }
 })
 
+/** The proxy handoff of a browser, under the request store that server/middleware/0.01.auth-request.ts sets. */
+async function handoff(token) {
+  const event = new H3Event(startRequest(token))
+  event.context.log = createRequestLogger()
+  const failure = await authRequest.run(event, () => proxySession(event)).catch((error) => error)
+  return { failure, logged: event.context.log.getContext() }
+}
+
 test("a Better Auth user policy rejection leaves no proxy user or account, and says why", async () => {
   github()
-  const instance = auth({ user: { create: { before: async () => false } } })
-  state.auth = instance
-  const event = new H3Event(startRequest("test-rejected"))
-  event.context.log = createRequestLogger()
-  await assert.rejects(proxySession(event), (error) => {
-    assert.equal(error.status, 403)
-    assert.equal(error.data?.code, "PROXY_SIGN_IN_FAILED")
-    return true
-  })
-  assert.deepEqual(event.context.log.getContext().auth, {
+  state.auth = auth({ user: { create: { before: async () => false } } })
+  const { failure, logged } = await handoff("test-rejected")
+  assert.equal(failure.status, 403)
+  assert.equal(failure.data?.code, "PROXY_SIGN_IN_FAILED")
+  assert.deepEqual(logged.auth, {
     signIn: "proxy failed",
     cause: "Better Auth refused the forwarded identity",
+    proxy: { refused: "unable_to_create_user" },
   })
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE email='maxi@example.com'").get().n, 0)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM account WHERE account_id='42'").get().n, 0)
+})
+
+test("a proxy identity whose unverified email belongs to another user is logged as account_not_linked", async () => {
+  github(undefined, undefined, () => Response.json([{ email: "maxi@example.com", primary: true, verified: false }]))
+  sql.exec(
+    `INSERT INTO user (id, name, email, email_verified, role) VALUES ('local', 'Local', 'maxi@example.com', 1, 'member')`,
+  )
+  state.auth = auth()
+  const { failure, logged } = await handoff("test-unlinked")
+  assert.equal(failure.data?.code, "PROXY_SIGN_IN_FAILED")
+  assert.deepEqual(logged.auth.proxy, { refused: "account_not_linked" })
+  assert.ok(!JSON.stringify(logged).includes("maxi@example.com"), "The log names no email")
+  assert.ok(!JSON.stringify(logged).includes("test-unlinked"), "The log names no token")
+})
+
+test("a session hook that denies the proxy identity is logged as denied, with the hook's code", async () => {
+  github()
+  state.auth = auth({
+    session: {
+      create: {
+        before: async () => {
+          throw new APIError("FORBIDDEN", { code: "AUTH_NOT_MEMBER", message: "Not a member" })
+        },
+      },
+    },
+  })
+  const { failure, logged } = await handoff("test-denied")
+  assert.equal(failure.status, 403)
+  assert.deepEqual(logged.auth.proxy, { refused: "denied", denied: "AUTH_NOT_MEMBER" })
 })
 
 test("parallel first proxy sign-ins provision one account through Better Auth hooks", async () => {
@@ -454,6 +489,26 @@ test("overlapping first proxy requests through separate auth instances provision
   assert.equal(sql.prepare("SELECT count(*) AS n FROM user WHERE id <> 'owner'").get().n, 1)
   assert.equal(sql.prepare("SELECT count(*) AS n FROM account WHERE account_id = '42'").get().n, 1)
   for (const event of events) assert.match(event.req.headers.get("cookie") ?? "", /session_token=/)
+})
+
+test.each([false, true])("overlapping proxy refusals reach both logs (throws: %s)", async (throws) => {
+  github()
+  let attempts = 0
+  const before = async () => {
+    attempts++
+    if (throws) throw new APIError("FORBIDDEN", { code: "AUTH_NOT_MEMBER", message: "Not a member" })
+    return false
+  }
+  state.auth = auth(throws ? { session: { create: { before } } } : { user: { create: { before } } })
+  const token = `test-overlap-refusal-${throws}`
+  const requests = await Promise.all([handoff(token), handoff(token)])
+  assert.equal(attempts, 1)
+  const refusal = throws ? { refused: "denied", denied: "AUTH_NOT_MEMBER" } : { refused: "unable_to_create_user" }
+  for (const { failure, logged } of requests) {
+    assert.equal(failure.status, 403)
+    assert.equal(failure.data?.code, throws ? "AUTH_NOT_MEMBER" : "PROXY_SIGN_IN_FAILED")
+    assert.deepEqual(logged.auth?.proxy, refusal)
+  }
 })
 
 test("two requests of one browser that arrive together get one session", async () => {
