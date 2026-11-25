@@ -9,7 +9,7 @@ export function nextPath(value: string | null | undefined, origin: string) {
   }
 }
 
-export const SIGN_IN_VIAS = ["button", "card", "auto"] as const
+const SIGN_IN_VIAS = ["button", "card", "auto"] as const
 export type SignInVia = (typeof SIGN_IN_VIAS)[number]
 export const signInVia = (value: string | null | undefined) => SIGN_IN_VIAS.find((via) => via === value)
 
