@@ -17,7 +17,7 @@ export default defineHandler(async (event) => {
   if (!token) return
   if (path !== "/signin/start" || sentPath(event) !== path) return withoutToken(event)
   if (!(await isProxyMember(token))) throw authError("GITHUB_MEMBERSHIP_REQUIRED")
-  const session = await oneSignInAtATime(token, () => sessionOf(event)).catch((error: unknown) => {
+  const session = await proxySignIn(event, token).catch((error: unknown) => {
     if (!(error instanceof APIError)) throw error
     const code = typeof error.body?.code === "string" ? error.body.code : undefined
     throw new HTTPError({ status: error.statusCode, statusText: error.message, ...(code ? { data: { code } } : {}) })
@@ -29,6 +29,18 @@ export default defineHandler(async (event) => {
 
   withoutToken(event, event.context.dropSessionCookies)
 })
+
+async function proxySignIn(event: H3Event, token: string) {
+  let ranHere = false
+  const { session, cookies } = await oneSignInAtATime(token, async () => {
+    ranHere = true
+    const before = event.context.dropSessionCookies?.length ?? 0
+    const signedIn = await sessionOf(event)
+    return { session: signedIn, cookies: event.context.dropSessionCookies?.slice(before) ?? [] }
+  })
+  if (!ranHere) (event.context.dropSessionCookies ??= []).push(...cookies)
+  return session
+}
 
 function sentPath(event: H3Event) {
   return event.runtime?.node?.req.url?.split("?")[0] ?? event.url.pathname

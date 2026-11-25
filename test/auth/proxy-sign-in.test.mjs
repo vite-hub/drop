@@ -19,7 +19,7 @@ migrate()
 beforeEach(() => {
   reset()
   state.authProxy = true
-  state.members = "github-org:quiverdk"
+  state.members = "github-org:example-org"
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -455,7 +455,22 @@ test("overlapping first proxy requests through separate auth instances provision
   for (const event of events) assert.match(event.req.headers.get("cookie") ?? "", /session_token=/)
 })
 
-test("requests of a proxy member who already has an account don't wait on each other", async () => {
+test("two requests of one browser that arrive together get one session", async () => {
+  github()
+  assert.equal((await signIn(auth(), "test-same-browser")).status, 200)
+  sql.prepare("DELETE FROM session").run()
+  Object.defineProperty(state, "auth", { get: () => auth(), configurable: true })
+  const events = Array.from({ length: 2 }, () => new H3Event(startRequest("test-same-browser")))
+  await Promise.all(events.map((event) => proxySession(event)))
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session").get().n, 1)
+  const [first, second] = events.map(
+    (event) => event.context.dropSessionCookies?.find((cookie) => cookie.includes("session_token="))?.split(";")[0],
+  )
+  assert.match(first ?? "", /session_token=/)
+  assert.equal(second, first)
+})
+
+test("browsers of a proxy member who already has an account don't wait on each other", async () => {
   github()
   assert.equal((await signIn(auth(), "test-concurrent-reads")).status, 200)
   let started = 0
@@ -463,8 +478,8 @@ test("requests of a proxy member who already has an account don't wait on each o
   const gate = new Promise((resolve) => {
     open = resolve
   })
-  const reads = Array.from({ length: 2 }, () =>
-    oneSignInAtATime("test-concurrent-reads", async () => {
+  const reads = ["test-concurrent-reads-a", "test-concurrent-reads-b"].map((token) =>
+    oneSignInAtATime(token, async () => {
       started++
       await gate
     }),
