@@ -53,7 +53,7 @@ patchedDependencies:
   # A failed Send says why (drop#301): `problem` ("delivery", "key-unset", "key-invalid") and the receiver's `agent` on
   # the failed result, the receiver's HTTP status or timeout from the webhook delivery, and Send or Pair again re-pairs
   # after a key problem. A status refresh keeps a failed Send failed, with its count updated, while comments still
-  # wait. No upstream issue yet. Delete when ViteHub ships drop#301's Send failure details.
+  # wait, and keeps a failed pairing or Allow until Send retries it (vite-hub/vitehub#5526). Delete when ViteHub ships it.
   "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
@@ -65,7 +65,8 @@ patchedDependencies:
   h3-mcp@0.2.0: patches/h3-mcp@0.2.0.patch
   # Runs nuxt-security 2.7.0 on Nuxt 5 / Nitro v3 / h3 v2: Nitro v3 imports, headers set in render:html (Nuxt 5 has no
   # render:response), x-powered-by removed in the response hook, getRouteRules(method, path), nitro/types augments,
-  # basic auth without a Node request, and request middlewares registered only for features in use.
+  # basic auth without a Node request, and request middlewares registered only for features in use. Delete when
+  # Baroshem/nuxt-security#769 ships.
   nuxt-security@2.7.0: patches/nuxt-security@2.7.0.patch
 
 # Only workerd (local Workers runtime) needs its install script.

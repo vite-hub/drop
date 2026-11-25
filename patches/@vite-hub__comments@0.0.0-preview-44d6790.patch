@@ -21,13 +21,23 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..1780adfeffded39b7a66a64f841221cf
    status: "limited";
    count: number;
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..096d2887d57d5247fd22ee518d5193dab16d3bbf 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..9f6abe9d069bd3cd1333d8c85f62c2d864739ef1 100644
 --- a/dist/client.js
 +++ b/dist/client.js
-@@ -1254,6 +1254,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1244,7 +1244,7 @@ function createCommentSend(transport, options = {}) {
+ 		if (status.retryAt !== void 0 && status.retryAt > Date.now()) return limited(status.retryAt);
+ 		idle();
+ 	};
+-	const refresh = async (onError, deliveryPending = false) => {
++	const refresh = async (onError, deliveryPending = false, recover = false) => {
+ 		const at = step;
+ 		const canApply = () => at === step && !fetching && state.status !== "pairing" && state.status !== "confirm" && (state.status !== "sending" || deliveryPending);
+ 		if (!canApply()) return;
+@@ -1254,6 +1254,15 @@ function createCommentSend(transport, options = {}) {
  			if (!canApply()) return;
  			if (revision === countRevision) count = status.count;
  			selection = status.selection ?? "";
++			if (state.status === "failed" && !recover && lastStep !== "send") return;
 +			if (state.status === "failed" && lastStep === "send" && count > 0) {
 +				agent = status.agent;
 +				if (count !== state.count) set({
@@ -39,7 +49,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..096d2887d57d5247fd22ee518d5193da
  			apply(status);
  		} catch (error) {
  			if (!onError) throw error;
-@@ -1281,7 +1289,9 @@ function createCommentSend(transport, options = {}) {
+@@ -1281,7 +1290,9 @@ function createCommentSend(transport, options = {}) {
  		if (result.status === "failed") return set({
  			status: "failed",
  			count,
@@ -50,12 +60,13 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..096d2887d57d5247fd22ee518d5193da
  		});
  		if (paired) agent = paired.agent;
  		if (result.status === "limited") return limited(result.retryAt);
-@@ -1469,13 +1479,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1469,13 +1480,14 @@ function createCommentSend(transport, options = {}) {
  			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
  			if (state.status === "failed" && lastStep === "pair") return pair(copy);
+-			if (needsStatus()) return refresh(() => void 0);
 +			if (needsStatus() && (state.problem === "key-unset" || state.problem === "key-invalid")) return pair(copy);
- 			if (needsStatus()) return refresh(() => void 0);
++			if (needsStatus()) return refresh(() => void 0, false, true);
  			if (!agent) return pair(copy);
  			lastStep = "send";
  			return deliver(() => transport.send());

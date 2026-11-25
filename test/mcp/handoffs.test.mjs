@@ -705,6 +705,8 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
     assert.equal(client.state.status, "failed")
     assert.equal(delivered.length, 1)
     assert.notEqual(delivered[0].endpoint, publishing.id)
+    await client.refresh()
+    assert.equal(client.state.status, "failed")
     await client.send()
     assert.equal(client.state.status, "idle")
     assert.equal(delivered.length, 1)
