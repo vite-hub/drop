@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "vite-plus/test"
 import { migrateWorkersBuild } from "../../scripts/migrate-workers-builds.mjs"
-import { migrations } from "../../scripts/migrations.mjs"
 
 const production = {
   WORKERS_CI: "1",
@@ -13,6 +12,8 @@ const production = {
   CLOUDFLARE_ACCOUNT_ID: "test-account",
   CLOUDFLARE_API_TOKEN: "deploy-token",
 }
+
+const noWrangler = () => assert.fail("Wrangler must not run")
 
 async function withWranglerConfig(databases, run) {
   const directory = await mkdtemp(join(tmpdir(), "drop-workers-builds-"))
@@ -26,26 +27,21 @@ async function withWranglerConfig(databases, run) {
 }
 
 test("previews and other hosts do not read the deploy config or migrate", async () => {
-  await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: "feat/pins" }, "/unused/wrangler.json")
-  await migrateWorkersBuild({ ...production, WORKERS_CI: undefined }, "/unused/wrangler.json")
-  await migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: "prod" }, "/unused/wrangler.json")
-  await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: undefined }, "/unused/wrangler.json")
+  await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: "feat/pins" }, "/unused/wrangler.json", noWrangler)
+  await migrateWorkersBuild({ ...production, WORKERS_CI: undefined }, "/unused/wrangler.json", noWrangler)
+  await migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: "prod" }, "/unused/wrangler.json", noWrangler)
+  await migrateWorkersBuild({ ...production, WORKERS_CI_BRANCH: undefined }, "/unused/wrangler.json", noWrangler)
   await migrateWorkersBuild(
     { ...production, WORKERS_CI_BRANCH: "", DROP_PRODUCTION_BRANCH: "" },
     "/unused/wrangler.json",
+    noWrangler,
   )
 })
 
-test("a main Preview without the production opt-in never queries its generated DB", async () => {
-  const previousFetch = globalThis.fetch
-  try {
-    globalThis.fetch = async () => assert.fail("Preview attempted to query D1")
-    await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
-      migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: undefined }, configPath),
-    )
-  } finally {
-    globalThis.fetch = previousFetch
-  }
+test("a main Preview without the production opt-in never migrates its generated DB", async () => {
+  await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
+    migrateWorkersBuild({ ...production, DROP_PRODUCTION_BRANCH: undefined }, configPath, noWrangler),
+  )
 })
 
 test.each([
@@ -55,34 +51,23 @@ test.each([
     { WORKERS_CI_BRANCH: "prod", DROP_PRODUCTION_BRANCH: "prod", CLOUDFLARE_D1_DATABASE_ID: "built-db" },
     "deploy-token",
   ],
-])("applies pending migrations to the generated DB from the %s", async (_source, overrides, token) => {
-  const previousFetch = globalThis.fetch
-  const entries = migrations()
-  const pending = entries.at(-1)
-  const queries = []
-  try {
-    globalThis.fetch = async (url, options) => {
-      assert.equal(url, "https://api.cloudflare.com/client/v4/accounts/test-account/d1/database/built-db/query")
-      assert.equal(options.headers.Authorization, `Bearer ${token}`)
-      const { sql } = JSON.parse(options.body)
-      queries.push(sql)
-      const results = sql.startsWith("SELECT") ? entries.slice(0, -1).map(({ name }) => ({ name })) : []
-      return Response.json({ success: true, result: [{ success: true, results }] })
-    }
-    await withWranglerConfig(
-      [
-        { binding: "OTHER", database_id: "other-db" },
-        { binding: "DB", database_id: "built-db" },
-      ],
-      (configPath) => migrateWorkersBuild({ ...production, ...overrides }, configPath),
-    )
-    assert.equal(queries.length, 3)
-    assert.match(queries[0], /^CREATE TABLE IF NOT EXISTS d1_migrations/)
-    assert.equal(queries[1], "SELECT name FROM d1_migrations")
-    assert.ok(queries[2].includes(`VALUES ('${pending.name}')`))
-  } finally {
-    globalThis.fetch = previousFetch
-  }
+])("Wrangler applies pending migrations to the generated DB from the %s", async (_source, overrides, token) => {
+  const calls = []
+  await withWranglerConfig(
+    [
+      { binding: "OTHER", database_id: "other-db" },
+      { binding: "DB", database_id: "built-db" },
+    ],
+    async (configPath) => {
+      await migrateWorkersBuild({ ...production, ...overrides }, configPath, (args, env) => calls.push({ args, env }))
+      assert.deepEqual(
+        calls.map(({ args }) => args),
+        [["d1", "migrations", "apply", "DB", "--remote", "--config", configPath]],
+      )
+    },
+  )
+  assert.equal(calls[0].env.CLOUDFLARE_API_TOKEN, token)
+  assert.equal(calls[0].env.CLOUDFLARE_ACCOUNT_ID, "test-account")
 })
 
 test.each([{ databases: [] }, { databases: [{ binding: "DB", database_id: "00000000-0000-4000-8000-000000000000" }] }])(
@@ -90,7 +75,7 @@ test.each([{ databases: [] }, { databases: [{ binding: "DB", database_id: "00000
   async ({ databases }) => {
     await withWranglerConfig(databases, (configPath) =>
       assert.rejects(
-        migrateWorkersBuild({ ...production, CLOUDFLARE_D1_DATABASE_ID: "unbound-db" }, configPath),
+        migrateWorkersBuild({ ...production, CLOUDFLARE_D1_DATABASE_ID: "unbound-db" }, configPath, noWrangler),
         /No deployed D1 database ID for DB/,
       ),
     )
@@ -100,27 +85,24 @@ test.each([{ databases: [] }, { databases: [{ binding: "DB", database_id: "00000
 test("production with no token fails with setup instructions", async () => {
   await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
     assert.rejects(
-      migrateWorkersBuild({ ...production, CLOUDFLARE_API_TOKEN: undefined }, configPath),
+      migrateWorkersBuild({ ...production, CLOUDFLARE_API_TOKEN: undefined }, configPath, noWrangler),
       /DROP_D1_MIGRATION_TOKEN.*D1 Write/,
     ),
   )
 })
 
 test("a deploy-only token rejected by D1 fails with setup instructions", async () => {
-  const previousFetch = globalThis.fetch
-  try {
-    globalThis.fetch = async (_url, options) => {
-      assert.equal(options.headers.Authorization, "Bearer deploy-token")
-      return Response.json({ success: false, errors: [{ message: "Permission denied" }] }, { status: 403 })
-    }
-    await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
-      assert.rejects(migrateWorkersBuild(production, configPath), (error) => {
-        assert.match(error.message, /DROP_D1_MIGRATION_TOKEN.*D1 Write/)
-        assert.match(error.cause.message, /403.*Permission denied/)
-        return true
+  await withWranglerConfig([{ binding: "DB", database_id: "built-db" }], (configPath) =>
+    assert.rejects(
+      migrateWorkersBuild(production, configPath, (_args, env) => {
+        assert.equal(env.CLOUDFLARE_API_TOKEN, "deploy-token")
+        throw new Error("wrangler d1 migrations apply DB --remote exited with 1")
       }),
-    )
-  } finally {
-    globalThis.fetch = previousFetch
-  }
+      (error) => {
+        assert.match(error.message, /DROP_D1_MIGRATION_TOKEN.*D1 Write/)
+        assert.match(error.cause.message, /exited with 1/)
+        return true
+      },
+    ),
+  )
 })

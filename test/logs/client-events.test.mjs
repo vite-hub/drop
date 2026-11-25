@@ -9,12 +9,12 @@ vi.mock("evlog/nitro/v3", () => ({
 }))
 const { default: clientEvents } = await import("../../server/api/client-events.post.ts")
 
-function post(body) {
+function post(body, headers = {}) {
   return clientEvents(
     new H3Event(
       new Request("https://drop.example/api/client-events", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...headers },
         body: JSON.stringify(body),
       }),
     ),
@@ -70,9 +70,21 @@ for (const [label, body] of [
   })
 
 test("client events are rate-limited", async () => {
-  await post({ event: "consent.allowed" })
-  assert.deepEqual(state.bursts, [{ bucket: "client-event", limit: 30, window: "1m" }])
+  const headers = { "x-forwarded-for": "198.51.100.7" }
+  await post({ event: "consent.allowed" }, headers)
+  assert.deepEqual(state.bursts, [{ bucket: "client-event", key: "198.51.100.7", limit: 30, window: "1m" }])
   state.failBurst = true
-  await assert.rejects(post({ event: "consent.allowed" }), (error) => error.status === 429)
+  await assert.rejects(post({ event: "consent.allowed" }, headers), (error) => error.status === 429)
   assert.equal(logged.length, 1)
+})
+
+test("client events use the proxy-supplied address, not the caller's forwarded values", async () => {
+  for (const forwarded of ["198.51.100.7", "203.0.113.1, 198.51.100.7", "198.51.100.8"]) {
+    const response = await post({ event: "signin.failed" }, { "x-forwarded-for": forwarded })
+    assert.equal(response.status, 204)
+  }
+  assert.deepEqual(
+    state.bursts.map(({ key }) => key),
+    ["198.51.100.7", "198.51.100.7", "198.51.100.8"],
+  )
 })

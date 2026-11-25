@@ -109,8 +109,7 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
           </h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">
             Your comments go to Drop with a screenshot of what you see on
-            <span class="font-mono text-highlighted">{{ host }}</span
-            >.
+            <span class="font-mono text-highlighted">{{ host }}</span>.
           </p>
           <UFormField class="mt-6" label="Your name" hint="Optional">
             <UInput
@@ -149,8 +148,8 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
         <template v-else-if="state === 'choose'">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">Pick the review</h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">
-            More than one review covers <span class="font-mono text-highlighted">{{ host }}</span
-            >. Your comments go to the one you pick.
+            More than one review covers <span class="font-mono text-highlighted">{{ host }}</span>. Your comments go to
+            the one you pick.
           </p>
           <ReviewSiteList class="mt-6" :pending="pending" :sites="sites" @pick="connect" />
         </template>

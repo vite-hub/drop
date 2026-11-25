@@ -38,8 +38,8 @@ async function join() {
       <template v-else-if="invitation">
         <p>
           <span class="font-medium text-highlighted">{{ invitation.inviterEmail }}</span> invited you to
-          <span class="font-medium text-highlighted">{{ invitation.organizationName }}</span
-          >. Its folders, and what its members share in them, open to you and your agents.
+          <span class="font-medium text-highlighted">{{ invitation.organizationName }}</span>. Its folders, and what its
+          members share in them, open to you and your agents.
         </p>
         <UButton color="neutral" label="Join the team" :loading="joining" @click="join" />
       </template>

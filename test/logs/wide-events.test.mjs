@@ -5,6 +5,7 @@ import { insertDrop, migrate, reset, sql, state, who } from "../cost/harness.mjs
 
 // Drop's own identity module, with Better Auth's session lookup answering for the test (test/stubs.ts `authApi`).
 const session = { current: null }
+const mcpJwt = "test.header.signature"
 state.authApi = {
   getSession: async () => {
     if (session.current instanceof Error) throw session.current
@@ -18,7 +19,7 @@ const { evlogOptions } = await import("../../scripts/logging.ts")
 process.env.__EVLOG_CONFIG = JSON.stringify(evlogOptions({ version: "1.2.3", commit: "abc1234" }))
 const { default: evlogPlugin } = await import("../../node_modules/evlog/dist/nitro/v3/plugin.mjs")
 const { default: wideEvents } = await import("../../server/plugins/wide-events.ts")
-const { identify, requireIdentity, mcpTokenReason, MCP_TOKEN_MESSAGES } = await import("../../server/utils/identity.ts")
+const { identify, requireIdentity } = await import("../../server/utils/identity.ts")
 const { default: patchDrop } = await import("../../server/api/drops/[id].patch.ts")
 const { default: deleteDropRoute } = await import("../../server/api/drops/[id].delete.ts")
 const { default: upload } = await import("../../server/api/uploads/[ticket].put.ts")
@@ -192,15 +193,22 @@ test("a person in the browser is their id on the event, never their name; an age
     user: { id: "owner", name: "Ada Realname", email: "owner@example.com", emailVerified: true },
     clientName: "Claude Code",
   }
-  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  const agent = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
   assert.ok(!JSON.stringify(agent.event).includes("Realname"))
 
   // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
   state.mcpCaller = null
-  const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
-  assert.deepEqual(refused.event.mcp.auth, { presented: true, result: "rejected", reason: "other" })
+  const refused = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
+  assert.deepEqual(refused.event.mcp.auth, { presented: true, result: "rejected", reason: "malformed" })
   assert.equal(refused.event.user, undefined)
+})
+
+test("a plain bearer without a session is signed out without a structured refusal", async () => {
+  const { event, failure } = await request("/mcp", requireIdentity, { headers: { authorization: "Bearer token" } })
+  assert.equal(failure.status, 401)
+  assert.equal(event.mcp?.auth?.reason, undefined)
+  assert.equal(event.identity.cookie, "absent")
 })
 
 /** A JSON-RPC call to the /mcp route, with the response h3-mcp answered and the request's wide event. */
@@ -243,23 +251,26 @@ test("/mcp logs a challenge apart from a rejected token, with the JSON-RPC metho
   assert.equal(accepted.event.mcp.method, "tools/list")
 })
 
-test("a rejected token names the check that failed, under no key evlog would redact", async () => {
+test("a rejected token logs ViteHub's reason and client, under no key evlog would redact", async () => {
   state.mcpRefusal = {
     code: "AUTH_MCP_TOKEN_INVALID",
-    message: 'The access token is not valid: "exp" claim timestamp check failed',
+    message: "The access token is not valid: the session does not exist or has expired.",
+    data: { reason: "session_ended", clientId: "client-1" },
   }
-  const { event } = await request("/mcp", identify, { headers: { authorization: "Bearer stale-access" } })
-  assert.deepEqual(event.mcp.auth, { presented: true, result: "rejected", reason: "expired" })
+  const { event } = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
+  assert.deepEqual(event.mcp.auth, {
+    presented: true,
+    result: "rejected",
+    reason: "session_ended",
+    clientId: "client-1",
+  })
   assert.equal(event.token, undefined)
+  assert.ok(!JSON.stringify(event).includes(mcpJwt))
   assert.deepEqual(
     JSON.stringify(event).match(/"[^"]*token"\s*:/gi),
     null,
     "evlog 2.31 redacts any key ending in token",
   )
-
-  state.mcpRefusal = { code: "AUTH_MCP_TOKEN_INVALID", message: "detail changed", data: { reason: "session_ended" } }
-  const named = await request("/mcp", identify, { headers: { authorization: "Bearer stale-access" } })
-  assert.equal(named.event.mcp.auth.reason, "session_ended")
 })
 
 test("/mcp names a batch's methods, and an unreadable body leaves the method out", async () => {
@@ -305,57 +316,6 @@ test("/mcp handles a body above the logging cap without Content-Length", async (
   assert.equal(response.status, 200)
   assert.deepEqual(event.mcp.auth, { presented: true, result: "ok" })
   assert.equal(event.mcp.method, undefined)
-})
-
-test("a token's reason comes from ViteHub's error.data first, else from its message", () => {
-  assert.equal(
-    mcpTokenReason({ message: "anything", data: { reason: "client_disabled", clientId: "c" } }),
-    "client_disabled",
-  )
-  assert.equal(
-    mcpTokenReason({ message: "The access token is not valid: the Auth has no signing keys.", data: {} }),
-    "no_keys",
-  )
-  assert.equal(mcpTokenReason({ message: "The access token is not valid: something new" }), "other")
-  assert.equal(mcpTokenReason({ message: "something new", data: { reason: "not-a-reason" } }), "other")
-})
-
-const prefix = "The access token is not valid: "
-test.each([
-  ['"exp" claim timestamp check failed', "expired"],
-  ["/api/drops is not a resource of `mcpOAuth()`.", "wrong_resource"],
-  ['unexpected "aud" claim value', "wrong_resource"],
-  ["the Auth has no signing keys.", "no_keys"],
-  ["sender-constrained access tokens are not supported; use a bearer token.", "sender_constrained"],
-  ["the user does not exist or is banned.", "user_gone"],
-  ["`access.policy` or `VITEHUB_MEMBERS` does not allow the user.", "not_allowed"],
-  ["the OAuth client does not exist or is disabled.", "client_disabled"],
-  ["the session does not exist or has expired.", "session_ended"],
-  ["signature verification failed", "malformed"],
-  ["Invalid Compact JWS", "malformed"],
-  ["Invalid Token or Protected Header formatting", "malformed"],
-  ["JWS Protected Header is invalid", "malformed"],
-  ['unexpected "iss" claim value', "malformed"],
-  ['"nbf" claim timestamp check failed', "malformed"],
-  ["no applicable key found in the JSON Web Key Set", "malformed"],
-  ["the signature or a claim does not match.", "malformed"],
-])("the message %j maps to %s", (detail, reason) => {
-  assert.equal(mcpTokenReason({ message: prefix + detail }), reason)
-})
-
-test("each row of the message table has a case above", () => {
-  const covered = new Set([
-    "expired",
-    "wrong_resource",
-    "no_keys",
-    "sender_constrained",
-    "user_gone",
-    "not_allowed",
-    "client_disabled",
-    "session_ended",
-    "malformed",
-  ])
-  assert.deepEqual(new Set(MCP_TOKEN_MESSAGES.map(([, reason]) => reason)), covered)
 })
 
 test("a signed-out request says whether it sent a session cookie that matched no session", async () => {
@@ -404,7 +364,7 @@ test("an agent accepted by ViteHub after its ban expires is not denied by Drop",
     user: { id: "owner", name: "Ada", email: "owner@example.com", banned: true, banExpires: new Date(0) },
     clientName: "Claude Code",
   }
-  const agent = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
+  const agent = await request("/mcp", identify, { headers: { authorization: `Bearer ${mcpJwt}` } })
   assert.equal(agent.event.user?.id, "owner")
   assert.deepEqual(agent.event.actor, { kind: "agent", name: "Claude Code" })
 })

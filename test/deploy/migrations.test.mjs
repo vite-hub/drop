@@ -2,42 +2,95 @@ import { adoptSqliteLedger } from "../../scripts/adopt-sqlite-ledger.mjs"
 import assert from "node:assert/strict"
 import { createHash } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
+import { createRequire } from "node:module"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { DatabaseSync } from "node:sqlite"
 import { test } from "vite-plus/test"
 import { drizzle } from "drizzle-orm/sqlite-proxy"
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator"
-import { migrateD1 } from "../../scripts/migrate-d1.mjs"
 import { migrations as dropMigrations } from "../../scripts/migrations.mjs"
 
-const settings = {
-  CLOUDFLARE_ACCOUNT_ID: "test-account",
-  CLOUDFLARE_API_TOKEN: "test-token",
-  CLOUDFLARE_D1_DATABASE_ID: "test-database",
+const require = createRequire(import.meta.resolve("vite-hub"))
+const { createDbCliContributor } = await import(pathToFileURL(require.resolve("@vite-hub/database/cli")))
+const root = fileURLToPath(new URL("../../", import.meta.url))
+
+// What a Docker image on D1 runs when it starts: ViteHub's migrator for D1 over HTTP, on Wrangler's ledger.
+async function migrateD1(database) {
+  const contributor = createDbCliContributor({}, async () => ({
+    rootDir: root,
+    databaseNames: ["default"],
+    databases: {
+      default: {
+        name: "default",
+        dialect: "sqlite",
+        migrationsDir: "server/databases/default/migrations",
+        cloudflare: { http: true, databaseId: "test-database" },
+      },
+    },
+  }))
+  const migrate = contributor.namespaces[0].features.find((feature) => feature.name === "migrate")
+  const previousFetch = globalThis.fetch
+  let stderr = ""
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.cloudflare.com/client/v4/accounts/test-account/d1/database/test-database/query")
+    const { sql, params } = JSON.parse(options.body)
+    let results = []
+    if (sql.startsWith("SELECT")) results = database.prepare(sql).all(...(params ?? []))
+    else database.exec(`BEGIN; ${sql}; COMMIT;`)
+    return Response.json({ success: true, result: [{ success: true, results }] })
+  }
+  try {
+    const context = {
+      rootDir: root,
+      env: { CLOUDFLARE_ACCOUNT_ID: "test-account", CLOUDFLARE_API_TOKEN: "test-token" },
+      stdout: { write() {} },
+      stderr: {
+        write(value) {
+          stderr += value
+        },
+      },
+      spawn() {
+        assert.fail("D1 HTTP migrations must not start Drizzle Kit")
+      },
+    }
+    assert.equal(await migrate.run([], context), 0, stderr)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
 }
+
+const ledger = (database) =>
+  database.prepare("SELECT name FROM sqlite_master WHERE name = 'd1_migrations'").get()
+    ? database
+        .prepare("SELECT name FROM d1_migrations ORDER BY id")
+        .all()
+        .map((row) => row.name)
+    : []
 
 test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])(
   "D1 migrations on a %s run only once",
   async (scenario) => {
-    const previousFetch = globalThis.fetch
-    const previousEnv = { ...process.env }
     const database = new DatabaseSync(":memory:")
     const entries = dropMigrations()
     const pinsMigration = "0016_drop_pins.sql"
     const cascadeMigration = "0018_drop_pin_user_cascade.sql"
+    // Indexes tables 0017_comment_sends creates, so no ledger here has it yet.
+    const liveKeyMigration = "0020_comment_sends_live_key.sql"
     const applied =
       scenario === "fresh database"
         ? []
         : entries.filter(
             ({ name }) =>
               name !== cascadeMigration &&
+              name !== liveKeyMigration &&
               name !== (scenario === "ledger with pins" ? "0017_comment_sends.sql" : pinsMigration),
           )
     const expected = entries.filter((entry) => !applied.includes(entry))
-    const migrations = []
     try {
       if (applied.length) {
-        database.exec("CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)")
+        database.exec(
+          "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+        )
         for (const { name, sql } of applied) {
           database.exec(sql)
           database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(name)
@@ -56,28 +109,9 @@ test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])(
           assert.throws(() => database.prepare("SELECT at FROM drop_pins"), /no such table/)
         }
       }
-      Object.assign(process.env, settings)
-      globalThis.fetch = async (url, options) => {
-        assert.equal(url, "https://api.cloudflare.com/client/v4/accounts/test-account/d1/database/test-database/query")
-        assert.equal(options.headers.Authorization, "Bearer test-token")
-        const { sql } = JSON.parse(options.body)
-        if (sql.startsWith("SELECT"))
-          return Response.json({ success: true, result: [{ success: true, results: database.prepare(sql).all() }] })
-        const entry = /INSERT INTO d1_migrations \(name\) VALUES \('([^']+)'\)/.exec(sql)
-        if (entry) migrations.push(entry[1])
-        database.exec(`BEGIN; ${sql}; COMMIT;`)
-        return Response.json({ success: true, result: [{ success: true, results: [] }] })
-      }
-      await migrateD1()
+      await migrateD1(database)
       assert.deepEqual(
-        migrations,
-        expected.map(({ name }) => name),
-      )
-      assert.deepEqual(
-        database
-          .prepare("SELECT name FROM d1_migrations ORDER BY id")
-          .all()
-          .map((row) => row.name),
+        ledger(database),
         [...applied, ...expected].map((migration) => migration.name),
       )
       assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
@@ -95,11 +129,9 @@ test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])(
         assert.equal(lookup.get("reader"), undefined)
         assert.ok(database.prepare("SELECT 1 FROM drops WHERE id = 'doc'").get())
       }
-      await migrateD1()
-      assert.equal(migrations.length, expected.length)
+      await migrateD1(database)
+      assert.equal(ledger(database).length, entries.length)
     } finally {
-      globalThis.fetch = previousFetch
-      process.env = previousEnv
       database.close()
     }
   },
@@ -196,34 +228,25 @@ test("the latest Drizzle snapshot includes all migrated columns of its registere
 })
 
 test("a D1 that recorded every earlier migration gets Send's tables, and a member's sends are found by them", async () => {
-  const previousFetch = globalThis.fetch
-  const previousEnv = { ...process.env }
   const database = new DatabaseSync(":memory:")
   const all = dropMigrations()
   const send = all.find((migration) => migration.name === "0017_comment_sends.sql")
+  const liveKey = all.find((migration) => migration.name === "0020_comment_sends_live_key.sql")
   assert.ok(send, "0017_comment_sends is a migration")
+  assert.ok(liveKey, "0020_comment_sends_live_key is a migration")
   try {
-    // Production's D1 before this change: every other migration applied and in Wrangler's ledger.
+    // Production's D1 before this change: every other migration applied and in Wrangler's ledger, except the later one
+    // that indexes Send's tables.
     database.exec(
       "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
     )
-    for (const migration of all.filter((item) => item !== send)) {
+    for (const migration of all.filter((item) => item !== send && item !== liveKey)) {
       database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
       database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(migration.name)
     }
-    const applied = []
-    Object.assign(process.env, settings)
-    globalThis.fetch = async (_url, options) => {
-      const { sql } = JSON.parse(options.body)
-      if (sql.startsWith("SELECT"))
-        return Response.json({ success: true, result: [{ success: true, results: database.prepare(sql).all() }] })
-      if (sql.includes("INSERT INTO d1_migrations")) applied.push(sql)
-      database.exec(`BEGIN; ${sql}; COMMIT;`)
-      return Response.json({ success: true, result: [{ success: true, results: [] }] })
-    }
-    await migrateD1()
-    assert.equal(applied.length, 1)
-    assert.match(applied[0], /INSERT INTO d1_migrations \(name\) VALUES \('0017_comment_sends\.sql'\)/)
+    const before = ledger(database)
+    await migrateD1(database)
+    assert.deepEqual(ledger(database), [...before, "0017_comment_sends.sql", "0020_comment_sends_live_key.sql"])
     // The columns ViteHub reads and writes: a send's endpoint and agent thread, a code's thread, and who owns or
     // disabled an endpoint.
     const columns = (table) =>
@@ -241,11 +264,15 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
 
     // What `list_handoffs` asks: a member's sends that wait, newest first, through the member index.
     const insert = database.prepare(
-      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', 'k', ?, '{}', ?, ?)",
+      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', ?, ?, '{}', ?, ?)",
     )
-    insert.run("send_a", "ana", "sent", 1, 1)
-    insert.run("send_b", "ana", "done", 2, 2)
-    insert.run("send_c", "bob", "sent", 3, 3)
+    insert.run("send_a", "ana", "k", "sent", 1, 1)
+    insert.run("send_b", "ana", "k2", "done", 2, 2)
+    insert.run("send_c", "bob", "k3", "sent", 3, 3)
+    // One send per key is live; a failed one leaves its key free for the retry.
+    assert.throws(() => insert.run("send_d", "ana", "k", "working", 4, 4), /UNIQUE/)
+    insert.run("send_e", "ana", "k", "failed", 5, 5)
+    insert.run("send_f", "ana", "k", "failed", 6, 6)
     const lookup =
       "SELECT id FROM vitehub_comment_sends WHERE member = ? AND state IN ('sent', 'working') ORDER BY created_at DESC"
     assert.deepEqual(
@@ -272,28 +299,59 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
     assert.throws(() => endpoint.run("e3", "t3-thread://v2/env/thread-a"))
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_pairings'").get())
     assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'vitehub_webhook_deliveries'").get())
-    await migrateD1()
-    assert.equal(applied.length, 1)
+    await migrateD1(database)
+    assert.deepEqual(ledger(database), [...before, "0017_comment_sends.sql", "0020_comment_sends_live_key.sql"])
   } finally {
-    globalThis.fetch = previousFetch
-    process.env = previousEnv
     database.close()
   }
 })
 
-test("missing credentials and D1 errors stop migrations", async () => {
-  const previousFetch = globalThis.fetch
-  const previousEnv = { ...process.env }
+test("sends that an older release made twice yield to one live send before the live key index", async () => {
+  const database = new DatabaseSync(":memory:")
+  const all = dropMigrations()
+  const liveKey = all.find((migration) => migration.name === "0020_comment_sends_live_key.sql")
+  assert.ok(liveKey, "0020_comment_sends_live_key is a migration")
   try {
-    Object.assign(process.env, settings)
-    delete process.env.CLOUDFLARE_D1_DATABASE_ID
-    await assert.rejects(migrateD1(), /CLOUDFLARE_D1_DATABASE_ID is required/)
-    Object.assign(process.env, settings)
-    globalThis.fetch = async () =>
-      Response.json({ success: false, errors: [{ message: "Database unavailable" }] }, { status: 503 })
-    await assert.rejects(migrateD1(), /D1 migration failed \(503\): Database unavailable/)
+    database.exec(
+      "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+    )
+    for (const migration of all.filter((item) => item !== liveKey)) {
+      database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
+      database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(migration.name)
+    }
+    // Two tabs pressed Send on the same comments before either send was stored.
+    const insert = database.prepare(
+      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, 'ana', 'drop', 'd1', '/d/d1', '[]', ?, ?, '{}', ?, ?)",
+    )
+    insert.run("a_pending", "k", "pending", 1, 1)
+    insert.run("a_done", "k", "done", 3, 3)
+    insert.run("a_sent", "k", "sent", 2, 2)
+    insert.run("b_first", "k2", "sent", 1, 1)
+    insert.run("b_second", "k2", "sent", 2, 2)
+    insert.run("b_failed", "k2", "failed", 0, 0)
+    insert.run("c_only", "k3", "working", 1, 1)
+    await migrateD1(database)
+    const states = Object.fromEntries(
+      database
+        .prepare("SELECT id, state FROM vitehub_comment_sends ORDER BY id")
+        .all()
+        .map((row) => [row.id, row.state]),
+    )
+    assert.deepEqual(states, {
+      a_done: "done",
+      a_pending: "failed",
+      a_sent: "failed",
+      b_failed: "failed",
+      b_first: "sent",
+      b_second: "failed",
+      c_only: "working",
+    })
+    assert.match(
+      database.prepare("SELECT error FROM vitehub_comment_sends WHERE id = 'b_second'").get().error,
+      /sent twice/,
+    )
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE name = 'vitehub_comment_sends_live_key'").get())
   } finally {
-    globalThis.fetch = previousFetch
-    process.env = previousEnv
+    database.close()
   }
 })

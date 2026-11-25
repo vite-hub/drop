@@ -13,7 +13,9 @@ let current = null
 Object.defineProperty(state, "who", {
   configurable: true,
   get: () => (identified++, current),
-  set: (value) => (current = value),
+  set: (value) => {
+    current = value
+  },
 })
 beforeEach(() => {
   reset()

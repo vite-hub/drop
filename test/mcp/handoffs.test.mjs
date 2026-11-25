@@ -4,7 +4,7 @@ import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { installComments } from "vite-hub/comments/server"
 import { createCommentSend, createCommentSendTransport } from "vite-hub/comments/client"
-import { createCommentsHandler } from "vite-hub/comments/runtime"
+import { createCommentsHandler, defineCommentsPlugin } from "vite-hub/comments/runtime"
 import * as realWebhooks from "vite-hub/webhooks"
 import { createDrizzleWebhookEndpointStore, createDrizzleWebhookStore } from "vite-hub/webhooks/database"
 import { installWebhooks } from "vite-hub/webhooks/runtime"
@@ -22,14 +22,16 @@ const { default: disconnect } = await import("../../server/api/send/endpoint.del
 const { dropDetail, findDrop } = await import("../../server/utils/drops.ts")
 
 // Send end to end on Drop's side: ViteHub Comments' Send routes with `send` from server/comments.ts, over real Webhooks
-// pairing and endpoints, and then Drop's MCP opening what was sent. Only the delivery is a stand-in: it records what
-// would go out.
+// pairing and endpoints, and then Drop's MCP opening what was sent. The delivery records what would go out and is a
+// stand-in, unless a test sets `realDelivery`: then Webhooks delivers it, to an inbox or to `receiving()`'s receiver.
 const delivered = []
 let rejectDelivery = false
+let realDelivery = false
 const webhooks = {
   ...realWebhooks,
   sendToMemberEndpoint: async (owner, body, options) => {
     delivered.push({ owner, body, endpoint: options.endpointId })
+    if (realDelivery) return realWebhooks.sendToMemberEndpoint(owner, body, options)
     return [undefined, { id: `dl_${delivered.length}`, status: rejectDelivery ? "failed" : "inbox" }]
   },
 }
@@ -44,6 +46,9 @@ installWebhooks({
   store: createDrizzleWebhookStore(state.db),
   endpoints: createDrizzleWebhookEndpointStore(state.db),
 })
+// The reader of the ViteHub Console's Site access cookie, as an app with the Console installs it for Comments.
+let siteVisitor
+defineCommentsPlugin({ comments, database: () => state.db, overlay: false, siteVisitor: async () => siteVisitor })({})
 installComments(comments, { database: state.db, webhooks: async () => webhooks })
 const handler = createCommentsHandler({ comments, realtime: false })
 
@@ -58,6 +63,8 @@ beforeEach(() => {
   )
   delivered.length = 0
   rejectDelivery = false
+  realDelivery = false
+  siteVisitor = undefined
   state.who = agentOf(ana)
 })
 
@@ -161,8 +168,35 @@ async function pairAndSend(doc, person = ana, count = 2) {
   return sent.id
 }
 
+/** Runs `run` with Webhooks POSTing to `receive(body)` instead of the network. The URL guard skips DNS, as on Workers. */
+async function receiving(receive, run) {
+  vi.stubGlobal("navigator", { userAgent: "Cloudflare-Workers" })
+  vi.stubGlobal("fetch", async (_url, init) => {
+    await receive(JSON.parse(init.body))
+    return new Response(null, { status: 204 })
+  })
+  try {
+    return await run()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+}
+
+/** `person` pairs a T3 thread through the relay and sends what waits on `doc`. */
+async function pairThreadAndSend(doc, person, thread) {
+  state.who = person
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  const { code, selection } = (await send(`/start${page}`, { method: "POST" })).body.data
+  state.who = null
+  const body = { code, thread, url: "https://relay.t3.codes/hook" }
+  assert.equal((await send("/pair", { method: "POST", body, origin: null })).status, 200)
+  state.who = person
+  return (await send(`/allow${page}`, { method: "POST", body: { code, selection } })).body.data
+}
+
 test("Send carries the drop, the version to build on, and the publishing session, and nothing anyone wrote", async () => {
   const { doc, mine, theirs, answered } = await reviewed()
+  realDelivery = true
   const id = await pairAndSend(doc)
 
   const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
@@ -265,6 +299,38 @@ test("read_drop with a handoff returns its threads as asks and quotes and marks 
   state.who = ana
   assert.equal((await send(`/status${page}`)).body.data.working, undefined)
   assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(id).state, "done")
+})
+
+test("the agent reads a handoff from inside its webhook delivery; another member still gets nothing", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  realDelivery = true
+  const reads = {}
+  // T3 opens the send as soon as the webhook comes, before its receiver answers and the delivery counts as sent.
+  const sent = await receiving(
+    async (body) => {
+      state.who = agentOf(bob)
+      reads.bob = await call(readDrop, { handoff: body.send })
+      state.who = agentOf(ana)
+      reads.ana = await call(readDrop, { handoff: body.send })
+      state.who = ana
+    },
+    () => pairThreadAndSend(doc, ana, "t3-thread://v2/laptop/thread-p"),
+  )
+  assert.equal(sent.status, "sent")
+  assert.equal(reads.bob.isError, true)
+  assert.match(reads.bob.message, new RegExp(`No handoff ${sent.id} of yours`))
+  assert.equal(reads.ana.isError, undefined, reads.ana.message)
+  assert.equal(reads.ana.structuredContent.id, doc.id)
+  assert.deepEqual(reads.ana.structuredContent.handoff, {
+    id: sent.id,
+    state: "working",
+    asks: [mine.n],
+    quotes: [theirs.n],
+  })
+  assert.equal(sql.prepare("SELECT state FROM vitehub_comment_sends WHERE id = ?").get(sent.id).state, "working")
+  state.who = ana
+  const status = (await send(`/status?page=${encodeURIComponent(`/d/${doc.id}`)}`)).body.data
+  assert.equal(status.working.id, sent.id)
 })
 
 test("reopening a handoff skips asks resolved or answered in another session", async () => {
@@ -449,6 +515,85 @@ test("a quote-only handoff stays working until the quoted threads are answered",
   assert.deepEqual((await call(listHandoffs, {})).structuredContent.handoffs, [])
 })
 
+test("Send status says where the last send went, whichever agent is paired now", async () => {
+  const { doc } = await reviewed()
+  realDelivery = true
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  const toInbox = await pairAndSend(doc)
+  await disconnect(new H3Event(new Request("https://drop.example/api/send/endpoint", { method: "DELETE" })))
+  state.who = ana
+  const disconnected = (await send(`/status${page}`)).body.data
+  assert.deepEqual(disconnected.sent, { id: toInbox, inbox: true })
+  assert.equal(disconnected.agent, undefined)
+
+  await comment(doc.id, ana, "And the rollout?")
+  const thread = "t3-thread://v2/laptop/thread-p"
+  const toWebhook = await receiving(
+    () => {},
+    () => pairThreadAndSend(doc, ana, thread),
+  )
+  assert.deepEqual(toWebhook, { status: "sent", id: toWebhook.id, thread, inbox: false })
+  await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+  const inboxPaired = (await send(`/status${page}`)).body.data
+  assert.deepEqual(inboxPaired.sent, { id: toWebhook.id, thread, inbox: false })
+  assert.equal(inboxPaired.agent.name, "Codex")
+})
+
+test("Send reports the attempted receiver's HTTP error without leaking the relay URL", async () => {
+  const { doc } = await reviewed()
+  state.who = ana
+  realDelivery = true
+  const key = process.env.VITEHUB_WEBHOOKS_KEY
+  const relay = "https://relay.t3.codes/hooks/private?token=private"
+  const fetch = vi.fn(async () => new Response("private reply", { status: 502 }))
+  vi.stubGlobal("navigator", { userAgent: "Cloudflare-Workers" })
+  vi.stubGlobal("fetch", fetch)
+  try {
+    const [error] = await realWebhooks.createMemberEndpoint({
+      owner: ana.userId,
+      name: "T3 Code thread",
+      agent: "t3",
+      address: "thread-p",
+      kind: "url",
+      url: relay,
+      secret: "test-signing-secret",
+    })
+    assert.equal(error, undefined)
+    await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+    const client = createCommentSend(transportFor(doc.id))
+    await client.refresh()
+
+    delete process.env.VITEHUB_WEBHOOKS_KEY
+    await client.send()
+    assert.equal(client.state.problem, "key-unset")
+    process.env.VITEHUB_WEBHOOKS_KEY = btoa(String.fromCharCode(...new Uint8Array(32).fill(19)))
+    await client.send()
+    assert.equal(client.state.problem, "key-invalid")
+    assert.equal(fetch.mock.calls.length, 0)
+
+    process.env.VITEHUB_WEBHOOKS_KEY = key
+    await client.send()
+    assert.deepEqual(client.state, {
+      status: "failed",
+      count: 2,
+      problem: "delivery",
+      reason: "The receiver returned HTTP 502.",
+      agent: { name: "T3 Code", logo: "t3", host: "relay.t3.codes" },
+    })
+    assert.equal(fetch.mock.calls.length, 1)
+    assert.equal(String(fetch.mock.calls[0][0]), relay)
+
+    fetch.mockRejectedValueOnce(new DOMException("private transport error", "TimeoutError"))
+    await client.send()
+    assert.equal(client.state.problem, "delivery")
+    assert.match(client.state.reason, /timed out.*may still have received/)
+    assert.equal(fetch.mock.calls.length, 2)
+  } finally {
+    process.env.VITEHUB_WEBHOOKS_KEY = key
+    vi.unstubAllGlobals()
+  }
+})
+
 test("pairing cannot send a changed selection and the copied prompt describes both inbox agents", async () => {
   const { doc, mine, theirs } = await reviewed()
   state.who = ana
@@ -458,20 +603,20 @@ test("pairing cannot send a changed selection and the copied prompt describes bo
   for (const inbox of ["Claude Code", "Codex"]) assert.ok(prompt.includes(JSON.stringify({ code, inbox })))
   await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
   const added = await comment(doc.id, ana, "One more question.")
-  assert.equal((await transport.allow(code, selection)).status, "failed")
+  const changed = await transport.allow(code, selection)
+  assert.equal(changed.status, "changed")
+  assert.equal(changed.count, 3)
   assert.equal(delivered.length, 0)
   assert.equal(endpointOf(ana.userId), undefined)
-  const next = await transport.startPairing()
-  assert.equal(next.count, 3)
-  await send("/pair", { method: "POST", body: { code: next.code, inbox: "Codex" }, origin: null })
-  assert.equal((await transport.allow(next.code, next.selection)).status, "sent")
+  // The code stays paired, so the member confirms the new selection.
+  assert.equal((await transport.allow(code, changed.selection)).status, "sent")
   assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, added.id].toSorted())
   assert.equal((await transport.status()).count, 0)
   state.who = bob
   assert.equal((await transport.status()).count, 3)
 })
 
-test("the real pill refreshes the batch both before and after pairing", async () => {
+test("the real pill confirms the batch as it is when the member allows", async () => {
   const { doc, mine, theirs } = await reviewed()
   state.who = ana
   const transport = transportFor(doc.id)
@@ -491,8 +636,6 @@ test("the real pill refreshes the batch both before and after pairing", async ()
     await client.refresh()
     await client.send()
     const third = await comment(doc.id, ana, "Added during pairing.")
-    await client.refresh()
-    assert.equal(client.state.count, 3)
 
     const confirmed = new Promise((resolve) => {
       const off = client.onChange(() => {
@@ -503,9 +646,12 @@ test("the real pill refreshes the batch both before and after pairing", async ()
     })
     await send("/pair", { method: "POST", body: { code, inbox: "Codex" }, origin: null })
     await confirmed
+    // The pill shows the batch it started pairing with until Allow checks it.
+    assert.equal(client.state.count, 2)
     const fourth = await comment(doc.id, ana, "Added during confirmation.")
-    await client.refresh()
-    assert.equal(client.state.count, 4)
+    // Allow finds the selection changed and asks again with the new count.
+    await client.allow()
+    assert.deepEqual([client.state.status, client.state.count], ["confirm", 4])
     await client.allow()
     assert.equal(client.state.status, "sent")
     assert.deepEqual(delivered[0].body.threads.toSorted(), [mine.id, theirs.id, third.id, fourth.id].toSorted())
@@ -526,9 +672,18 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   state.who = ana
   const transport = transportFor(doc.id)
   let pairCode
+  let gate
+  let read
   const client = createCommentSend(
     {
       ...transport,
+      status: async () => {
+        const wait = gate
+        const status = await transport.status()
+        read?.()
+        await wait
+        return status
+      },
       startPairing: async () => {
         const pairing = await transport.startPairing()
         pairCode = pairing.code
@@ -559,7 +714,24 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
     assert.equal(client.state.status, "failed")
     assert.equal(delivered.length, 1)
     assert.notEqual(delivered[0].endpoint, publishing.id)
-    await client.send()
+    const waiting = client.state.count
+    let releaseOlder
+    gate = new Promise((resolve) => (releaseOlder = resolve))
+    const stale = new Promise((resolve) => (read = resolve))
+    const older = client.refresh()
+    await stale
+    gate = undefined
+    await comment(doc.id, ana, "Added after Allow failed.")
+    const routine = client.refresh()
+    let release
+    gate = new Promise((resolve) => (release = resolve))
+    const retry = client.send()
+    await routine
+    releaseOlder()
+    await older
+    assert.deepEqual([client.state.status, client.state.count], ["failed", waiting + 1])
+    release()
+    await retry
     assert.equal(client.state.status, "idle")
     assert.equal(delivered.length, 1)
   } finally {
@@ -567,7 +739,29 @@ test("retrying failed setup or Allow never sends to the publishing endpoint", as
   }
 }, 3000)
 
-test("a failed ordinary Send updates its count and clears when the comments are answered", async () => {
+test("a failed pairing clears once no comment waits", async () => {
+  const { doc, mine, theirs } = await reviewed()
+  await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
+  state.who = ana
+  const client = createCommentSend(transportFor(doc.id))
+  try {
+    await client.refresh()
+    await client.pairAnother(() => Promise.reject(new Error("clipboard denied")))
+    assert.equal(client.state.status, "failed")
+
+    state.who = agentOf(ana)
+    await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })
+    state.who = agentOf(bob)
+    await call(reply, { id: doc.id, comment: theirs.n, body: "The freeze has moved." })
+    state.who = ana
+    await client.refresh()
+    assert.deepEqual([client.state.status, client.state.count], ["idle", 0])
+  } finally {
+    client.start()()
+  }
+})
+
+test("a failed ordinary Send stays failed with its count updated while comments wait, and clears when they are answered", async () => {
   const { doc, mine, theirs } = await reviewed()
   await realWebhooks.createMemberEndpoint({ owner: ana.userId, name: "Codex", kind: "inbox", agent: "codex" })
   state.who = ana
@@ -585,10 +779,12 @@ test("a failed ordinary Send updates its count and clears when the comments are 
       (await call(reply, { id: doc.id, comment: mine.n, body: "Friday is the release train." })).isError,
       undefined,
     )
+    // The failure and its reason stay while a comment still waits.
     state.who = ana
     await client.refresh()
     assert.equal(client.state.status, "failed")
     assert.equal(client.state.count, 1)
+    assert.equal(client.state.problem, "delivery")
 
     state.who = agentOf(bob)
     assert.equal(
@@ -747,4 +943,35 @@ test("Send stays off the ViteHub toolbar's page threads and off pages that aren'
   assert.deepEqual((await session.json()).data.subject, { kind: "page", id: `/d/${doc.id}` })
   // Send doesn't use ordinary toolbar pages as subjects.
   assert.equal((await send(`/status?page=${encodeURIComponent("/drops")}`)).body.data.count, 0)
+})
+
+test("a ViteHub Console Site access cookie signs nobody in to Drop's comments or Send", async () => {
+  const { doc } = await reviewed()
+  // A Console member with every Comments role, whose email is the owner's.
+  siteVisitor = {
+    id: "console-person",
+    name: "Console Admin",
+    email: "owner@example.com",
+    roles: ["console", "comments-read", "comments-write", "comments-resolve", "comments-delete"],
+    kind: "member",
+  }
+  const page = `?page=${encodeURIComponent(`/d/${doc.id}`)}`
+  const session = async () =>
+    (await (await handler.fetch(new Request(`https://drop.example/_vitehub/comments/session${page}`))).json()).data
+  const post = () =>
+    handler.fetch(
+      new Request("https://drop.example/_vitehub/comments/threads", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://drop.example" },
+        body: JSON.stringify({ page: `/d/${doc.id}`, body: "From the Console" }),
+      }),
+    )
+
+  state.who = null
+  assert.equal((await session()).user, null)
+  assert.equal((await send(`/start${page}`, { method: "POST" })).status, 403)
+  assert.equal((await post()).status, 403)
+
+  state.who = bob
+  assert.equal((await session()).user.id, "bob", "a signed-in member stays themselves")
 })

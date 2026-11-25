@@ -1,12 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { DatabaseSync } from "node:sqlite"
 import { adoptSqliteLedger } from "./adopt-sqlite-ledger.mjs"
-import { migrations } from "./migrations.mjs"
 
 const app = resolve(dirname(fileURLToPath(import.meta.url)), "..")
-const KEEP_BACKUPS = 3
 
 export function databasePath(url = "file:.data/database/drop.db") {
   if (!url.startsWith("file:")) throw new Error("DROP_DATABASE_URL must be a local file: URL.")
@@ -14,65 +12,16 @@ export function databasePath(url = "file:.data/database/drop.db") {
   return resolve(decodeURIComponent(url.slice("file:".length).split("?")[0]))
 }
 
-function pendingMigrations(database, entries, columns) {
-  if (!columns.length) return entries
-  if (columns.some(({ name }) => name === "name")) {
-    const applied = new Set(
-      database
-        .prepare('SELECT name FROM "__drizzle_migrations"')
-        .all()
-        .map(({ name }) => name),
-    )
-    return entries.filter(({ tag }) => !applied.has(tag))
-  }
-  const { last } = database.prepare('SELECT max(created_at) AS last FROM "__drizzle_migrations"').get()
-  return last === null ? entries : entries.filter((entry) => entry.when > Number(last))
-}
-
-export function backupBeforeMigrate({ file, entries, backups, now = new Date(), log = console.log }) {
-  if (!existsSync(file)) return
-  const database = new DatabaseSync(file)
-  try {
-    const columns = database.prepare("PRAGMA table_info('__drizzle_migrations')").all()
-    const pending = pendingMigrations(database, entries, columns)
-    const adoption =
-      columns.length &&
-      !columns.some((column) => column.name === "name") &&
-      database
-        .prepare("SELECT 1 FROM __drizzle_migrations WHERE hash = ? AND created_at = ?")
-        .get("3e6aa3ac60516bdd27edd10c4de906ced19bdbb289c2a2c247a8e7d35a5be083", 1793445000000)
-    if (!pending.length && !adoption) return
-    mkdirSync(backups, { recursive: true })
-    const stamp = now
-      .toISOString()
-      .replaceAll(":", "-")
-      .replace(/\.\d+Z$/, "Z")
-    const target = join(backups, `drop-${stamp}-before-${pending.at(-1)?.tag ?? "ledger-adoption"}.db`)
-    database.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`)
-    log(`Drop: backed up the database to ${target} before ${pending.length} migration(s).`)
-  } finally {
-    database.close()
-  }
-  const copies = readdirSync(backups)
-    .filter((name) => name.startsWith("drop-") && name.endsWith(".db"))
-    .sort()
-  for (const name of copies.slice(0, -KEEP_BACKUPS)) rmSync(join(backups, name))
-}
-
 async function start() {
-  if (readFileSync(join(app, ".output/drop-database"), "utf8").trim() === "d1") {
-    const { migrateD1 } = await import("./migrate-d1.mjs")
-    await migrateD1()
-  } else {
-    const file = databasePath(process.env.DROP_DATABASE_URL || undefined)
-    backupBeforeMigrate({ file, entries: migrations(), backups: join(dirname(file), "backups") })
-    if (existsSync(file)) {
-      const database = new DatabaseSync(file)
-      try {
-        adoptSqliteLedger(database)
-      } finally {
-        database.close()
-      }
+  const file =
+    readFileSync(join(app, ".output/drop-database"), "utf8").trim() !== "d1" &&
+    databasePath(process.env.DROP_DATABASE_URL || undefined)
+  if (file && existsSync(file)) {
+    const database = new DatabaseSync(file)
+    try {
+      adoptSqliteLedger(database)
+    } finally {
+      database.close()
     }
   }
   await import(pathToFileURL(join(app, ".output/server/index.mjs")).href)

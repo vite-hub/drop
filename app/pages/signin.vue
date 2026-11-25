@@ -62,8 +62,7 @@ async function connect() {
           {{ me ? "Choose your Drop account" : "Sign in to Drop" }}
         </h1>
         <p v-if="me" class="mt-2 text-sm text-muted">
-          Signed in as <span class="font-medium text-highlighted">{{ me.email }}</span
-          >.
+          Signed in as <span class="font-medium text-highlighted">{{ me.email }}</span>.
         </p>
         <p class="mt-2 text-sm leading-relaxed text-muted">
           The first sign-in creates your account. Use the same account your agent connects with: private drops belong to

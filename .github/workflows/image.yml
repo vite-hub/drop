@@ -25,7 +25,8 @@ on:
       - patches/**
       - nuxt.config.ts
       - scripts/start.mjs
-      - scripts/migrate-d1.mjs
+      - scripts/adopt-sqlite-ledger.mjs
+      - scripts/migrations.mjs
       - scripts/deployment.ts
       - server/databases/**
       - test/deploy/image-smoke.mjs

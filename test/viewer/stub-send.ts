@@ -6,7 +6,7 @@ import type {
   CommentSendTransport,
 } from "vite-hub/comments/client"
 import { waitingForAnswer } from "../../shared/feedback"
-import type { DropComment } from "../../shared/types"
+import type { DropComment, SendSetup } from "../../shared/types"
 import type { DropSend, SendEndpoint, SendTestResult } from "../../app/utils/comment-send"
 
 // A Send server that keeps everything in the page, for the pill's browser test: its controls play the agent and the
@@ -29,6 +29,8 @@ const PAIRING_MS = 10 * 60_000
 export interface StubSendControls {
   /** The agent uses the setup code. */
   pair: (agent: CommentSendAgent) => void
+  /** The server pushes each reader its count, as it does when a comment arrives. */
+  recount: () => void
   /** The agent starts on the last send, with the URL of its thread. */
   work: (thread?: string) => void
   /** The agent finishes the last send. */
@@ -40,6 +42,9 @@ export interface StubSendControls {
   /** Sends wait until `release`, so Sending stays on screen. */
   hold: () => void
   release: () => void
+  /** The server has no usable VITEHUB_WEBHOOKS_KEY, so pairing throws, as ViteHub's handler does, until `setUp`. */
+  unset: (setup: SendSetup) => void
+  setUp: () => void
 }
 
 export function createStubSend({ me, comments }: StubReader): DropSend & { controls: StubSendControls } {
@@ -49,7 +54,6 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
     expiresAt: number
     agent?: CommentSendAgent
     owner: symbol
-    batch: Map<string, number>
   } | null = null
   // Per drop, the time each thread's last message had when a send carried it.
   const carried = new Map<string, Map<string, number>>()
@@ -58,11 +62,12 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
   let nextTest: SendTestResult | null = null
   let sends = 0
   let held: { promise: Promise<void>; release: () => void } | null = null
+  let setup: SendSetup = { problem: null, admin: false }
   const changes = new Set<() => void>()
-  const events = new Set<{ owner: symbol; listener: (event: CommentSendEvent) => void }>()
+  const events = new Set<{ count: () => number; listener: (event: CommentSendEvent) => void }>()
   const changed = () => changes.forEach((listener) => listener())
-  const emit = (event: CommentSendEvent, owner?: symbol) => {
-    for (const entry of events) if (!owner || entry.owner === owner) entry.listener(event)
+  const emit = (event: CommentSendEvent) => {
+    for (const entry of events) entry.listener(event)
   }
 
   const t3: CommentSendAgent = { name: "T3 Code", logo: "t3", host: "relay.t3.codes" }
@@ -79,12 +84,18 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       }
       return batch
     }
+    // Names the threads in a batch and their last messages, so Allow can tell whether they are the ones confirmed.
+    const selectionOf = (batch: Map<string, number>) =>
+      [...batch]
+        .map(([id, at]) => `${id}@${at}`)
+        .sort()
+        .join(",")
     const deliver = async (agent: CommentSendAgent, batch: Map<string, number>): Promise<CommentSendResult> => {
       await held?.promise
       if (nextAnswer) {
         const answer = nextAnswer
         nextAnswer = null
-        return answer
+        return answer.status === "failed" && answer.problem === "delivery" ? { ...answer, agent } : answer
       }
       const sent = carried.get(drop) ?? new Map<string, number>()
       for (const [id, at] of batch) sent.set(id, Math.max(sent.get(id) ?? -1, at))
@@ -97,13 +108,9 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
     return {
       status: async () => {
         const batch = unsent()
-        if (pairing?.owner === owner) {
-          const previous = pairing.batch.size
-          pairing.batch = batch
-          if (previous !== batch.size) emit({ type: "count", count: batch.size }, owner)
-        }
         return {
           count: batch.size,
+          selection: selectionOf(batch),
           ...(endpoint ? { agent: endpoint.agent } : {}),
           ...(working?.drop === drop
             ? { working: { id: working.id, ...(working.thread ? { thread: working.thread } : {}) } }
@@ -111,9 +118,13 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         }
       },
       startPairing: async () => {
+        if (setup.problem) throw new Error('[POST] "/api/send/pairing": 500 Server Error')
         const code = crypto.randomUUID().slice(0, 7).toUpperCase()
-        pairing = { code, expiresAt: Date.now() + PAIRING_MS, owner, batch: unsent() }
+        pairing = { code, expiresAt: Date.now() + PAIRING_MS, owner }
+        const batch = unsent()
         return {
+          count: batch.size,
+          selection: selectionOf(batch),
           code,
           expiresAt: pairing.expiresAt,
           agent: t3,
@@ -124,10 +135,19 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         if (pairing?.code !== code || Date.now() >= pairing.expiresAt) return { status: "expired" }
         return pairing.agent ? { status: "paired", agent: pairing.agent } : { status: "waiting" }
       },
-      allow: async (code) => {
+      allow: async (code, selection) => {
         if (pairing?.owner !== owner || pairing.code !== code || !pairing.agent)
           return { status: "failed", reason: "The setup code is not paired." }
-        const { agent, batch } = pairing
+        const batch = unsent()
+        if (selectionOf(batch) !== selection)
+          return { status: "changed", count: batch.size, selection: selectionOf(batch) }
+        if (setup.problem)
+          return {
+            status: "failed",
+            problem: setup.problem === "unset" ? "key-unset" : "key-invalid",
+            reason: "Cannot open receiver.",
+          }
+        const { agent } = pairing
         endpoint = { agent, lastSentAt: null }
         pairing = null
         changed()
@@ -139,7 +159,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       send: async () =>
         endpoint ? deliver(endpoint.agent, unsent()) : { status: "failed", reason: "No agent is connected." },
       subscribe: (listener) => {
-        const entry = { owner, listener }
+        const entry = { count: () => unsent().size, listener }
         events.add(entry)
         return () => events.delete(entry)
       },
@@ -159,6 +179,7 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
       endpoint = null
       changed()
     },
+    setup: async () => setup,
     onChange: (listener) => {
       changes.add(listener)
       return () => changes.delete(listener)
@@ -166,6 +187,9 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
     controls: {
       pair: (agent) => {
         if (pairing) pairing.agent = agent
+      },
+      recount: () => {
+        for (const entry of events) entry.listener({ type: "count", count: entry.count() })
       },
       work: (thread) => {
         if (!working) return
@@ -188,6 +212,8 @@ export function createStubSend({ me, comments }: StubReader): DropSend & { contr
         held?.release()
         held = null
       },
+      unset: (next) => (setup = next),
+      setUp: () => (setup = { ...setup, problem: null }),
     },
   }
 }

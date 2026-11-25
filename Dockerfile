@@ -34,7 +34,7 @@ LABEL org.opencontainers.image.source="https://github.com/vite-hub/drop"
 LABEL org.opencontainers.image.licenses="BUSL-1.1"
 WORKDIR /app
 COPY --from=build /app/.output ./.output
-COPY scripts/start.mjs scripts/migrate-d1.mjs scripts/migrations.mjs scripts/adopt-sqlite-ledger.mjs ./scripts/
+COPY scripts/start.mjs scripts/migrations.mjs scripts/adopt-sqlite-ledger.mjs ./scripts/
 COPY server/databases/default/migrations ./server/databases/default/migrations
 RUN mkdir .data && chown node:node .data
 USER node

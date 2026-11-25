@@ -12,6 +12,7 @@ import { user as users } from "./databases/default/index"
 import { ac, roles } from "./utils/access"
 import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { authRequest, logAudit, requestLog } from "./utils/logs"
+import { oauthLog } from "./utils/oauth-log"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
 import { DROP_SECURE_COOKIE_PREFIX } from "./utils/proxy-auth-config"
@@ -62,7 +63,7 @@ export default defineAuth(({ env, requestOrigin }) => {
         plans: teamPlans(billing),
       }
     : undefined
-  const password = import.meta.dev === true || env.drop.testSignin
+  const password = import.meta.dev || env.drop.testSignin
   const quotas = env.drop.quotas.enabled
   const { clientIpHeader } = useRuntimeConfig()
   return {
@@ -73,7 +74,7 @@ export default defineAuth(({ env, requestOrigin }) => {
     ),
     events: { store: createDatabaseAuthEventStore({ db }) },
     secret: env.auth.secret.unseal(),
-    rateLimit: { enabled: import.meta.dev !== true, storage: "database" },
+    rateLimit: { enabled: !import.meta.dev, storage: "database" },
     route: false,
     advanced: {
       ...(clientIpHeader ? { ipAddress: { ipAddressHeaders: [clientIpHeader] } } : {}),
@@ -202,6 +203,7 @@ export default defineAuth(({ env, requestOrigin }) => {
           enforcePerClientResources: false,
         },
       }),
+      oauthLog(),
     ],
   }
 })

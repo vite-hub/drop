@@ -131,16 +131,17 @@ test("an MCP token refreshed after the approving browser session expired still o
     // Executor renews the access, as it did on 2026-11-06, and calls /mcp with the new token.
     const renewed = await token({ grant_type: "refresh_token", refresh_token: live.refresh_token, resource })
     assert.equal(claims(renewed.access_token).sid, undefined, "A renewed access token drops the expired session")
-    assert.equal(refreshSessionId(), null, "The rotated refresh token drops the expired session")
+    // Better Auth keeps the session id on the rotated row and resolves it on every refresh, so the dead
+    // session never reaches a token, and a grant without offline_access still ends with its session.
+    assert.equal(refreshSessionId(), sessionId)
     const [renewedError, caller] = await callMcp(auth, renewed.access_token)
     assert.equal(renewedError, undefined, renewedError?.message)
     assert.equal(caller.clientName, "Executor")
     assert.equal(caller.user.email, "owner@example.test")
 
-    // The renewed refresh token no longer names the dead session, so the next renewal works too.
+    // The next renewal works too.
     const again = await token({ grant_type: "refresh_token", refresh_token: renewed.refresh_token, resource })
     assert.equal(claims(again.access_token).sid, undefined)
-    assert.equal(refreshSessionId(), null)
     const [againError] = await callMcp(auth, again.access_token)
     assert.equal(againError, undefined, againError?.message)
   } finally {

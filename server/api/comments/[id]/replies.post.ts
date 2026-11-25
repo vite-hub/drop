@@ -28,9 +28,14 @@ import { logDrop } from "../../../utils/logs"
 import { routeId } from "../../../utils/params"
 
 export default defineHandler(async (event) => {
-  const thread = await findThread(await routeId(event))
-  const drop = thread ? await findDrop(thread.meta.dropId, event) : null
-  const who = await identify(event)
+  const id = await routeId(event)
+  const [{ thread, drop }, who] = await Promise.all([
+    findThread(id).then(async (found) => ({
+      thread: found,
+      drop: found ? await findDrop(found.meta.dropId, event) : null,
+    })),
+    identify(event),
+  ])
   if (!thread || !drop || !permissions(drop, who).comment)
     return refuseSend(event, who, new HTTPError({ status: 404, statusText: "You can't reply to this comment." }))
   await requireRateLimit(event, "comment", {

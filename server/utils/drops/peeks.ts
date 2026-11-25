@@ -65,7 +65,9 @@ function newestInside(ownerId: string, folders: string[]) {
       kind: drops.kind,
       title: drops.title,
       blobKey: drops.blobKey,
-      rank: sql<number>`row_number() over (partition by ${drops.parentId} order by ${drops.updatedAt} desc)`.as("rank"),
+      rank: sql<number>`row_number() over (partition by ${drops.parentId} order by ${drops.updatedAt} desc)`
+        .mapWith(Number)
+        .as("rank"),
     })
     .from(drops)
     .where(
