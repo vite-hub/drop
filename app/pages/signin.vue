@@ -9,6 +9,8 @@ const { signOut } = useUserSession(useNuxtApp().$auth)
 const pending = ref(false)
 const error = ref("")
 const dev = import.meta.dev
+const leave = (url: string) => navigateTo(url, { external: true })
+const switchFailed = (cause: unknown) => reportClientError("signin-switch", cause)
 
 async function connect() {
   pending.value = true
@@ -16,7 +18,7 @@ async function connect() {
   try {
     if (method.value?.proxy) {
       const start = signInPath(next.value, { proxy: true })
-      await navigateTo(me.value ? `/oauth2/sign_out?rd=${encodeURIComponent(start)}` : start, { external: true })
+      await (me.value ? switchProxyAccount(start, { signOut, navigate: leave, failed: switchFailed }) : leave(start))
       return
     }
     if (me.value) {

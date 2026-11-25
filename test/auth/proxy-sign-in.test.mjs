@@ -474,6 +474,55 @@ test("requests of a proxy member who already has an account don't wait on each o
   await Promise.all(reads)
 })
 
+test("using another account signs the first one out of Drop before the second signs in", async () => {
+  github()
+  const instance = auth()
+  state.auth = instance
+  const first = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-first" },
+    }),
+  )
+  await proxySession(first)
+  const firstUser = sql.prepare("SELECT id FROM user WHERE email = 'maxi@example.com'").get().id
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 1)
+
+  const signOut = new H3Event(
+    new Request("https://drop.example/api/auth/sign-out", {
+      method: "POST",
+      headers: {
+        origin: "https://drop.example",
+        cookie: withCookies(first).get("cookie"),
+        "x-auth-request-access-token": "test-switch-first",
+      },
+    }),
+  )
+  await proxySession(signOut)
+  assert.equal((await instance.handler(signOut.req)).status, 200)
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM session WHERE user_id = ?").get(firstUser).n, 0)
+
+  github(
+    undefined,
+    () => Response.json({ id: 43, login: "other", name: "Other", email: "other@example.com" }),
+    () => Response.json([{ email: "other@example.com", primary: true, verified: true }]),
+  )
+  const second = new H3Event(
+    new Request("https://drop.example/signin/start", {
+      headers: { "x-auth-request-access-token": "test-switch-second" },
+    }),
+  )
+  await proxySession(second)
+  const session = await instance.api.getSession({ headers: withCookies(second) })
+  assert.equal(session?.user.email, "other@example.com")
+  assert.deepEqual(
+    sql
+      .prepare("SELECT user_id FROM session")
+      .all()
+      .map((row) => row.user_id),
+    [session.user.id],
+  )
+})
+
 test("an expired proxy token can still sign out through Better Auth", async () => {
   github(() => Response.json({ message: "Bad credentials" }, { status: 401 }))
   state.authProxyCookie = "__Host-drop-auth"
