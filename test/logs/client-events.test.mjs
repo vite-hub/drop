@@ -30,9 +30,9 @@ beforeEach(() => {
 const valid = [
   { event: "card.shown", reason: "signed-out" },
   { event: "card.shown", reason: "no-access" },
-  { event: "signin.clicked", mode: "proxy" },
-  { event: "signin.clicked", mode: "github" },
-  { event: "signin.returned" },
+  { event: "signin.clicked", mode: "proxy", via: "button" },
+  { event: "signin.clicked", mode: "github", via: "button" },
+  { event: "signin.clicked", mode: "proxy", via: "card" },
   { event: "signin.switch_account" },
   { event: "signin.failed", code: "GITHUB_REAUTH_REQUIRED", status: 401 },
   { event: "signin.failed" },
@@ -54,9 +54,12 @@ for (const body of valid)
 for (const [label, body] of [
   ["an unknown event", { event: "signin.hacked" }],
   ["the server's own signin.redirected", { event: "signin.redirected" }],
+  ["the server's own signin.returned, which only a new session logs", { event: "signin.returned" }],
+  ["a click the server counts itself", { event: "signin.clicked", mode: "github", via: "auto" }],
+  ["a click without where it came from", { event: "signin.clicked", mode: "github" }],
   ["an unknown reason", { event: "card.shown", reason: "because" }],
-  ["a field the event doesn't take", { event: "signin.clicked", mode: "proxy", reason: "signed-out" }],
-  ["free text", { event: "signin.returned", message: "Signed in as someone@example.com" }],
+  ["a field the event doesn't take", { event: "signin.clicked", mode: "proxy", via: "card", reason: "signed-out" }],
+  ["free text", { event: "consent.allowed", message: "Signed in as someone@example.com" }],
   ["free text as a code", { event: "signin.failed", code: "Couldn't sign in, try again" }],
   ["a status out of range", { event: "consent.failed", status: 1000 }],
   ["no event", { reason: "signed-out" }],
@@ -67,9 +70,9 @@ for (const [label, body] of [
   })
 
 test("client events are rate-limited", async () => {
-  await post({ event: "signin.returned" })
+  await post({ event: "consent.allowed" })
   assert.deepEqual(state.bursts, [{ bucket: "client-event", limit: 30, window: "1m" }])
   state.failBurst = true
-  await assert.rejects(post({ event: "signin.returned" }), (error) => error.status === 429)
+  await assert.rejects(post({ event: "consent.allowed" }), (error) => error.status === 429)
   assert.equal(logged.length, 1)
 })

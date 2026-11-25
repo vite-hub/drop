@@ -266,15 +266,13 @@ const failure = {
 }
 export const ClientEventSchema = v.variant("event", [
   v.strictObject({ event: v.literal("card.shown"), reason: v.picklist(CARD_REASONS) }),
-  v.strictObject({ event: v.literal("signin.clicked"), mode: v.picklist(SIGN_IN_MODES) }),
   v.strictObject({
-    event: v.picklist([
-      "signin.returned",
-      "signin.switch_account",
-      "consent.allowed",
-      "consent.denied",
-      "consent.invalid_link",
-    ]),
+    event: v.literal("signin.clicked"),
+    mode: v.picklist(SIGN_IN_MODES),
+    via: v.picklist(["button", "card"]),
+  }),
+  v.strictObject({
+    event: v.picklist(["signin.switch_account", "consent.allowed", "consent.denied", "consent.invalid_link"]),
   }),
   v.strictObject({ event: v.picklist(["signin.failed", "consent.failed"]), ...failure }),
 ])

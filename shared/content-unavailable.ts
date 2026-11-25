@@ -25,7 +25,7 @@ export function contentUnavailable(
   waitingForReview = false,
   authProxy = false,
 ): CardMessage {
-  const signIn = signInPath(path, { proxy: authProxy, choose: true })
+  const signIn = signInPath(path, { proxy: authProxy, choose: true, via: "card" })
   if (status >= 500 || status === 429)
     return {
       reason: status === 429 ? "rate-limited" : "unavailable",

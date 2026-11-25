@@ -116,5 +116,12 @@ export function reportClientError(action: string, error: unknown, fields: Client
     })
 }
 
+const Answer = v.object({ code: Code, error: Code })
+
+export function answerCode(failure: unknown) {
+  const parsed = v.safeParse(Answer, failure)
+  return parsed.success ? (parsed.output.code ?? parsed.output.error) : undefined
+}
+
 export const answerError = (message: string, status: number, code?: string) =>
   Object.assign(new Error(message), { status, ...(code ? { code } : {}) })

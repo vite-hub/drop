@@ -14,6 +14,7 @@ import { authAccessLines, countDropsByUser } from "./utils/auth-console"
 import { authRequest, logAudit, requestLog } from "./utils/logs"
 import { roleOf, syncRole } from "./utils/identity"
 import { authProxy, proxyAuth } from "./utils/proxy-auth"
+import { logSignedIn } from "./utils/sign-in-attempt"
 import {
   authorizeBilling,
   billingConfig,
@@ -154,8 +155,9 @@ export default defineAuth(({ env, requestOrigin }) => {
       },
       session: {
         create: {
-          after: async (session) => {
+          after: async (session, context) => {
             await syncRole(session.userId)
+            logSignedIn(authRequest.getStore(), context)
           },
         },
       },

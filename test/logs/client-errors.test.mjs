@@ -3,7 +3,7 @@ import { test, vi } from "vite-plus/test"
 import * as v from "valibot"
 import { createFetch } from "ofetch"
 import { sendFile } from "../../app/utils/send-file.ts"
-import { answerError, createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
+import { answerCode, answerError, createClientErrorReporter, httpStatus } from "../../app/utils/client-errors.ts"
 
 const page = { path: "/d/abc123", online: true, leaving: false }
 
@@ -76,6 +76,27 @@ test("a sign-in or consent refusal is reported as its step's failure, with its c
   )
   report("notify", fetchError({ status: 401, data: { status: 401, data: { code: "SIGN_IN_REQUIRED" } } }))
   assert.equal(events.length, 6, "Other actions send no step")
+})
+
+test("an OAuth provider's refusal keeps its error identifier, without the description", () => {
+  const { events, report } = reporter()
+  const expired = {
+    status: 400,
+    statusText: "Bad Request",
+    error: "invalid_signature",
+    error_description: "The signature for client abc123 is invalid",
+  }
+  assert.equal(answerCode(expired), "invalid_signature")
+  assert.equal(answerCode({ status: 401, code: "UNAUTHORIZED", error: "invalid_request" }), "UNAUTHORIZED")
+  assert.equal(answerCode({ status: 400, error: "free text with spaces" }), undefined)
+  assert.equal(answerCode({ status: 400, message: "No identifier" }), undefined)
+  report("oauth-consent", answerError("This authorization link has expired.", expired.status, answerCode(expired)))
+  report("oauth-signin", answerError("Couldn't start GitHub sign-in.", 400, answerCode({ error: "invalid_client" })))
+  assert.deepEqual(events, [
+    { event: "consent.failed", code: "invalid_signature", status: 400 },
+    { event: "signin.failed", code: "invalid_client", status: 400 },
+  ])
+  assert.doesNotMatch(JSON.stringify(events), /client abc123/)
 })
 
 test("a gateway's 5xx (502, 503, 504, the edge's 52x) is reported with its status and request id, unless Drop wrote it", () => {

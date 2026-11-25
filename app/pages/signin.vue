@@ -26,7 +26,7 @@ async function connect() {
     if (me.value) {
       const result = await signOut()
       if (result.error)
-        throw answerError(result.error.message ?? "Couldn't sign out.", result.error.status, result.error.code)
+        throw answerError(result.error.message ?? "Couldn't sign out.", result.error.status, answerCode(result.error))
       clearNuxtData()
     }
     const result = await signIn.social({
@@ -38,7 +38,7 @@ async function connect() {
       throw answerError(
         result.error.message ?? "Couldn't start GitHub sign-in.",
         result.error.status,
-        result.error.code,
+        answerCode(result.error),
       )
   } catch (cause) {
     reportClientError(switchingProxyAccount ? "signin-switch" : "signin", cause)

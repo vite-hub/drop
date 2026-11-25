@@ -6,7 +6,7 @@ import { RETURNING_COOKIE, TRIED_COOKIE, signInPath, signInRightAway } from "../
 import RECOVERY_CSS from "../../shared/content-unavailable.css?raw"
 import THEME_CSS from "../../shared/theme.css?raw"
 import DROP_MARK from "../../shared/drop-mark.svg?raw"
-import { background } from "../utils/logs.ts"
+import { background, logClientEvent } from "../utils/logs.ts"
 import { isMembershipOutage } from "../utils/members.ts"
 import { readAuthProxyConfig as authProxy } from "../utils/proxy-auth-config.ts"
 
@@ -20,16 +20,6 @@ function fellBack(event: H3Event, step: string, error: unknown) {
     path: event.url.pathname,
     requestId: event.req.context?.log ? useLogger(event).getContext().requestId : undefined,
     error: error instanceof Error ? error.message : String(error),
-  })
-}
-
-function shown(event: H3Event, client: Record<string, string>, status: number) {
-  background.info({
-    action: "client-event",
-    client,
-    path: event.url.pathname,
-    status,
-    requestId: event.req.context?.log ? useLogger(event).getContext().requestId : undefined,
   })
 }
 
@@ -84,11 +74,11 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
     })
   ) {
     const proxy = authProxy().enabled
-    shown(event, { event: "signin.redirected", mode: proxy ? "proxy" : "github" }, status)
+    logClientEvent(event, { event: "signin.redirected", mode: proxy ? "proxy" : "github" }, status)
     return new Response(null, {
       status: 302,
       headers: {
-        Location: signInPath(`${path}${event.url.search}`, { proxy }),
+        Location: signInPath(`${path}${event.url.search}`, { proxy, via: "auto" }),
         "Set-Cookie": `${TRIED_COOKIE}=1; Path=/; Max-Age=60; SameSite=Lax${event.url.protocol === "https:" ? "; Secure" : ""}`,
         "Cache-Control": "private, no-store",
       },
@@ -103,7 +93,7 @@ export default async function contentError(error: HTTPError<{ shareReview?: stri
         error.data?.shareReview === "pending",
         authProxy().enabled,
       )
-  shown(event, { event: "card.shown", reason: message.reason }, status)
+  logClientEvent(event, { event: "card.shown", reason: message.reason }, status)
   const card = path.startsWith("/d/")
     ? `<meta property="og:site_name" content="Drop"><meta property="og:title" content="Shared on Drop"><meta property="og:image" content="${escapeHtml(event.url.origin)}/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">`
     : ""

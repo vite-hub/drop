@@ -31,6 +31,16 @@ export const background = {
   error: (fields: Record<string, unknown>) => log.error({ ...fields, ...deployment() }),
 }
 
+export function logClientEvent(event: H3Event, client: Record<string, string>, status?: number) {
+  background.info({
+    action: "client-event",
+    client,
+    path: event.url.pathname,
+    ...(status ? { status } : {}),
+    requestId: event.req.context?.log ? useLogger(event).getContext().requestId : undefined,
+  })
+}
+
 export function logError(event: H3Event | undefined, error: unknown, fields: Record<string, unknown>) {
   const failure = error instanceof Error ? error : new Error(String(error))
   const request = requestLog(event)
