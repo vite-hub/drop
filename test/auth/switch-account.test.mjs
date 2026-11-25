@@ -32,7 +32,9 @@ test("using another account in proxy mode ends the Drop session before leaving f
 test("unconfirmed sign-outs block navigation but report distinct failures on retry", async () => {
   const visited = []
   const sent = []
-  const report = createClientErrorReporter((body) => sent.push(body))
+  const report = createClientErrorReporter((error, { fields }) =>
+    sent.push({ message: error.message ?? error, ...fields }),
+  )
   const network = new TypeError("fetch failed")
   const gateway = { message: "Bad Gateway", status: 502, code: "BAD_GATEWAY" }
   for (const failure of [network, gateway]) {
@@ -44,7 +46,7 @@ test("unconfirmed sign-outs block navigation but report distinct failures on ret
       assert.ok(error instanceof SwitchSignOutError)
       assert.equal(error.message, "Couldn't confirm sign-out. Try again.")
       assert.equal(error.cause, failure)
-      report("signin-switch", error.cause, {}, { path: "/signin", online: true, leaving: false })
+      report("signin-switch", error.cause, {}, { online: true, leaving: false })
       return true
     })
   }
@@ -53,7 +55,7 @@ test("unconfirmed sign-outs block navigation but report distinct failures on ret
     sent.map(({ message, status, code }) => [message, status, code]),
     [
       ["fetch failed", undefined, undefined],
-      ["Bad Gateway", 502, "BAD_GATEWAY"],
+      ["[HTTP 502, code BAD_GATEWAY] Bad Gateway", 502, "BAD_GATEWAY"],
     ],
   )
 })

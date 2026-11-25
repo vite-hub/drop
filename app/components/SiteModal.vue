@@ -8,6 +8,7 @@ const emit = defineEmits<{ close: [value: { url: string; title?: string } | null
 const formId = useId()
 const schema = v.object({ url: SiteSchema.entries.url, title: SiteSchema.entries.title })
 const state = reactive({ url: "", title: "" })
+const pattern = "https://*.preview.example.com"
 const placeholder = computed(() => {
   const address = siteAddress(state.url)
   return address ? siteHost(address) : "Acme previews"
@@ -27,9 +28,9 @@ const submit = (event: FormSubmitEvent<v.InferOutput<typeof schema>>) =>
         <UFormField
           label="Address"
           name="url"
-          help="One origin, or a pattern like https://*.preview.example.com that covers every preview."
+          :help="`One origin, or a pattern like ${pattern} that covers every preview.`"
         >
-          <UInput v-model="state.url" autofocus class="w-full font-mono" placeholder="https://*.preview.example.com" />
+          <UInput v-model="state.url" autofocus class="w-full font-mono" :placeholder="pattern" />
         </UFormField>
         <UFormField label="Name" name="title" hint="Optional">
           <UInput v-model="state.title" class="w-full" :maxlength="160" :placeholder="placeholder" />

@@ -120,7 +120,7 @@ function cleanSnippet(snippet: string | null) {
 
 export async function searchDrops(where: SQL | undefined, words: string[], limit: number) {
   const rows = await db
-    .select({ drop: drops, snippet: snippetOf(words), named: namedMatch(words).as("named_match") })
+    .select({ drop: drops, snippet: snippetOf(words), named: namedMatch(words).mapWith(Number).as("named_match") })
     .from(drops)
     .leftJoin(dropTexts, eq(dropTexts.dropId, drops.id))
     .where(and(where, ...matching(words)))

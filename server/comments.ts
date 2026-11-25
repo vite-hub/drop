@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 import { H3Event } from "h3"
-import type { CommentSubject, CommentsUser, CommentUser } from "vite-hub/comments"
+import type { CommentSendPromptContext, CommentSubject, CommentsUser, CommentUser } from "vite-hub/comments"
 import { defineComments, defineCommentSubject } from "vite-hub/comments"
 import { blob } from "vite-hub/blob"
 import { db } from "vite-hub/database"
@@ -14,6 +14,26 @@ type DropCommentsUser = CommentsUser & { identity?: Identity }
 
 const identityIn = (user: DropCommentsUser | null): Identity | null => (user?.guest ? null : (user?.identity ?? null))
 const sendPermissions = new WeakMap<Identity, Map<string, ReturnType<typeof allowed>>>()
+
+export function sendUser(who: Identity): DropCommentsUser {
+  const identity = { ...who }
+  sendPermissions.set(identity, new Map())
+  return { id: who.userId, name: who.name, ...(who.image ? { image: who.image } : {}), identity }
+}
+
+function sendPrompt({ origin, pairUrl, code, prompt }: CommentSendPromptContext) {
+  const pair = (inbox: string) =>
+    `curl -sS -X POST ${pairUrl} -H 'content-type: application/json' -d '${JSON.stringify({ code, inbox })}'`
+  const [, ...t3ThreadSteps] = prompt.split("\n\n")
+  return [
+    `Connect my Drop comments from ${new URL(origin).host} to this agent. Use exactly one of the following setup options.`,
+    `For Claude Code, run: ${pair("Claude Code")}`,
+    `For Codex, run: ${pair("Codex")}`,
+    "After I allow an inbox on the site, use Drop's list_handoffs tool to find sends and read_drop with the handoff id to read one. Do not create a webhook for inbox setup.",
+    "For a T3 Code thread with the T3 tools available, use the webhook option instead:",
+    ...t3ThreadSteps,
+  ].join("\n\n")
+}
 
 const dropLink = (kind: string) =>
   defineCommentSubject({
@@ -64,6 +84,7 @@ export default defineComments({
     grant: false,
     payload: ({ subject, user }) => handoffData(subject, user.id),
     address: ({ subject, user }) => publishingThread(subject, user.id),
+    prompt: sendPrompt,
   },
 
   page: ({ url, event }) =>

@@ -9,7 +9,7 @@ export default defineMcpTool({
   name: "list_handoffs",
   title: "List handoffs",
   description:
-    "The user's handoffs: the comments they sent to their agent with Send in Drop's review pill, newest first. Each names its drop and how many threads it carries, the user's own (asks) and others' (quotes). `sent` ones wait for an agent; `working` ones an agent already opened. Open one with read_drop and its handoff id, which reads those threads and tells the user you are working on it; then answer each ask in its thread, or publish the next version with base.",
+    "The user's handoffs: the comments they sent to their agent with Send in Drop's review pill, newest first. Each names its drop and how many threads it carries, the user's own (asks) and others' (quotes). `sent` ones wait for an agent; `working` ones an agent already opened. A send still on its way to a webhook (`pending`) isn't listed until it arrives. Open one with read_drop and its handoff id, which reads those threads and tells the user you are working on it; then answer each ask in its thread, or publish the next version with base.",
   annotations: { readOnlyHint: true },
   inputSchema: toStandardJsonSchema(v.object({})),
   handler: async (_input, event) => {

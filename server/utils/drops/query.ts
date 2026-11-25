@@ -48,7 +48,7 @@ const TEXT_KINDS = new Set(["markdown", "html"])
 
 async function findOne(hit: SQL, event?: H3Event): Promise<DropRow | null> {
   const rows = await db
-    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})` })
+    .select({ drop: drops, owner: user, hit: sql<number>`${drops.id} = (${hit})`.mapWith(Number) })
     .from(drops)
     .leftJoin(user, eq(user.id, drops.ownerId))
     .where(inArray(drops.id, withAncestors(hit)))

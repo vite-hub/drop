@@ -137,18 +137,20 @@ test("the content origin serves only the frame host, at any path, and nothing of
   assert.equal(await contentMiddleware(request("https://drop-usercontent.example/")), undefined)
 })
 
-// The page tools helpers aren't a public export of vite-hub, so find them by name in its build.
+// The page tools helpers aren't a public export, so find them by name in the build of @vite-hub/comments, which puts
+// the pill on pages since vite-hub/vitehub#5419.
 async function viteHubPageTools() {
-  const { readdir } = await import("node:fs/promises")
-  const dist = new URL("../../node_modules/vite-hub/dist/", import.meta.url)
+  const { readdir, readFile } = await import("node:fs/promises")
+  const dist = new URL("../../node_modules/@vite-hub/comments/dist/", import.meta.url)
   for (const file of await readdir(dist)) {
-    if (!file.startsWith("page-tools-") || !file.endsWith(".js")) continue
+    if (!file.endsWith(".js")) continue
+    if (!(await readFile(new URL(file, dist), "utf8")).includes("function installViteHubPageTools")) continue
     const exports = Object.values(await import(new URL(file, dist).href))
     const install = exports.find((value) => value.name === "installViteHubPageTools")
     const register = exports.find((value) => value.name === "registerViteHubPageTool")
     if (install && register) return { install, register }
   }
-  throw new Error("vite-hub's page tools build moved")
+  throw new Error("the page tools build of @vite-hub/comments moved")
 }
 
 test("ViteHub adds no page tools to the frame host, so Firefox keeps an app's import map", async () => {

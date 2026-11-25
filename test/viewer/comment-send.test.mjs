@@ -31,9 +31,9 @@ test("Send N counts every open thread that waits for an answer, others' too, unt
   const bob = createStubSend({ me: "bob", comments: () => comments })
   assert.equal((await bob.transport("abc").status()).count, 3)
 
-  const { code } = await transport.startPairing()
+  const { code, selection } = await transport.startPairing()
   send.controls.pair({ name: "T3 Code", logo: "t3", host: "relay.t3.codes" })
-  assert.equal((await transport.allow(code)).status, "sent")
+  assert.equal((await transport.allow(code, selection)).status, "sent")
   assert.equal((await transport.status()).count, 0)
 
   // A new word in a carried thread, or a new thread from anyone, waits again.
@@ -52,23 +52,30 @@ test("pairing confirms the current count and carries only that batch even if del
   const client = createCommentSend(transport, { pairingInterval: 1 })
   const stop = client.start()
   try {
+    const until = (done) => {
+      const { promise, resolve } = Promise.withResolvers()
+      const unwatch = client.onChange(() => done() && (unwatch(), resolve()))
+      return promise
+    }
     await client.refresh()
     await client.send()
     assert.equal(client.state.status, "pairing")
+    assert.equal(client.state.count, 3)
+    // While pairing, the count arrives as a push, not from a refresh.
     comments.push(thread(4, "bob"))
-    await client.refresh()
+    const counted = until(() => client.state.count === 4)
+    send.controls.recount()
+    await counted
 
-    const { promise, resolve } = Promise.withResolvers()
-    const unwatch = client.onChange(() => {
-      if (client.state.status === "confirm") resolve()
-    })
+    const confirmed = until(() => client.state.status === "confirm")
     send.controls.pair({ name: "T3 Code", logo: "t3", host: "relay.t3.codes" })
-    await promise
-    unwatch()
+    await confirmed
     assert.equal(client.state.count, 4)
 
+    // Allow names the 4 confirmed threads; with a 5th waiting it changes nothing and asks again for 5.
     comments.push(thread(5, "bob"))
-    await client.refresh()
+    await client.allow()
+    assert.equal(client.state.status, "confirm")
     assert.equal(client.state.count, 5)
     send.controls.hold()
     const delivery = client.allow()

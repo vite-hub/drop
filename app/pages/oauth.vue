@@ -152,8 +152,8 @@ async function answer(accept: boolean) {
             Allow returns to {{ destination.label }}.
           </p>
           <p v-else-if="destination" class="mt-4 text-xs leading-relaxed text-warning">
-            Allow gives this access to <span class="font-mono font-medium">{{ destination.label }}</span
-            >. Only allow it if you started this connection from an agent that runs there.
+            Allow gives this access to <span class="font-mono font-medium">{{ destination.label }}</span>. Only allow it
+            if you started this connection from an agent that runs there.
           </p>
           <p class="mt-4 text-xs leading-relaxed text-muted">
             Private drops belong to this account on this Drop site. You can disconnect it any time on the Agents page.

@@ -8,7 +8,7 @@ import { applySuggestion } from "#shared/suggestion"
 import { suggestionAcceptances } from "../databases/default/index"
 import { type DropThread, setResolved } from "./comments"
 import { createDocDrop, type DropRow, findDropAt, permissions, readText } from "./drops"
-import { restoreReopenedHandoffs } from "./handoffs"
+import { waitsInFinishedHandoff } from "./handoffs"
 import type { Identity } from "./identity"
 
 const acceptedNote = (thread: DropThread) => `Accepted suggestion #${thread.n}`
@@ -79,12 +79,9 @@ export async function undoSuggestion(
 ) {
   const { drop, thread, who } = requireSuggestion(row, found, identity)
   const accepted = await acceptanceOf(drop, thread)
-  if (accepted?.undoneVersion != null) {
-    if (thread.status === "resolved") {
-      await setResolved(thread, false, who)
-      return drop
-    }
-    if (await restoreReopenedHandoffs(thread)) return drop
+  if (accepted?.undoneVersion != null && (thread.status === "resolved" || (await waitsInFinishedHandoff(thread)))) {
+    await setResolved(thread, false, who)
+    return drop
   }
   if (
     thread.status !== "resolved" ||

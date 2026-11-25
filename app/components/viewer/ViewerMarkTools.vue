@@ -28,9 +28,7 @@ const colorName = (name: string) => name[0]!.toUpperCase() + name.slice(1)
       >
         <UIcon aria-hidden="true" :name="tip.icon" />
       </button>
-      <template #content>
-        {{ tip.label }}<span class="ml-1.5 opacity-60">{{ tip.key }}</span>
-      </template>
+      <template #content> {{ tip.label }}<span class="ml-1.5 opacity-60">{{ tip.key }}</span> </template>
     </UTooltip>
     <span aria-hidden="true" class="w-1 shrink-0" />
     <UTooltip v-for="size in sizes" :key="size.index" :content="{ side: 'top', sideOffset: 8 }">

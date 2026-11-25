@@ -1,10 +1,10 @@
 import * as v from "valibot"
-import type { ClientErrorSchema, ClientEventSchema } from "#shared/schemas"
+import { type BrowserReportOptions, reportBrowserError } from "vite-hub/logs/client"
+import type { ClientEventSchema } from "#shared/schemas"
 
-type ClientError = v.InferInput<typeof ClientErrorSchema>
 type ClientEvent = v.InferInput<typeof ClientEventSchema>
-export type ClientErrorFields = Partial<Pick<ClientError, "status" | "requestId" | "drop" | "title" | "source">>
-type Page = { path: string; online: boolean; leaving: boolean }
+export type ClientErrorFields = { status?: number; requestId?: string; drop?: string; title?: string; source?: string }
+type Page = { online: boolean; leaving: boolean }
 
 const optional = <T extends v.GenericSchema>(schema: T) => v.fallback(v.optional(schema), undefined)
 const Code = optional(v.pipe(v.string(), v.regex(/^[A-Za-z][\w.]{0,59}$/)))
@@ -46,11 +46,12 @@ const STEPS: Record<string, "signin.failed" | "consent.failed"> = {
   "oauth-consent": "consent.failed",
 }
 
+const text = (value?: string) => value?.slice(0, 300)
+
 export function createClientErrorReporter(
-  send: (body: ClientError) => void,
+  send: (error: unknown, options: BrowserReportOptions) => void = reportBrowserError,
   sendEvent: (body: ClientEvent) => void = () => {},
 ) {
-  const sent = new Set<string>()
   return (action: string, error: unknown, fields: ClientErrorFields, page: Page) => {
     const parsed = parse(error)
     if (parsed.name === "AbortError" || parsed.cause?.name === "AbortError" || !page.online || page.leaving) return
@@ -65,30 +66,39 @@ export function createClientErrorReporter(
       })
     }
     if (status && serverLogged(parsed, status)) return
-    const failure =
-      error instanceof Error ? error : { name: "Error", message: parsed.message ?? String(error), stack: undefined }
-    const key = JSON.stringify([action, failure.message, status, code])
-    if (sent.has(key) || sent.size >= 10) return
-    sent.add(key)
     const requestId =
       fields.requestId ??
       parsed.requestId ??
       parsed.response?.headers.get("cf-ray") ??
       parsed.response?.headers.get("x-request-id") ??
       undefined
-    send({
-      action: action.slice(0, 60),
-      path: page.path.slice(0, 600),
-      name: failure.name.slice(0, 120),
-      message: failure.message.slice(0, 1000),
-      stack: failure.stack?.slice(0, 4000),
-      ...fields,
-      ...(status ? { status } : {}),
-      ...(code ? { code: code.slice(0, 120) } : {}),
-      ...(requestId ? { requestId: requestId.slice(0, 100) } : {}),
-      ...(fields.title ? { title: fields.title.slice(0, 200) } : {}),
-      ...(fields.source ? { source: fields.source.slice(0, 300) } : {}),
-    })
+    const details = { status: status ?? fields.status, code: text(code) }
+    const flat = Object.fromEntries(
+      Object.entries({
+        ...details,
+        requestId: text(requestId),
+        drop: text(fields.drop),
+        title: text(fields.title),
+        source: text(fields.source),
+      }).filter((entry): entry is [string, string | number] => entry[1] !== undefined),
+    )
+    const options = { action, fields: flat }
+    const failure = error instanceof Error ? error : (parsed.message ?? String(error))
+    const dedupeContext = [
+      details.status === undefined ? undefined : `HTTP ${details.status}`,
+      details.code ? `code ${details.code}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(", ")
+    if (!dedupeContext) return send(failure, options)
+
+    const message = `[${dedupeContext}] ${typeof failure === "string" ? failure : failure.message}`
+    send(
+      typeof failure === "string"
+        ? message
+        : Object.assign(new Error(message), { name: failure.name, stack: failure.stack }),
+      options,
+    )
   }
 }
 
@@ -100,25 +110,10 @@ if (import.meta.client) {
   addEventListener("pageshow", () => (leaving = false))
 }
 
-const report = createClientErrorReporter(
-  (body) => {
-    fetch("/api/client-errors", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      keepalive: true,
-    }).catch(() => {})
-  },
-  (body) => sendClientEvent(body),
-)
+const report = createClientErrorReporter(reportBrowserError, (body) => sendClientEvent(body))
 
 export function reportClientError(action: string, error: unknown, fields: ClientErrorFields = {}) {
-  if (import.meta.client)
-    report(action, error, fields, {
-      path: window.location.pathname,
-      online: navigator.onLine,
-      leaving,
-    })
+  if (import.meta.client) report(action, error, fields, { online: navigator.onLine, leaving })
 }
 
 const Answer = v.object({ code: Code, error: Code })

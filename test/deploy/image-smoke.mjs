@@ -70,7 +70,7 @@ try {
   const logs = stop()
   if (previous) {
     assert.deepEqual(JSON.parse(query("SELECT value FROM smoke_marker")), [{ value: "from the previous image" }])
-    const backup = logs.match(/backed up the database to (\S+)/)?.[1]
+    const backup = logs.match(/copied \S+ to (\S+) before/)?.[1]
     if (backup) {
       run("run", "--rm", "-v", `${volume}:/app/.data`, "--entrypoint", "test", image, "-s", backup)
       console.log(`Upgrade from ${previous}: data kept, backup at ${backup}`)

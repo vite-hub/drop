@@ -8,6 +8,7 @@ import frontmatter from "@comark/html/plugins/frontmatter"
 import linkify from "@comark/html/plugins/linkify"
 import security from "@comark/html/plugins/security"
 import taskList from "@comark/html/plugins/task-list"
+import { scripts as annotateScripts } from "comark-annotate/html"
 import { lint } from "comark-linter"
 import comarkUi, { mermaidScript } from "comark-ui/html"
 import { escapeUTF8 as escapeHtml } from "entities"
@@ -51,10 +52,13 @@ const preset = comarkUi({
 })
 
 export const RENDERER_SCRIPTS = [
-  mermaidScript,
-  ...scriptsOf(await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })),
-  ...propertiesScripts,
-  ...outlineScripts,
+  ...new Set([
+    mermaidScript,
+    ...scriptsOf(await renderHtmlFromDocument({ nodes: [["zoom-runtime", {}]] }, { components: preset.components })),
+    ...annotateScripts,
+    ...propertiesScripts,
+    ...outlineScripts,
+  ]),
 ]
 
 function scriptsOf(html: string): string[] {

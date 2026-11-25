@@ -5,7 +5,6 @@ import { createRequire } from "node:module"
 import { DatabaseSync } from "node:sqlite"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { test } from "vite-plus/test"
-import { migrateD1 } from "../../scripts/migrate-d1.mjs"
 import { migrations } from "../../scripts/migrations.mjs"
 
 const require = createRequire(import.meta.resolve("vite-hub"))
@@ -80,11 +79,28 @@ test("host deploy commands apply intentional destructive migrations on fresh D1 
       assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), [])
     }
 
-    // Deno and Docker on D1 used Drop's D1 script, which writes the same Wrangler ledger: nothing is pending after it.
+    // Deno and Docker on D1 used Drop's own D1 script before ViteHub migrated them, with one Wrangler ledger row per
+    // file: nothing is pending after it.
     database.close()
     database = new DatabaseSync(":memory:")
-    await migrateD1({ ...context.env, CLOUDFLARE_D1_DATABASE_ID: "test-database" })
+    database.exec(
+      "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+    )
+    for (const { name, sql } of migrations()) {
+      database.exec(sql)
+      database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(name)
+    }
+    const statements = []
+    const recorded = globalThis.fetch
+    globalThis.fetch = async (url, options) => {
+      statements.push(JSON.parse(options.body).sql)
+      return recorded(url, options)
+    }
     assert.equal(await migrate.run([], context), 0, stderr)
+    assert.deepEqual(
+      statements.filter((sql) => !sql.startsWith("SELECT")),
+      [],
+    )
     assert.equal(database.prepare("SELECT count(*) AS n FROM d1_migrations").get().n, migrations().length)
   } finally {
     globalThis.fetch = previousFetch

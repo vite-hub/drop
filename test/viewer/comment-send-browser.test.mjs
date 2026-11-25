@@ -104,7 +104,11 @@ const entry = `
   const send = createStubSend({ me: "ada", comments: () => comments.value })
   window.drop = {
     send: send.controls,
-    comment: (authorId) => (comments.value = [...comments.value, comment(comments.value.length + 1, authorId)]),
+    // A new comment reaches the server, which pushes each reader its count.
+    comment: (authorId) => {
+      comments.value = [...comments.value, comment(comments.value.length + 1, authorId)]
+      send.controls.recount()
+    },
   }
   const button = (label, props = {}) => Vue.h("button", { style: { width: "56px" }, ...props }, label)
   const app = Vue.createApp({

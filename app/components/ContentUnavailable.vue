@@ -35,9 +35,7 @@ const reportTarget = computed(() => props.path.split("?")[0]!.replace(/^\/drops\
         </span>
         <h1 id="content-unavailable-title" class="content-unavailable-title">{{ message.title }}</h1>
         <p class="content-unavailable-description">{{ message.description }}</p>
-        <p v-if="message.email" class="content-unavailable-account">
-          Signed in as <bdi>{{ message.email }}</bdi>
-        </p>
+        <p v-if="message.email" class="content-unavailable-account">Signed in as <bdi>{{ message.email }}</bdi></p>
         <nav class="content-unavailable-actions" aria-label="Content recovery">
           <NuxtLink
             class="content-unavailable-action"

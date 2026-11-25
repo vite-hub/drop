@@ -13,7 +13,7 @@ import { htmlLanding, HTML_CONTENT_SECURITY_POLICY } from "../../shared/html-lan
 
 const skill = fileURLToPath(new URL("../../skills/code-along/", import.meta.url))
 const require = createRequire(import.meta.url)
-const lexer = readFileSync(require.resolve("es-module-lexer/js"), "utf8")
+const lexer = readFileSync(require.resolve("es-module-lexer/minimal/js"), "utf8")
 
 function build(source) {
   const dir = mkdtempSync(join(tmpdir(), "code-along-browser-"))
@@ -41,7 +41,7 @@ async function open(browser, html, layout = "standalone", markedGate) {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
   await page.route("**/*", async (route) => {
     const url = new URL(route.request().url())
-    if (url.pathname.endsWith("/lexer.asm.js"))
+    if (url.pathname.endsWith("/lexer.minimal.asm.js"))
       return route.fulfill({
         contentType: "text/javascript",
         headers: { "access-control-allow-origin": "*" },

@@ -28,7 +28,7 @@ Drop reads its settings when it runs, so a change needs a restart, not a rebuild
 
 - **Who signs in.** Anyone with a GitHub account, as a Member. `VITEHUB_MEMBERS` lets in only the people it lists, plus the admins, for publishing and viewing, shared links and MCP included. Each entry is a GitHub account (`github:22072217`), an email a sign-in method verified, an email domain (`@example.com`), or a GitHub organization (`github-org:your-org`), which makes sign-in ask for `read:org`. Matching any entry is enough. Take someone off, and they can't sign in again and lose their session within five minutes. It's [ViteHub Auth's member list](https://vitehub.dev/docs/auth/configure#choose-who-can-sign-in).
 - **Who is Admin.** `DROP_ADMINS` lists admin emails, separated by commas or spaces, in any case. Whoever signs in with one, by a method that verified the email, is Admin. Restart to apply a change. In `nuxt dev` and with `DROP_TEST_SIGNIN`, an unverified email counts too.
-- **Roles come only from that list.** Admins open **Console** in the sidebar, which opens this Drop in the [ViteHub Console](https://console.vitehub.dev), to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. Link the Drop there once and set the `VITEHUB_CONSOLE_KEY_<NAME>` variable it shows; the Console then lets in only people whose email is in `DROP_ADMINS`. On Node/VPS, build with `DROP_PUBLIC_URL=https://drop.example.com`; signed calls require this trusted origin at build time. For Docker, build your deployment image with `docker build --build-arg DROP_PUBLIC_URL=https://drop.example.com -t my-drop .` instead of using the generic prebuilt image for Console access. Rebuild when the public origin changes. The ingress must pass `POST /_vitehub/rpc` and its subpaths unchanged. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
+- **Roles come only from that list.** Admins open **Console** in the sidebar, which opens this Drop in the [ViteHub Console](https://console.vitehub.dev), to ban and unban users, revoke sessions, and change plans when `DROP_QUOTAS` is on. Link the Drop there once and set the `VITEHUB_CONSOLE_KEY_<NAME>` variable it shows; the Console then lets in only people whose email is in `DROP_ADMINS`. On Node/VPS, build with `DROP_PUBLIC_URL=https://drop.example.com`; signed calls require this trusted origin at build time. For Docker, build your deployment image with `docker build --build-arg DROP_PUBLIC_URL=https://drop.example.com -t my-drop .` instead of using the generic prebuilt image for Console access. Rebuild when the public origin changes. The ingress must pass `POST /_vitehub/rpc` and its subpaths, and `/_vitehub/site`, unchanged. An admin who opens `/_vitehub` on the Drop goes through the Console's Site access and comes back with a site cookie for 12 hours, which only ViteHub's page tools read. That cookie changes nothing in Drop: commenting follows the drop's share setting, as for anyone else, and Send still needs a signed-in Drop member. Roles are read-only and impersonation is disabled. Admins can find **Review shares** and **Reports** through Search.
 - **Other sign-in.** Change the Better Auth options in `server/auth.ts`, or [reuse an existing GitHub oauth2-proxy](/docs/self-host/vps#auth-proxy).
 
 ::roles-table
@@ -120,6 +120,8 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | `version`, `commitHash`, `deployment.host` | The release that answered, and the host it runs on. |
 | `user`, `actor` | Who called: a person by id, an agent with its client's name. People's names and emails stay out. |
 | `identity.denied`, `identity.session` | Why Drop refused a session (`banned` or `not-member`), or that a session lookup failed. ViteHub Auth refuses sign-ins by `VITEHUB_MEMBERS` itself. |
+| `auth.proxy.refused` | Why ViteHub Auth refused a person the sign-in proxy vouched for, such as `account_not_linked`. For `denied`, `auth.proxy.denied` holds the refusing hook's code. |
+| `mcp.auth` | Whether an MCP request sent a token. If ViteHub verifies and refuses an MCP token, `mcp.auth.reason` says why (for example, `expired` or `session_ended`), and `mcp.auth.clientId` names the OAuth client if ViteHub could identify it. |
 | `roomAccess.refused` | Which of Drop's access rules refused a realtime connection. |
 | `drop` | The drop the request is about, and for a write what it did (`change`) and which fields (`fields`). |
 | `mcp.calls` | Each MCP tool call: the tool, its drop, how long it took, and its error. |
@@ -150,11 +152,11 @@ Put its id and name, your Cloudflare account id, and an account API token with A
 | --- | --- |
 | Cloudflare | `pnpm run deploy`, which the button runs: Wrangler applies them, then deploys the Worker. Workers Builds that run `npx wrangler deploy` need [`DROP_PRODUCTION_BRANCH`](/docs/self-host/cloudflare#workers-builds). |
 | Vercel, Netlify, Deno Deploy | `pnpm db:migrate` (ViteHub's `vitehub database migrate`) after the build, before publishing. |
-| Docker | Drop itself before it listens, after copying the SQLite file to `backups/`; an image built for D1 runs Drop's D1 script before Drop starts. |
+| Docker | Drop itself before it listens, on SQLite after copying the file to `backups/`, and on D1 over Cloudflare's API. |
 
-`pnpm db:migrate` and the D1 script need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. Every path records migrations in `d1_migrations`, as Wrangler does, and skips those already applied.
+`pnpm db:migrate` and a Docker image on D1 need `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_D1_DATABASE_ID`. Every path records migrations in `d1_migrations`, as Wrangler does, and skips those already applied.
 
-`pnpm db:migrate` and Drop's own migration on Docker refuse a migration that would delete existing data. Wrangler on Cloudflare and the D1 script of D1 Docker images have no such check, so read new migrations before you deploy there.
+`pnpm db:migrate` and Drop's own migration on Docker refuse a migration that would delete existing data. Wrangler on Cloudflare has no such check, so read new migrations before you deploy there.
 
 Give previews their own D1 database, or turn preview deployments off: a build with production D1 credentials migrates production.
 

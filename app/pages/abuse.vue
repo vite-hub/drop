@@ -13,8 +13,7 @@ const { data: contact } = await useApi("/api/abuse-contact", { key: keys.abuseCo
       </p>
       <p v-if="contact?.email">
         You can also contact the operator at
-        <a :href="`mailto:${contact.email}`">{{ contact.email }}</a
-        >.
+        <a :href="`mailto:${contact.email}`">{{ contact.email }}</a>.
       </p>
       <p v-else>This Drop lists no contact email. Use the report form.</p>
       <h2>Copyright / DMCA notices</h2>
