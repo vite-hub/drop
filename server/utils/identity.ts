@@ -131,8 +131,6 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
 
 const SESSION_COOKIE = /(?:^|;)\s*[^=;\s]+\.session_token=[^;\s]/
 
-// Workaround: vite-hub/vitehub#5476 puts the reason in `error.data.reason`, one of `mcpTokenInvalidReasons`; until Drop
-// runs it, these copy that set and read the reason from the message.
 const MCP_TOKEN_REASONS = [
   "expired",
   "malformed",
