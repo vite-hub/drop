@@ -18,13 +18,14 @@ const { evlogOptions } = await import("../../scripts/logging.ts")
 process.env.__EVLOG_CONFIG = JSON.stringify(evlogOptions({ version: "1.2.3", commit: "abc1234" }))
 const { default: evlogPlugin } = await import("../../node_modules/evlog/dist/nitro/v3/plugin.mjs")
 const { default: wideEvents } = await import("../../server/plugins/wide-events.ts")
-const { identify, requireIdentity } = await import("../../server/utils/identity.ts")
+const { identify, requireIdentity, mcpTokenReason, MCP_TOKEN_MESSAGES } = await import("../../server/utils/identity.ts")
 const { default: patchDrop } = await import("../../server/api/drops/[id].patch.ts")
 const { default: deleteDropRoute } = await import("../../server/api/drops/[id].delete.ts")
 const { default: upload } = await import("../../server/api/uploads/[ticket].put.ts")
 const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
 const { default: report } = await import("../../server/api/reports.post.ts")
 const { mcpFor } = await import("../../server/mcp/index.ts")
+const { default: mcpRoute } = await import("../../server/routes/mcp.ts")
 
 /** A Nitro app's hooks, enough for evlog's plugin and Drop's. */
 const listeners = new Map()
@@ -94,6 +95,7 @@ beforeEach(() => {
   reset()
   session.current = null
   state.mcpCaller = null
+  state.mcpRefusal = undefined
   state.authSecret = undefined
   background.length = 0
   warnings.length = 0
@@ -197,8 +199,154 @@ test("a person in the browser is their id on the event, never their name; an age
   // A refused token is signed out, and does not fall back to the browser session; the event says which check failed.
   state.mcpCaller = null
   const refused = await request("/mcp", identify, { headers: { authorization: "Bearer token" } })
-  assert.deepEqual(refused.event.token, { rejected: "invalid token" })
+  assert.deepEqual(refused.event.mcp.auth, { presented: true, result: "rejected", reason: "other" })
   assert.equal(refused.event.user, undefined)
+})
+
+/** A JSON-RPC call to the /mcp route, with the response h3-mcp answered and the request's wide event. */
+async function mcpCall(headers = {}, rpc = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) {
+  let response
+  const { event } = await request(
+    "/mcp",
+    async (event) => {
+      response = await mcpRoute(event)
+      return response.status
+    },
+    {
+      method: "POST",
+      headers: { accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-03-26", ...headers },
+      body: rpc,
+    },
+  )
+  return { event, response }
+}
+
+test("/mcp logs a challenge apart from a rejected token, with the JSON-RPC method", async () => {
+  const challenge = await mcpCall()
+  assert.equal(challenge.response.status, 401)
+  assert.equal(challenge.event.mcp.method, "tools/list")
+  assert.deepEqual(challenge.event.mcp.auth, { presented: false, result: "challenge" })
+  assert.doesNotMatch(challenge.response.headers.get("www-authenticate"), /error=/)
+
+  // The route reaches identify() through its test double (test/stubs.ts), which refuses while `state.who` is null.
+  const rejected = await mcpCall({ authorization: "Bearer stale-access" })
+  assert.equal(rejected.response.status, 401)
+  assert.equal(rejected.event.mcp.method, "tools/list")
+  assert.deepEqual(rejected.event.mcp.auth, { presented: true, result: "rejected" })
+  assert.match(rejected.response.headers.get("www-authenticate"), /, error="invalid_token"$/)
+  assert.ok(!JSON.stringify(rejected.event).includes("stale-access"))
+
+  state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+  const accepted = await mcpCall({ authorization: "Bearer good-access" })
+  assert.equal(accepted.response.status, 200)
+  assert.deepEqual(accepted.event.mcp.auth, { presented: true, result: "ok" })
+  assert.equal(accepted.event.mcp.method, "tools/list")
+})
+
+test("a rejected token names the check that failed, under no key evlog would redact", async () => {
+  state.mcpRefusal = {
+    code: "AUTH_MCP_TOKEN_INVALID",
+    message: 'The access token is not valid: "exp" claim timestamp check failed',
+  }
+  const { event } = await request("/mcp", identify, { headers: { authorization: "Bearer stale-access" } })
+  assert.deepEqual(event.mcp.auth, { presented: true, result: "rejected", reason: "expired" })
+  assert.equal(event.token, undefined)
+  assert.deepEqual(
+    JSON.stringify(event).match(/"[^"]*token"\s*:/gi),
+    null,
+    "evlog 2.31 redacts any key ending in token",
+  )
+
+  state.mcpRefusal = { code: "AUTH_MCP_TOKEN_INVALID", message: "detail changed", data: { reason: "session_ended" } }
+  const named = await request("/mcp", identify, { headers: { authorization: "Bearer stale-access" } })
+  assert.equal(named.event.mcp.auth.reason, "session_ended")
+})
+
+test("/mcp names a batch's methods, and an unreadable body leaves the method out", async () => {
+  const batch = await mcpCall({}, [
+    { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_drops", arguments: {} } },
+  ])
+  assert.equal(batch.event.mcp.method, "tools/list,tools/call")
+
+  const named = await mcpCall({ "mcp-method": "resources/read", "mcp-name": "skill://drop" })
+  assert.equal(named.event.mcp.method, "resources/read")
+  assert.equal(named.event.mcp.name, "skill://drop")
+
+  const garbled = await request("/mcp", (event) => mcpRoute(event).then((response) => response.status), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{not json",
+  })
+  assert.equal(garbled.event.mcp.method, undefined)
+  assert.deepEqual(garbled.event.mcp.auth, { presented: false, result: "challenge" })
+})
+
+test("a token's reason comes from ViteHub's error.data first, else from its message", () => {
+  assert.equal(
+    mcpTokenReason({ message: "anything", data: { reason: "client_disabled", clientId: "c" } }),
+    "client_disabled",
+  )
+  assert.equal(
+    mcpTokenReason({ message: "The access token is not valid: the Auth has no signing keys.", data: {} }),
+    "no_keys",
+  )
+  assert.equal(mcpTokenReason({ message: "The access token is not valid: something new" }), "other")
+  assert.equal(mcpTokenReason({ message: "something new", data: { reason: "not-a-reason" } }), "other")
+})
+
+const prefix = "The access token is not valid: "
+test.each([
+  ['"exp" claim timestamp check failed', "expired"],
+  ["/api/drops is not a resource of `mcpOAuth()`.", "wrong_resource"],
+  ['unexpected "aud" claim value', "wrong_resource"],
+  ["the Auth has no signing keys.", "no_keys"],
+  ["sender-constrained access tokens are not supported; use a bearer token.", "sender_constrained"],
+  ["the user does not exist or is banned.", "user_gone"],
+  ["`access.policy` or `VITEHUB_MEMBERS` does not allow the user.", "not_allowed"],
+  ["the OAuth client does not exist or is disabled.", "client_disabled"],
+  ["the session does not exist or has expired.", "session_ended"],
+  ["signature verification failed", "malformed"],
+  ["Invalid Compact JWS", "malformed"],
+  ["Invalid Token or Protected Header formatting", "malformed"],
+  ["JWS Protected Header is invalid", "malformed"],
+  ['unexpected "iss" claim value', "malformed"],
+  ['"nbf" claim timestamp check failed', "malformed"],
+  ["no applicable key found in the JSON Web Key Set", "malformed"],
+  ["the signature or a claim does not match.", "malformed"],
+])("the message %j maps to %s", (detail, reason) => {
+  assert.equal(mcpTokenReason({ message: prefix + detail }), reason)
+})
+
+test("each row of the message table has a case above", () => {
+  const covered = new Set([
+    "expired",
+    "wrong_resource",
+    "no_keys",
+    "sender_constrained",
+    "user_gone",
+    "not_allowed",
+    "client_disabled",
+    "session_ended",
+    "malformed",
+  ])
+  assert.deepEqual(new Set(MCP_TOKEN_MESSAGES.map(([, reason]) => reason)), covered)
+})
+
+test("a signed-out request says whether it sent a session cookie that matched no session", async () => {
+  const absent = await request("/api/me", identify)
+  assert.equal(absent.event.identity.cookie, "absent")
+
+  const stale = await request("/api/me", identify, {
+    headers: { cookie: "theme=dark; __Host-drop.session_token=gone.signature" },
+  })
+  assert.equal(stale.event.identity.cookie, "stale")
+  assert.equal(stale.event.user, undefined)
+  assert.ok(!JSON.stringify(stale.event).includes("gone.signature"))
+
+  session.current = { user: { id: "owner", name: "Ada", email: "owner@example.com", banned: false } }
+  const signedIn = await request("/api/me", identify, { headers: { cookie: "better-auth.session_token=live" } })
+  assert.equal(signedIn.event.identity?.cookie, undefined)
 })
 
 test("a refused or failed session says why on the event, and the request is still signed out", async () => {

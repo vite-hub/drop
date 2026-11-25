@@ -104,7 +104,12 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
   if (!result) return null
   const [error, caller] = result
   if (error) {
-    if (error.code === "AUTH_MCP_TOKEN_INVALID") requestLog(event)?.set({ token: { rejected: error.message } })
+    if (error.code === "AUTH_MCP_TOKEN_INVALID")
+      requestLog(event)?.set({ mcp: { auth: { presented: true, result: "rejected", reason: mcpTokenReason(error) } } })
+    if (error.code === "AUTH_SIGNED_OUT")
+      requestLog(event)?.set({
+        identity: { cookie: SESSION_COOKIE.test(event.req.headers.get("cookie") ?? "") ? "stale" : "absent" },
+      })
     return null
   }
   const { user } = caller
@@ -122,6 +127,48 @@ async function resolveIdentity(event: H3Event): Promise<Identity | null> {
     actorKind: caller.kind,
     actorName: caller.kind === "agent" ? (caller.client.name ?? "MCP client") : user.name,
   }
+}
+
+const SESSION_COOKIE = /(?:^|;)\s*[^=;\s]+\.session_token=[^;\s]/
+
+// Workaround: vite-hub/vitehub#5476 puts the reason in `error.data.reason`, one of `mcpTokenInvalidReasons`; until Drop
+// runs it, these copy that set and read the reason from the message.
+const MCP_TOKEN_REASONS = [
+  "expired",
+  "malformed",
+  "wrong_resource",
+  "no_keys",
+  "sender_constrained",
+  "user_gone",
+  "not_allowed",
+  "client_disabled",
+  "session_ended",
+] as const
+
+export type McpTokenReason = (typeof MCP_TOKEN_REASONS)[number] | "other"
+
+export const MCP_TOKEN_MESSAGES: readonly (readonly [RegExp, McpTokenReason])[] = [
+  [/"exp" claim timestamp check failed/, "expired"],
+  [/is not a resource of `mcpOAuth\(\)`|unexpected "aud" claim value/, "wrong_resource"],
+  [/the Auth has no signing keys/, "no_keys"],
+  [/sender-constrained access tokens are not supported/, "sender_constrained"],
+  [/the user does not exist or is banned/, "user_gone"],
+  [/does not allow the user/, "not_allowed"],
+  [/the OAuth client does not exist or is disabled/, "client_disabled"],
+  [/the session does not exist or has expired/, "session_ended"],
+  [
+    /signature verification failed|Invalid Compact JWS|Invalid Token or Protected Header formatting|JWS Protected Header is invalid|unexpected "iss" claim value|"nbf" claim timestamp check failed|no applicable key found|the signature or a claim does not match/,
+    "malformed",
+  ],
+]
+
+const isMcpTokenReason = (value: unknown): value is McpTokenReason =>
+  MCP_TOKEN_REASONS.some((reason) => reason === value)
+
+export function mcpTokenReason(error: { message: string; data?: unknown }): McpTokenReason {
+  const { data } = error
+  if (typeof data === "object" && data !== null && "reason" in data && isMcpTokenReason(data.reason)) return data.reason
+  return MCP_TOKEN_MESSAGES.find(([pattern]) => pattern.test(error.message))?.[1] ?? "other"
 }
 
 export async function identityOf(userId: string): Promise<Identity | null> {
