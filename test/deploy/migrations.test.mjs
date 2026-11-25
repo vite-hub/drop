@@ -305,3 +305,53 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
     database.close()
   }
 })
+
+test("sends that an older release made twice yield to one live send before the live key index", async () => {
+  const database = new DatabaseSync(":memory:")
+  const all = dropMigrations()
+  const liveKey = all.find((migration) => migration.name === "0020_comment_sends_live_key.sql")
+  assert.ok(liveKey, "0020_comment_sends_live_key is a migration")
+  try {
+    database.exec(
+      "CREATE TABLE d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)",
+    )
+    for (const migration of all.filter((item) => item !== liveKey)) {
+      database.exec(migration.sql.replaceAll("--> statement-breakpoint", ""))
+      database.prepare("INSERT INTO d1_migrations (name) VALUES (?)").run(migration.name)
+    }
+    // Two tabs pressed Send on the same comments before either send was stored.
+    const insert = database.prepare(
+      "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, 'ana', 'drop', 'd1', '/d/d1', '[]', ?, ?, '{}', ?, ?)",
+    )
+    insert.run("a_pending", "k", "pending", 1, 1)
+    insert.run("a_done", "k", "done", 3, 3)
+    insert.run("a_sent", "k", "sent", 2, 2)
+    insert.run("b_first", "k2", "sent", 1, 1)
+    insert.run("b_second", "k2", "sent", 2, 2)
+    insert.run("b_failed", "k2", "failed", 0, 0)
+    insert.run("c_only", "k3", "working", 1, 1)
+    await migrateD1(database)
+    const states = Object.fromEntries(
+      database
+        .prepare("SELECT id, state FROM vitehub_comment_sends ORDER BY id")
+        .all()
+        .map((row) => [row.id, row.state]),
+    )
+    assert.deepEqual(states, {
+      a_done: "done",
+      a_pending: "failed",
+      a_sent: "failed",
+      b_failed: "failed",
+      b_first: "sent",
+      b_second: "failed",
+      c_only: "working",
+    })
+    assert.match(
+      database.prepare("SELECT error FROM vitehub_comment_sends WHERE id = 'b_second'").get().error,
+      /sent twice/,
+    )
+    assert.ok(database.prepare("SELECT 1 FROM sqlite_master WHERE name = 'vitehub_comment_sends_live_key'").get())
+  } finally {
+    database.close()
+  }
+})
