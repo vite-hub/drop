@@ -72,17 +72,33 @@ export function createClientErrorReporter(
       parsed.response?.headers.get("cf-ray") ??
       parsed.response?.headers.get("x-request-id") ??
       undefined
+    const details = { status: status ?? fields.status, code: text(code) }
     const flat = Object.fromEntries(
       Object.entries({
-        status: status ?? fields.status,
-        code: text(code),
+        ...details,
         requestId: text(requestId),
         drop: text(fields.drop),
         title: text(fields.title),
         source: text(fields.source),
       }).filter((entry): entry is [string, string | number] => entry[1] !== undefined),
     )
-    send(error instanceof Error ? error : (parsed.message ?? String(error)), { action, fields: flat })
+    const options = { action, fields: flat }
+    const failure = error instanceof Error ? error : (parsed.message ?? String(error))
+    const dedupeContext = [
+      details.status === undefined ? undefined : `HTTP ${details.status}`,
+      details.code ? `code ${details.code}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(", ")
+    if (!dedupeContext) return send(failure, options)
+
+    const message = `[${dedupeContext}] ${typeof failure === "string" ? failure : failure.message}`
+    send(
+      typeof failure === "string"
+        ? message
+        : Object.assign(new Error(message), { name: failure.name, stack: failure.stack }),
+      options,
+    )
   }
 }
 

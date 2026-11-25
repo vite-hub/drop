@@ -98,6 +98,27 @@ test("a refusal posts nothing", async () => {
   assert.deepEqual(requests, [])
 })
 
+test("gateway retries with a different status are reported, but identical failures are not", async () => {
+  const requests = await browserPage()
+  const report = createClientErrorReporter()
+  const message = "Couldn't start GitHub sign-in."
+  for (const status of [502, 503, 502]) {
+    const error = answerError(message, status)
+    const stack = error.stack
+    report("signin", error, {}, page)
+    assert.equal(error.message, message)
+    assert.equal(requests.find(({ body }) => body.fields.status === status).body.stack.includes(message), true)
+    assert.equal(error.stack, stack)
+  }
+  assert.deepEqual(
+    requests.map(({ body }) => [body.action, body.fields.status]),
+    [
+      ["signin", 502],
+      ["signin", 503],
+    ],
+  )
+})
+
 test("a client exception and a network failure are reported", () => {
   const { sent, report } = reporter()
   report("board-load", new TypeError("Cannot read properties of undefined"))
@@ -146,15 +167,19 @@ test("a sign-in or consent refusal is reported as its step's failure, with its c
   assert.equal(events.length, 6, "Other actions send no step")
 })
 
-test("a code outside the funnel schema is preserved only in the generic error report", () => {
-  const { sent, events, report } = reporter()
-  report("signin-switch", answerError("Couldn't sign out", 500, "provider/sign-out"))
-  report("signin-switch", answerError("Couldn't sign out", 500, "provider/other"))
+test("distinct codes outside the funnel schema are preserved only in the generic error reports", async () => {
+  const requests = await browserPage()
+  const events = []
+  const report = createClientErrorReporter(undefined, (body) => events.push(body))
+  for (const code of ["provider/sign-out", "provider/other", "provider/sign-out"]) {
+    report("signin-switch", answerError("Couldn't sign out", 500, code), {}, page)
+  }
   assert.deepEqual(
-    sent.map(({ fields }) => fields.code),
+    requests.map(({ body }) => body.fields.code),
     ["provider/sign-out", "provider/other"],
   )
   assert.deepEqual(events, [
+    { event: "signin.failed", status: 500 },
     { event: "signin.failed", status: 500 },
     { event: "signin.failed", status: 500 },
   ])
@@ -227,7 +252,7 @@ test("a thrown non-error is reported by its message or text, and string fields k
   report("notify", { status: 503, message: "Service unavailable" })
   report("vue", new Error("x"), { title: "t".repeat(400), source: "s".repeat(400) })
   assert.equal(sent[0].error, "plain string")
-  assert.equal(sent[1].error, "Service unavailable")
+  assert.equal(sent[1].error, "[HTTP 503] Service unavailable")
   assert.equal(sent[1].fields.status, 503)
   assert.equal(sent[2].fields.title.length, 300)
   assert.equal(sent[2].fields.source.length, 300)

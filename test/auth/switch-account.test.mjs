@@ -55,7 +55,7 @@ test("unconfirmed sign-outs block navigation but report distinct failures on ret
     sent.map(({ message, status, code }) => [message, status, code]),
     [
       ["fetch failed", undefined, undefined],
-      ["Bad Gateway", 502, "BAD_GATEWAY"],
+      ["[HTTP 502, code BAD_GATEWAY] Bad Gateway", 502, "BAD_GATEWAY"],
     ],
   )
 })
