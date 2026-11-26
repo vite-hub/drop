@@ -331,6 +331,22 @@ test("text, mentions and attached images survive plain/area composer replacement
   reload.unmount()
 })
 
+test("a screenshot that takes a heavy page's 2.5 s after Send still joins its comment", async () => {
+  vi.useFakeTimers()
+  try {
+    const state = viewer("html")
+    state.reviewOpen.value = true
+    state.receive({ ...area, shot: 1 }, frame)
+    const shot = state.shotFor(state.popover.value.shot)
+    state.popover.value = null
+    await vi.advanceTimersByTimeAsync(2500)
+    state.receive({ type: "area-shot", shot: 1, image: new Blob([new Uint8Array([1])], { type: "image/webp" }) }, frame)
+    assert.equal((await shot)?.size, 1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 test("a screenshot that comes in after the next area started lands on its own comment only", async () => {
   const state = viewer("html")
   state.reviewOpen.value = true

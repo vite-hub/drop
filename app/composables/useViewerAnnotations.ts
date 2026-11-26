@@ -24,8 +24,11 @@ export type ViewerPopover = { x: number; y: number } & (
 )
 export type ViewerTool = "browse" | "comment" | "measure" | "mark"
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
-/** How long a comment waits for its screenshot before it goes without one. */
-export const SHOT_WAIT = 1500
+/**
+ * How long a comment waits for its screenshot before it goes without one. Send doesn't wait for it, and the frame
+ * always answers, so only a frame that went away runs out: a heavy page's capture takes up to 2.5 s after Send.
+ */
+export const SHOT_WAIT = 10_000
 /** How many recent captures `shotFor` remembers; an older one answers null. */
 const SHOTS_KEPT = 8
 
