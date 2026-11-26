@@ -25,6 +25,8 @@ const OPEN = {
   "GET /api/review/comments": "review.js: checks its review token",
   "POST /api/review/comments": "review.js: checks its review token",
   "OPTIONS /api/review/comments": "review.js: CORS preflight",
+  "POST /api/review/comments/refresh": "review.js: checks its review token and comment access",
+  "OPTIONS /api/review/comments/refresh": "review.js: CORS preflight for an origin covered by a site review",
   "PATCH /api/review/comments/x": "review.js: checks its review token",
   "OPTIONS /api/review/comments/x": "review.js: CORS preflight",
   "POST /api/review/comments/x/replies": "review.js: checks its review token",
