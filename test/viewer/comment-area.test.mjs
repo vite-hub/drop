@@ -330,3 +330,35 @@ test("text, mentions and attached images survive plain/area composer replacement
   assert.equal(draft.body.value, "Ada's own draft")
   reload.unmount()
 })
+
+test("a screenshot that comes in after the next area started lands on its own comment only", async () => {
+  const state = viewer("html")
+  state.reviewOpen.value = true
+  state.receive({ ...area, shot: 1 }, frame)
+  const first = state.popover.value.shot
+  const firstShot = state.shotFor(first, 10_000)
+  // Send closes the composer before the picture is in, and the reviewer draws the next area at once.
+  state.popover.value = null
+  state.receive({ ...area, shot: 2 }, frame)
+  const second = state.popover.value.shot
+  assert.notEqual(second, first)
+  const secondShot = state.shotFor(second, 10_000)
+  const one = new Blob([new Uint8Array([1])], { type: "image/png" })
+  state.receive({ type: "area-shot", shot: 1, image: one }, frame)
+  const landed = await firstShot
+  assert.ok(landed instanceof File)
+  assert.equal(landed.size, 1)
+  // The second comment's draft never sees the first picture.
+  assert.deepEqual(state.shots, [])
+  const two = new Blob([new Uint8Array([2, 2])], { type: "image/webp" })
+  state.receive({ type: "area-shot", shot: 2, image: two }, frame)
+  assert.equal((await secondShot).size, 2)
+  assert.equal(state.shots.length, 1)
+  assert.equal(state.shots[0].size, 2)
+  // Asked again, a capture answers the same picture; one that never comes in answers null at the cap.
+  assert.equal((await state.shotFor(first, 0)).size, 1)
+  state.popover.value = null
+  state.receive({ ...area, shot: 3 }, frame)
+  assert.equal(await state.shotFor(state.popover.value.shot, 5), null)
+  assert.equal(await state.shotFor(undefined), null)
+})
