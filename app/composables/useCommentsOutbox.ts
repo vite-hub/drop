@@ -9,6 +9,7 @@ import {
   type CommentUser,
 } from "vite-hub/comments/client"
 import type { CommentReply, DropComment } from "#shared/types"
+import type { DeliveryClock } from "~/utils/comment-delivery"
 import { readOutboxAuthor, writeOutboxAuthor } from "../lib/comment-outbox-storage.client"
 
 interface OutboxPage {
@@ -32,6 +33,8 @@ export interface AppCommentsOutbox {
   edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
   attach: (page: OutboxPage) => void
   clear: (account: string) => Promise<void>
+  /** What `troubleCount` needs at `now`: the network, and how long the queue head has been going out. */
+  clock: (now: number) => DeliveryClock
 }
 
 interface Holder {
@@ -64,6 +67,8 @@ export function createCommentsOutbox(
   const pages = new Set<OutboxPage>()
   const accepted = new Map<string, string>()
   const sentHere = new Set<string>()
+  const sendingSince = new Map<string, number>()
+  const online = useOnline()
   const outbox: AppCommentsOutbox = {
     account: computed(() => holder.value?.account ?? GUEST_ACCOUNT),
     author: (account) => (holder.value?.account === account ? holder.value.user : undefined),
@@ -83,6 +88,7 @@ export function createCommentsOutbox(
       onScopeDispose(() => pages.delete(page))
     },
     clear: async () => {},
+    clock: (now) => ({ now, online: online.value, sendingSince: (requestId) => sendingSince.get(requestId) }),
   }
   if (import.meta.server) return outbox
 
@@ -269,6 +275,15 @@ export function createCommentsOutbox(
     )
   }
   connect(holder, active, activeEntries)
+  watch(
+    activeEntries,
+    (entries) => {
+      const going = new Set(entries.flatMap((entry) => (entry.status === "sending" ? [entry.requestId] : [])))
+      for (const requestId of sendingSince.keys()) if (!going.has(requestId)) sendingSince.delete(requestId)
+      for (const requestId of going) if (!sendingSince.has(requestId)) sendingSince.set(requestId, Date.now())
+    },
+    { immediate: true, flush: "sync" },
+  )
   connect(heldHolder, held, heldEntries)
 
   const guard = (event: Event) => {

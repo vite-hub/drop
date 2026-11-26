@@ -1,4 +1,4 @@
-import type { CommentDelivery } from "vite-hub/comments/client"
+import type { CommentDelivery, CommentDeliveryError, CommentsOutboxEntry } from "vite-hub/comments/client"
 import type { DropComment } from "#shared/types"
 
 export const WAITING_NOTICE_MS = 2000
@@ -32,9 +32,38 @@ export function deliveryLine(delivery: CommentDelivery, since: number, now: numb
   return { state: "waiting", text: "Waiting to send", actions: [] }
 }
 
-export function waitingCount(comments: readonly DropComment[], now: number) {
-  let count = 0
-  for (const item of comments.flatMap((comment) => [comment, ...comment.replies]))
-    if (item.delivery?.status === "pending" && now - item.createdAt >= WAITING_NOTICE_MS) count++
-  return count
+export const STUCK_SENDING_MS = 5000
+
+/** An outbox entry, or the delivery of a comment on the page, which lacks `sending` and `held`. */
+interface Delivery {
+  status: CommentsOutboxEntry["status"]
+  requestId: string
+  error?: CommentDeliveryError
+  held?: boolean
 }
+
+export interface DeliveryClock {
+  now: number
+  online: boolean
+  /** When the outbox started sending this request, while it is sending. */
+  sendingSince: (requestId: string) => number | undefined
+}
+
+/**
+ * Comments on their way show as pending pins, so a count shows only trouble: refused, held, retrying after an error,
+ * waiting for the network, or a queue head that has been going out for more than 5 s.
+ */
+export function inTrouble(delivery: Delivery, clock: DeliveryClock) {
+  if (delivery.status === "failed" || delivery.held || delivery.error || !clock.online) return true
+  const since = clock.sendingSince(delivery.requestId)
+  return since !== undefined && clock.now - since > STUCK_SENDING_MS
+}
+
+export const troubleCount = (deliveries: readonly Delivery[], clock: DeliveryClock) =>
+  deliveries.filter((delivery) => inTrouble(delivery, clock)).length
+
+export const waitingCount = (comments: readonly DropComment[], clock: DeliveryClock) =>
+  troubleCount(
+    comments.flatMap((comment) => [comment, ...comment.replies]).flatMap((item) => item.delivery ?? []),
+    clock,
+  )
