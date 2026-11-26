@@ -234,6 +234,42 @@ test("on the canvas, Space on a clicked Comments button holds the Hand; on one r
   }
 })
 
+test("a Space hold ends even when this window never hears Space let go", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 600 }, reducedMotion: "reduce" })
+    await openDock(page, "?canvas")
+    const comments = page
+      .getByRole("group", { name: "Document tools" })
+      .getByRole("button", { name: "Comments", exact: true })
+    await comments.click()
+    const commands = () => page.evaluate(() => window.commands)
+
+    // Something on the page stops the keyup before it reaches the window.
+    await comments.evaluate((button) => button.addEventListener("keyup", (event) => event.stopPropagation()))
+    await page.keyboard.down(" ")
+    await page.keyboard.up(" ")
+    assert.deepEqual(await commands(), ["hold", "release"])
+
+    // On a Mac, Space let go while ⌘ is down sends no keyup: ⌘'s own keyup ends the hold.
+    await page.keyboard.down(" ")
+    await page.keyboard.down("Meta")
+    await page.keyboard.up("Meta")
+    assert.deepEqual(await commands(), ["hold", "release", "hold", "release"])
+    await page.keyboard.up(" ")
+
+    // The tab is hidden with Space down.
+    await page.keyboard.down(" ")
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => true })
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+    assert.deepEqual(await commands(), ["hold", "release", "hold", "release", "hold", "release"])
+  } finally {
+    await browser.close()
+  }
+})
+
 test("the phone canvas dock reports its top as a bottom ViteHub mark appears, moves, or disappears", async () => {
   const browser = await chromium.launch()
   try {

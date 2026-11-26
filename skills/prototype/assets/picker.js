@@ -792,7 +792,8 @@
     else return;
     e.preventDefault();
   });
-  window.addEventListener("keyup", (e) => { if (e.key === " ") hold(false); });
+  // On a Mac, Space let go while ⌘ is down sends no keyup, so ⌘'s own keyup puts the Hand down too.
+  window.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Meta") hold(false); });
 
   // The Hand tool, or Space held: a shield over the items takes the pointer, so a drag pans from anywhere, live pages
   // included, and the items get no clicks or hovers until it's put down. The cursor says which: grab, then grabbing.

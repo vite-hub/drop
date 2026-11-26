@@ -63,12 +63,21 @@ const release = () => {
   if (holding) emit("command", "release")
   holding = false
 }
-useEventListener("keyup", (event: KeyboardEvent) => {
-  if (event.key !== " " || !holding) return
-  event.preventDefault()
-  release()
-})
+// Space can be let go where this window never hears it: in a field that stops the keyup, with ⌘ down on a Mac, in
+// another tab. A hold left on keeps the canvas's Hand up, and Drop's comment tools stand aside for it, so clicks
+// stop commenting. Any of those ends the hold.
+useEventListener(
+  "keyup",
+  (event: KeyboardEvent) => {
+    if (!holding || (event.key !== " " && event.key !== "Meta")) return
+    if (event.key === " ") event.preventDefault()
+    release()
+  },
+  { capture: true },
+)
 useEventListener("blur", release)
+useEventListener(document, "visibilitychange", () => document.hidden && release())
+onBeforeUnmount(release)
 
 const tool = computed(() => props.state.tool ?? "move")
 const zoomItems = computed<DropdownMenuItem[][]>(() => [
