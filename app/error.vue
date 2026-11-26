@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import type { NuxtError } from "#app"
 const props = defineProps<{ error: NuxtError }>()
-const path = useRequestURL().pathname
+const { pathname: path, search } = useRequestURL()
+const retryPath = `${path.startsWith("//") ? `/.${path}` : path}${search}`
 const target = path.startsWith("/f/") || path.startsWith("/d/") ? path : ""
 const missing = computed(() => props.error.status === 404)
+
+function retry() {
+  window.location.reload()
+}
 </script>
 <template>
   <NuxtLayout
@@ -13,12 +18,14 @@ const missing = computed(() => props.error.status === 404)
           {{ missing ? "This content is unavailable." : "Could not open this page." }}
         </h1>
         <div class="flex justify-center gap-3">
-          <UButton v-if="!missing" :to="path" external label="Try again" color="neutral" /><UButton
-            to="/"
-            label="Home"
+          <UButton
+            v-if="!missing"
+            :to="retryPath"
+            external
+            label="Try again"
             color="neutral"
-            variant="outline"
-          /><UButton
+            @click.prevent="retry"
+          /><UButton to="/" label="Home" color="neutral" variant="outline" /><UButton
             v-if="target"
             :to="{ path: '/report', query: { target } }"
             label="Report"
