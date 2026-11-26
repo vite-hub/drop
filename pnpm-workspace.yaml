@@ -53,7 +53,11 @@ patchedDependencies:
   # A failed Send says why (drop#301): `problem` ("delivery", "key-unset", "key-invalid") and the receiver's `agent` on
   # the failed result, the receiver's HTTP status or timeout from the webhook delivery, and Send or Pair again re-pairs
   # after a key problem. A status refresh keeps a failed Send, pairing or Allow failed, with the newest count, while
-  # comments still wait, without cancelling a retry in flight (vite-hub/vitehub#5526). Delete when ViteHub ships it.
+  # comments still wait, without cancelling a retry in flight (vite-hub/vitehub#5526). The outbox shows a new comment or
+  # reply the moment create()/reply() is called, takes files as a promise, and keeps a refused store write as a failed
+  # entry; one tab's unsaved comments keep their order past another tab's, a reply to a comment whose save failed waits
+  # with it for Retry, and closing the page warns while one is held only in memory (vite-hub/vitehub#5540). Delete when
+  # ViteHub ships both.
   "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone

@@ -1,4 +1,4 @@
-import type { CommentDelivery } from "vite-hub/comments/client"
+import type { CommentDelivery, CommentDeliveryError, CommentsOutboxEntry } from "vite-hub/comments/client"
 import type { DropComment } from "#shared/types"
 
 export const WAITING_NOTICE_MS = 2000
@@ -18,6 +18,8 @@ export function deliveryLine(delivery: CommentDelivery, since: number, now: numb
   const status = delivery.error?.status ?? 0
   const why = delivery.error?.why
   if (delivery.status === "failed") {
+    if (status === 0)
+      return { state: "refused", text: why || "The browser didn't save this comment", actions: ["retry", "discard"] }
     if (status === 403 || status === 404)
       return { state: "gone", text: "This drop no longer takes comments", actions: ["copy", "discard"] }
     return {
@@ -32,9 +34,32 @@ export function deliveryLine(delivery: CommentDelivery, since: number, now: numb
   return { state: "waiting", text: "Waiting to send", actions: [] }
 }
 
-export function waitingCount(comments: readonly DropComment[], now: number) {
-  let count = 0
-  for (const item of comments.flatMap((comment) => [comment, ...comment.replies]))
-    if (item.delivery?.status === "pending" && now - item.createdAt >= WAITING_NOTICE_MS) count++
-  return count
+export const STUCK_SENDING_MS = 5000
+
+interface Delivery {
+  status: CommentsOutboxEntry["status"]
+  requestId: string
+  error?: CommentDeliveryError
+  held?: boolean
 }
+
+export interface DeliveryClock {
+  now: number
+  online: boolean
+  sendingSince: (requestId: string) => number | undefined
+}
+
+function inTrouble(delivery: Delivery, clock: DeliveryClock) {
+  if (delivery.status === "failed" || delivery.held || delivery.error || !clock.online) return true
+  const since = clock.sendingSince(delivery.requestId)
+  return since !== undefined && clock.now - since > STUCK_SENDING_MS
+}
+
+export const troubleCount = (deliveries: readonly Delivery[], clock: DeliveryClock) =>
+  deliveries.filter((delivery) => inTrouble(delivery, clock)).length
+
+export const waitingCount = (comments: readonly DropComment[], clock: DeliveryClock) =>
+  troubleCount(
+    comments.flatMap((comment) => [comment, ...comment.replies]).flatMap((item) => item.delivery ?? []),
+    clock,
+  )

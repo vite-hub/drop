@@ -74,6 +74,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     body: string,
     files: File[] = [],
     mentions: string[] = [],
+    deferredFiles?: Promise<File[]>,
   ): Promise<Sent<DropComment>> {
     const requestId = randomId()
     try {
@@ -83,13 +84,14 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       const pinned = at ?? (displayed?.kind === "app" ? undefined : displayed?.version)
       const target = toValue(id)
       const inputSubject = subject()
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       const thread = await client.create({
         subject: inputSubject,
         anchor: { kind: "page" },
         body,
         mentions,
         files,
+        deferredFiles,
         requestId,
         metadata: targetMetadata({
           route: "comment",
@@ -111,7 +113,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     try {
       const inputSubject = subject()
       const revision = drop.data.value?.version ?? 0
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       await client.create({
         subject: inputSubject,
         anchor: { kind: "page" },
@@ -186,7 +188,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     const requestId = randomId()
     try {
       const inputSubject = subject()
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       await client.reply({ threadId: commentId, body, mentions, files, requestId, subject: inputSubject })
       const reply = list.value.flatMap((comment) => comment.replies).find((item) => item.requestId === requestId)
       if (!reply) throw new Error("The reply didn't stay in this browser. Try again.")

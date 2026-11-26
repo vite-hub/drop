@@ -3,7 +3,7 @@ import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
 import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
-import { breakpointsTailwind, promiseTimeout } from "@vueuse/core"
+import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { ViewerVariants } from "~/composables/useViewerFrame"
 import { expiryLabel } from "#shared/expiry"
@@ -69,7 +69,8 @@ const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
 const second = useNow({ scheduler: (update) => useIntervalFn(update, 1000) })
-const deliveryCount = computed(() => waitingCount(comments.value, second.value.getTime()))
+const outbox = useCommentsOutbox()
+const deliveryCount = computed(() => waitingCount(comments.value, outbox.clock(second.value.getTime())))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -985,37 +986,22 @@ watch(shownVersion, (version) => {
   }
 })
 
-const SHOT_WAIT = 1500
-
-async function submit(body: string, files: File[] = [], mentions: string[] = []) {
-  const open = popover.value
-  if (open?.type !== "new" || reviewDraft.waiting.value) return
-  const draftScope = reviewDraft.scope.value
-  const before = reviewDraft.images.picks.value.length
-  reviewDraft.waiting.value = true
-  try {
-    await Promise.race([annotations.waitForShot(), promiseTimeout(SHOT_WAIT)])
-    if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
-    const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-    const sent = await state.addComment(
-      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
-      body,
-      attached,
-      mentions,
-    )
-    if (reviewDraft.scope.value !== draftScope) return
-    if ("value" in sent) {
-      reviewDraft.clear()
-      if (popover.value === open) {
-        popover.value = null
-        send({ type: "clear-selection" })
-        return showSent(sent.value.id)
-      }
-    } else if (popover.value === open) await popoverRef.value?.fail(sent.error)
-  } finally {
-    reviewDraft.waiting.value = false
-  }
-}
+const { submit } = usePinSend({
+  popover,
+  draft: reviewDraft,
+  page: () => (isApp.value ? page.value : undefined),
+  shown: () => autoShot,
+  shotFor: (id) => annotations.shotFor(id),
+  ready: () => Boolean(outbox.ready()),
+  prepare: () => outbox.writable(),
+  addComment: state.addComment,
+  closed: () => send({ type: "clear-selection" }),
+  sent: showSent,
+  fail: async (reason) => {
+    await nextTick()
+    await popoverRef.value?.fail(reason)
+  },
+})
 
 async function keepFocus() {
   await nextTick()

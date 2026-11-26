@@ -18,12 +18,20 @@ type Lightbox = {
   pdfPage?: number
   file?: File
 }
-type Popover = { x: number; y: number } & (
-  | { type: "new"; pending: PendingComment; body?: string; error?: string }
+export type ViewerPopover = { x: number; y: number } & (
+  | { type: "new"; pending: PendingComment; body?: string; error?: string; shot?: number }
   | { type: "thread"; id: string }
 )
 export type ViewerTool = "browse" | "comment" | "measure" | "mark"
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
+export const SHOT_WAIT = 10_000
+const SHOTS_KEPT = 8
+
+interface Capture {
+  file: Promise<File | null>
+  settle: (file: File | null) => void
+  settled: boolean
+}
 
 type PointerMessage = Extract<
   FrameMessage,
@@ -54,7 +62,7 @@ export function useViewerAnnotations(options: {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
-  const popover = ref<Popover | null>(null)
+  const popover = ref<ViewerPopover | null>(null)
   const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
   const threadPlace = ref<{ id: string; rail: boolean; rect: Rect } | null>(null)
   watch(
@@ -72,21 +80,40 @@ export function useViewerAnnotations(options: {
     return ++focusGeneration
   }
   const isFocusCurrent = (generation: number) => generation === focusGeneration
-  let awaitedShot: number | undefined
-  let shotTaken = false
-  let shotWaiters: (() => void)[] = []
-  function settleShot() {
-    awaitedShot = undefined
-    for (const resolve of shotWaiters.splice(0)) resolve()
+  let lastShot = 0
+  const captures = new Map<number, Capture>()
+  const framed = new Map<number, number>()
+  function capture(taken?: File) {
+    const id = ++lastShot
+    const { promise, resolve } = Promise.withResolvers<File | null>()
+    const entry: Capture = {
+      file: promise,
+      settled: false,
+      settle: (file) => {
+        entry.settled = true
+        resolve(file)
+      },
+    }
+    captures.set(id, entry)
+    for (const old of [...captures.keys()].slice(0, -SHOTS_KEPT)) forget(old)
+    if (taken) entry.settle(taken)
+    return id
   }
+  function forget(id: number) {
+    captures.get(id)?.settle(null)
+    captures.delete(id)
+    for (const [n, shot] of framed) if (shot === id) framed.delete(n)
+  }
+  function shotFor(id: number | undefined, cap = SHOT_WAIT): Promise<File | null> {
+    const entry = id === undefined ? undefined : captures.get(id)
+    if (!entry) return Promise.resolve(null)
+    if (entry.settled) return entry.file
+    return Promise.race([entry.file, promiseTimeout(cap).then(() => null)])
+  }
+  let shotTaken = false
   function dropShot() {
-    settleShot()
     if (shotTaken) options.shot?.(null)
     shotTaken = false
-  }
-  function waitForShot() {
-    if (awaitedShot === undefined) return Promise.resolve()
-    return Promise.race([promiseTimeout(10_000), new Promise<void>((resolve) => shotWaiters.push(resolve))])
   }
   const awaitThread = (id: string | null, generation?: number) => {
     if (generation !== undefined && generation !== focusGeneration) return false
@@ -219,7 +246,13 @@ export function useViewerAnnotations(options: {
     }
     if (message.type === "area") {
       dropShot()
-      awaitedShot = commenting.value ? message.shot : undefined
+      let shot: number | undefined
+      if (commenting.value && message.shot !== undefined) {
+        const before = framed.get(message.shot)
+        if (before !== undefined) forget(before)
+        shot = capture()
+        framed.set(message.shot, shot)
+      }
       const marked = tool.value === "mark"
       if (marked) tool.value = "browse"
       if (commenting.value) {
@@ -240,17 +273,21 @@ export function useViewerAnnotations(options: {
           },
           x: x(message.rect.left),
           y: y(message.rect.bottom),
+          ...(shot === undefined ? {} : { shot }),
         }
       }
     }
-    if (message.type === "area-shot" && message.shot === awaitedShot && popover.value?.type === "new") {
+    const shot = message.type === "area-shot" ? framed.get(message.shot) : undefined
+    if (message.type === "area-shot" && shot !== undefined) {
+      framed.delete(message.shot)
       const { image } = message
-      if (image) {
-        const type = image.type || "image/png"
-        options.shot?.(new File([image], `screenshot.${type.split("/")[1]}`, { type }))
+      const type = image?.type || "image/png"
+      const file = image ? new File([image], `screenshot.${type.split("/")[1]}`, { type }) : null
+      captures.get(shot)?.settle(file)
+      if (file && popover.value?.type === "new" && popover.value.shot === shot) {
+        options.shot?.(file)
         shotTaken = true
       }
-      settleShot()
     }
     if (message.type === "marker")
       popover.value = {
@@ -311,6 +348,7 @@ export function useViewerAnnotations(options: {
   function pickImage(area: Area, x: number, y: number) {
     if (!lightbox.value || !commenting.value) return
     const { selector, alt, label, at, pdfPage, file } = lightbox.value
+    const shot = file ? capture(file) : undefined
     popover.value = {
       type: "new",
       pending:
@@ -321,6 +359,7 @@ export function useViewerAnnotations(options: {
             : { kind: "image", selector, ...area, label: alt || "image" },
       x,
       y,
+      ...(shot === undefined ? {} : { shot }),
     }
     if (!file) return
     dropShot()
@@ -365,6 +404,6 @@ export function useViewerAnnotations(options: {
     receive,
     commentOnSelection,
     pickImage,
-    waitForShot,
+    shotFor,
   }
 }

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import { mkdir } from "node:fs/promises"
 import { chromium } from "playwright"
 
 // DROP_URL=http://127.0.0.1:3027 node test/e2e/offline-comments.mjs checks comments written with no network against a
 // local Drop built for VPS and served with DROP_TEST_SIGNIN=true (email sign-up). The comment and reply POSTs are cut
 // with Playwright routes, so the browser thinks it's online and the outbox must cope with failed requests, a lost
-// answer, two tabs, refusals, a closed tab, a stale session and a guest who signs in. Each step reports pass or fail and the run goes on;
+// answer, two tabs, refusals, a closed tab, a stale session and a guest who signs in. Step 10 holds the screenshots and
+// POSTs instead, to check that Send closes the composer at once. Each step reports pass or fail and the run goes on;
 // screenshots go to tmp/offline-check/. Exit 1 when any step failed.
 const origin = new URL(process.env.DROP_URL ?? "http://127.0.0.1:3027")
 assert.ok(
@@ -34,7 +36,10 @@ async function step(name, run) {
   try {
     await run(check)
   } catch (error) {
-    const at = error instanceof Error ? error.stack?.match(/offline-comments\.mjs:(\d+)/)?.[1] : undefined
+    const at =
+      error instanceof Error
+        ? [...(error.stack ?? "").matchAll(/offline-comments\.mjs:(\d+)/g)].map((m) => m[1]).join(" < ")
+        : undefined
     failures.push(
       `threw${at ? ` at line ${at}` : ""}: ${error instanceof Error ? error.message.split("\n")[0] : error}`,
     )
@@ -43,8 +48,27 @@ async function step(name, run) {
   console.log(`${failures.length ? "FAIL" : "PASS"} ${name}${failures.map((line) => `\n  - ${line}`).join("")}`)
 }
 
+/**
+ * Nuxt dev stalls on a busy machine (a POST once waited 15 s on the SQLite file, and each page render regenerates its
+ * templates) and resets connections meanwhile: the fetch throws `read ECONNRESET`, or its proxy answers 500 with it.
+ * A GET goes again for up to 20 s, so a stall doesn't read as a comment that never landed.
+ */
+async function fetchAgain(context, url, options = {}) {
+  const retry = (options.method ?? "GET") === "GET"
+  const deadline = Date.now() + 20_000
+  for (;;) {
+    const last = !retry || Date.now() > deadline
+    const response = await context.request.fetch(url, options).catch((error) => {
+      if (last) throw error
+      return null
+    })
+    if (response && (response.status() < 500 || last)) return response
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+}
+
 async function api(context, path, body, method = body ? "POST" : "GET") {
-  const response = await context.request.fetch(new URL(path, origin).href, {
+  const response = await fetchAgain(context, new URL(path, origin).href, {
     method,
     headers: { origin: origin.origin },
     ...(body ? { data: body } : {}),
@@ -78,12 +102,21 @@ async function held(owner, drop) {
   }
 }
 
+/** Polls `condition` until it answers; a poll that throws counts as "not yet", as a stalled dev server is no answer. */
 async function until(condition, timeout = WAIT, what = "condition") {
   const start = Date.now()
+  let failed
   for (;;) {
-    const value = await condition()
+    const value = await Promise.resolve()
+      .then(condition)
+      .catch((error) => {
+        failed = error
+      })
     if (value) return value
-    if (Date.now() - start > timeout) throw new Error(`timed out after ${timeout / 1000} s waiting for ${what}`)
+    if (Date.now() - start > timeout)
+      throw new Error(
+        `timed out after ${timeout / 1000} s waiting for ${what}${failed ? ` (last: ${failed.message})` : ""}`,
+      )
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
 }
@@ -105,6 +138,10 @@ const reviewerId = reviewer.user.id
 // The network for comment and reply POSTs: "offline" aborts them, "lose" lets the next one reach the server and drops
 // its answer, "refuse" answers the next one 400 with a sentence, "online" lets them through.
 let network = "online"
+// While `gate` is set, each comment POST waits for it before the switch above decides. Each of `refusals` answers the
+// first POST whose body holds its text with its status, once.
+let gate = null
+const refusals = []
 const sent = [] // { requestId, url, status } for each POST that left the page, status 0 when it got no answer
 const commentPost = /\/api\/(drops\/[^/]+\/comments|comments\/[^/]+\/replies)(\?|$)/
 const requestIdOf = (request) =>
@@ -117,8 +154,34 @@ const cut = (target) => target.route(commentPost, through)
 async function through(route) {
   const request = route.request()
   if (request.method() !== "POST") return route.fallback()
-  const entry = { requestId: requestIdOf(request), url: request.url(), status: 0 }
+  const entry = {
+    requestId: requestIdOf(request),
+    url: request.url(),
+    status: 0,
+    at: Date.now(),
+    body: request.postDataBuffer()?.toString("utf8").slice(0, 4000),
+  }
   sent.push(entry)
+  if (gate) {
+    entry.held = true
+    await gate
+    entry.held = false
+    // The page it came from has reloaded, and the browser cancelled it.
+    if (entry.abandoned) return route.abort().catch(() => undefined)
+  }
+  const posted = request.postDataBuffer()?.toString("utf8") ?? ""
+  const refusal = refusals.find((rule) => posted.includes(rule.text))
+  if (refusal) {
+    refusals.splice(refusals.indexOf(refusal), 1)
+    entry.status = refusal.status
+    return route
+      .fulfill({
+        status: refusal.status,
+        contentType: "application/json",
+        body: JSON.stringify({ statusCode: refusal.status, message: refusal.message, statusText: refusal.message }),
+      })
+      .catch(() => undefined)
+  }
   if (network === "offline") return route.abort("internetdisconnected")
   if (network === "lose") {
     network = "offline"
@@ -141,9 +204,11 @@ async function through(route) {
       }),
     })
   }
-  const response = await route.fetch()
+  // A POST held across a reload has no page left to answer.
+  const response = await route.fetch().catch(() => null)
+  if (!response) return route.abort().catch(() => undefined)
   entry.status = response.status()
-  return route.fulfill({ response })
+  return route.fulfill({ response }).catch(() => undefined)
 }
 await cut(context)
 const postsFor = (requestId) => sent.filter((entry) => entry.requestId === requestId)
@@ -156,7 +221,11 @@ async function open(page, target) {
     .getByRole("button", { name: /^Comments/ })
     .first()
     .waitFor()
-  // Hydration, then the outbox learns who's signed in from /api/me.
+  // Hydration: the server-rendered buttons ignore a click until Vue mounts, which takes longer than a fixed wait on a
+  // busy machine. Then the outbox learns who's signed in from /api/me.
+  await page.waitForFunction(() => document.querySelector("#__nuxt")?.__vue_app__?.$nuxt?.isHydrating === false, null, {
+    timeout: WAIT,
+  })
   await page.waitForTimeout(2500)
 }
 const commentMode = (page) => page.getByRole("button", { name: /^Comments/ }).first()
@@ -220,6 +289,11 @@ async function area(page, from, to, body) {
   await page.mouse.up()
   await newComment(page).waitFor()
   await removeShot(page)
+  await pasteImage(page)
+  await newComment(page).fill(body)
+  await newComment(page).press("Enter")
+}
+async function pasteImage(page) {
   // A pasted image, as from the clipboard.
   await newComment(page).evaluate(async (textarea) => {
     const canvas = Object.assign(document.createElement("canvas"), { width: 16, height: 16 })
@@ -232,8 +306,6 @@ async function area(page, from, to, body) {
     textarea.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }))
   })
   await page.getByRole("region", { name: "New comment" }).getByText("pasted.png").first().waitFor({ timeout: 5000 })
-  await newComment(page).fill(body)
-  await newComment(page).press("Enter")
 }
 async function selectText(page, words, body) {
   await stopCommenting(page)
@@ -924,6 +996,330 @@ await step("8. A guest writes offline, then signs in: it lands once, as them", a
   await shot(tab, "8-guest-signed-in")
   await guest.close()
 })
+
+// The viewer's frame posts each area's screenshot ("area-shot") when it has rendered it. With `__holdShots` on, the
+// viewer doesn't hear them until `__releaseShots()` replays them, as from a slow capture.
+function holdShots() {
+  const held = []
+  window.__holdShots = false
+  window.__heldShots = () => held.length
+  // How long each capture took, from its area to its screenshot, held or not.
+  const drawn = new Map()
+  window.__captureMs = []
+  addEventListener(
+    "message",
+    (event) => {
+      if (event.isTrusted && event.data?.type === "area") drawn.set(event.data.shot, performance.now())
+      if (event.isTrusted && event.data?.type === "area-shot" && drawn.has(event.data.shot))
+        window.__captureMs.push(Math.round(performance.now() - drawn.get(event.data.shot)))
+      if (!window.__holdShots || !event.isTrusted || event.data?.type !== "area-shot") return
+      event.stopImmediatePropagation()
+      held.push(event)
+    },
+    { capture: true },
+  )
+  window.__releaseShots = () => {
+    window.__holdShots = false
+    for (const event of held.splice(0))
+      dispatchEvent(new MessageEvent("message", { data: event.data, origin: event.origin, source: event.source }))
+  }
+}
+/** Draws an area on the frame and waits for its composer. */
+async function drawArea(page, from, to) {
+  await startCommenting(page)
+  const box = await frameBox(page)
+  await page.mouse.move(box.x + from[0], box.y + from[1])
+  await page.mouse.down()
+  await page.mouse.move(box.x + to[0], box.y + to[1], { steps: 6 })
+  await page.mouse.up()
+  await newComment(page)
+    .waitFor({ timeout: 5000 })
+    .catch(async (error) => {
+      await shot(page, `no-composer-${from.join("-")}`)
+      throw error
+    })
+}
+/** Types and presses Enter; answers how many ms the composer stayed after the keypress, or Infinity past 3 s. */
+async function sendTimed(page, body) {
+  await newComment(page).fill(body)
+  await page.evaluate(() => {
+    window.__closed = new Promise((resolve) => {
+      let start
+      const keydown = (event) => event.key === "Enter" && start === undefined && (start = performance.now())
+      addEventListener("keydown", keydown, true)
+      const finish = (ms) => {
+        observer.disconnect()
+        removeEventListener("keydown", keydown, true)
+        resolve(ms)
+      }
+      const observer = new MutationObserver(() => {
+        if (start !== undefined && !document.querySelector("[data-pin-composer]")) finish(performance.now() - start)
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      setTimeout(() => finish(Infinity), 3000)
+    })
+  })
+  await newComment(page).press("Enter")
+  return page.evaluate(() => window.__closed)
+}
+/** The open composer's screenshot, folded away under "Show 1 picture" or not. */
+const composerShot = (page) => page.locator('[data-pin-composer] [aria-label^="Remove screenshot"]')
+const pendingPins = (page) => page.frameLocator("iframe").first().locator('[data-delivery="pending"]:not(small)')
+const failedPins = (page) => page.frameLocator("iframe").first().locator('[data-delivery="failed"]:not(small)')
+/** Records every "N waiting" or "Unsent comments" the page shows from now until `stop()`. */
+async function watchTrouble(page) {
+  await page.evaluate(() => {
+    window.__trouble = new Set()
+    const look = () => {
+      for (const element of document.querySelectorAll("[data-waiting], button"))
+        if (element.matches("[data-waiting]") || element.textContent.trim().startsWith("Unsent comments"))
+          window.__trouble.add(element.textContent.trim())
+    }
+    window.__troubleWatch = new MutationObserver(look)
+    window.__troubleWatch.observe(document.body, { childList: true, subtree: true, characterData: true })
+    look()
+  })
+  return {
+    stop: () =>
+      page.evaluate(() => {
+        window.__troubleWatch.disconnect()
+        return [...window.__trouble]
+      }),
+  }
+}
+const bytes = async (target, url) => {
+  const response = await fetchAgain(target, new URL(url, origin).href)
+  return response.ok()
+    ? createHash("sha256")
+        .update(await response.body())
+        .digest("hex")
+    : `HTTP ${response.status()}`
+}
+
+await step(
+  "10. Instant Send: each composer closes at once while the screenshot and POST are held; three land in order with their own screenshots; a refusal keeps its words; a reload keeps one held",
+  async (check) => {
+    const target = await publish(owner, "Instant comments")
+    // A reviewer of its own, so what earlier steps left in the outbox doesn't sit in front of these.
+    const reviewing = await browser.newContext({ viewport: { width: 1400, height: 900 } })
+    await api(reviewing, "/api/auth/sign-up/email", { name: "Quick reviewer", email: email("quick"), password })
+    await cut(reviewing)
+    network = "online"
+    const tab = await reviewing.newPage()
+    tab.on("pageerror", (error) => errors.push(error.message))
+    const consoleLines = []
+    tab.on("console", (message) => consoleLines.push(`${message.type()} ${message.text()}`.slice(0, 300)))
+    await tab.addInitScript(holdShots)
+    await open(tab, target)
+    // A first comment loads the screenshot module and settles the outbox, as a reviewer's first one does.
+    const WARM = "Instant: warm-up"
+    await drawArea(tab, [380, 150], [560, 172])
+    await composerShot(tab).waitFor({ state: "attached", timeout: 15_000 })
+    await newComment(tab).fill(WARM)
+    await newComment(tab).press("Enter")
+    await until(async () => (await held(owner, target)).bodies.includes(WARM), 30_000, "the warm-up comment")
+
+    // 1-4. Screenshots and POSTs held; three comments in a burst.
+    const burst = ["Instant: first of three", "Instant: second of three", "Instant: third of three"]
+    const spots = [
+      [
+        [380, 215],
+        [600, 237],
+      ],
+      [
+        [380, 300],
+        [600, 322],
+      ],
+      [
+        [380, 380],
+        [600, 400],
+      ],
+    ]
+    const trouble = await watchTrouble(tab)
+    let release
+    gate = new Promise((resolve) => (release = resolve))
+    await tab.evaluate(() => (window.__holdShots = true))
+    const started = Date.now()
+    const before = await pendingPins(tab).count()
+    let firstSent
+    for (const [index, body] of burst.entries()) {
+      await drawArea(tab, ...spots[index])
+      const leftover = await newComment(tab).inputValue()
+      check(leftover === "", `composer ${index + 1} starts empty (${JSON.stringify(leftover)})`)
+      check((await composerShot(tab).count()) === 0, `composer ${index + 1} has no screenshot left from the one before`)
+      const ms = await sendTimed(tab, body)
+      firstSent ??= Date.now()
+      check(ms <= 150, `composer ${index + 1} is gone ${Math.round(ms)} ms after Enter (at most 150)`)
+      const shown = await until(
+        async () => (await pendingPins(tab).count()) >= before + index + 1,
+        1000,
+        "the pending pin",
+      ).catch(() => false)
+      check(shown, `comment ${index + 1} shows as a pending pin (${await pendingPins(tab).count()} pending)`)
+    }
+    // Held as long as a heavy page's capture takes (up to 2.5 s): the first comment's screenshot still joins it.
+    await tab.waitForTimeout(Math.max(0, firstSent + 2500 - Date.now()))
+    const heldShots = await tab.evaluate(() => window.__heldShots())
+    check(heldShots >= 1, `the screenshots were still held when the burst ended (${heldShots})`)
+    console.log(`  burst written and held for ${Date.now() - started} ms, ${heldShots} screenshots held`)
+    await tab.evaluate(() => window.__releaseShots())
+    release()
+    gate = null
+
+    // 5. All three land, in order, each with a screenshot of its own.
+    const landed = await until(
+      async () => {
+        const now = await held(owner, target)
+        return burst.every((body) => now.bodies.includes(body)) ? now : null
+      },
+      30_000,
+      "the three comments on the server",
+    ).catch(() => null)
+    const flagged = await trouble.stop()
+    check(
+      Date.now() - started > 5000 || flagged.length === 0,
+      `no trouble chip during the burst (${flagged.join(", ")})`,
+    )
+    console.log(`  burst landed ${Date.now() - started} ms after it started`)
+    if (check(Boolean(landed), "all three land")) {
+      const three = landed.comments.filter((comment) => burst.includes(comment.body)).sort((a, b) => a.n - b.n)
+      check(
+        three.map((comment) => comment.body).join() === burst.join(),
+        `they land in order (${three.map((c) => `${c.n} ${c.body}`).join(", ")})`,
+      )
+      check(
+        burst.every((body) => landed.bodies.filter((each) => each === body).length === 1),
+        "each lands once",
+      )
+      const attached = three.map((comment) => comment.attachments ?? [])
+      check(
+        attached.every((files) => files.length === 1 && files[0].contentType.startsWith("image/")),
+        `each has one screenshot (${attached.map((files) => files.length).join(", ")})`,
+      )
+      const hashes = await Promise.all(attached.flat().map((file) => bytes(owner, file.url)))
+      check(
+        new Set(hashes).size === hashes.length,
+        `no two share a screenshot (${hashes.map((h) => h.slice(0, 8)).join(", ")})`,
+      )
+    }
+    await shot(tab, "10-burst-landed")
+
+    // 6. One POST answered 422 and the next 500: the refused one shows failed and keeps its words, the next isn't
+    // stuck behind it and goes again by itself.
+    const REFUSED = "Instant: refused once"
+    const AFTER = "Instant: answered 500 once"
+    refusals.push(
+      { text: REFUSED, status: 422, message: "Say which part." },
+      { text: AFTER, status: 500, message: "Server error" },
+    )
+    await drawArea(tab, [640, 140], [820, 160])
+    await sendTimed(tab, REFUSED)
+    await drawArea(tab, [640, 215], [820, 235])
+    await sendTimed(tab, AFTER)
+    await until(async () => (await held(owner, target)).bodies.includes(AFTER), 30_000, "the comment after it").catch(
+      () => undefined,
+    )
+    const afterServer = await held(owner, target)
+    console.log(`  captures took ${(await tab.evaluate(() => window.__captureMs)).join(", ")} ms`)
+    check(afterServer.bodies.filter((body) => body === AFTER).length === 1, "the 500 one goes again and lands once")
+    check(
+      await appears(failedPins(tab)),
+      `the refused comment's pin shows failed (${await failedPins(tab).count()} failed)`,
+    )
+    await showList(tab)
+    check(await marked(tab, REFUSED, "failed"), "the refused comment is marked data-failed with its words")
+    await shot(tab, "10-refused")
+    await openThread(tab, REFUSED)
+    const again = tab.getByRole("button", { name: /^(Retry|Edit)$/ })
+    if (check(await appears(again), "the refused comment offers Retry or Edit")) {
+      console.log(`  the refused comment offers ${await again.first().textContent()}`)
+      await again.first().click()
+      const box = tab.getByRole("textbox", { name: "Edit the comment" })
+      if (await appears(box, 1000)) {
+        check((await box.inputValue()) === REFUSED, "Edit starts from the refused words")
+        await box.press("Enter")
+      }
+      const resent = await until(
+        async () => (await held(owner, target)).bodies.includes(REFUSED),
+        30_000,
+        "the resent comment",
+      ).catch(() => false)
+      if (!check(resent, "sending it again lands it")) {
+        // What a stuck resend leaves behind: the page's console, every POST that carried it, and its outbox record.
+        const records = await entriesWith(tab, REFUSED).catch((error) => [{ text: `unreadable: ${error.message}` }])
+        const posts = sent.filter((entry) => entry.body?.includes(REFUSED))
+        console.log(
+          `  console:\n${consoleLines
+            .slice(-40)
+            .map((line) => `    ${line}`)
+            .join("\n")}`,
+        )
+        console.log(`  POSTs with it: ${JSON.stringify(posts.map(({ body: _body, ...entry }) => entry))}`)
+        console.log(`  outbox records: ${records.map((record) => record.text).join("\n    ")}`)
+        await shot(tab, "10-resend-stuck")
+      }
+    }
+
+    // 7. A reload with one POST held and the next one's screenshot held: both come back, and each lands once.
+    const RELOAD = "Instant: POST held across a reload"
+    const UNSHOT = "Instant: screenshot held across a reload"
+    gate = new Promise((resolve) => (release = resolve))
+    await tab.keyboard.press("Escape")
+    await drawArea(tab, [640, 290], [820, 310])
+    await sendTimed(tab, RELOAD)
+    const requestId = await until(
+      async () => (await entriesWith(tab, RELOAD))[0]?.text.match(/"requestId":"([^"]+)"/)?.[1],
+      5000,
+      "the saved entry",
+    ).catch(() => undefined)
+    check(Boolean(requestId), "the outbox keeps it")
+    const atGate = await until(() => postsFor(requestId).some((entry) => entry.held), 10_000, "the held POST").catch(
+      () => false,
+    )
+    check(atGate, "its POST is out and held")
+    await tab.evaluate(() => (window.__holdShots = true))
+    await drawArea(tab, [640, 335], [820, 352])
+    await pasteImage(tab)
+    await sendTimed(tab, UNSHOT)
+    await until(async () => (await entriesWith(tab, UNSHOT)).length === 1, WAIT, "the comment awaiting its screenshot")
+    check((await entriesWith(tab, UNSHOT))[0].blobs.length === 1, "the outbox already saved the pasted image")
+    for (const entry of sent) if (entry.held) entry.abandoned = true
+    await tab.reload()
+    const kept = await until(async () => (await pendingPins(tab).count()) >= 2, 15_000, "two pending pins").catch(
+      () => false,
+    )
+    check(kept, `after the reload both show as pending pins (${await pendingPins(tab).count()})`)
+    release()
+    gate = null
+    const back = await until(
+      async () => {
+        const now = await held(owner, target)
+        return now.bodies.includes(RELOAD) && now.bodies.includes(UNSHOT)
+      },
+      30_000,
+      "both comments after the reload",
+    ).catch(() => false)
+    check(back, "both land after the reload")
+    await tab.waitForTimeout(1500)
+    const server = await held(owner, target)
+    for (const body of [RELOAD, UNSHOT])
+      check(server.bodies.filter((each) => each === body).length === 1, `the server holds "${body}" once`)
+    check(
+      server.comments.find((comment) => comment.body === UNSHOT)?.attachments?.length === 1,
+      "the pasted image lands even though the reload interrupted the screenshot",
+    )
+    const answered = postsFor(requestId).filter((entry) => entry.status >= 200 && entry.status < 300)
+    check(answered.length === 1, `one POST of the held one landed (${answered.length})`)
+    console.log(
+      `  after the reload: ${server.comments
+        .filter((c) => [RELOAD, UNSHOT].includes(c.body))
+        .map((c) => `"${c.body}" with ${c.attachments?.length ?? 0} attachment(s)`)
+        .join(", ")}`,
+    )
+    await shot(tab, "10-after-reload")
+    await reviewing.close()
+  },
+)
 
 if (errors.length) console.log(`Page errors:\n${[...new Set(errors)].map((line) => `  ${line}`).join("\n")}`)
 await browser.close()

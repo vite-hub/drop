@@ -60,7 +60,7 @@ const pending = ref<{
   page: string
   origin: string
 } | null>(null)
-const { body: note, images, clear, scope, waiting } = injectReviewDraft()!
+const { body: note, images, clear, scope } = injectReviewDraft()!
 
 function point(event: PointerEvent) {
   const el = stage.value!
@@ -158,34 +158,31 @@ const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
 async function send() {
   const shot = pending.value
-  if (!shot || !note.value.trim() || !state || waiting.value) return
+  if (!shot || !note.value.trim() || !state) return
   const { box: b, size } = shot
   const ox = thousandths(b.left, size.width),
     oy = thousandths(b.top, size.height)
   const body = note.value.trim()
-  const attached = [shot.blob, ...files.value]
-  waiting.value = true
-  try {
-    const kept = await state.addSiteComment(
-      shot.origin,
-      {
-        page: shot.page,
-        ox,
-        oy,
-        ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
-        oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
-        viewport: size,
-      },
-      body,
-      attached,
-    )
-    if (kept && pending.value === shot) {
-      clear()
-      discard()
-    }
-  } finally {
-    waiting.value = false
-  }
+  const picked = [...files.value]
+  clear()
+  discard()
+  const kept = await state.addSiteComment(
+    shot.origin,
+    {
+      page: shot.page,
+      ox,
+      oy,
+      ow: Math.max(1, Math.min(1000 - ox, thousandths(b.width, size.width))),
+      oh: Math.max(1, Math.min(1000 - oy, thousandths(b.height, size.height))),
+      viewport: size,
+    },
+    body,
+    [shot.blob, ...picked],
+  )
+  if (kept || pending.value || note.value) return
+  pending.value = { ...shot, url: URL.createObjectURL(shot.blob) }
+  note.value = body
+  images.add(picked)
 }
 
 function cancelDrawing() {
@@ -308,7 +305,6 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             aria-label="Comment"
             autofocus
             class="w-full"
-            :disabled="waiting"
             placeholder="What should change here?"
             :rows="3"
             :ui="{ base: 'field-sizing-content min-h-[calc(3lh+--spacing(3))] max-h-[calc(8lh+--spacing(3))]' }"
@@ -324,7 +320,6 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
                 aria-label="Add images"
                 class="mr-auto"
                 color="neutral"
-                :disabled="waiting"
                 icon="i-mingcute-pic-line"
                 variant="ghost"
                 @click="pickImages"
@@ -333,12 +328,11 @@ defineExpose({ capturing, pending: computed(() => Boolean(pending.value)) })
             <UButton
               class="hidden in-[#drop-comments]:inline-flex"
               color="neutral"
-              :disabled="waiting"
               label="Remove area"
               variant="ghost"
               @click="discard"
             />
-            <UButton color="neutral" :disabled="!note.trim()" label="Send" :loading="waiting" type="submit" />
+            <UButton color="neutral" :disabled="!note.trim()" label="Send" type="submit" />
           </div>
         </form>
       </Teleport>

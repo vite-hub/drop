@@ -63,9 +63,6 @@ const release = () => {
   if (holding) emit("command", "release")
   holding = false
 }
-// Space can be let go where this window never hears it: in a field that stops the keyup, with ⌘ down on a Mac, in
-// another tab. A hold left on keeps the canvas's Hand up, and Drop's comment tools stand aside for it, so clicks
-// stop commenting. Any of those ends the hold.
 useEventListener(
   "keyup",
   (event: KeyboardEvent) => {

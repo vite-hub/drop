@@ -5,31 +5,13 @@ import { COMMENT_IMAGE_TYPES } from "#shared/schemas"
 const emit = defineEmits<{ submit: [body: string, files: File[], mentions: string[]]; cancel: [] }>()
 const draft = injectReviewDraft()!
 const { user, users } = injectDropComments()!
-const body = computed({
-  get: () => draft.body.value,
-  set: (value) => {
-    if (!busy.value) draft.body.value = value
-  },
-})
-const mentions = computed({
-  get: () => draft.mentions.value,
-  set: (value) => {
-    if (!busy.value) draft.mentions.value = value
-  },
-})
-const files = computed({
-  get: () => draft.images.files.value,
-  set: (value) => {
-    if (!busy.value) draft.images.files.value = value
-  },
-})
+const { body, mentions } = draft
+const files = draft.images.files
 const lookup = async (query: string) => draft.rememberPeople(await users(query))
 const error = ref<string>()
 watch(draft.body, () => (error.value = undefined))
-const busy = computed(() => draft.waiting.value)
-
 function send(sent: CommentComposerSubmit) {
-  if (!busy.value) emit("submit", sent.body, sent.files, sent.mentions)
+  emit("submit", sent.body, sent.files, sent.mentions)
 }
 defineExpose({
   fail: async (reason?: string, text?: string) => {
@@ -48,7 +30,6 @@ defineExpose({
       :accept="COMMENT_IMAGE_TYPES.join(',')"
       allow-empty
       :autofocus="false"
-      :busy="busy"
       :error="error || draft.images.problem.value"
       frame="none"
       :guard="false"

@@ -1,7 +1,13 @@
 <script setup lang="ts">
-const { entries, heldIds, discard } = useCommentsOutbox()
+const { entries, heldIds, discard, clock } = useCommentsOutbox()
 const route = useRoute()
-const count = computed(() => entries.value.length + heldIds.value.length)
+const second = useNow({ controls: true, scheduler: (update) => useIntervalFn(update, 1000, { immediate: false }) })
+watch(
+  () => entries.value.length > 0,
+  (queued) => (queued ? second.resume() : second.pause()),
+  { immediate: true },
+)
+const count = computed(() => troubleCount(entries.value, clock(second.now.value.getTime())) + heldIds.value.length)
 const open = ref(false)
 const urls = fileUrls()
 watch(

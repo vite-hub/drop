@@ -37,6 +37,7 @@ for (const [name, value] of Object.entries({
   createInjectionState,
   useEventListener,
   useTimeoutFn,
+  useOnline: () => ref(true),
   keys,
   toThread,
   useApi: (_url, options) => ({
