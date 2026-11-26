@@ -63,7 +63,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
 +export type { AnchorPoint, AnchorPosition, AnchorRect, AnchorTarget, AreaAnchor, CommentActor, CommentAnchor, CommentAttachment, CommentBuild, CommentComponent, CommentContext, CommentCreateInput, CommentDeleteInput, CommentDelivery, CommentDeliveryError, CommentEditInput, CommentEvent, CommentFiles, CommentForgeLink, CommentGetInput, CommentListCursor, CommentListQuery, CommentMessage, CommentMetadata, CommentReplyInput, CommentSendAgent, CommentSendClient, CommentSendCopy, CommentSendEvent, CommentSendLogo, CommentSendOptions, CommentSendPairing, CommentSendPairingCheck, CommentSendResult, CommentSendState, CommentSendStatus, CommentSendTransport, CommentSendTransportOptions, CommentStatus, CommentStatusInput, CommentSubject, CommentThread, CommentUploadInput, CommentUser, CommentUsersInput, CommentsClientFiles, CommentsGuest, CommentsOutbox, CommentsOutboxEntry, CommentsOutboxEnvironment, CommentsOutboxMessage, CommentsOutboxOptions, CommentsOutboxStore, CommentsRestAnswer, CommentsRestRequest, CommentsTransport, CreateAnchorOptions, DetachedAnchor, ElementAnchor, ImageAnchor, PageAnchor, ResolvedAnchor, RestCommentThread, RestTransport, RestTransportOptions, TextAnchor };
 \ No newline at end of file
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328c26dd955 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef33851bcc075 100644
 --- a/dist/client.js
 +++ b/dist/client.js
 @@ -257,7 +257,13 @@ function createOutbox(options, host) {
@@ -91,7 +91,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  		const pending = await store.list(account);
  		const ids = /* @__PURE__ */ new Map();
  		if (globalThis.crypto?.subtle) await Promise.all(pending.map(async (entry) => {
-@@ -287,9 +295,15 @@ function createOutbox(options, host) {
+@@ -287,9 +295,27 @@ function createOutbox(options, host) {
  			ids.set(key, replyIds.get(key) ?? await replyMessageId(threadId, entry.requestId));
  		}));
  		replyIds = ids;
@@ -104,12 +104,24 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
 +	const merge = () => {
 +		const ids = new Set(stored.map((entry) => entry.id));
 +		entries = sortEntries([...stored, ...[...unsaved.values()].flatMap((local) => ids.has(local.entry.id) ? [] : [local.entry])]);
++		guardUnload([...unsaved.values()].some((local) => !local.saved));
 +		host.changed();
++	};
++	let guarded = false;
++	const holdPage = (event) => {
++		event.preventDefault();
++		Reflect.set(event, "returnValue", "");
++	};
++	const guardUnload = (on) => {
++		if (on === guarded || typeof globalThis.addEventListener !== "function") return;
++		guarded = on;
++		if (on) globalThis.addEventListener("beforeunload", holdPage);
++		else globalThis.removeEventListener("beforeunload", holdPage);
 +	};
  	const changed = async () => {
  		await reload();
  		post({
-@@ -374,9 +388,14 @@ function createOutbox(options, host) {
+@@ -374,9 +400,14 @@ function createOutbox(options, host) {
  	};
  	/** The first entry that may go out now. A reply waits while its comment has not gone out. */
  	const next = (list) => {
@@ -117,7 +129,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
 +		const waiting = new Set([...list, ...[...unsaved.values()].map((local) => local.entry)].flatMap((entry) => entry.kind === "create" ? [entry.id] : []));
  		return list.find((entry) => entry.status !== "failed" && !(entry.kind === "reply" && waiting.has(entry.input.threadId)));
  	};
-+	const saving = (order) => [...unsaved.values()].some((local) => !local.saved && local.entry.status !== "failed" && local.entry.order < order);
++	const saving = (order) => [...unsaved.values()].some((local) => !local.saved && !local.parked && local.entry.status !== "failed" && local.entry.order < order);
 +	const aborted = (signal) => new Promise((resolve) => {
 +		if (signal.aborted) resolve();
 +		else signal.addEventListener("abort", () => resolve(), { once: true });
@@ -125,7 +137,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  	const wait = (ms) => {
  		cancelWait?.();
  		cancelWait = environment.schedule(() => {
-@@ -484,7 +503,8 @@ function createOutbox(options, host) {
+@@ -484,7 +515,8 @@ function createOutbox(options, host) {
  			const selected = await update((drafts) => {
  				if (signal.aborted) return;
  				const entry = next(sortEntries([...drafts.values()]));
@@ -135,7 +147,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  				const delay = (entry.retryAt ?? 0) - Date.now();
  				if (delay > 0) return { delay };
  				const claimed = {
-@@ -497,16 +517,31 @@ function createOutbox(options, host) {
+@@ -497,16 +529,31 @@ function createOutbox(options, host) {
  				return { claimed };
  			});
  			if (!selected) return;
@@ -168,7 +180,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  		if (leading) {
  			again = true;
  			return;
-@@ -524,22 +559,90 @@ function createOutbox(options, host) {
+@@ -524,22 +571,110 @@ function createOutbox(options, host) {
  			}
  		});
  	}
@@ -184,20 +196,37 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
 +		const local = unsaved.get(id);
 +		if (!local) return Promise.resolve();
 +		const run = async () => {
++			local.parked = false;
++			let group = [local];
 +			try {
-+				await update((drafts) => {
-+					const key = keyOf(local.entry);
-+					if ([...drafts.values()].some((draft) => keyOf(draft) === key)) return;
++				const parked = await update((drafts) => {
++					const parent = local.entry.kind === "reply" ? unsaved.get(local.entry.input.threadId) : void 0;
++					if (parent && !parent.saved && !drafts.has(parent.entry.id)) return true;
 +					let order = local.entry.order;
 +					for (const draft of drafts.values()) if (!written.has(draft.id)) order = Math.max(order, draft.order + 1);
-+					if (order !== local.entry.order) order = Math.max(order, lastOrder + 1);
-+					lastOrder = Math.max(lastOrder, order);
++					const later = [...unsaved.values()].filter((other) => other !== local && !drafts.has(other.entry.id) && other.entry.order > local.entry.order);
++					let previous = order;
++					for (const other of later.sort((a, b) => a.entry.order - b.entry.order)) {
++						previous = Math.max(other.entry.order, previous + 1);
++						other.entry = {
++							...other.entry,
++							order: previous
++						};
++					}
++					lastOrder = Math.max(lastOrder, previous);
 +					local.entry = {
 +						...local.entry,
 +						order
 +					};
-+					drafts.set(id, local.entry);
++					group = [local, ...[...unsaved.values()].filter((other) => other.parked && other.entry.kind === "reply" && other.entry.input.threadId === id)];
++					const keys = new Set([...drafts.values()].map(keyOf));
++					for (const member of group) if (!keys.has(keyOf(member.entry))) drafts.set(member.entry.id, member.entry);
++					return false;
 +				});
++				if (parked) {
++					local.parked = true;
++					return;
++				}
 +			} catch (cause) {
 +				local.entry = {
 +					...local.entry,
@@ -209,7 +238,10 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
 +			} finally {
 +				if (local.write === write) local.write = void 0;
 +			}
-+			local.saved = true;
++			for (const member of group) Object.assign(member, {
++				saved: true,
++				parked: false
++			});
 +			await changed().catch(() => void 0);
 +			kick();
 +		};
@@ -273,7 +305,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  	};
  	const fields = (requestId, files) => {
  		const now = Date.now();
-@@ -548,7 +651,7 @@ function createOutbox(options, host) {
+@@ -548,7 +683,7 @@ function createOutbox(options, host) {
  			id,
  			requestId: requestId ?? id,
  			account,
@@ -282,7 +314,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			createdAt: now,
  			order: now,
  			status: "pending"
-@@ -579,9 +682,11 @@ function createOutbox(options, host) {
+@@ -579,9 +714,11 @@ function createOutbox(options, host) {
  			const receipt = () => receipts.get(keyOf(entry)) ?? [...host.threads()].find((thread) => matchesCreate(entry, thread));
  			const earlier = receipt();
  			if (earlier) return earlier;
@@ -297,7 +329,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  		},
  		async reply({ files, requestId, subject, ...input }) {
  			const threadId = realId(input.threadId);
-@@ -599,8 +704,8 @@ function createOutbox(options, host) {
+@@ -599,8 +736,8 @@ function createOutbox(options, host) {
  			};
  			const earlier = receipts.get(keyOf(entry));
  			if (earlier) return serverThread(earlier.id) ?? earlier;
@@ -308,7 +340,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			const thread = serverThread(realId(threadId)) ?? cached;
  			if (thread) return overlay([thread]).server[0] ?? thread;
  			const local = overlay([]).local.find((local) => local.id === threadId);
-@@ -622,6 +727,17 @@ function createOutbox(options, host) {
+@@ -622,6 +759,17 @@ function createOutbox(options, host) {
  			};
  		},
  		async retry(id) {
@@ -326,7 +358,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			await update((drafts) => {
  				for (const entry of drafts.values()) {
  					if (entry.status === "sending" || id !== void 0 && entry.id !== id) continue;
-@@ -640,6 +756,15 @@ function createOutbox(options, host) {
+@@ -640,6 +788,15 @@ function createOutbox(options, host) {
  			kick();
  		},
  		async dismiss(id) {
@@ -342,7 +374,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			const removed = await update((drafts) => {
  				const entry = drafts.get(id);
  				if (!entry || !changeable(entry)) return false;
-@@ -655,6 +780,23 @@ function createOutbox(options, host) {
+@@ -655,6 +812,23 @@ function createOutbox(options, host) {
  			return removed;
  		},
  		async edit(id, body, mentions) {
@@ -366,7 +398,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			const edited = await update((drafts) => {
  				const entry = drafts.get(id);
  				if (!entry || !changeable(entry)) return false;
-@@ -691,12 +833,14 @@ function createOutbox(options, host) {
+@@ -691,12 +865,14 @@ function createOutbox(options, host) {
  		async clear() {
  			cancelWait?.();
  			cancelWait = void 0;
@@ -381,7 +413,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			const stops = [environment.listen((event) => {
  				if (event !== "online" && event !== "visible") return;
  				update((drafts) => {
-@@ -718,6 +862,7 @@ function createOutbox(options, host) {
+@@ -718,6 +894,7 @@ function createOutbox(options, host) {
  			kick();
  			return () => {
  				for (const stop of stops.splice(0)) stop();
@@ -389,7 +421,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  				cancelWait?.();
  				cancelWait = void 0;
  				leading?.giveUp();
-@@ -1160,6 +1305,8 @@ function createCommentSend(transport, options = {}) {
+@@ -1160,6 +1337,8 @@ function createCommentSend(transport, options = {}) {
  	let timer;
  	let run = 0;
  	let lastStep = "send";
@@ -398,7 +430,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  	const notify = () => {
  		for (const listener of listeners) listener();
  	};
-@@ -1244,16 +1391,29 @@ function createCommentSend(transport, options = {}) {
+@@ -1244,16 +1423,29 @@ function createCommentSend(transport, options = {}) {
  		if (status.retryAt !== void 0 && status.retryAt > Date.now()) return limited(status.retryAt);
  		idle();
  	};
@@ -430,7 +462,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			apply(status);
  		} catch (error) {
  			if (!onError) throw error;
-@@ -1281,7 +1441,9 @@ function createCommentSend(transport, options = {}) {
+@@ -1281,7 +1473,9 @@ function createCommentSend(transport, options = {}) {
  		if (result.status === "failed") return set({
  			status: "failed",
  			count,
@@ -441,7 +473,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  		});
  		if (paired) agent = paired.agent;
  		if (result.status === "limited") return limited(result.retryAt);
-@@ -1469,13 +1631,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1469,13 +1663,14 @@ function createCommentSend(transport, options = {}) {
  			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
  			if (state.status === "failed" && lastStep === "pair") return pair(copy);
@@ -458,7 +490,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  			return pair(copy);
  		},
  		async allow() {
-@@ -1692,6 +1855,12 @@ function createCommentSendTransport(options = {}) {
+@@ -1692,6 +1887,12 @@ function createCommentSendTransport(options = {}) {
  	};
  }
  // src/client.ts
@@ -471,7 +503,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..51ee98d06f7bca884087f8cb62c41328
  function createCommentsClient(options) {
  	const { transport } = options;
  	const listeners = /* @__PURE__ */ new Set();
-@@ -1877,8 +2046,8 @@ function createCommentsClient(options) {
+@@ -1877,8 +2078,8 @@ function createCommentsClient(options) {
  			upsert(thread);
  			return shown(thread.id) ?? thread;
  		},
