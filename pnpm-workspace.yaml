@@ -58,6 +58,10 @@ patchedDependencies:
   # picked save at once while the screenshot is on its way, as `deferredFiles` (vite-hub/vitehub#5553). Delete when
   # ViteHub ships #5526 and #5553, and move the pins to that commit.
   "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
+  # Formats durations without Intl.DurationFormat, which Firefox before 136 lacks: the formatters were built when the
+  # module loaded, so a drop's page crashed there with "Could not open this page." Delete when ViteHub ships the fix
+  # (vite-hub/vitehub#5557) and move the pins to that commit.
+  "@vite-hub/ui@0.0.0-preview-44d6790": patches/@vite-hub__ui@0.0.0-preview-44d6790.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
   # screenshot the same fit check (onmax/comark-ui#491). Delete with the next comark-ui bump that includes it.

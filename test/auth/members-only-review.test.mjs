@@ -63,13 +63,13 @@ test("a members-only Drop lets a folder's skill discovery through, and nothing e
     assert.equal((await request(path)).status, 401, path)
 })
 
-// ViteHub serves Comments, Realtime, browser errors and the Console's reads under /_vitehub, outside /api.
+// ViteHub serves Comments, Realtime, browser errors and the Console's reads under /_vitehub, outside /api. Browser
+// errors stay open, so a signed-out reader's crash is logged.
 test("a members-only Drop gates ViteHub's data routes, and leaves its signed and static ones open", async () => {
   for (const path of [
     "/_vitehub/comments/threads",
     "/_vitehub/comments/auth/github",
     "/_vitehub/realtime/drafts/abc",
-    "/_vitehub/browser-errors",
     "/_vitehub/console/status",
     "/api/_vitehub/comments/threads",
     "/api/_vitehub/realtime/drafts/abc",
@@ -80,6 +80,7 @@ test("a members-only Drop gates ViteHub's data routes, and leaves its signed and
     "/api/_vitehub/comments/attachments/abc",
     "/_vitehub/realtime/latest/abc",
     "/_vitehub/realtime/presence/abc",
+    "/_vitehub/browser-errors",
     "/api/_vitehub/realtime/presence/abc",
     "/_vitehub/rpc",
     "/_vitehub/comments/assets/overlay.js",
