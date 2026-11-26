@@ -14,10 +14,10 @@ index 6cb14849626eef88a508edbfb30a20ce1c7dc3a6..30845f2c83a7a880e1acf4a125a0d85f
  		why: "The server may already have this comment, so the draft cannot change.",
  		fix: "Wait for delivery to finish, then edit or delete the server copy."
 diff --git a/dist/client.d.ts b/dist/client.d.ts
-index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c4660613a2f8de 100644
+index 216e02722e027b793a4f66542c859c09dd6be51c..1b78a95925e47806ad11c2354c2d918b1c1ec4e7 100644
 --- a/dist/client.d.ts
 +++ b/dist/client.d.ts
-@@ -54,7 +54,15 @@ interface CommentsOutboxEntryBase {
+@@ -54,7 +54,20 @@ interface CommentsOutboxEntryBase {
    retryAt?: number;
    held?: boolean;
    uploaded?: string[];
@@ -25,15 +25,20 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
  }
 +/**
 + * The files of a new comment or reply. With an outbox, `files` may be a promise, such as of a screenshot that renders
-+ * after Send: the entry shows and saves at once and sends when the promise settles, without files if it rejects.
++ * after Send: the entry shows and saves at once and sends when the promise settles. Use `deferredFiles` alongside
++ * a `files` array to save those files immediately and append the deferred files when they arrive.
 + */
-+type CommentsClientFiles = Omit<CommentFiles, "files"> & {
++type CommentsClientFiles = Omit<CommentFiles, "files"> & ({
 +  files?: Blob[] | Promise<Blob[]>;
-+};
++  deferredFiles?: undefined;
++} | {
++  files?: Blob[];
++  deferredFiles: Promise<Blob[]>;
++});
  /** A comment or reply that the outbox holds. */
  type CommentsOutboxEntry = CommentsOutboxEntryBase & ({
    kind: "create";
-@@ -68,10 +76,10 @@ type CommentsOutboxEntry = CommentsOutboxEntryBase & ({
+@@ -68,10 +81,10 @@ type CommentsOutboxEntry = CommentsOutboxEntryBase & ({
  interface CommentsOutboxStore {
    /** `false` when the entries live only in this page, and a reload loses them. */
    readonly persisted: boolean;
@@ -48,7 +53,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
  }
  interface CommentsOutboxOptions {
    /**
-@@ -79,6 +87,8 @@ interface CommentsOutboxOptions {
+@@ -79,6 +92,8 @@ interface CommentsOutboxOptions {
     * comment never goes out as somebody else.
     */
    account: string;
@@ -57,7 +62,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
    /** Default: the `vitehub-comments` IndexedDB database, else memory with `persisted: false`. */
    store?: CommentsOutboxStore;
    /** Default: the browser. */
-@@ -385,6 +395,10 @@ export declare const commentsErrorDiagnostics: import("nostics").Diagnostics<{
+@@ -385,6 +400,10 @@ export declare const commentsErrorDiagnostics: import("nostics").Diagnostics<{
      why: string;
      fix: string;
    };
@@ -68,7 +73,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
    readonly COMMENTS_OUTBOX_SENDING: {
      why: string;
      fix: string;
-@@ -477,6 +491,8 @@ type CommentSendResult = {
+@@ -477,6 +496,8 @@ type CommentSendResult = {
  } | {
    status: "failed";
    reason: string;
@@ -77,7 +82,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
  } | {
    status: "limited";
    retryAt: number;
-@@ -547,6 +563,8 @@ type CommentSendState = {
+@@ -547,6 +568,8 @@ type CommentSendState = {
    status: "failed";
    count: number;
    reason: string;
@@ -86,7 +91,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
  } | {
    status: "limited";
    count: number;
-@@ -707,10 +725,13 @@ export interface CommentsClient {
+@@ -707,10 +730,13 @@ export interface CommentsClient {
    query: CommentListQuery;
    refresh: () => Promise<readonly CommentThread[]>;
    get: (input: CommentGetInput) => Promise<CommentThread | null>;
@@ -104,16 +109,15 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c46606
    edit: (input: CommentEditInput) => Promise<CommentThread>;
    delete: (input: CommentDeleteInput) => Promise<CommentThread | null>;
    resolve: (input: CommentStatusInput) => Promise<CommentThread>;
-@@ -734,4 +755,4 @@ export declare function createCommentsClient(options: CommentsClientOptions & {
+@@ -734,4 +760,4 @@ export declare function createCommentsClient(options: CommentsClientOptions & {
    readonly outbox: CommentsOutbox;
  };
  export declare function createCommentsClient(options: CommentsClientOptions): CommentsClient;
 -export type { AnchorPoint, AnchorPosition, AnchorRect, AnchorTarget, AreaAnchor, CommentActor, CommentAnchor, CommentAttachment, CommentBuild, CommentComponent, CommentContext, CommentCreateInput, CommentDeleteInput, CommentDelivery, CommentDeliveryError, CommentEditInput, CommentEvent, CommentFiles, CommentForgeLink, CommentGetInput, CommentListCursor, CommentListQuery, CommentMessage, CommentMetadata, CommentReplyInput, CommentSendAgent, CommentSendClient, CommentSendCopy, CommentSendEvent, CommentSendLogo, CommentSendOptions, CommentSendPairing, CommentSendPairingCheck, CommentSendResult, CommentSendState, CommentSendStatus, CommentSendTransport, CommentSendTransportOptions, CommentStatus, CommentStatusInput, CommentSubject, CommentThread, CommentUploadInput, CommentUser, CommentUsersInput, CommentsGuest, CommentsOutbox, CommentsOutboxEntry, CommentsOutboxEnvironment, CommentsOutboxMessage, CommentsOutboxOptions, CommentsOutboxStore, CommentsRestAnswer, CommentsRestRequest, CommentsTransport, CreateAnchorOptions, DetachedAnchor, ElementAnchor, ImageAnchor, PageAnchor, ResolvedAnchor, RestCommentThread, RestTransport, RestTransportOptions, TextAnchor };
 \ No newline at end of file
 +export type { AnchorPoint, AnchorPosition, AnchorRect, AnchorTarget, AreaAnchor, CommentActor, CommentAnchor, CommentAttachment, CommentBuild, CommentComponent, CommentContext, CommentCreateInput, CommentDeleteInput, CommentDelivery, CommentDeliveryError, CommentEditInput, CommentEvent, CommentFiles, CommentForgeLink, CommentGetInput, CommentListCursor, CommentListQuery, CommentMessage, CommentMetadata, CommentReplyInput, CommentSendAgent, CommentSendClient, CommentSendCopy, CommentSendEvent, CommentSendLogo, CommentSendOptions, CommentSendPairing, CommentSendPairingCheck, CommentSendResult, CommentSendState, CommentSendStatus, CommentSendTransport, CommentSendTransportOptions, CommentStatus, CommentStatusInput, CommentSubject, CommentThread, CommentUploadInput, CommentUser, CommentUsersInput, CommentsClientFiles, CommentsGuest, CommentsOutbox, CommentsOutboxEntry, CommentsOutboxEnvironment, CommentsOutboxMessage, CommentsOutboxOptions, CommentsOutboxStore, CommentsRestAnswer, CommentsRestRequest, CommentsTransport, CreateAnchorOptions, DetachedAnchor, ElementAnchor, ImageAnchor, PageAnchor, ResolvedAnchor, RestCommentThread, RestTransport, RestTransportOptions, TextAnchor };
-\ No newline at end of file
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5fe14635e 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..c881d2b2a530a650b5d153e944e9488b76cd01d0 100644
 --- a/dist/client.js
 +++ b/dist/client.js
 @@ -146,9 +146,9 @@ function requested(request) {
@@ -532,11 +536,12 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
  			createdAt: now,
  			order: now,
  			status: "pending"
-@@ -569,7 +803,23 @@ function createOutbox(options, host) {
+@@ -569,8 +803,24 @@ function createOutbox(options, host) {
  			return store.persisted;
  		},
  		overlay,
 -		owns: (threadId, messageId) => entries.some((entry) => entry.id === (messageId ?? threadId)),
+-		async create({ files, requestId, ...input }) {
 +		owns: (threadId, messageId) => entries.some((entry) => entry.id === entryId(messageId ?? threadId)),
 +		async beforeResolve(threadId) {
 +			await reload();
@@ -554,17 +559,18 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
 +				});
 +			}
 +		},
- 		async create({ files, requestId, ...input }) {
++		async create({ files, deferredFiles, requestId, ...input }) {
  			const entry = {
  				...fields(requestId, files),
-@@ -579,9 +829,14 @@ function createOutbox(options, host) {
+ 				kind: "create",
+@@ -579,11 +829,16 @@ function createOutbox(options, host) {
  			const receipt = () => receipts.get(keyOf(entry)) ?? [...host.threads()].find((thread) => matchesCreate(entry, thread));
  			const earlier = receipt();
  			if (earlier) return earlier;
 -			const saved = await enqueue(entry);
 -			kick();
 -			return receipt() ?? localThread(saved.kind === "create" ? saved : entry);
-+			const queued = queueEntry(entry, files);
++			const queued = queueEntry(entry, deferredFiles ?? files);
 +			if (requestId !== void 0) {
 +				await queued.write;
 +				const confirmed = receipt();
@@ -573,8 +579,11 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
 +			const saved = queued.local?.duplicate ?? entries.find((draft) => draft.id === queued.entry.id) ?? queued.entry;
 +			return localThread(saved.kind === "create" ? saved : entry);
  		},
- 		async reply({ files, requestId, subject, ...input }) {
+-		async reply({ files, requestId, subject, ...input }) {
++		async reply({ files, deferredFiles, requestId, subject, ...input }) {
  			const threadId = realId(input.threadId);
+ 			const parent = entries.find((entry) => entry.kind === "create" && entry.id === threadId);
+ 			const cached = serverThread(threadId);
 @@ -599,14 +854,18 @@ function createOutbox(options, host) {
  			};
  			const earlier = receipts.get(keyOf(entry));
@@ -582,7 +591,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
 -			const saved = await enqueue(entry);
 -			kick();
 -			const thread = serverThread(realId(threadId)) ?? cached;
-+			const queued = queueEntry(entry, files);
++			const queued = queueEntry(entry, deferredFiles ?? files);
 +			if (requestId !== void 0) await queued.write;
 +			const saved = queued.local?.duplicate ?? queued.local?.entry ?? queued.entry;
 +			const confirmed = receipts.get(keyOf(saved));
@@ -791,11 +800,12 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
  			return pair(copy);
  		},
  		async allow() {
-@@ -1692,6 +2028,12 @@ function createCommentSendTransport(options = {}) {
+@@ -1692,6 +2028,13 @@ function createCommentSendTransport(options = {}) {
  	};
  }
  // src/client.ts
-+async function filesArrived({ files, ...input }) {
++async function filesArrived({ files, deferredFiles, ...input }) {
++	if (deferredFiles) return { ...input, files: [...(await files ?? []), ...await deferredFiles] };
 +	return {
 +		...input,
 +		...files ? { files: await files } : {}
@@ -804,7 +814,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
  function createCommentsClient(options) {
  	const { transport } = options;
  	const listeners = /* @__PURE__ */ new Set();
-@@ -1877,8 +2219,8 @@ function createCommentsClient(options) {
+@@ -1877,8 +2220,8 @@ function createCommentsClient(options) {
  			upsert(thread);
  			return shown(thread.id) ?? thread;
  		},
@@ -815,7 +825,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5
  		edit: async (input) => {
  			if (outbox?.owns(input.threadId, input.messageId)) {
  				if (!await outbox.edit(input.messageId, input.body, input.mentions)) throw commentsClientDiagnostics.COMMENTS_OUTBOX_SENDING();
-@@ -1898,7 +2240,14 @@ function createCommentsClient(options) {
+@@ -1898,7 +2241,14 @@ function createCommentsClient(options) {
  				return next;
  			});
  		},

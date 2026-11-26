@@ -289,6 +289,11 @@ async function area(page, from, to, body) {
   await page.mouse.up()
   await newComment(page).waitFor()
   await removeShot(page)
+  await pasteImage(page)
+  await newComment(page).fill(body)
+  await newComment(page).press("Enter")
+}
+async function pasteImage(page) {
   // A pasted image, as from the clipboard.
   await newComment(page).evaluate(async (textarea) => {
     const canvas = Object.assign(document.createElement("canvas"), { width: 16, height: 16 })
@@ -301,8 +306,6 @@ async function area(page, from, to, body) {
     textarea.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }))
   })
   await page.getByRole("region", { name: "New comment" }).getByText("pasted.png").first().waitFor({ timeout: 5000 })
-  await newComment(page).fill(body)
-  await newComment(page).press("Enter")
 }
 async function selectText(page, words, body) {
   await stopCommenting(page)
@@ -1276,8 +1279,10 @@ await step(
     check(atGate, "its POST is out and held")
     await tab.evaluate(() => (window.__holdShots = true))
     await drawArea(tab, [640, 335], [820, 352])
+    await pasteImage(tab)
     await sendTimed(tab, UNSHOT)
-    check((await entriesWith(tab, UNSHOT)).length === 1, "the outbox keeps the one waiting for its screenshot")
+    await until(async () => (await entriesWith(tab, UNSHOT)).length === 1, WAIT, "the comment awaiting its screenshot")
+    check((await entriesWith(tab, UNSHOT))[0].blobs.length === 1, "the outbox already saved the pasted image")
     for (const entry of sent) if (entry.held) entry.abandoned = true
     await tab.reload()
     const kept = await until(async () => (await pendingPins(tab).count()) >= 2, 15_000, "two pending pins").catch(
@@ -1299,6 +1304,10 @@ await step(
     const server = await held(owner, target)
     for (const body of [RELOAD, UNSHOT])
       check(server.bodies.filter((each) => each === body).length === 1, `the server holds "${body}" once`)
+    check(
+      server.comments.find((comment) => comment.body === UNSHOT)?.attachments?.length === 1,
+      "the pasted image lands even though the reload interrupted the screenshot",
+    )
     const answered = postsFor(requestId).filter((entry) => entry.status >= 200 && entry.status < 300)
     check(answered.length === 1, `one POST of the held one landed (${answered.length})`)
     console.log(

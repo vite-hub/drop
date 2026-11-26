@@ -4,6 +4,7 @@ import { computed, effectScope, onScopeDispose, readonly, ref, shallowRef, toVal
 import { createMemoryOutboxStore } from "vite-hub/comments/client"
 import { createEventHook, createInjectionState, useEventListener, useTimeoutFn } from "@vueuse/core"
 import { keys } from "../../app/utils/keys.ts"
+import { deliveryLine } from "../../app/utils/comment-delivery.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
 
 // Send on a new comment's composer (usePinSend) over the app's real outbox and useDrop, with Nuxt's auto-imports
@@ -85,10 +86,15 @@ const comment = (id, body) => ({
 function heldStore() {
   const memory = createMemoryOutboxStore()
   let gate
+  let readGate
   let refusing = false
   return {
     persisted: true,
-    list: (account) => memory.list(account),
+    async list(account) {
+      await readGate?.promise
+      return memory.list(account)
+    },
+    saved: () => memory.list("ada"),
     async update(account, change) {
       if (refusing) throw new Error("The browser didn't save it.")
       await gate?.promise
@@ -96,6 +102,8 @@ function heldStore() {
     },
     hold: () => void (gate = Promise.withResolvers()),
     release: () => gate?.resolve((gate = undefined)),
+    holdReads: () => void (readGate = Promise.withResolvers()),
+    releaseReads: () => readGate?.resolve((readGate = undefined)),
     refuse: (value) => void (refusing = value),
   }
 }
@@ -122,6 +130,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   store.release()
+  store.releaseReads()
   scope.stop()
   fetches.length = 0
 })
@@ -135,7 +144,7 @@ function viewer() {
   const draft = {
     body,
     mentions: ref([]),
-    images: { add: (files) => (picks.value = [...picks.value, ...files]) },
+    images: { files: picks, add: (files) => (picks.value = [...picks.value, ...files]) },
     scope: ref("doc"),
     clear: () => {
       body.value = ""
@@ -203,7 +212,14 @@ test("Send empties and closes the composer and lists the comment while its save 
   // The second area's screenshot never comes; the first one's comes late.
   page.shot.arrive(2, null)
   store.release()
-  await new Promise((resolve) => setTimeout(resolve, 20))
+  await vi.waitFor(async () => {
+    const [first] = await store.saved()
+    assert.equal(first?.awaitingFiles, true)
+    assert.deepEqual(
+      first.files.map((file) => file.name),
+      ["picked.png"],
+    )
+  })
   assert.equal(fetches.length, 0, "the first comment waits for its screenshot, and the second waits behind it")
   page.shot.arrive(1, new File(["shot"], "screenshot.png", { type: "image/png" }))
 
@@ -257,4 +273,49 @@ test("before the outbox is ready, Send waits with the composer open and shows wh
   assert.equal(page.draft.body.value, "Private window")
   assert.deepEqual(page.events.failed, ["Allow browser storage before sending comments. Your draft is still here."])
   assert.deepEqual(waiting(page.state), [])
+})
+
+test("editing the same composer during storage preparation preserves the newer draft", async () => {
+  const page = viewer()
+  store.persisted = false
+  store.holdReads()
+  page.area("Chart")
+  const submitted = page.write("Original text")
+  assert.equal(page.popover.value?.type, "new")
+  page.draft.body.value = "Corrected text"
+  const picked = new File(["picked"], "correction.png", { type: "image/png" })
+  page.picks.value = [picked]
+  page.draft.mentions.value = ["cal"]
+  store.persisted = true
+  store.releaseReads()
+  await submitted
+
+  assert.equal(page.popover.value?.type, "new")
+  assert.equal(page.draft.body.value, "Corrected text")
+  assert.deepEqual(page.picks.value, [picked])
+  assert.deepEqual(page.draft.mentions.value, ["cal"])
+  assert.deepEqual(waiting(page.state), [])
+})
+
+test("Send again recovers a refused deferred attachment write", async () => {
+  const page = viewer()
+  const picked = new File(["picked"], "picked.png", { type: "image/png" })
+  page.area("Chart")
+  await page.write("Keep both files", [picked])
+  await vi.waitFor(async () => assert.equal((await store.saved())[0]?.awaitingFiles, true))
+  store.refuse(true)
+  page.shot.arrive(1, new File(["shot"], "screenshot.png", { type: "image/png" }))
+  await vi.waitFor(() => assert.deepEqual(waiting(page.state), [["Keep both files", "failed"]]))
+
+  const [failed] = page.state.list.value
+  assert.equal(fetches.length, 0)
+  assert.deepEqual(deliveryLine(failed.delivery, failed.createdAt, Date.now())?.actions, ["retry", "discard"])
+  store.refuse(false)
+  await app.retry(failed.id)
+  await vi.waitFor(() =>
+    assert.deepEqual(fetches, [
+      { url: "/api/drops/doc/comments", body: "Keep both files", images: ["picked.png", "screenshot.png"] },
+    ]),
+  )
+  await vi.waitFor(() => assert.equal(app.entries.value.length, 0))
 })

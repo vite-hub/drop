@@ -11,37 +11,30 @@ export interface PinSendOptions {
   draft: {
     body: Ref<string>
     mentions: Ref<string[]>
-    images: { add: (files: Iterable<File>) => void }
+    images: { files: Readonly<Ref<File[]>>; add: (files: Iterable<File>) => void }
     scope: Readonly<Ref<string>>
     clear: () => void
   }
-  /** The app page the comment is on, for an app drop. */
   page: () => string | undefined
-  /** The composer's screenshot once it has joined the draft, before Send. */
   shown: () => File | null
   shotFor: (id: number | undefined) => Promise<File | null>
-  /** Whether the outbox can take a comment in this tick; `prepare` waits until it can, or throws why not. */
   ready: () => boolean
   prepare: () => Promise<unknown>
   addComment: (
     place: CommentPlace,
     body: string,
-    files: File[] | Promise<File[]>,
+    files: File[],
     mentions: string[],
+    deferredFiles?: Promise<File[]>,
   ) => Promise<Sent<DropComment>>
-  /** The composer closed on Send: clear the page's selection. */
   closed: () => void
-  /** The comment shows, waiting: point at it. */
   sent: (id: string) => void
-  /** The comment couldn't be kept; the composer is open again with it. */
   fail: (reason: string | undefined) => void
 }
 
-/**
- * Send for a new comment's composer. Once the outbox is ready, Send closes the composer, empties the draft and lists
- * the comment as waiting in the same tick; its screenshot and the network finish behind it, so the next comment can
- * start at once. A comment the outbox couldn't save shows as failed, with Retry, and keeps its text.
- */
+const sameItems = <T>(before: T[], after: T[]) =>
+  before.length === after.length && before.every((item, index) => item === after[index])
+
 export function usePinSend(options: PinSendOptions) {
   const { popover, draft } = options
   let preparing = false
@@ -49,8 +42,15 @@ export function usePinSend(options: PinSendOptions) {
   async function submit(body: string, files: File[] = [], mentions: string[] = []) {
     const open = popover.value
     if (open?.type !== "new" || preparing) return
+    const picked = [...files]
+    const tagged = [...mentions]
     if (!options.ready()) {
       const scope = draft.scope.value
+      const text = draft.body.value
+      const attachments = [...draft.images.files.value]
+      const taggedDraft = [...draft.mentions.value]
+      const suggestion = open.pending.suggestion
+      const shown = options.shown()
       preparing = true
       try {
         await options.prepare()
@@ -61,23 +61,33 @@ export function usePinSend(options: PinSendOptions) {
         preparing = false
       }
       if (popover.value !== open || draft.scope.value !== scope) return
+      const currentFiles = draft.images.files.value
+      const screenshot = options.shown()
+      const arrived = screenshot && screenshot !== shown && currentFiles.includes(screenshot) ? screenshot : null
+      if (
+        draft.body.value !== text ||
+        open.pending.suggestion !== suggestion ||
+        !sameItems(taggedDraft, draft.mentions.value) ||
+        !sameItems(attachments, arrived ? currentFiles.filter((file) => file !== arrived) : currentFiles)
+      )
+        return
+      if (arrived && picked.length < MAX_COMMENT_IMAGES) picked.push(arrived)
     }
-    send(open, body, [...files], [...mentions])
+    send(open, body, picked, tagged)
   }
 
   function send(open: NewComment, body: string, picked: File[], mentions: string[]) {
-    // A screenshot that hasn't joined the draft yet follows the comment, as it would have joined the draft.
-    const files =
+    const deferredFiles =
       open.shot === undefined || options.shown() || picked.length >= MAX_COMMENT_IMAGES
-        ? picked
-        : options.shotFor(open.shot).then((shot) => (shot ? [...picked, shot] : picked))
+        ? undefined
+        : options.shotFor(open.shot).then((shot) => (shot ? [shot] : []))
     const page = options.page()
     const place = { ...open.pending, ...(page === undefined ? {} : { page }) }
     draft.clear()
     draft.mentions.value = []
     popover.value = null
     options.closed()
-    void kept(open, options.addComment(place, body, files, mentions), body, picked, mentions)
+    void kept(open, options.addComment(place, body, picked, mentions, deferredFiles), body, picked, mentions)
   }
 
   async function kept(
@@ -89,7 +99,6 @@ export function usePinSend(options: PinSendOptions) {
   ) {
     const sent = await sending
     if ("value" in sent) return options.sent(sent.value.id)
-    // Nothing was kept. Put the comment back, unless the reader has started another one.
     if (popover.value || draft.body.value) return
     draft.body.value = body
     draft.mentions.value = mentions

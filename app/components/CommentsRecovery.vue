@@ -1,7 +1,6 @@
 <script setup lang="ts">
 const { entries, heldIds, discard, clock } = useCommentsOutbox()
 const route = useRoute()
-// Ticks only while something is queued: a head stuck sending shows up after 5 s.
 const second = useNow({ controls: true, scheduler: (update) => useIntervalFn(update, 1000, { immediate: false }) })
 watch(
   () => entries.value.length > 0,

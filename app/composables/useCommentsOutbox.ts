@@ -28,14 +28,12 @@ export interface AppCommentsOutbox {
   heldIds: Readonly<Ref<readonly string[]>>
   accepted: ReadonlyMap<string, string>
   writable: () => Promise<Client>
-  /** The client `writable` last let through, while it still holds: a Send can then show its comment in the same tick. */
   ready: () => Client | undefined
   retry: (id: string) => Promise<void>
   discard: (id: string) => Promise<boolean>
   edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
   attach: (page: OutboxPage) => void
   clear: (account: string) => Promise<void>
-  /** What `troubleCount` needs at `now`: the network, and how long the queue head has been going out. */
   clock: (now: number) => DeliveryClock
 }
 
@@ -286,7 +284,6 @@ export function createCommentsOutbox(
     )
   }
   connect(holder, active, activeEntries)
-  // Check the store as soon as the client starts, so the first Send already finds it ready.
   watch(active, (client) => client && void outbox.writable().catch(() => undefined), { immediate: true })
   watch(
     activeEntries,

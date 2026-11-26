@@ -24,12 +24,7 @@ export type ViewerPopover = { x: number; y: number } & (
 )
 export type ViewerTool = "browse" | "comment" | "measure" | "mark"
 export type ViewerOverlays = { rulers: boolean; xray: boolean; pins: boolean }
-/**
- * How long a comment waits for its screenshot before it goes without one. Send doesn't wait for it, and the frame
- * always answers, so only a frame that went away runs out: a heavy page's capture takes up to 2.5 s after Send.
- */
 export const SHOT_WAIT = 10_000
-/** How many recent captures `shotFor` remembers; an older one answers null. */
 const SHOTS_KEPT = 8
 
 interface Capture {
@@ -85,8 +80,6 @@ export function useViewerAnnotations(options: {
     return ++focusGeneration
   }
   const isFocusCurrent = (generation: number) => generation === focusGeneration
-  // Each area or image comment gets its screenshot by number, so the picture finds its comment after the composer
-  // closes and the next area has started. The frame numbers its areas per load: `framed` maps that number to ours.
   let lastShot = 0
   const captures = new Map<number, Capture>()
   const framed = new Map<number, number>()
@@ -111,14 +104,12 @@ export function useViewerAnnotations(options: {
     captures.delete(id)
     for (const [n, shot] of framed) if (shot === id) framed.delete(n)
   }
-  /** The screenshot of capture `id`: its file once the frame sends it, or null when it has none or after `cap` ms. */
   function shotFor(id: number | undefined, cap = SHOT_WAIT): Promise<File | null> {
     const entry = id === undefined ? undefined : captures.get(id)
     if (!entry) return Promise.resolve(null)
     if (entry.settled) return entry.file
     return Promise.race([entry.file, promiseTimeout(cap).then(() => null)])
   }
-  // The open composer's screenshot also shows in its draft, and leaves it when the composer closes.
   let shotTaken = false
   function dropShot() {
     if (shotTaken) options.shot?.(null)

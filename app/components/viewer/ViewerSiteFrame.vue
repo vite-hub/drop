@@ -156,8 +156,6 @@ function discard() {
 const thousandths = (value: number, whole: number) => Math.min(1000, Math.max(0, Math.round((value / whole) * 1000)))
 const percent = (value: number, whole: number) => `${(value / whole) * 100}%`
 
-// Send closes the composer at once; the comment shows as waiting while the outbox sends it. If the outbox couldn't
-// keep it, the screenshot and its note come back, unless the reader has started another.
 async function send() {
   const shot = pending.value
   if (!shot || !note.value.trim() || !state) return

@@ -69,15 +69,12 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
 
-  /**
-   * Keeps a new comment in the outbox. Once the outbox is ready, the comment is in `list` before this returns its
-   * promise. `files` may still be coming, such as an area's screenshot: the comment sends once they arrive.
-   */
   async function addComment(
     input: CommentPlace,
     body: string,
-    files: File[] | Promise<File[]> = [],
+    files: File[] = [],
     mentions: string[] = [],
+    deferredFiles?: Promise<File[]>,
   ): Promise<Sent<DropComment>> {
     const requestId = randomId()
     try {
@@ -94,6 +91,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
         body,
         mentions,
         files,
+        deferredFiles,
         requestId,
         metadata: targetMetadata({
           route: "comment",
