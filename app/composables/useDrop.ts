@@ -69,10 +69,14 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   )
   const findComment = (commentId: string) => list.value.find((comment) => comment.id === commentId)
 
+  /**
+   * Keeps a new comment in the outbox. Once the outbox is ready, the comment is in `list` before this returns its
+   * promise. `files` may still be coming, such as an area's screenshot: the comment sends once they arrive.
+   */
   async function addComment(
     input: CommentPlace,
     body: string,
-    files: File[] = [],
+    files: File[] | Promise<File[]> = [],
     mentions: string[] = [],
   ): Promise<Sent<DropComment>> {
     const requestId = randomId()
@@ -83,7 +87,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
       const pinned = at ?? (displayed?.kind === "app" ? undefined : displayed?.version)
       const target = toValue(id)
       const inputSubject = subject()
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       const thread = await client.create({
         subject: inputSubject,
         anchor: { kind: "page" },
@@ -111,7 +115,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     try {
       const inputSubject = subject()
       const revision = drop.data.value?.version ?? 0
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       await client.create({
         subject: inputSubject,
         anchor: { kind: "page" },
@@ -186,7 +190,7 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     const requestId = randomId()
     try {
       const inputSubject = subject()
-      const client = await app.writable()
+      const client = app.ready() ?? (await app.writable())
       await client.reply({ threadId: commentId, body, mentions, files, requestId, subject: inputSubject })
       const reply = list.value.flatMap((comment) => comment.replies).find((item) => item.requestId === requestId)
       if (!reply) throw new Error("The reply didn't stay in this browser. Try again.")

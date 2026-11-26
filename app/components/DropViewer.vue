@@ -986,35 +986,22 @@ watch(shownVersion, (version) => {
   }
 })
 
-async function submit(body: string, files: File[] = [], mentions: string[] = []) {
-  const open = popover.value
-  if (open?.type !== "new" || reviewDraft.waiting.value) return
-  const draftScope = reviewDraft.scope.value
-  const before = reviewDraft.images.picks.value.length
-  reviewDraft.waiting.value = true
-  try {
-    await annotations.shotFor(open.shot)
-    if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
-    const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-    const sent = await state.addComment(
-      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
-      body,
-      attached,
-      mentions,
-    )
-    if (reviewDraft.scope.value !== draftScope) return
-    if ("value" in sent) {
-      reviewDraft.clear()
-      if (popover.value === open) {
-        popover.value = null
-        send({ type: "clear-selection" })
-        return showSent(sent.value.id)
-      }
-    } else if (popover.value === open) await popoverRef.value?.fail(sent.error)
-  } finally {
-    reviewDraft.waiting.value = false
-  }
-}
+const { submit } = usePinSend({
+  popover,
+  draft: reviewDraft,
+  page: () => (isApp.value ? page.value : undefined),
+  shown: () => autoShot,
+  shotFor: (id) => annotations.shotFor(id),
+  ready: () => Boolean(outbox.ready()),
+  prepare: () => outbox.writable(),
+  addComment: state.addComment,
+  closed: () => send({ type: "clear-selection" }),
+  sent: showSent,
+  fail: async (reason) => {
+    await nextTick()
+    await popoverRef.value?.fail(reason)
+  },
+})
 
 async function keepFocus() {
   await nextTick()

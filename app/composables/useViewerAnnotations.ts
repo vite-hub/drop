@@ -18,7 +18,7 @@ type Lightbox = {
   pdfPage?: number
   file?: File
 }
-type Popover = { x: number; y: number } & (
+export type ViewerPopover = { x: number; y: number } & (
   | { type: "new"; pending: PendingComment; body?: string; error?: string; shot?: number }
   | { type: "thread"; id: string }
 )
@@ -64,7 +64,7 @@ export function useViewerAnnotations(options: {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
   const lightbox = ref<Lightbox | null>(null)
-  const popover = ref<Popover | null>(null)
+  const popover = ref<ViewerPopover | null>(null)
   const draftPlace = ref<{ rail: boolean; pin?: boolean; rect: Rect } | null>(null)
   const threadPlace = ref<{ id: string; rail: boolean; rect: Rect } | null>(null)
   watch(

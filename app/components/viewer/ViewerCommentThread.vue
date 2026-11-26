@@ -41,27 +41,8 @@ const lookup = async (query: string) => {
 }
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
-const busy = computed(() => Boolean(draft?.waiting.value))
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
-const composerBody = computed({
-  get: () => body.value,
-  set: (value) => {
-    if (!busy.value) body.value = value
-  },
-})
-const composerFiles = computed({
-  get: () => files.value,
-  set: (value) => {
-    if (!busy.value) files.value = value
-  },
-})
-const composerMentions = computed({
-  get: () => mentions.value,
-  set: (value) => {
-    if (!busy.value) mentions.value = value
-  },
-})
 
 const suggesting = computed(() => props.pending?.suggestion !== undefined)
 const suggestion = computed({
@@ -78,7 +59,6 @@ onMounted(() => {
 })
 
 function send(submit?: CommentComposerSubmit) {
-  if (busy.value) return
   const text = submit?.body ?? body.value
   const changed = suggesting.value && suggestion.value !== props.pending?.quote
   if (!text.trim() && !files.value.length && !changed) return
@@ -142,13 +122,12 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         {{ pending.quote }}
       </p>
       <CommentComposer
-        v-model="composerBody"
-        v-model:files="composerFiles"
-        v-model:mentions="composerMentions"
+        v-model="body"
+        v-model:files="files"
+        v-model:mentions="mentions"
         :accept="accept"
         allow-empty
         :autofocus="false"
-        :busy="busy"
         :error="error || problem"
         :guard="false"
         layout="row"
@@ -192,7 +171,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
                 color="neutral"
                 :disabled="suggestion === pending.quote && !body.trim()"
                 icon="i-mingcute-arrow-up-line"
-                :loading="busy"
                 size="sm"
                 variant="ghost"
                 @click="send()"

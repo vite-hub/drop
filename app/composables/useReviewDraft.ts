@@ -68,12 +68,10 @@ export const [provideReviewDraft, injectReviewDraft] = createInjectionState((dro
       )
     })
   }
-  const waiting = ref(false)
-
   function clear() {
     body.value = ""
     images.clear()
   }
 
-  return { body, images, mentions, people, rememberPeople, waiting, clear, scope }
+  return { body, images, mentions, people, rememberPeople, clear, scope }
 })

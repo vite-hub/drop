@@ -28,6 +28,8 @@ export interface AppCommentsOutbox {
   heldIds: Readonly<Ref<readonly string[]>>
   accepted: ReadonlyMap<string, string>
   writable: () => Promise<Client>
+  /** The client `writable` last let through, while it still holds: a Send can then show its comment in the same tick. */
+  ready: () => Client | undefined
   retry: (id: string) => Promise<void>
   discard: (id: string) => Promise<boolean>
   edit: (id: string, body: string, mentions?: string[]) => Promise<boolean>
@@ -78,6 +80,7 @@ export function createCommentsOutbox(
     writable: async () => {
       throw new Error("Comments can't be written before the page has loaded.")
     },
+    ready: () => undefined,
     retry: async (id) => {
       if (activeEntries.value.some((entry) => entry.id === id)) await active.value?.outbox.retry(id)
     },
@@ -97,18 +100,26 @@ export function createCommentsOutbox(
   const store = options.store ?? createIndexedDBOutboxStore()
   const pageOf = (drop: string | undefined) => [...pages].find((page) => page.drop() === drop)
 
+  const checked = new WeakSet<Client>()
+  const current = (client: Client | undefined, who: Holder | undefined) =>
+    client === active.value && who === holder.value && who?.account === (me.value?.id ?? GUEST_ACCOUNT)
   outbox.writable = async () => {
     const client = active.value
     const who = holder.value
     if (client && who) {
       await store.list(who.account)
-      if (client === active.value && who.account === (me.value?.id ?? GUEST_ACCOUNT)) {
+      if (current(client, who)) {
         if (!store.persisted)
           throw new Error("Allow browser storage before sending comments. Your draft is still here.")
+        checked.add(client)
         return client
       }
     }
     throw new Error("Comments aren't ready yet. Try again in a moment.")
+  }
+  outbox.ready = () => {
+    const client = active.value
+    return client && checked.has(client) && store.persisted && current(client, holder.value) ? client : undefined
   }
   outbox.clear = async (account) => {
     const client =
@@ -275,6 +286,8 @@ export function createCommentsOutbox(
     )
   }
   connect(holder, active, activeEntries)
+  // Check the store as soon as the client starts, so the first Send already finds it ready.
+  watch(active, (client) => client && void outbox.writable().catch(() => undefined), { immediate: true })
   watch(
     activeEntries,
     (entries) => {
