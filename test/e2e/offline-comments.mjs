@@ -48,8 +48,27 @@ async function step(name, run) {
   console.log(`${failures.length ? "FAIL" : "PASS"} ${name}${failures.map((line) => `\n  - ${line}`).join("")}`)
 }
 
+/**
+ * Nuxt dev stalls on a busy machine (a POST once waited 15 s on the SQLite file, and each page render regenerates its
+ * templates) and resets connections meanwhile: the fetch throws `read ECONNRESET`, or its proxy answers 500 with it.
+ * A GET goes again for up to 20 s, so a stall doesn't read as a comment that never landed.
+ */
+async function fetchAgain(context, url, options = {}) {
+  const retry = (options.method ?? "GET") === "GET"
+  const deadline = Date.now() + 20_000
+  for (;;) {
+    const last = !retry || Date.now() > deadline
+    const response = await context.request.fetch(url, options).catch((error) => {
+      if (last) throw error
+      return null
+    })
+    if (response && (response.status() < 500 || last)) return response
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+}
+
 async function api(context, path, body, method = body ? "POST" : "GET") {
-  const response = await context.request.fetch(new URL(path, origin).href, {
+  const response = await fetchAgain(context, new URL(path, origin).href, {
     method,
     headers: { origin: origin.origin },
     ...(body ? { data: body } : {}),
@@ -83,12 +102,21 @@ async function held(owner, drop) {
   }
 }
 
+/** Polls `condition` until it answers; a poll that throws counts as "not yet", as a stalled dev server is no answer. */
 async function until(condition, timeout = WAIT, what = "condition") {
   const start = Date.now()
+  let failed
   for (;;) {
-    const value = await condition()
+    const value = await Promise.resolve()
+      .then(condition)
+      .catch((error) => {
+        failed = error
+      })
     if (value) return value
-    if (Date.now() - start > timeout) throw new Error(`timed out after ${timeout / 1000} s waiting for ${what}`)
+    if (Date.now() - start > timeout)
+      throw new Error(
+        `timed out after ${timeout / 1000} s waiting for ${what}${failed ? ` (last: ${failed.message})` : ""}`,
+      )
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
 }
@@ -126,7 +154,13 @@ const cut = (target) => target.route(commentPost, through)
 async function through(route) {
   const request = route.request()
   if (request.method() !== "POST") return route.fallback()
-  const entry = { requestId: requestIdOf(request), url: request.url(), status: 0 }
+  const entry = {
+    requestId: requestIdOf(request),
+    url: request.url(),
+    status: 0,
+    at: Date.now(),
+    body: request.postDataBuffer()?.toString("utf8").slice(0, 4000),
+  }
   sent.push(entry)
   if (gate) {
     entry.held = true
@@ -187,7 +221,11 @@ async function open(page, target) {
     .getByRole("button", { name: /^Comments/ })
     .first()
     .waitFor()
-  // Hydration, then the outbox learns who's signed in from /api/me.
+  // Hydration: the server-rendered buttons ignore a click until Vue mounts, which takes longer than a fixed wait on a
+  // busy machine. Then the outbox learns who's signed in from /api/me.
+  await page.waitForFunction(() => document.querySelector("#__nuxt")?.__vue_app__?.$nuxt?.isHydrating === false, null, {
+    timeout: WAIT,
+  })
   await page.waitForTimeout(2500)
 }
 const commentMode = (page) => page.getByRole("button", { name: /^Comments/ }).first()
@@ -1047,7 +1085,7 @@ async function watchTrouble(page) {
   }
 }
 const bytes = async (target, url) => {
-  const response = await target.request.get(new URL(url, origin).href)
+  const response = await fetchAgain(target, new URL(url, origin).href)
   return response.ok()
     ? createHash("sha256")
         .update(await response.body())
@@ -1066,6 +1104,8 @@ await step(
     network = "online"
     const tab = await reviewing.newPage()
     tab.on("pageerror", (error) => errors.push(error.message))
+    const consoleLines = []
+    tab.on("console", (message) => consoleLines.push(`${message.type()} ${message.text()}`.slice(0, 300)))
     await tab.addInitScript(holdShots)
     await open(tab, target)
     // A first comment loads the screenshot module and settles the outbox, as a reviewer's first one does.
@@ -1201,7 +1241,20 @@ await step(
         30_000,
         "the resent comment",
       ).catch(() => false)
-      check(resent, "sending it again lands it")
+      if (!check(resent, "sending it again lands it")) {
+        // What a stuck resend leaves behind: the page's console, every POST that carried it, and its outbox record.
+        const records = await entriesWith(tab, REFUSED).catch((error) => [{ text: `unreadable: ${error.message}` }])
+        const posts = sent.filter((entry) => entry.body?.includes(REFUSED))
+        console.log(
+          `  console:\n${consoleLines
+            .slice(-40)
+            .map((line) => `    ${line}`)
+            .join("\n")}`,
+        )
+        console.log(`  POSTs with it: ${JSON.stringify(posts.map(({ body: _body, ...entry }) => entry))}`)
+        console.log(`  outbox records: ${records.map((record) => record.text).join("\n    ")}`)
+        await shot(tab, "10-resend-stuck")
+      }
     }
 
     // 7. A reload with one POST held and the next one's screenshot held: both come back, and each lands once.
