@@ -32,7 +32,7 @@ export default defineMcpTool({
     const comment = await findCommentByNumber(drop, n)
     if (!comment) throw new HTTPError({ status: 404, message: `No comment #${n} on this drop.` })
     const next = mcpDrop(toSummary(await acceptSuggestion(drop, comment, who, event)), event.url.origin)
-    await noticeComments(event, drop)
+    await noticeComments(event, drop, [comment])
     return {
       content: [{ type: "text" as const, text: `Accepted suggestion #${n} as v${next.version}:\n${dropLine(next)}` }],
       structuredContent: next,

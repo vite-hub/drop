@@ -46,7 +46,7 @@ async function open(browser, { presence = true } = {}) {
     },
     { drop: DROP },
   )
-  const seen = { threads: 0, client: 0, tickets: [] }
+  const seen = { threads: 0, primary: 0, client: 0, tickets: [] }
   await context.route("**/*", (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -84,6 +84,7 @@ async function open(browser, { presence = true } = {}) {
     }
     if (url.pathname === "/api/review/related")
       return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ any: false }) })
+    if (url.pathname === "/api/review/comments/refresh" && request.method() === "POST") seen.primary++
     seen.threads++
     return route.fulfill({ contentType: "application/json", headers: CORS, body: JSON.stringify({ threads: [] }) })
   })
@@ -124,20 +125,24 @@ test("review.js loads the first comment from its only other reviewer", { timeout
   }
 })
 
-test("review.js loads the threads again when Drop's server says the comments changed", { timeout: 30_000 }, async () => {
-  const browser = await chromium.launch()
-  try {
-    const { context, page, seen } = await open(browser)
-    await page.waitForFunction(() => window.__presence)
-    const before = seen.threads
-    await page.evaluate(() => window.__presence.notice({ type: "comments" }))
-    for (let tries = 0; seen.threads === before && tries < 20; tries++) await page.waitForTimeout(50)
-    assert.ok(seen.threads > before, "an agent's resolve reaches the open page without a reload")
-    await context.close()
-  } finally {
-    await browser.close()
-  }
-})
+test(
+  "review.js loads the threads again when Drop's server says the comments changed",
+  { timeout: 30_000 },
+  async () => {
+    const browser = await chromium.launch()
+    try {
+      const { context, page, seen } = await open(browser)
+      await page.waitForFunction(() => window.__presence)
+      const before = seen.primary
+      await page.evaluate(() => window.__presence.notice({ type: "comments" }))
+      for (let tries = 0; seen.primary === before && tries < 20; tries++) await page.waitForTimeout(50)
+      assert.ok(seen.primary > before, "an agent's resolve starts a fresh read on the primary without a reload")
+      await context.close()
+    } finally {
+      await browser.close()
+    }
+  },
+)
 
 test(
   "a site's popover stays open while commenting with presence, and its saved comment stays reachable",

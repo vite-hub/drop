@@ -427,8 +427,9 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   }
   if (previous && input.folder) await updateDrop((await findDrop(row.id, event))!, who, { folder: input.folder }, event)
 
-  const resolved = previous && input.resolves?.length ? await resolveComments(previous, input.resolves, who) : []
-  if (previous && resolved.length) await noticeComments(event, previous)
+  const threads = previous && input.resolves?.length ? await resolveComments(previous, input.resolves, who) : []
+  if (previous && threads.length) await noticeComments(event, previous, threads)
+  const resolved = threads.map((thread) => thread.n)
 
   const fresh = (await findDrop(row.id, event)) ?? row
   if (resources) await saveResources(fresh, resources)

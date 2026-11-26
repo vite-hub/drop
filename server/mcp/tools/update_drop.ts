@@ -132,8 +132,9 @@ export default defineMcpTool({
       drop,
     )
     if (links) await saveResources(drop, links)
-    const resolved = resolves?.length ? await resolveComments(drop, resolves, who) : []
-    if (resolved.length) await noticeComments(event, drop)
+    const threads = resolves?.length ? await resolveComments(drop, resolves, who) : []
+    if (threads.length) await noticeComments(event, drop, threads)
+    const resolved = threads.map((thread) => thread.n)
     const result = { ...updated, ...(resolved.length ? { resolved } : {}) }
     return {
       content: [

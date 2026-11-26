@@ -15,7 +15,7 @@ const props = defineProps<{
   draft?: string
   draftError?: string
   floating?: boolean
-  agentPrompt?: (comment: DropComment) => string
+  agentPrompt?: (comment: DropComment) => string | undefined
 }>()
 const emit = defineEmits<{
   submit: [body: string, files: File[], mentions: string[]]

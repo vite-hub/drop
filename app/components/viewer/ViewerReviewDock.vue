@@ -304,8 +304,7 @@ watch(
   outline-offset: -1px;
 }
 
-.review-toolbar
-  :deep(button:focus-visible:not([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
+.review-toolbar :deep(button:focus-visible:not([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
   background: rgb(255 255 255 / 8%);
   color: var(--ui-text);
 }

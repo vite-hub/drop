@@ -1,5 +1,6 @@
 import { dropPath } from "#shared/links"
 import type { CommentReply, DropComment, DropDetail, DropSummary, DropVersion } from "#shared/types"
+import type { FetchContext } from "ofetch"
 import * as v from "valibot"
 import { replyMessageId } from "vite-hub/comments/client"
 import type { CommentPlace, SiteCommentPlace } from "../utils/comment-outbox"
@@ -13,10 +14,20 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
     key: () => keys.drop(toValue(id), toValue(version)),
     query,
   })
+  let primaryComments = false
+  const commentRead = (context: FetchContext) => {
+    if (!primaryComments || typeof context.request !== "string") return
+    context.request += "/refresh"
+    context.options.method = "POST"
+  }
+  const preferPrimaryComments = () => {
+    primaryComments = true
+  }
   const comments = useApi<DropComment[]>(() => `/api/drops/${toValue(id)}/comments`, {
     key: () => keys.comments(toValue(id), toValue(version)),
     query,
     default: () => [],
+    onRequest: commentRead,
   })
 
   const wrote = createEventHook<void>()
@@ -282,6 +293,8 @@ function useDrop(id: MaybeRefOrGetter<string>, version?: MaybeRefOrGetter<number
   return {
     drop,
     comments,
+    commentRead,
+    preferPrimaryComments,
     list,
     outboxEntries: app.entries,
     onWrote: wrote.on,

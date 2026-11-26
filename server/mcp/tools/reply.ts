@@ -46,7 +46,7 @@ export default defineMcpTool({
     const reply = await addReply(thread, who, text)
     const resolved = Boolean(resolve) && thread.status === "open"
     if (resolved) await setResolved(thread, true, who)
-    await noticeComments(event, drop)
+    await noticeComments(event, drop, [thread])
     logDrop(event, drop, { change: resolved ? "reply-resolve" : "reply" })
     const within = page && drop.kind === "site" && isSitePattern(drop.siteUrl!) ? originOf(page) : undefined
     const open = await openByPage(drop, within).then(

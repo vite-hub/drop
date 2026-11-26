@@ -12,7 +12,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
-import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
+import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
@@ -48,6 +48,7 @@ const siteReview =
     ? useApi<SiteReviewItem[]>(() => `/api/drops/${drop.value.id}/review`, {
         key: () => keys.review(drop.value.id),
         default: () => [],
+        onRequest: state.commentRead,
       })
     : undefined
 const screenshots = computed(() => new Map((siteReview?.data.value ?? []).map((item) => [item.id, item.screenshot])))
@@ -280,7 +281,10 @@ function refreshComments() {
   void state.comments.refresh()
   void siteReview?.refresh()
 }
-watch([presence.commentsChange, presence.notices], refreshComments)
+watch([presence.commentsChange, presence.notices], () => {
+  state.preferPrimaryComments()
+  refreshComments()
+})
 useEventListener("focus", refreshComments)
 
 function startEdit() {
@@ -920,14 +924,13 @@ const readerId = computed(
     "",
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
-const prompt = () => promptMarkdown(drop.value, feedbackLink.value, waiting.value, pageErrors.value.length)
-const threadPrompt = (comment: DropComment) =>
-  promptMarkdown(drop.value, feedbackLink.value, [
-    waiting.value.find((item) => item.id === comment.id) ?? {
-      ...comment,
-      mark: comment.authorId === readerId.value ? "ask" : "quote",
-    },
-  ])
+const promptTarget = computed(() => feedbackPromptTarget(drop.value, feedbackLink.value))
+const prompt = () =>
+  promptMarkdown(promptTarget.value.drop, promptTarget.value.url, waiting.value, pageErrors.value.length)
+const threadPrompt = (comment: DropComment) => {
+  const thread = waiting.value.find((item) => item.id === comment.id)
+  if (thread) return promptMarkdown(promptTarget.value.drop, promptTarget.value.url, [thread])
+}
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)

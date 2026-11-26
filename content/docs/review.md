@@ -111,7 +111,7 @@ Each open thread that waits for an answer has **Open in T3 Code** and **Copy** n
 
 **Copy prompt** in the review toolbar copies every open thread that waits for an answer, and the page's errors, as one prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
 
-When an agent replies, resolves a thread, or publishes a version that resolves it, an open page shows the change at once, with no reload. A page you come back to loads the threads again.
+When an agent replies, resolves a thread, or publishes a version that resolves it, an open page with a live presence connection shows the change without a reload. Live presence needs a Realtime-enabled host and a signed-in reader the review is shared with. Everyone else can refresh the threads by returning focus to the page or reloading it.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 
