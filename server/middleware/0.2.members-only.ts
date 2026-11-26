@@ -9,8 +9,7 @@ const REVIEW_SCRIPT = /^\/api\/review\/(?:comments(?:\/[^/]+(?:\/replies)?)?|ima
 
 const PRESENCE_ROOM = /^\/(?:api\/)?_vitehub\/realtime\/presence\/[^/]+$/
 
-const VITEHUB_DATA =
-  /^\/_vitehub\/(?:comments(?!\/assets\/)|realtime|browser-errors|console\/(?:status|logs|usage))(?:\/|$)/
+const VITEHUB_DATA = /^\/_vitehub\/(?:comments(?!\/assets\/)|realtime|console\/(?:status|logs|usage))(?:\/|$)/
 
 const SEND_PAIR = /^\/(?:api\/)?_vitehub\/comments\/send\/pair$/
 
@@ -20,6 +19,7 @@ export default defineHandler(async (event) => {
   if (path.startsWith("/api/auth/") && !path.startsWith("/api/auth/admin/")) return
   if (path === "/api/health" || path === "/api/mcp" || path === "/api/sign-in" || path === "/api/client-events") return
   if (path.startsWith("/api/favicons/")) return
+  if (path === "/_vitehub/browser-errors") return
   if (REVIEW_SCRIPT.test(path) || PRESENCE_ROOM.test(path) || SEND_PAIR.test(path)) return
   if (/^\/api\/uploads\/[^/]+$/.test(path)) return
   if (/^\/(?:api|[dfi])(?:\/|$)/.test(path) || VITEHUB_DATA.test(path)) {

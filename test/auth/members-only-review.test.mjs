@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
+import { pathToFileURL } from "node:url"
 import { H3 } from "h3"
+import { vitehub } from "vite-hub"
 import { afterEach, beforeEach, test } from "vite-plus/test"
 import { migrate, reset, state } from "../cost/harness.mjs"
 
@@ -63,13 +65,12 @@ test("a members-only Drop lets a folder's skill discovery through, and nothing e
     assert.equal((await request(path)).status, 401, path)
 })
 
-// ViteHub serves Comments, Realtime, browser errors and the Console's reads under /_vitehub, outside /api.
+// ViteHub serves Comments, Realtime and the Console's reads under /_vitehub, outside /api.
 test("a members-only Drop gates ViteHub's data routes, and leaves its signed and static ones open", async () => {
   for (const path of [
     "/_vitehub/comments/threads",
     "/_vitehub/comments/auth/github",
     "/_vitehub/realtime/drafts/abc",
-    "/_vitehub/browser-errors",
     "/_vitehub/console/status",
     "/api/_vitehub/comments/threads",
     "/api/_vitehub/realtime/drafts/abc",
@@ -86,4 +87,35 @@ test("a members-only Drop gates ViteHub's data routes, and leaves its signed and
     "/_vitehub/console/assets/page-tool.js",
   ])
     assert.equal((await request(path)).status, 200, path)
+})
+
+test("a members-only Drop logs a signed-out reader's browser error", async () => {
+  const plugins = [vitehub({ host: "node", observability: { browserErrors: true } })].flat(Infinity)
+  const plugin = (await Promise.all(plugins)).flat(Infinity).find((entry) => entry?.name === "vite-hub/browser-errors")
+  const config = {}
+  plugin.config(config)
+  const route = "/_vitehub/browser-errors"
+  const registration = config.nitro.handlers.find((entry) => entry.route === route && entry.method === "POST")
+  const { default: handler } = await import(pathToFileURL(registration.handler).href)
+  const logged = []
+  const receiver = new H3().use(membersOnly).post(route, (event) => {
+    event.req.context.log = {
+      set() {},
+      warn() {},
+      error: (error, fields) => logged.push({ message: error.message, ...fields }),
+    }
+    return handler.fetch(event.req)
+  })
+  const origin = "https://drop.quiver.dk"
+  const response = await receiver.fetch(
+    new Request(`${origin}${route}`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json", "sec-fetch-site": "same-origin" },
+      body: JSON.stringify({ kind: "nuxt", path: "/d/abc/plan", message: "Could not open this page" }),
+    }),
+  )
+  assert.equal(response.status, 204)
+  assert.deepEqual(logged, [
+    { message: "Could not open this page", browserError: { kind: "nuxt", path: "/d/abc/plan", level: "error" } },
+  ])
 })

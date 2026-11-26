@@ -1,0 +1,41 @@
+diff --git a/dist/format-Bc9m7-r0.js b/dist/format-Bc9m7-r0.js
+index 0323186d669e7f3e206c935ee3b4918379ba195c..4fb2203aecbbd176eea89cf41e3cc0aa99ce4559 100644
+--- a/dist/format-Bc9m7-r0.js
++++ b/dist/format-Bc9m7-r0.js
+@@ -1,32 +1,13 @@
+ // src/internal/format.ts
+-const milliseconds = new Intl.DurationFormat("en", {
+-	style: "narrow",
+-	millisecondsDisplay: "always"
+-});
+-const tenths = new Intl.DurationFormat("en", {
+-	style: "narrow",
+-	milliseconds: "numeric",
+-	fractionalDigits: 1
+-});
+-const minutes = new Intl.DurationFormat("en", {
+-	style: "narrow",
+-	secondsDisplay: "always"
+-});
+ /** "320ms", "1.2s", "30s", or "1m 35s". Seconds round down, so a running counter never shows "60s". */
+ function formatDuration(ms) {
+ 	const whole = Math.round(ms);
+-	if (whole < 1e3) return milliseconds.format({ milliseconds: whole });
++	if (whole < 1e3) return `${whole}ms`;
+ 	const elapsed = Math.max(ms, 1e3);
+ 	const seconds = Math.floor(elapsed / 1e3);
+-	if (seconds < 10) return tenths.format({
+-		seconds,
+-		milliseconds: Math.floor(elapsed % 1e3)
+-	});
+-	if (seconds < 60) return minutes.format({ seconds });
+-	return minutes.format({
+-		minutes: Math.floor(seconds / 60),
+-		seconds: seconds % 60
+-	});
++	if (seconds < 10) return `${seconds}.${Math.floor(elapsed % 1e3 / 100)}s`;
++	if (seconds < 60) return `${seconds}s`;
++	return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+ }
+ /** Two letters for an avatar without an image: `Ana Lopez` and `ana.lopez@vitehub.dev` are `AL`, `Ana` is `AN`. */
+ function initials(name) {
