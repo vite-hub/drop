@@ -61,7 +61,7 @@ codex mcp login drop
 
 Finish signing in through the browser before using Drop tools. The plugin connects to drop.vitehub.dev; for a Drop you host, add its `/mcp` as step 2 above says.
 
-`/drop:feedback` in Claude Code (`$feedback` in Codex) pulls the comments people sent you with Send in a drop's review pill, and answers them.
+`/drop:feedback` in Claude Code (`$feedback` in Codex) reads a drop's comments that wait for an answer, and answers them.
 
 ## Install the skills
 

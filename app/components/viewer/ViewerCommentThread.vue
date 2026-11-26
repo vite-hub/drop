@@ -15,6 +15,7 @@ const props = defineProps<{
   draft?: string
   draftError?: string
   floating?: boolean
+  agentPrompt?: (comment: DropComment) => string | undefined
 }>()
 const emit = defineEmits<{
   submit: [body: string, files: File[], mentions: string[]]
@@ -76,6 +77,17 @@ defineExpose({
 })
 
 const thread = computed(() => (props.comment ? dropComments.thread(props.comment) : undefined))
+const prompt = computed(() =>
+  props.comment && props.agentPrompt && !props.comment.delivery && !props.comment.resolved
+    ? props.agentPrompt(props.comment)
+    : undefined,
+)
+const t3Link = computed(() => {
+  if (!prompt.value) return undefined
+  const url = new URL("https://app.t3.codes/new")
+  url.searchParams.set("prompt", prompt.value)
+  return url.href
+})
 const versionTo = useVersionTo()
 const state = injectDrop()!
 const earlier = computed(() =>
@@ -214,6 +226,33 @@ const edit = (messageId: string, text: string, ids: string[]) =>
             @click="emit('accept', comment.id)"
           />
         </UTooltip>
+        <template v-if="prompt">
+          <UTooltip text="Open in T3 Code">
+            <UButton
+              aria-label="Open in T3 Code"
+              color="neutral"
+              data-action="open-in-t3-code"
+              rel="noopener noreferrer"
+              size="xs"
+              target="_blank"
+              :to="t3Link"
+              variant="ghost"
+            >
+              <AgentIcon class="size-3.5" kind="agent" name="T3 Code" />
+            </UButton>
+          </UTooltip>
+          <UTooltip text="Copy a prompt for your agent">
+            <DropCopyButton
+              aria-label="Copy prompt"
+              color="neutral"
+              data-action="copy-prompt"
+              icon="i-mingcute-copy-2-line"
+              size="xs"
+              :value="prompt"
+              variant="ghost"
+            />
+          </UTooltip>
+        </template>
         <UTooltip v-if="!comment.delivery" text="Copy link">
           <UButton
             aria-label="Copy link"

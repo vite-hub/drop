@@ -7,6 +7,7 @@ import { feedbackMarkdown } from "../../shared/feedback.ts"
 const { reviewBookmarklet, siteAddress, siteAddressesFor, siteMatches } = await import("../../shared/review.ts")
 const { REVIEW_SCRIPT } = await import("../../shared/review-script.ts")
 const { readReviewToken, sealChoice, signReviewToken } = await import("../../server/utils/review.ts")
+const { presenceRoom } = await import("../../server/utils/presence.ts")
 const { default: sitesPost } = await import("../../server/api/review/sites.post.ts")
 const { default: tokenPost } = await import("../../server/api/review/token.post.ts")
 const { default: openPost } = await import("../../server/api/review/open.post.ts")
@@ -888,6 +889,26 @@ test("the embedded review needs comment access to the site", async () => {
   state.who = null
   assert.equal((await embedded("viewonly", {})).status, 403)
   assert.equal(threads().length, 0)
+})
+
+test("MCP replies and batch resolutions notify both the site and capture rooms", async () => {
+  site("previews", { site_url: PATTERN })
+  state.who = who
+  assert.equal((await embedded("previews", {}, { screenshot: PNG })).status, 200)
+  const image = sql.prepare("SELECT id FROM drops WHERE kind = 'image'").get()
+  const rooms = await Promise.all(["previews", image.id].map((id) => presenceRoom(request("/"), { id })))
+  const expectNotices = () => {
+    assert.deepEqual(state.notices.map(({ room }) => room).sort(), rooms.toSorted())
+    assert.ok(state.notices.every(({ body }) => body.type === "comments"))
+    state.notices.length = 0
+  }
+  state.who = { ...who, actorKind: "agent" }
+  for (const id of ["previews", image.id]) {
+    assert.equal((await call(replyTool, { id, comment: 1, body: "Investigating" })).structuredContent.comment, 1)
+    expectNotices()
+  }
+  assert.deepEqual((await call(updateDrop, { id: "previews", resolves: [1] })).structuredContent.resolved, [1])
+  expectNotices()
 })
 
 test("Open in Drop and Copy link reach the review only for people who could open it without its link", async () => {

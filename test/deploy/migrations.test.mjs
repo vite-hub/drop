@@ -262,7 +262,6 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
     ])
       for (const name of names) assert.ok(columns(table).includes(name), `${table}.${name}`)
 
-    // What `list_handoffs` asks: a member's sends that wait, newest first, through the member index.
     const insert = database.prepare(
       "INSERT INTO vitehub_comment_sends (id, member, subject_kind, subject_id, page, threads, key, state, sender, created_at, updated_at) VALUES (?, ?, 'drop', 'd1', '/d/d1', '[]', ?, ?, '{}', ?, ?)",
     )
@@ -273,23 +272,6 @@ test("a D1 that recorded every earlier migration gets Send's tables, and a membe
     assert.throws(() => insert.run("send_d", "ana", "k", "working", 4, 4), /UNIQUE/)
     insert.run("send_e", "ana", "k", "failed", 5, 5)
     insert.run("send_f", "ana", "k", "failed", 6, 6)
-    const lookup =
-      "SELECT id FROM vitehub_comment_sends WHERE member = ? AND state IN ('sent', 'working') ORDER BY created_at DESC"
-    assert.deepEqual(
-      database
-        .prepare(lookup)
-        .all("ana")
-        .map((row) => row.id),
-      ["send_a"],
-    )
-    assert.match(
-      database
-        .prepare(`EXPLAIN QUERY PLAN ${lookup}`)
-        .all("ana")
-        .map((row) => row.detail)
-        .join("\n"),
-      /vitehub_comment_sends_member/,
-    )
     // Webhooks keeps one endpoint per member and address, and the pairing codes beside them.
     const endpoint = database.prepare(
       "INSERT INTO vitehub_webhook_endpoints (id, owner, address, name, kind, created_at, updated_at) VALUES (?, 'ana', ?, 'T3 Code thread', 'url', 1, 1)",

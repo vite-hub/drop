@@ -3,6 +3,7 @@ import { errorsSection } from "./runtime-errors"
 import { suggestionLine } from "./suggestion"
 import { writtenBy } from "./agents"
 import { formatElementReference, formatSiteElementReference } from "./element-reference"
+import { dropPath } from "./links"
 
 const images = (item: Pick<DropComment, "attachments">, url: string, indent = "   ") =>
   item.attachments.length
@@ -33,6 +34,13 @@ export function feedbackMarkdown(
 }
 
 type PromptDrop = Pick<DropDetail, "id" | "kind" | "title" | "isOwner">
+export function feedbackPromptTarget(drop: PromptDrop & Pick<DropDetail, "ancestors">, url: string) {
+  const parent = drop.ancestors.at(-1)
+  return drop.kind === "image" && parent?.kind === "site"
+    ? { drop: { ...parent, isOwner: drop.isOwner }, url: new URL(dropPath(parent), url).href }
+    : { drop, url }
+}
+
 function nextStep(drop: PromptDrop, comments: DropComment[], errorUrl?: string) {
   const readHead = `Call read_drop for drop ${drop.id}.`
   const read = errorUrl ? `Call read_drop with id "${errorUrl}" to inspect the reported version.` : readHead

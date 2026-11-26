@@ -7,7 +7,7 @@ import { keys } from "../../app/utils/keys.ts"
 import { deliveryLine } from "../../app/utils/comment-delivery.ts"
 import { toThread } from "../../app/utils/comment-threads.ts"
 
-// Send on a new comment's composer (usePinSend) over the app's real outbox and useDrop, with Nuxt's auto-imports
+// Send on a new comment's composer (usePinSubmit) over the app's real outbox and useDrop, with Nuxt's auto-imports
 // stubbed as in comment-outbox.test.mjs. The store and the screenshot can be held, to look at the page in between.
 const fetches = []
 for (const [name, value] of Object.entries({
@@ -47,7 +47,7 @@ vi.stubGlobal("window", new EventTarget())
 vi.stubGlobal("document", Object.assign(new EventTarget(), { visibilityState: "visible" }))
 const { createCommentsOutbox } = await import("../../app/composables/useCommentsOutbox.ts")
 const { provideDrop } = await import("../../app/composables/useDrop.ts")
-const { usePinSend } = await import("../../app/composables/usePinSend.ts")
+const { usePinSubmit } = await import("../../app/composables/usePinSubmit.ts")
 
 const comment = (id, body) => ({
   id,
@@ -153,7 +153,7 @@ function viewer() {
   }
   const shot = shots()
   const events = { closed: 0, sent: [], failed: [] }
-  const { submit } = usePinSend({
+  const { submit } = usePinSubmit({
     popover,
     draft,
     page: () => undefined,

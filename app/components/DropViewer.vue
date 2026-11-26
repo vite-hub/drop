@@ -12,7 +12,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
-import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
+import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
@@ -48,6 +48,7 @@ const siteReview =
     ? useApi<SiteReviewItem[]>(() => `/api/drops/${drop.value.id}/review`, {
         key: () => keys.review(drop.value.id),
         default: () => [],
+        onRequest: state.commentRead,
       })
     : undefined
 const screenshots = computed(() => new Map((siteReview?.data.value ?? []).map((item) => [item.id, item.screenshot])))
@@ -276,11 +277,15 @@ const presence = usePresence(drop, {
   enabled: () => !visitor.value && !trashed.value,
 })
 state.onWrote(() => presence.commented())
-watch(presence.commentsChange, (change, before) => {
-  if (change === before) return
+function refreshComments() {
   void state.comments.refresh()
   void siteReview?.refresh()
+}
+watch([presence.commentsChange, presence.notices], () => {
+  state.preferPrimaryComments()
+  refreshComments()
 })
+useEventListener("focus", refreshComments)
 
 function startEdit() {
   if (lightbox.value) return
@@ -919,8 +924,13 @@ const readerId = computed(
     "",
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
-const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const prompt = () => promptMarkdown(drop.value, feedbackLink.value, waiting.value, pageErrors.value.length)
+const promptTarget = computed(() => feedbackPromptTarget(drop.value, feedbackLink.value))
+const prompt = () =>
+  promptMarkdown(promptTarget.value.drop, promptTarget.value.url, waiting.value, pageErrors.value.length)
+const threadPrompt = (comment: DropComment) => {
+  const thread = waiting.value.find((item) => item.id === comment.id)
+  if (thread) return promptMarkdown(promptTarget.value.drop, promptTarget.value.url, [thread])
+}
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -986,7 +996,7 @@ watch(shownVersion, (version) => {
   }
 })
 
-const { submit } = usePinSend({
+const { submit } = usePinSubmit({
   popover,
   draft: reviewDraft,
   page: () => (isApp.value ? page.value : undefined),
@@ -1653,6 +1663,7 @@ watch(
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
       :floating="pinThread"
+      :agent-prompt="threadPrompt"
       :can-accept="canAccept"
       :accepting="Boolean(accepting) && accepting === threadComment?.id"
       :version="drop.version"
@@ -2043,16 +2054,8 @@ watch(
                 @pins="toggleOverlay('pins')"
               >
                 <template #tools>
-                  <ViewerCommentSend
-                    v-if="canSend"
-                    v-show="!lightbox && !commentMode"
-                    :comments="publishedComments"
-                    :drop="drop.id"
-                    :prompt="prompt"
-                    :send="dropSend"
-                  />
                   <ViewerCopyPrompt
-                    v-if="(pageErrors.length || (!canSend && waiting.length)) && !lightbox && !commentMode"
+                    v-if="(pageErrors.length || waiting.length) && !lightbox && !commentMode"
                     :count="waiting.length"
                     :errors="pageErrors.length"
                     :signed-in="Boolean(me)"

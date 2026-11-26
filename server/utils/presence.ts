@@ -1,15 +1,35 @@
 import type { H3Event } from "h3"
 import * as v from "valibot"
-import { isRealtimeAvailable } from "vite-hub/realtime/server"
+import { isRealtimeAvailable, notifyRealtimeRoom } from "vite-hub/realtime/server"
 import { siteMatches } from "#shared/review"
+import type { DropThread } from "./comments"
 import { type DropRow, findDrop } from "./drops"
 import { type Identity, identify } from "./identity"
+import { logError } from "./logs"
 import { isMember, membersOnly } from "./members"
 import { keyedName, openable, type ReviewClaims, reviewer, seal, unseal } from "./review"
 
 export const PRESENCE = isRealtimeAvailable()
 
 export const presenceRoom = (event: H3Event, drop: Pick<DropRow, "id">) => keyedName(event, "presence", drop.id)
+
+export async function noticeComments(event: H3Event, drop: Pick<DropRow, "id">, threads: DropThread[]) {
+  if (!PRESENCE) return
+  const ids = new Set([drop.id])
+  for (const thread of threads) {
+    if (thread.subject.kind === "site") {
+      ids.add(thread.subject.id)
+      ids.add(thread.meta.dropId)
+    }
+  }
+  await Promise.all(
+    [...ids].map((id) =>
+      presenceRoom(event, { id })
+        .then((room) => notifyRealtimeRoom("presence", room, { type: "comments" }))
+        .catch((error: unknown) => logError(event, error, { comments: { notice: "failed" } })),
+    ),
+  )
+}
 
 const Ticket = v.object({ d: v.string(), u: v.string(), o: v.string(), e: v.number() })
 

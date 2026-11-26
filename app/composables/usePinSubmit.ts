@@ -6,7 +6,7 @@ import type { ViewerPopover } from "./useViewerAnnotations"
 
 type NewComment = Extract<ViewerPopover, { type: "new" }>
 
-export interface PinSendOptions {
+export interface PinSubmitOptions {
   popover: Ref<ViewerPopover | null>
   draft: {
     body: Ref<string>
@@ -35,7 +35,7 @@ export interface PinSendOptions {
 const sameItems = <T>(before: T[], after: T[]) =>
   before.length === after.length && before.every((item, index) => item === after[index])
 
-export function usePinSend(options: PinSendOptions) {
+export function usePinSubmit(options: PinSubmitOptions) {
   const { popover, draft } = options
   let preparing = false
 

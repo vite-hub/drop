@@ -11,5 +11,6 @@ export default defineHandler(async (event) => {
   const [drop, who] = await Promise.all([findDropAt(id, version, event), identify(event)])
   if (!drop || !permissions(drop, who).view) throw new HTTPError({ status: 404, statusText: "No drop with that id." })
   const guest = who ? null : await guestOf(event, { mint: permissions(drop, null).comment })
+  event.res.headers.set("Cache-Control", "private, no-store")
   return listComments(drop, readerOf(who, guest))
 })
