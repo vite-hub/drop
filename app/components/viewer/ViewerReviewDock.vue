@@ -256,30 +256,6 @@ watch(
   max-width: calc(100% - 6rem);
 }
 
-@container review-dock (width < 40rem) {
-  .review-toolbar :deep([data-slot="comment-send"]:is([data-state="pairing"], [data-state="confirm"])) {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .review-toolbar :deep(:is([data-state="pairing"], [data-state="confirm"]) [data-slot="comment-send-content"]) {
-    min-width: 0;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .review-toolbar
-    :deep(:is([data-state="pairing"], [data-state="confirm"]) [data-slot="comment-send-status"]:not([data-icon])) {
-    flex: 0 1 100%;
-    min-width: 0;
-    height: auto;
-    padding-block: 4px;
-    line-height: 1.35;
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-}
-
 .review-toolbar :deep(button) {
   min-width: 28px;
   height: 28px;
@@ -314,38 +290,28 @@ watch(
   scale: 0.96;
 }
 
-/* Send's Allow and send N is the one action its segment inverts (vite-hub/ui's data-variant="on"). */
 .review-toolbar :deep(button[aria-pressed="true"]),
 .review-toolbar :deep(button[aria-expanded="true"]),
-.review-toolbar :deep(button[data-review-primary]),
-.review-toolbar :deep(button[data-variant="on"]) {
+.review-toolbar :deep(button[data-review-primary]) {
   background: var(--ui-bg-inverted);
   color: var(--ui-text-inverted);
 }
 
 /* Closing the panel with Esc hands focus back to Comments. A solid white ring outside the button boxed it in against the
-   pill's edge, so focus is the hover's fill with a grey hairline inside, still 4.5:1 against the pill. Send's Open
-   thread is a link that looks like a button, so it focuses as one. */
-.review-toolbar :deep(button:focus-visible),
-.review-toolbar :deep(a[data-slot="comment-send-action"]:focus-visible) {
+   pill's edge, so focus is the hover's fill with a grey hairline inside, still 4.5:1 against the pill. */
+.review-toolbar :deep(button:focus-visible) {
   outline: 1px solid rgb(255 255 255 / 45%);
   outline-offset: -1px;
 }
 
 .review-toolbar
-  :deep(
-    button:focus-visible:not([aria-pressed="true"], [aria-expanded="true"], [data-review-primary], [data-variant="on"])
-  ),
-.review-toolbar :deep(a[data-slot="comment-send-action"]:focus-visible) {
+  :deep(button:focus-visible:not([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
   background: rgb(255 255 255 / 8%);
   color: var(--ui-text);
 }
 
 /* A pressed button is already white, so its hairline sits just outside. */
-.review-toolbar
-  :deep(
-    button:focus-visible:is([aria-pressed="true"], [aria-expanded="true"], [data-review-primary], [data-variant="on"])
-  ) {
+.review-toolbar :deep(button:focus-visible:is([aria-pressed="true"], [aria-expanded="true"], [data-review-primary])) {
   outline-offset: 1px;
 }
 

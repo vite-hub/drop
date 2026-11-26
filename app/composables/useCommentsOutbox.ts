@@ -249,7 +249,6 @@ export function createCommentsOutbox(
         const next = createCommentsClient({
           transport,
           ...(who.user ? { user: who.user } : {}),
-          refreshOnFocus: false,
           outbox: { account: who.account, store, ...(options.environment ? { environment: options.environment } : {}) },
         })
         client.value = next

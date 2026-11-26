@@ -10,13 +10,14 @@ const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers
 // A stand-in for the presence client Drop serves at /review-presence.js: the reviewer is Ada (client 1), and the test
 // adds the others through window.__presence, as their awareness would arrive.
 const CLIENT = `export function connectRealtimeRoom(definition, room, options) {
-  const listeners = new Set(), others = new Map(), local = {};
+  const listeners = new Set(), notices = new Set(), others = new Map(), local = {};
   const me = { id: "ada", name: "Ada", color: "#2563EB", clientId: 1 };
   const emit = () => listeners.forEach((listener) => listener());
   window.__presence = {
     definition, room, options, local,
     set(clientId, person, state) { others.set(clientId, { person: { ...person, clientId }, state }); emit(); },
     leave(clientId) { others.delete(clientId); emit(); },
+    notice(body) { notices.forEach((listener) => listener(body)); },
   };
   return {
     clientId: 1,
@@ -25,6 +26,7 @@ const CLIENT = `export function connectRealtimeRoom(definition, room, options) {
     status: () => "connected",
     setLocal(field, value) { if (value === null) delete local[field]; else local[field] = value; },
     onUpdate(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    onNotice(listener) { notices.add(listener); return () => notices.delete(listener); },
     destroy() { window.__presence.destroyed = true; },
   };
 }`
@@ -56,7 +58,7 @@ async function open(browser, { presence = true } = {}) {
     if (url.origin !== DROP) return route.abort()
     if (url.pathname === "/review.js") return route.fulfill({ contentType: "text/javascript", body: REVIEW_SCRIPT })
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS })
-    if (url.pathname === "/review-presence.js" && url.searchParams.get("v") === "2") {
+    if (url.pathname === "/review-presence.js" && url.searchParams.get("v") === "3") {
       seen.client++
       return route.fulfill({ contentType: "text/javascript", headers: CORS, body: CLIENT })
     }
@@ -116,6 +118,21 @@ test("review.js loads the first comment from its only other reviewer", { timeout
     )
     await page.waitForTimeout(100)
     assert.equal(seen.threads, after)
+    await context.close()
+  } finally {
+    await browser.close()
+  }
+})
+
+test("review.js loads the threads again when Drop's server says the comments changed", { timeout: 30_000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const { context, page, seen } = await open(browser)
+    await page.waitForFunction(() => window.__presence)
+    const before = seen.threads
+    await page.evaluate(() => window.__presence.notice({ type: "comments" }))
+    for (let tries = 0; seen.threads === before && tries < 20; tries++) await page.waitForTimeout(50)
+    assert.ok(seen.threads > before, "an agent's resolve reaches the open page without a reload")
     await context.close()
   } finally {
     await browser.close()

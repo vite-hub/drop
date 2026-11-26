@@ -907,6 +907,7 @@ test("a comment inside an element with an id says which section it's in, so a pr
 })
 
 test("a comment carried to v2 takes replies; the agent answers in the thread and reads it back", async () => {
+  state.authSecret = "test-secret"
   const route = (id, init) => {
     const event = new H3Event(
       new Request(
@@ -936,6 +937,11 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   })
   assert.equal(answered.structuredContent.comment, 1)
   assert.equal(answered.structuredContent.reply.authorName, "Owner")
+  assert.deepEqual(
+    state.notices.map(({ definition, body }) => [definition, body]),
+    [["presence", { type: "comments" }]],
+    "open pages of the drop load its comments again",
+  )
   assert.deepEqual(answered.structuredContent.reply.agent, { name: "Claude", image: "/agents/claude.svg" })
   assert.equal((await call(reply, { id: v2.id, comment: 9, body: "Nope" })).isError, true, "a missing number fails")
 
@@ -951,7 +957,9 @@ test("a comment carried to v2 takes replies; the agent answers in the thread and
   assert.equal(read.structuredContent.comments[0].replies.length, 1)
 
   // A resolved thread still takes a reply, and stays resolved.
+  state.notices.length = 0
   await call(publish, { previous: v2.id, markdown: "# Plan\n\nShip it on Friday.", note: "Same", resolves: [1] })
+  assert.equal(state.notices.length, 1, "resolving through publish tells open pages too")
   assert.equal((await call(reply, { id: v2.id, comment: 1, body: "Done." })).structuredContent.comment, 1)
   assert.deepEqual([threads()[0].status, threads()[0].messages.length], ["resolved", 3])
   // The reply came after the resolve, so the viewer lists the thread under Open again.

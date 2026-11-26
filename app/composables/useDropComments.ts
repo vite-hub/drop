@@ -113,7 +113,7 @@ function useDropComments(options: { source: () => DropComment[]; page: () => str
     return shown.isOwner || mine(message.author)
   }
 
-  const client = createCommentsClient({ transport, user: user.value, refreshOnFocus: false })
+  const client = createCommentsClient({ transport, user: user.value })
   watch(
     [options.source, subject],
     () => void client.refresh().catch((error: unknown) => reportClientError("comments-refresh", error)),

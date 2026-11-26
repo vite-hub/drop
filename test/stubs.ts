@@ -74,7 +74,7 @@ export const useAuth = () => {
 }
 export default () => new Response(null, { status: 404 })`,
   "vite-hub/realtime/server":
-    "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true; export const blobDocument = () => ({ kind: 'blob' })",
+    "export const isRealtimeAvailable = () => true; export const refreshRealtimeDocument = async () => true; export const blobDocument = () => ({ kind: 'blob' }); export const notifyRealtimeRoom = async (definition, room, body) => { globalThis.dropTest.notices.push({ definition, room, body }) }",
   "vite-hub/env": `const optionalSecret = (value) => value ? { unseal: () => value } : undefined;
     export const deriveSecret = async (purpose) => \`test-secret:\${purpose}\`;
     export const useServerEnv = () => {

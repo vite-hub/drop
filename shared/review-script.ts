@@ -1467,13 +1467,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     joining = true;
     try {
       const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
-      const client = await import(drop + "/review-presence.js?v=2");
+      const client = await import(drop + "/review-presence.js?v=3");
       if (!token || presence) return;
       const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);
       room.setLocal("at", herePage());
       presence = { room, you: answer.you && answer.you.id, expiresAt: Number(answer.expiresAt) || 0, comments: "" };
       room.onUpdate(onPresence);
+      room.onNotice(() => void refresh());
     } catch (e) {
       // Not shared with this reviewer, no Realtime on this Drop, or a page whose CSP blocks the client: no faces.
     } finally {

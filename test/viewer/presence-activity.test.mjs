@@ -16,6 +16,7 @@ test("frame input wakes a reviewer and restarts the idle deadline, while a hidde
   const room = {
     destroy: vi.fn(),
     onUpdate: vi.fn(),
+    onNotice: vi.fn(),
     setLocal: vi.fn(),
     states: () => new Map(),
     people: () => [],

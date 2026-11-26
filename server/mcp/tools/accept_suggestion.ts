@@ -5,6 +5,7 @@ import * as v from "valibot"
 import { findCommentByNumber } from "../../utils/comments"
 import { findDropByRef, toSummary } from "../../utils/drops"
 import { requireIdentity } from "../../utils/identity"
+import { noticeComments } from "../../utils/presence"
 import { acceptSuggestion } from "../../utils/suggestions"
 import { dropLine, mcpDrop } from "../format"
 
@@ -31,6 +32,7 @@ export default defineMcpTool({
     const comment = await findCommentByNumber(drop, n)
     if (!comment) throw new HTTPError({ status: 404, message: `No comment #${n} on this drop.` })
     const next = mcpDrop(toSummary(await acceptSuggestion(drop, comment, who, event)), event.url.origin)
+    await noticeComments(event, drop)
     return {
       content: [{ type: "text" as const, text: `Accepted suggestion #${n} as v${next.version}:\n${dropLine(next)}` }],
       structuredContent: next,

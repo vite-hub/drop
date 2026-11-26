@@ -5,43 +5,43 @@ packages:
 blockExoticSubdeps: false
 
 overrides:
-  "@vite-hub/agent": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/auth": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/blob": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/browser": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/bundle": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/bundle@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/channels": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/cms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cms@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/codemods": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/codemods@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/docs": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/docs@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/email": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/env": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/forms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forms@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/gateways": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/i18n": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/i18n@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/kit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kit@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/kv": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/markdown-template": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/mcp": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/mcp@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/presets": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@44d679002e86db7242d95175b461a44bfa0b92bc
-  "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@44d679002e86db7242d95175b461a44bfa0b92bc
+  "@vite-hub/agent": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/agent@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/auth": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/auth@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/blob": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/blob@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/browser": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/browser@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/bundle": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/bundle@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/channels": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/channels@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/cli": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cli@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/cms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/cms@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/codemods": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/codemods@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/comments": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/comments@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/connections": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/connections@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/content": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/content@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/database": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/database@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/docs": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/docs@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/email": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/email@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/env": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/env@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/forge": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forge@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/forms": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/forms@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/gateways": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/gateways@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/i18n": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/i18n@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/kit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kit@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/kv": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/kv@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/markdown-template": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/markdown-template@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/mcp": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/mcp@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/presets": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/presets@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/queue": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/queue@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/rate-limit": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/rate-limit@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/realtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/realtime@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/runtime": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/runtime@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/sandbox": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/sandbox@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/schedule": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/schedule@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/shell": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/shell@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/source": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/source@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/ui": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/ui@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/web-container": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/web-container@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@bb58bb98620e86aa315dc43404d188b652ca17b5
+  "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@bb58bb98620e86aa315dc43404d188b652ca17b5
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy.
   "@vite-hub/content>comark-ui": 0.14.3
   # Keep ViteHub auth and the app on one Better Auth type surface.
@@ -50,18 +50,6 @@ overrides:
   vite@*: "catalog:"
 
 patchedDependencies:
-  # A failed Send says why (drop#301): `problem` ("delivery", "key-unset", "key-invalid") and the receiver's `agent` on
-  # the failed result, the receiver's HTTP status or timeout from the webhook delivery, and Send or Pair again re-pairs
-  # after a key problem. A status refresh keeps a failed Send, pairing or Allow failed, with the newest count, while
-  # comments still wait, without cancelling a retry in flight (vite-hub/vitehub#5526). The outbox from
-  # vite-hub/vitehub#5540 (merged): a comment shows the moment Send is pressed and its screenshot follows. Files the reader
-  # picked save at once while the screenshot is on its way, as `deferredFiles` (vite-hub/vitehub#5553). Delete when
-  # ViteHub ships #5526 and #5553, and move the pins to that commit.
-  "@vite-hub/comments@0.0.0-preview-44d6790": patches/@vite-hub__comments@0.0.0-preview-44d6790.patch
-  # Formats durations without Intl.DurationFormat, which Firefox before 136 lacks: the formatters were built when the
-  # module loaded, so a drop's page crashed there with "Could not open this page." Delete when ViteHub ships the fix
-  # (vite-hub/vitehub#5557) and move the pins to that commit.
-  "@vite-hub/ui@0.0.0-preview-44d6790": patches/@vite-hub__ui@0.0.0-preview-44d6790.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
   # screenshot the same fit check (onmax/comark-ui#491). Delete with the next comark-ui bump that includes it.

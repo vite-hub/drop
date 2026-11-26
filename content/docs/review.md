@@ -107,17 +107,11 @@ Comments stay anchored to what they point at, per page for apps. Click a pin to 
 
 Agents read open comments and their threads with `read_drop` or the `address_feedback` prompt, answer with `reply`, accept a suggestion as written with `accept_suggestion`, and resolve what they fixed when they publish the next version. **Copy feedback for your agent** copies them as Markdown.
 
-**Send** hands your own agent every open thread that waits for an answer, yours and everyone else's, in one click. It sits in the toolbar under the page as **Send 3**, with the number of waiting threads, and turns into its status: Sending, Sent (or In inbox), then Working once your agent opens the handoff. A paired T3 link appears as **Open thread** while the agent works.
+Each open thread that waits for an answer has **Open in T3 Code** and **Copy** next to **Copy link**. **Open in T3 Code** starts a T3 Code thread with a prompt for that thread, and **Copy** copies the same prompt for any agent. The prompt names the drop and the thread, and your agent reads it through Drop's MCP as you, with `read_drop`.
 
-If Drop can't confirm delivery, the toolbar says **Not delivered** and offers **Retry**. The dialog shows what Drop knows about the attempted receiver, such as an HTTP status or a timeout. A timeout doesn't mean the receiver got nothing. After a second delivery failure, **Open Agents** becomes the main action. If confirmation failed before delivery, the dialog shows that reason instead.
+**Copy prompt** in the review toolbar copies every open thread that waits for an answer, and the page's errors, as one prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
 
-If the server's `VITEHUB_WEBHOOKS_KEY` is missing or invalid ([self-hosting](/docs/self-host#github)), **Send** looks as it always does, and pressing it opens a dialog: an admin gets a prompt to paste in an agent that can reach the host, and anyone else gets **Copy prompt** and a note for an admin. If a valid replacement key can't open an old connection, choose **Pair again** in the failure dialog and paste the new setup prompt in the same agent thread, then confirm **Allow and send**. That repairs the saved destination and leaves your other agents connected. Pasting it in a different thread delivers these comments there, but later sends still go to the old thread.
-
-The first Send copies a setup prompt: paste it in a T3 Code thread, or follow the [plugin's inbox setup](/docs/agents#plugin) for `/drop:feedback` in Claude Code or `$feedback` in Codex. Then confirm **Allow and send 3** in Drop. The **Agents** page shows the default destination: **Test default** checks it, and **Disconnect all** removes all of your Send destinations, including paired publishing threads.
-
-The agent gets ids and fixed words, never what people wrote, and reads the threads through Drop's MCP as you, with `read_drop` and the send's id. A delivery names the drop and the version to build on. It includes the publishing session only when you own the drop and published the latest version; for teammates or versions with no verified publisher, `session` is `null`. Send clears when the threads it tracks have been answered or resolved: your asks if there are any, otherwise the quoted threads. For a handoff with only quotes, the feedback skill asks which threads you want addressed before acting.
-
-Signed out, as a guest, where you can't comment, or on an individual live-site screenshot, **Copy prompt** in the review toolbar copies every open thread waiting for an answer as a prompt for any agent. It includes your threads as requests and quotes other people's threads for context.
+When an agent replies, resolves a thread, or publishes a version that resolves it, an open page shows the change at once, with no reload. A page you come back to loads the threads again.
 
 To comment on a running website, such as a preview deploy, see [Review a live site](/docs/sites).
 
