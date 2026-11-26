@@ -1,5 +1,20 @@
+diff --git a/dist/client-diagnostics-CvfTW5d4.js b/dist/client-diagnostics-CvfTW5d4.js
+index 6cb14849626eef88a508edbfb30a20ce1c7dc3a6..30845f2c83a7a880e1acf4a125a0d85f19bd2561 100644
+--- a/dist/client-diagnostics-CvfTW5d4.js
++++ b/dist/client-diagnostics-CvfTW5d4.js
+@@ -5,6 +5,10 @@ const commentsClientCodes = {
+ 		why: "The current author is not the author of this queued comment.",
+ 		fix: "Sign in as the original author and retry the outbox."
+ 	},
++	COMMENTS_OUTBOX_RESOLVE_BLOCKED: {
++		why: "Queued delivery must resume before the thread can close.",
++		fix: "Go online, then retry or dismiss any blocked comments and resolve the thread again."
++	},
+ 	COMMENTS_OUTBOX_SENDING: {
+ 		why: "The server may already have this comment, so the draft cannot change.",
+ 		fix: "Wait for delivery to finish, then edit or delete the server copy."
 diff --git a/dist/client.d.ts b/dist/client.d.ts
-index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d2068c173f90 100644
+index 216e02722e027b793a4f66542c859c09dd6be51c..2270f4a837e14fa9d49460e887c4660613a2f8de 100644
 --- a/dist/client.d.ts
 +++ b/dist/client.d.ts
 @@ -54,7 +54,15 @@ interface CommentsOutboxEntryBase {
@@ -18,7 +33,42 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
  /** A comment or reply that the outbox holds. */
  type CommentsOutboxEntry = CommentsOutboxEntryBase & ({
    kind: "create";
-@@ -477,6 +485,8 @@ type CommentSendResult = {
+@@ -68,10 +76,10 @@ type CommentsOutboxEntry = CommentsOutboxEntryBase & ({
+ interface CommentsOutboxStore {
+   /** `false` when the entries live only in this page, and a reload loses them. */
+   readonly persisted: boolean;
+-  /** The entries of `account`, in queue order. */
+-  list: (account: string) => Promise<CommentsOutboxEntry[]>;
+-  /** Read and change one account's entries in one transaction. Replace entries rather than mutating them. */
+-  update: <T>(account: string, change: (entries: Map<string, CommentsOutboxEntry>) => T) => Promise<T>;
++  /** The entries of one queue, in queue order. The key is the account, or the namespace and account of the outbox. */
++  list: (queue: string) => Promise<CommentsOutboxEntry[]>;
++  /** Read and change one queue's entries in one transaction. Replace entries rather than mutating them. */
++  update: <T>(queue: string, change: (entries: Map<string, CommentsOutboxEntry>) => T) => Promise<T>;
+ }
+ interface CommentsOutboxOptions {
+   /**
+@@ -79,6 +87,8 @@ interface CommentsOutboxOptions {
+    * comment never goes out as somebody else.
+    */
+   account: string;
++  /** Separates destinations on the same origin, such as two Comments APIs. Entries of another namespace never send. */
++  namespace?: string;
+   /** Default: the `vitehub-comments` IndexedDB database, else memory with `persisted: false`. */
+   store?: CommentsOutboxStore;
+   /** Default: the browser. */
+@@ -385,6 +395,10 @@ export declare const commentsErrorDiagnostics: import("nostics").Diagnostics<{
+     why: string;
+     fix: string;
+   };
++  readonly COMMENTS_OUTBOX_RESOLVE_BLOCKED: {
++    why: string;
++    fix: string;
++  };
+   readonly COMMENTS_OUTBOX_SENDING: {
+     why: string;
+     fix: string;
+@@ -477,6 +491,8 @@ type CommentSendResult = {
  } | {
    status: "failed";
    reason: string;
@@ -27,7 +77,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
  } | {
    status: "limited";
    retryAt: number;
-@@ -547,6 +557,8 @@ type CommentSendState = {
+@@ -547,6 +563,8 @@ type CommentSendState = {
    status: "failed";
    count: number;
    reason: string;
@@ -36,7 +86,7 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
  } | {
    status: "limited";
    count: number;
-@@ -707,10 +719,13 @@ export interface CommentsClient {
+@@ -707,10 +725,13 @@ export interface CommentsClient {
    query: CommentListQuery;
    refresh: () => Promise<readonly CommentThread[]>;
    get: (input: CommentGetInput) => Promise<CommentThread | null>;
@@ -45,16 +95,16 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
 -  /** With an outbox, returns a thread view with the waiting reply once it is saved. */
 -  reply: (input: CommentReplyInput & CommentFiles) => Promise<CommentThread>;
 +  /**
-+   * With an outbox, shows the comment and returns the waiting thread at once, with a local `id` and `delivery`, while
-+   * the outbox saves it. `files` may be a promise, which the outbox waits for before it sends.
++   * With an outbox, shows the comment at once. With no supplied `requestId`, returns the waiting thread before the save.
++   * With a supplied `requestId`, waits for the save to check for a replay. `files` may be a promise.
 +   */
 +  create: (input: CommentCreateInput & CommentsClientFiles) => Promise<CommentThread>;
-+  /** With an outbox, shows the reply and returns a thread view with it at once. `files` may be a promise, as for `create`. */
++  /** With an outbox, shows the reply at once. `requestId` and `files` work as they do for `create`. */
 +  reply: (input: CommentReplyInput & CommentsClientFiles) => Promise<CommentThread>;
    edit: (input: CommentEditInput) => Promise<CommentThread>;
    delete: (input: CommentDeleteInput) => Promise<CommentThread | null>;
    resolve: (input: CommentStatusInput) => Promise<CommentThread>;
-@@ -734,4 +749,4 @@ export declare function createCommentsClient(options: CommentsClientOptions & {
+@@ -734,4 +755,4 @@ export declare function createCommentsClient(options: CommentsClientOptions & {
    readonly outbox: CommentsOutbox;
  };
  export declare function createCommentsClient(options: CommentsClientOptions): CommentsClient;
@@ -63,35 +113,86 @@ index 216e02722e027b793a4f66542c859c09dd6be51c..d3de625d9e948a4331ccdc8857a7d206
 +export type { AnchorPoint, AnchorPosition, AnchorRect, AnchorTarget, AreaAnchor, CommentActor, CommentAnchor, CommentAttachment, CommentBuild, CommentComponent, CommentContext, CommentCreateInput, CommentDeleteInput, CommentDelivery, CommentDeliveryError, CommentEditInput, CommentEvent, CommentFiles, CommentForgeLink, CommentGetInput, CommentListCursor, CommentListQuery, CommentMessage, CommentMetadata, CommentReplyInput, CommentSendAgent, CommentSendClient, CommentSendCopy, CommentSendEvent, CommentSendLogo, CommentSendOptions, CommentSendPairing, CommentSendPairingCheck, CommentSendResult, CommentSendState, CommentSendStatus, CommentSendTransport, CommentSendTransportOptions, CommentStatus, CommentStatusInput, CommentSubject, CommentThread, CommentUploadInput, CommentUser, CommentUsersInput, CommentsClientFiles, CommentsGuest, CommentsOutbox, CommentsOutboxEntry, CommentsOutboxEnvironment, CommentsOutboxMessage, CommentsOutboxOptions, CommentsOutboxStore, CommentsRestAnswer, CommentsRestRequest, CommentsTransport, CreateAnchorOptions, DetachedAnchor, ElementAnchor, ImageAnchor, PageAnchor, ResolvedAnchor, RestCommentThread, RestTransport, RestTransportOptions, TextAnchor };
 \ No newline at end of file
 diff --git a/dist/client.js b/dist/client.js
-index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef33851bcc075 100644
+index cf8cc5c632c689a2f77d11ac75ff62d84b874343..8d9706500a357e55e7b79769839389a5fe14635e 100644
 --- a/dist/client.js
 +++ b/dist/client.js
-@@ -257,7 +257,13 @@ function createOutbox(options, host) {
+@@ -146,9 +146,9 @@ function requested(request) {
+ 		request.onerror = () => reject(request.error ?? /* @__PURE__ */ new Error("The IndexedDB request failed."));
+ 	});
+ }
+-function openDatabase() {
++function openDatabase(name) {
+ 	return new Promise((resolve, reject) => {
+-		const request = indexedDB.open(databaseName, format);
++		const request = indexedDB.open(name, format);
+ 		request.onupgradeneeded = (event) => {
+ 			const drafts = request.result.createObjectStore("drafts", { keyPath: ["account", "id"] });
+ 			drafts.createIndex("account", "account");
+@@ -184,9 +184,12 @@ function openDatabase() {
+ * does not open, as in some private windows, it keeps the entries in memory and `persisted` is `false`.
+ */
+ function createIndexedDBOutboxStore() {
++	return indexedDBOutboxStore(databaseName);
++}
++function indexedDBOutboxStore(name) {
+ 	let backend;
+ 	let persisted = typeof indexedDB !== "undefined";
+-	const open = () => backend ??= (persisted ? openDatabase() : Promise.reject(/* @__PURE__ */ new Error("No IndexedDB."))).then((database) => ({ database }), () => {
++	const open = () => backend ??= (persisted ? openDatabase(name) : Promise.reject(/* @__PURE__ */ new Error("No IndexedDB."))).then((database) => ({ database }), () => {
+ 		persisted = false;
+ 		return { memory: createMemoryOutboxStore() };
+ 	});
+@@ -250,14 +253,32 @@ function outcomeOf(status) {
+ }
+ /** The outbox of one client. */
+ function createOutbox(options, host) {
+-	const { account } = options;
+-	const store = options.store ?? createIndexedDBOutboxStore();
++	const { account, namespace } = options;
++	const scopedChannel = namespace === void 0 ? channel : `${channel}:${JSON.stringify(namespace)}`;
++	const hasLocks = Boolean(options.environment || globalThis.navigator?.locks);
++	const stageFiles = Boolean(options.store && !hasLocks);
++	const store = options.store ?? (hasLocks ? indexedDBOutboxStore(scopedChannel) : createMemoryOutboxStore());
+ 	const environment = options.environment ?? createBrowserEnvironment({
+-		channel,
++		channel: scopedChannel,
  		isMessage: isOutboxMessage
  	});
- 	const lockName = `vitehub-comments-outbox:${account}`;
-+	const filesLock = (id) => `vitehub-comments-files:${account}:${id}`;
+-	const lockName = `vitehub-comments-outbox:${account}`;
++	const queue = namespace === void 0 ? account : JSON.stringify([namespace, account]);
++	const storeKey = options.store ? queue : account;
++	const lockName = `vitehub-comments-outbox:${queue}`;
++	const filesLock = (id) => `vitehub-comments-files:${queue}:${id}`;
  	let entries = [];
 +	let stored = [];
 +	const unsaved = /* @__PURE__ */ new Map();
 +	const arriving = /* @__PURE__ */ new Map();
++	const blockedFiles = /* @__PURE__ */ new Map();
++	const aliases = /* @__PURE__ */ new Map();
++	const entryId = (id) => aliases.get(id) ?? id;
++	const queueListeners = /* @__PURE__ */ new Set();
++	const queueChanged = () => {
++		for (const listener of queueListeners) listener();
++	};
 +	const written = /* @__PURE__ */ new Set();
 +	let lastOrder = 0;
  	const sent = /* @__PURE__ */ new Map();
  	const receipts = /* @__PURE__ */ new Map();
  	const keyOf = (entry) => entry.kind === "create" ? JSON.stringify([
-@@ -276,8 +282,10 @@ function createOutbox(options, host) {
+@@ -276,9 +297,11 @@ function createOutbox(options, host) {
  	let leading;
  	let again = false;
  	let cancelWait;
 +	let stopped = false;
  	const post = (message) => environment.post(message);
  	const reload = () => loading = loading.catch(() => void 0).then(async () => {
+-		const pending = await store.list(account);
 +		const landed = [...unsaved].flatMap(([id, local]) => local.saved ? [id] : []);
- 		const pending = await store.list(account);
++		const pending = await store.list(storeKey);
  		const ids = /* @__PURE__ */ new Map();
  		if (globalThis.crypto?.subtle) await Promise.all(pending.map(async (entry) => {
-@@ -287,9 +295,27 @@ function createOutbox(options, host) {
+ 			if (entry.kind !== "reply") return;
+@@ -287,14 +310,41 @@ function createOutbox(options, host) {
  			ids.set(key, replyIds.get(key) ?? await replyMessageId(threadId, entry.requestId));
  		}));
  		replyIds = ids;
@@ -103,9 +204,18 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  	});
 +	const merge = () => {
 +		const ids = new Set(stored.map((entry) => entry.id));
-+		entries = sortEntries([...stored, ...[...unsaved.values()].flatMap((local) => ids.has(local.entry.id) ? [] : [local.entry])]);
-+		guardUnload([...unsaved.values()].some((local) => !local.saved));
++		entries = sortEntries([...stored, ...[...unsaved.values()].flatMap((local) => ids.has(local.entry.id) || local.duplicate ? [] : [local.entry])]).map((entry) => {
++			const blocked = blockedFiles.get(entry.id);
++			return blocked ? {
++				...entry,
++				status: "failed",
++				files: [...entry.files, ...blocked.files],
++				error: blocked.error
++			} : entry;
++		});
++		guardUnload(!store.persisted && entries.length > 0 || blockedFiles.size > 0 || [...unsaved.values()].some((local) => !local.saved));
 +		host.changed();
++		queueChanged();
 +	};
 +	let guarded = false;
 +	const holdPage = (event) => {
@@ -121,7 +231,23 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  	const changed = async () => {
  		await reload();
  		post({
-@@ -374,9 +400,14 @@ function createOutbox(options, host) {
+ 			type: "change",
+-			account
++			account: queue
+ 		});
+ 	};
+ 	const serverThread = (id) => {
+@@ -302,7 +352,8 @@ function createOutbox(options, host) {
+ 	};
+ 	/** The server id of a thread that the client may still name by its local id. */
+ 	const realId = (threadId) => {
+-		return sent.get(threadId)?.id ?? threadId;
++		const id = entryId(threadId);
++		return sent.get(id)?.id ?? id;
+ 	};
+ 	const delivery = (entry) => ({
+ 		status: entry.status === "failed" ? "failed" : "pending",
+@@ -374,9 +425,14 @@ function createOutbox(options, host) {
  	};
  	/** The first entry that may go out now. A reply waits while its comment has not gone out. */
  	const next = (list) => {
@@ -137,7 +263,25 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  	const wait = (ms) => {
  		cancelWait?.();
  		cancelWait = environment.schedule(() => {
-@@ -484,7 +515,8 @@ function createOutbox(options, host) {
+@@ -384,7 +440,7 @@ function createOutbox(options, host) {
+ 			kick();
+ 		}, ms);
+ 	};
+-	const update = (change) => store.update(account, change);
++	const update = (change) => store.update(storeKey, change);
+ 	const send = async (entry) => {
+ 		const withClaim = (change) => update((drafts) => {
+ 			const current = drafts.get(entry.id);
+@@ -469,7 +525,7 @@ function createOutbox(options, host) {
+ 		await reload();
+ 		post({
+ 			type: "sent",
+-			account,
++			account: queue,
+ 			id: entry.id,
+ 			kind: entry.kind,
+ 			key,
+@@ -484,7 +540,8 @@ function createOutbox(options, host) {
  			const selected = await update((drafts) => {
  				if (signal.aborted) return;
  				const entry = next(sortEntries([...drafts.values()]));
@@ -147,7 +291,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  				const delay = (entry.retryAt ?? 0) - Date.now();
  				if (delay > 0) return { delay };
  				const claimed = {
-@@ -497,16 +529,31 @@ function createOutbox(options, host) {
+@@ -497,16 +554,31 @@ function createOutbox(options, host) {
  				return { claimed };
  			});
  			if (!selected) return;
@@ -157,12 +301,12 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  				return;
  			}
 +			if ("files" in selected) {
-+				if (arriving.has(selected.files)) return;
++				if (stageFiles || arriving.has(selected.files)) return;
 +				await Promise.race([environment.lock(filesLock(selected.files), async () => void 0), aborted(signal)]);
 +				if (signal.aborted) return;
 +				await update((drafts) => {
 +					const current = drafts.get(selected.files);
-+					if (current?.awaitingFiles) drafts.set(current.id, {
++					if (current?.awaitingFiles && !arriving.has(current.id)) drafts.set(current.id, {
 +						...current,
 +						awaitingFiles: false
 +					});
@@ -180,7 +324,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  		if (leading) {
  			again = true;
  			return;
-@@ -524,22 +571,110 @@ function createOutbox(options, host) {
+@@ -524,22 +596,184 @@ function createOutbox(options, host) {
  			}
  		});
  	}
@@ -200,6 +344,14 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +			let group = [local];
 +			try {
 +				const parked = await update((drafts) => {
++					if (unsaved.get(id) !== local) return false;
++					if (local.entry.kind === "reply") local.entry = {
++						...local.entry,
++						input: {
++							...local.entry.input,
++							threadId: realId(local.entry.input.threadId)
++						}
++					};
 +					const parent = local.entry.kind === "reply" ? unsaved.get(local.entry.input.threadId) : void 0;
 +					if (parent && !parent.saved && !drafts.has(parent.entry.id)) return true;
 +					let order = local.entry.order;
@@ -219,8 +371,26 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +						order
 +					};
 +					group = [local, ...[...unsaved.values()].filter((other) => other.parked && other.entry.kind === "reply" && other.entry.input.threadId === id)];
-+					const keys = new Set([...drafts.values()].map(keyOf));
-+					for (const member of group) if (!keys.has(keyOf(member.entry))) drafts.set(member.entry.id, member.entry);
++					for (const member of group) member.write ??= write;
++					const keys = new Map([...drafts.values()].map((draft) => [keyOf(draft), draft]));
++					for (const member of group) {
++						if (member.entry.kind === "reply") member.entry = {
++							...member.entry,
++							input: {
++								...member.entry.input,
++								threadId: realId(member.entry.input.threadId)
++							}
++						};
++						const key = keyOf(member.entry);
++						const duplicate = keys.get(key);
++						if (duplicate) {
++							member.duplicate = duplicate;
++							aliases.set(member.entry.id, duplicate.id);
++						} else {
++							drafts.set(member.entry.id, member.entry);
++							keys.set(key, member.entry);
++						}
++					}
 +					return false;
 +				});
 +				if (parked) {
@@ -234,9 +404,10 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +					error: deliveryError(cause)
 +				};
 +				merge();
++				kick();
 +				return;
 +			} finally {
-+				if (local.write === write) local.write = void 0;
++				for (const member of group) if (member.write === write) member.write = void 0;
 +			}
 +			for (const member of group) Object.assign(member, {
 +				saved: true,
@@ -245,16 +416,28 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +			await changed().catch(() => void 0);
 +			kick();
 +		};
-+		const write = run();
++		const write = Promise.resolve().then(run);
 +		local.write = write;
 +		return write;
++	};
++	const flushStaged = () => {
++		const locals = [...unsaved.values()];
++		if (locals.some((local) => local.write)) return;
++		const next = locals.find((local) => !local.saved && !local.parked && local.entry.status === "pending");
++		if (next && !next.entry.awaitingFiles) save(next.entry.id).then(flushStaged);
++	};
++	const queueSave = (local) => {
++		if (!stageFiles) return save(local.entry.id);
++		local.parked = false;
++		flushStaged();
++		return local.write ?? Promise.resolve();
 +	};
 +	const add = (entry, files) => {
 +		const later = files !== void 0 && !Array.isArray(files);
 +		const order = Math.max(Date.now(), lastOrder + 1, ...entries.map((other) => other.order + 1));
 +		lastOrder = order;
 +		written.add(entry.id);
-+		unsaved.set(entry.id, {
++		const local = {
 +			entry: copyEntry({
  				...entry,
 -				order
@@ -265,10 +448,27 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +				...later ? { awaitingFiles: true } : {}
 +			}),
 +			saved: false
-+		});
++		};
++		unsaved.set(entry.id, local);
 +		if (later) arrive(entry.id, Promise.resolve(files));
 +		merge();
-+		save(entry.id);
++		return {
++			local,
++			write: queueSave(local)
++		};
++	};
++	const queueEntry = (entry, files) => {
++		const existing = entries.find((draft) => keyOf(draft) === keyOf(entry));
++		if (!existing) return {
++			entry,
++			...add(entry, files)
++		};
++		const local = unsaved.get(existing.id);
++		return {
++			entry: existing,
++			local,
++			write: local?.write
++		};
 +	};
 +	const arrive = (id, files) => {
 +		const arrival = environment.lock(filesLock(id), async () => {
@@ -283,14 +483,32 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +			if (local && !local.saved) {
 +				local.entry = settled(local.entry);
 +				merge();
++				if (stageFiles) flushStaged();
 +				return;
 +			}
-+			await update((drafts) => {
-+				const current = drafts.get(id);
-+				if (current?.awaitingFiles) drafts.set(id, settled(current));
-+			});
++			while (arriving.has(id)) {
++				try {
++					await update((drafts) => {
++						const current = drafts.get(id);
++						if (current?.awaitingFiles) drafts.set(id, settled(current));
++					});
++					break;
++				} catch (cause) {
++					if (!arriving.has(id)) break;
++					const retry = new Promise((resume) => {
++						blockedFiles.set(id, {
++							files: arrived,
++							error: deliveryError(cause),
++							resume
++						});
++					});
++					merge();
++					await retry;
++				}
++			}
 +		}).catch(() => void 0).then(async () => {
 +			arriving.delete(id);
++			blockedFiles.delete(id);
 +			await changed().catch(() => void 0);
 +			kick();
  		});
@@ -305,7 +523,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  	};
  	const fields = (requestId, files) => {
  		const now = Date.now();
-@@ -548,7 +683,7 @@ function createOutbox(options, host) {
+@@ -548,7 +782,7 @@ function createOutbox(options, host) {
  			id,
  			requestId: requestId ?? id,
  			account,
@@ -314,36 +532,92 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  			createdAt: now,
  			order: now,
  			status: "pending"
-@@ -579,9 +714,11 @@ function createOutbox(options, host) {
+@@ -569,7 +803,23 @@ function createOutbox(options, host) {
+ 			return store.persisted;
+ 		},
+ 		overlay,
+-		owns: (threadId, messageId) => entries.some((entry) => entry.id === (messageId ?? threadId)),
++		owns: (threadId, messageId) => entries.some((entry) => entry.id === entryId(messageId ?? threadId)),
++		async beforeResolve(threadId) {
++			await reload();
++			while (true) {
++				const id = realId(threadId);
++				const pending = entries.filter((entry) => entry.id === id || entry.kind === "reply" && realId(entry.input.threadId) === id);
++				if (!pending.length) return id;
++				if (stopped || !environment.isOnline() || pending.some((entry) => entry.held || entry.status === "failed" || entry.retryAt !== void 0) || entries.some((entry) => entry.held)) return;
++				await new Promise((resolve) => {
++					const wake = () => {
++						queueListeners.delete(wake);
++						resolve();
++					};
++					queueListeners.add(wake);
++				});
++			}
++		},
+ 		async create({ files, requestId, ...input }) {
+ 			const entry = {
+ 				...fields(requestId, files),
+@@ -579,9 +829,14 @@ function createOutbox(options, host) {
  			const receipt = () => receipts.get(keyOf(entry)) ?? [...host.threads()].find((thread) => matchesCreate(entry, thread));
  			const earlier = receipt();
  			if (earlier) return earlier;
 -			const saved = await enqueue(entry);
 -			kick();
 -			return receipt() ?? localThread(saved.kind === "create" ? saved : entry);
-+			const existing = entries.find((draft) => keyOf(draft) === keyOf(entry));
-+			if (existing?.kind === "create") return localThread(existing);
-+			add(entry, files);
-+			const shown = entries.find((draft) => draft.id === entry.id);
-+			return localThread(shown?.kind === "create" ? shown : entry);
++			const queued = queueEntry(entry, files);
++			if (requestId !== void 0) {
++				await queued.write;
++				const confirmed = receipt();
++				if (confirmed) return confirmed;
++			}
++			const saved = queued.local?.duplicate ?? entries.find((draft) => draft.id === queued.entry.id) ?? queued.entry;
++			return localThread(saved.kind === "create" ? saved : entry);
  		},
  		async reply({ files, requestId, subject, ...input }) {
  			const threadId = realId(input.threadId);
-@@ -599,8 +736,8 @@ function createOutbox(options, host) {
+@@ -599,14 +854,18 @@ function createOutbox(options, host) {
  			};
  			const earlier = receipts.get(keyOf(entry));
  			if (earlier) return serverThread(earlier.id) ?? earlier;
 -			const saved = await enqueue(entry);
 -			kick();
-+			const saved = entries.find((draft) => keyOf(draft) === keyOf(entry)) ?? entry;
-+			if (saved === entry) add(entry, files);
- 			const thread = serverThread(realId(threadId)) ?? cached;
+-			const thread = serverThread(realId(threadId)) ?? cached;
++			const queued = queueEntry(entry, files);
++			if (requestId !== void 0) await queued.write;
++			const saved = queued.local?.duplicate ?? queued.local?.entry ?? queued.entry;
++			const confirmed = receipts.get(keyOf(saved));
++			if (confirmed) return serverThread(confirmed.id) ?? confirmed;
++			const resolvedId = realId(threadId);
++			const thread = serverThread(resolvedId) ?? cached;
  			if (thread) return overlay([thread]).server[0] ?? thread;
- 			const local = overlay([]).local.find((local) => local.id === threadId);
-@@ -622,6 +759,17 @@ function createOutbox(options, host) {
+-			const local = overlay([]).local.find((local) => local.id === threadId);
++			const local = overlay([]).local.find((local) => local.id === resolvedId);
+ 			if (local) return local;
+ 			return {
+-				id: threadId,
++				id: resolvedId,
+ 				scope: "",
+ 				n: 0,
+ 				subject: target ?? {
+@@ -616,12 +875,31 @@ function createOutbox(options, host) {
+ 				anchor: { kind: "page" },
+ 				status: "open",
+ 				author: author(),
+-				messages: [localMessage(saved, threadId)],
++				messages: [localMessage(saved, resolvedId)],
+ 				createdAt: entry.createdAt,
+ 				updatedAt: entry.createdAt
  			};
  		},
  		async retry(id) {
++			if (id !== void 0) {
++				id = entryId(id);
++				const blocked = blockedFiles.get(id);
++				if (blocked) {
++					blocked.resume();
++					return;
++				}
++			}
 +			const local = id === void 0 ? void 0 : await unsavedEntry(id);
 +			if (local) {
 +				local.entry = {
@@ -352,32 +626,43 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +					error: void 0
 +				};
 +				merge();
-+				await save(local.entry.id);
++				await queueSave(local);
 +				return;
 +			}
  			await update((drafts) => {
  				for (const entry of drafts.values()) {
  					if (entry.status === "sending" || id !== void 0 && entry.id !== id) continue;
-@@ -640,6 +788,15 @@ function createOutbox(options, host) {
+@@ -640,6 +918,17 @@ function createOutbox(options, host) {
  			kick();
  		},
  		async dismiss(id) {
++			id = entryId(id);
 +			if (await unsavedEntry(id)) {
 +				for (const [other, local] of unsaved) if (other === id || local.entry.kind === "reply" && local.entry.input.threadId === id) unsaved.delete(other);
 +				await update((drafts) => {
 +					for (const reply of drafts.values()) if (reply.kind === "reply" && reply.input.threadId === id) drafts.delete(reply.id);
 +				});
 +				await changed();
++				if (stageFiles) flushStaged();
 +				kick();
 +				return true;
 +			}
  			const removed = await update((drafts) => {
  				const entry = drafts.get(id);
  				if (!entry || !changeable(entry)) return false;
-@@ -655,6 +812,23 @@ function createOutbox(options, host) {
+@@ -649,12 +938,32 @@ function createOutbox(options, host) {
+ 				return drafts.delete(id);
+ 			});
+ 			if (removed) {
++				arriving.delete(id);
++				blockedFiles.get(id)?.resume();
+ 				await changed();
+ 				kick();
+ 			}
  			return removed;
  		},
  		async edit(id, body, mentions) {
++			id = entryId(id);
 +			const local = await unsavedEntry(id);
 +			if (local) {
 +				const input = {
@@ -392,18 +677,22 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
 +					error: void 0
 +				};
 +				merge();
-+				await save(id);
++				await queueSave(local);
 +				return true;
 +			}
  			const edited = await update((drafts) => {
  				const entry = drafts.get(id);
  				if (!entry || !changeable(entry)) return false;
-@@ -691,12 +865,14 @@ function createOutbox(options, host) {
+@@ -691,13 +1000,20 @@ function createOutbox(options, host) {
  		async clear() {
  			cancelWait?.();
  			cancelWait = void 0;
 +			unsaved.clear();
  			await update((drafts) => drafts.clear());
++			arriving.clear();
++			for (const blocked of blockedFiles.values()) blocked.resume();
++			blockedFiles.clear();
++			aliases.clear();
  			sent.clear();
  			receipts.clear();
  			await changed();
@@ -411,17 +700,29 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  		start() {
 +			stopped = false;
  			const stops = [environment.listen((event) => {
++				if (event === "offline") queueChanged();
  				if (event !== "online" && event !== "visible") return;
  				update((drafts) => {
-@@ -718,6 +894,7 @@ function createOutbox(options, host) {
+ 					for (const entry of drafts.values()) if (entry.status === "pending" && entry.retryAt !== void 0) drafts.set(entry.id, {
+@@ -706,7 +1022,7 @@ function createOutbox(options, host) {
+ 					});
+ 				}).then(changed).then(kick);
+ 			}), environment.receive((message) => {
+-				if (message.account !== account) return;
++				if (message.account !== queue) return;
+ 				if (message.type === "sent") {
+ 					if (message.kind === "create") sent.set(message.id, message.thread);
+ 					receipts.set(message.key, message.thread);
+@@ -718,6 +1034,8 @@ function createOutbox(options, host) {
  			kick();
  			return () => {
  				for (const stop of stops.splice(0)) stop();
 +				stopped = true;
++				queueChanged();
  				cancelWait?.();
  				cancelWait = void 0;
  				leading?.giveUp();
-@@ -1160,6 +1337,8 @@ function createCommentSend(transport, options = {}) {
+@@ -1160,6 +1478,8 @@ function createCommentSend(transport, options = {}) {
  	let timer;
  	let run = 0;
  	let lastStep = "send";
@@ -430,7 +731,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  	const notify = () => {
  		for (const listener of listeners) listener();
  	};
-@@ -1244,16 +1423,29 @@ function createCommentSend(transport, options = {}) {
+@@ -1244,16 +1564,29 @@ function createCommentSend(transport, options = {}) {
  		if (status.retryAt !== void 0 && status.retryAt > Date.now()) return limited(status.retryAt);
  		idle();
  	};
@@ -462,7 +763,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  			apply(status);
  		} catch (error) {
  			if (!onError) throw error;
-@@ -1281,7 +1473,9 @@ function createCommentSend(transport, options = {}) {
+@@ -1281,7 +1614,9 @@ function createCommentSend(transport, options = {}) {
  		if (result.status === "failed") return set({
  			status: "failed",
  			count,
@@ -473,7 +774,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  		});
  		if (paired) agent = paired.agent;
  		if (result.status === "limited") return limited(result.retryAt);
-@@ -1469,13 +1663,14 @@ function createCommentSend(transport, options = {}) {
+@@ -1469,13 +1804,14 @@ function createCommentSend(transport, options = {}) {
  			if (fetching || state.status !== "idle" && state.status !== "failed" && state.status !== "sent" && state.status !== "working") return;
  			if (state.status !== "failed" && count === 0) return;
  			if (state.status === "failed" && lastStep === "pair") return pair(copy);
@@ -490,7 +791,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  			return pair(copy);
  		},
  		async allow() {
-@@ -1692,6 +1887,12 @@ function createCommentSendTransport(options = {}) {
+@@ -1692,6 +2028,12 @@ function createCommentSendTransport(options = {}) {
  	};
  }
  // src/client.ts
@@ -503,7 +804,7 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  function createCommentsClient(options) {
  	const { transport } = options;
  	const listeners = /* @__PURE__ */ new Set();
-@@ -1877,8 +2078,8 @@ function createCommentsClient(options) {
+@@ -1877,8 +2219,8 @@ function createCommentsClient(options) {
  			upsert(thread);
  			return shown(thread.id) ?? thread;
  		},
@@ -514,6 +815,22 @@ index cf8cc5c632c689a2f77d11ac75ff62d84b874343..1bc3e96f1a72fca09c74a8c48d9ef338
  		edit: async (input) => {
  			if (outbox?.owns(input.threadId, input.messageId)) {
  				if (!await outbox.edit(input.messageId, input.body, input.mentions)) throw commentsClientDiagnostics.COMMENTS_OUTBOX_SENDING();
+@@ -1898,7 +2240,14 @@ function createCommentsClient(options) {
+ 				return next;
+ 			});
+ 		},
+-		resolve: (input) => mutate(input.threadId, async () => upsert(await transport.resolve(input))),
++		resolve: (input) => mutate(input.threadId, async () => {
++			const threadId = outbox ? await outbox.beforeResolve(input.threadId) : input.threadId;
++			if (threadId === void 0) throw commentsClientDiagnostics.COMMENTS_OUTBOX_RESOLVE_BLOCKED();
++			return upsert(await transport.resolve({
++				...input,
++				threadId
++			}));
++		}),
+ 		reopen: (input) => mutate(input.threadId, async () => upsert(await transport.reopen(input))),
+ 		users: (input) => transport.users(input),
+ 		outbox,
 diff --git a/dist/install-w6CCgGFV.js b/dist/install-w6CCgGFV.js
 index d1d94c0b7ca495ef0f073c4f2ce46f1805f1b166..334e2f6584953c3d506fa396e8cc7c563b95ecb1 100644
 --- a/dist/install-w6CCgGFV.js
