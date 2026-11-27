@@ -8,8 +8,6 @@ const group = useTemplateRef<HTMLElement>("group")
 const shown = computed(() => props.state.variants[props.state.current]!)
 const count = computed(() => props.state.variants.length)
 
-// The address names the item in focus (#v-…), or where the canvas looks (#@v-…,x,y,zoomz), which the picker reports
-// once the reader moves the camera, as Google Maps keeps its map in the address.
 const named = () => props.state.variants.findIndex((variant) => variant.id && `#${variant.id}` === location.hash)
 const viewed = () => location.hash.startsWith("#@")
 let opened = false
