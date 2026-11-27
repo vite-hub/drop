@@ -1,6 +1,7 @@
 import { HTTPError } from "h3"
 import { requireRateLimit } from "vite-hub/rate-limit"
 import { CommentReplySchema } from "#shared/schemas"
+import { clientAddress } from "../../../../utils/client-address"
 import { lists, readCommentBody, withImages } from "../../../../utils/comment-images"
 import { authorOf, earlierReply, findCommentByNumber, replyTo, TOO_MANY_COMMENTS } from "../../../../utils/comments"
 import { logDrop } from "../../../../utils/logs"
@@ -13,7 +14,7 @@ export default reviewApi(async (event) => {
     throw error
   })
   await requireRateLimit(event, "review-comment", {
-    key: claims.u ?? undefined,
+    key: claims.u ?? clientAddress(event),
     limit: 20,
     window: "1m",
     message: TOO_MANY_COMMENTS,

@@ -67,6 +67,26 @@ test("a host without Browser Run, or a caller past the render limit, gets the ge
   assert.equal(state.bursts.at(-1).bucket, "og-image")
 })
 
+test("on a VPS, each signed-out caller gets its own render limit, by the address the proxy adds", async () => {
+  const { H3Event } = await import("h3")
+  insertDrop("open", { visibility: "public" })
+  state.ogBrowser = false
+  for (const forwarded of ["198.51.100.7", "203.0.113.1, 198.51.100.7"]) {
+    const request = new H3Event(
+      new Request("https://drop.example/og/open.png", {
+        headers: { "x-forwarded-for": forwarded, "cf-connecting-ip": "203.0.113.2" },
+      }),
+    )
+    request.context.log = { set() {}, error() {}, warn() {} }
+    request.context.params = { id: "open.png" }
+    await ogHandler(request)
+  }
+  assert.deepEqual(
+    state.bursts.map((burst) => burst.key),
+    ["198.51.100.7", "198.51.100.7"],
+  )
+})
+
 test("the card escapes what the drop's owner wrote", () => {
   const html = ogCardHtml(
     { title: `<img src=x onerror="x">`, excerpt: "a & b", kind: "markdown", version: 2, date: 0 },
