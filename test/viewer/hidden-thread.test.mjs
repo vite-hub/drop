@@ -9,6 +9,7 @@ import { transpileModule } from "typescript"
 const source = readFileSync(new URL("../../app/components/DropViewer.vue", import.meta.url), "utf8")
 const close = source.match(/function closeComments\(\) \{[\s\S]*?\n\}/)[0]
 const show = source.match(/function showComments\(\) \{[\s\S]*?\n\}/)[0]
+const toggleArea = source.match(/function toggleCommentArea\(\) \{[\s\S]*?\n\}/)[0]
 const annotationSource = readFileSync(new URL("../../app/composables/useViewerAnnotations.ts", import.meta.url), "utf8")
 const select = annotationSource.match(/function commentOnSelection\(suggest = false\) \{[\s\S]*?\n  \}/)[0]
 const shown = transpileModule(
@@ -28,15 +29,27 @@ const build = new Function(
   const overlays = reactive({ pins: false }), tool = ref('comment'), selection = ref(null)
   const annotations = { beginFocus() {} }, reviewDock = ref(null)
   const hasComments = ref(true), editing = ref(false), shareOpen = ref(false), detailsPop = ref(null)
+  const canMarkArea = ref(true), canUseCommentMode = ref(false), trashed = ref(false), commentMode = ref(false)
   ${close}
   ${show}
+  ${toggleArea}
   ${select}
   ${shown}
-  return { commentsOpen, popover, showSent, overlays, shownWhileHidden, closeComments, showComments, selection, commentOnSelection }
+  return { commentsOpen, popover, showSent, overlays, shownWhileHidden, closeComments, showComments, selection, commentOnSelection, toggleCommentArea }
 `,
 )
 const setup = () =>
   effectScope().run(() => build(ref, reactive, computed, shallowRef, watch, onScopeDispose, createCommentVisibility))
+
+test("the live-site area shortcut reports success only when it opens comments", () => {
+  const state = setup()
+  state.closeComments()
+  assert.equal(state.toggleCommentArea(), true)
+  assert.equal(state.commentsOpen.value, true)
+  assert.ok(!state.toggleCommentArea())
+  state.closeComments()
+  assert.equal(state.toggleCommentArea(), true)
+})
 
 test("closing comments ends a thread reveal without changing the eye or a sent comment's exception", async () => {
   vi.useFakeTimers()

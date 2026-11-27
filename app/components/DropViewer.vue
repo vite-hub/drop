@@ -121,7 +121,7 @@ const siteRef = useTemplateRef<{
   pending: boolean
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
-const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number }>("reviewDock")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number; toolbar: HTMLElement | null }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   shareOpen.value = false
@@ -142,6 +142,13 @@ function toggleComments() {
   else showComments()
 }
 const commentMode = ref(false)
+const usage = useUiUsage({
+  pill: () => reviewDock.value?.toolbar,
+  kind: () => drop.value.kind,
+  commenting: () => commentMode.value,
+  view: () => drop.value.id,
+  hidden: () => Boolean(siteRef.value?.capturing),
+})
 function toggleCommentMode() {
   if (!hasComments.value || editing.value || trashed.value) return
   if (!canUseCommentMode.value) return toggleComments()
@@ -186,6 +193,7 @@ const annotations = useViewerAnnotations({
   editing,
   enabled: annotationsEnabled,
   canvas: prototypeCanvas,
+  onShortcut: usage.key,
   reviewOpen: computed({
     get: () => commentMode.value || commentsOpen.value,
     set: (value: boolean) => {
@@ -464,9 +472,15 @@ watch(
   (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
 function toggleCommentArea() {
-  if (!canMarkArea.value) return
-  if (canUseCommentMode.value && !editing.value && !trashed.value) commentMode.value = true
-  else showComments()
+  if (!canMarkArea.value || editing.value) return
+  if (canUseCommentMode.value && !trashed.value) {
+    if (commentMode.value) return
+    commentMode.value = true
+    return true
+  }
+  const wasOpen = commentsOpen.value
+  showComments()
+  return !wasOpen && commentsOpen.value
 }
 if (route.query.changes && hasHistory.value) showDetails(true)
 
@@ -543,7 +557,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     },
     openDrop: (id) => void router.push(`/drops/${id}`),
     palette: usePaletteOpener(),
-    toggleZen,
+    toggleZen: zenShortcut,
     escape: leaveZen,
     errors: pageErrors,
   })
@@ -620,29 +634,50 @@ function present() {
   openPath("/presenter/1")
 }
 
+function runShortcut(action: () => unknown) {
+  action()
+  return true
+}
+function zenShortcut() {
+  usage.key("z", () => runShortcut(toggleZen))
+}
 defineShortcuts({
-  c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
-  e: () => (selection.value ? commentOnSelection(true) : edit()),
-  h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
-  i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
-  r: toggleCommentArea,
+  c: () => {
+    if (selection.value) return commentOnSelection()
+    usage.key("c", () => hasComments.value && !editing.value && !trashed.value && runShortcut(toggleCommentMode))
+  },
+  e: () => {
+    if (selection.value) return commentOnSelection(true)
+    usage.key("e", () => !editing.value && showEditTool.value && runShortcut(edit))
+  },
+  h: () => {
+    if (canvasShown.value) return canvasTool("hand")
+    usage.key("h", () => hasHistory.value && !editing.value && runShortcut(() => showDetails(true)))
+  },
+  i: () =>
+    usage.key("i", () => {
+      if (detailsOpen.value) return runShortcut(() => (detailsOpen.value = false))
+      return !editing.value && runShortcut(showDetails)
+    }),
+  r: () => usage.key("r", toggleCommentArea),
   v: () => {
     tool.value = "browse"
     if (canvasShown.value) canvasTool("move")
   },
-  s: () => framed.value && setTool("measure"),
-  b: () => canMark.value && annotations.mark("marker"),
-  p: () => canMark.value && annotations.mark("pen"),
-  a: () => canMark.value && annotations.mark("arrow"),
-  t: () => canMark.value && annotations.mark("text"),
+  s: () => usage.key("s", () => framed.value && setTool("measure")),
+  b: () => usage.key("b", () => canMark.value && annotations.mark("marker")),
+  p: () => usage.key("p", () => canMark.value && annotations.mark("pen")),
+  a: () => usage.key("a", () => canMark.value && annotations.mark("arrow")),
+  t: () => usage.key("t", () => canMark.value && annotations.mark("text")),
   meta_z: () => undoMark(),
-  u: () => framed.value && toggleOverlay("rulers"),
-  x: () => framed.value && toggleOverlay("xray"),
+  u: () => usage.key("u", () => framed.value && toggleOverlay("rulers")),
+  x: () => usage.key("x", () => framed.value && toggleOverlay("xray")),
   l: () => !editing.value && copyLink("Link copied"),
-  d: () => !editing.value && download(),
-  m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
-  w: () => widens.value && nextWidth(),
-  z: toggleZen,
+  d: () => usage.key("d", () => !editing.value && Boolean(drop.value.url) && runShortcut(download)),
+  m: () =>
+    usage.key("m", () => !editing.value && copiesMarkdown.value && runShortcut(() => copyMarkdown("Markdown copied"))),
+  w: () => usage.key("w", () => widens.value && runShortcut(nextWidth)),
+  z: zenShortcut,
   meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
 })
 const typing = (event: KeyboardEvent) =>
@@ -988,7 +1023,7 @@ const showEditTool = computed(
   () =>
     !lightbox.value &&
     !shownVersion.value &&
-    (drop.value.canEdit || (drop.value.kind === "markdown" && drop.value.editNote)),
+    Boolean(drop.value.canEdit || (drop.value.kind === "markdown" && drop.value.editNote)),
 )
 watch(shownVersion, (version) => {
   if (version) {
@@ -1129,7 +1164,8 @@ const shownAt = computed(() => {
   const version = shownVersion.value?.version ?? drop.value.version
   return drop.value.versions.find((item) => item.version === version)?.createdAt ?? drop.value.updatedAt
 })
-usePaletteOffer("drop", () => {
+usePaletteOffer("drop", dropPalette)
+function dropPalette() {
   if (visitor.value) return null
   const title = drop.value.title
   if (editing.value)
@@ -1168,24 +1204,35 @@ usePaletteOffer("drop", () => {
             label: "Edit together",
             icon: "i-mingcute-pencil-line",
             kbds: ["E"],
-            onSelect: () => {
+            onSelect: usage.palette("edit", () => {
               if (!drop.value.canEdit) showDetails()
               edit()
-            },
+            }),
           },
         ]
       : []),
-    { label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) },
+    {
+      label: "Share…",
+      icon: SHARE_ICONS[drop.value.share],
+      onSelect: usage.palette("share", () => (shareOpen.value = true)),
+    },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["L"], onSelect: () => copyLink("Link copied") },
     ...(canPin.value
       ? [
           drop.value.pinned
-            ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: () => togglePin() }
-            : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: () => togglePin() },
+            ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: usage.palette("pin", () => togglePin()) }
+            : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: usage.palette("pin", () => togglePin()) },
         ]
       : []),
     ...(drop.value.url
-      ? [{ label: "Download original", icon: "i-mingcute-download-2-line", kbds: ["D"], onSelect: download }]
+      ? [
+          {
+            label: "Download original",
+            icon: "i-mingcute-download-2-line",
+            kbds: ["D"],
+            onSelect: usage.palette("download", download),
+          },
+        ]
       : []),
     ...(copiesMarkdown.value
       ? [
@@ -1193,16 +1240,22 @@ usePaletteOffer("drop", () => {
             label: "Copy as Markdown",
             icon: "i-mingcute-markdown-line",
             kbds: ["M"],
-            onSelect: () => void copyMarkdown("Markdown copied"),
+            onSelect: usage.palette("markdown", () => void copyMarkdown("Markdown copied")),
           },
         ]
       : []),
     ...(printsPdf.value ? [{ label: "Export as PDF", icon: "i-mingcute-pdf-line", onSelect: exportPdf }] : []),
     ...(slidev.value && contentOrigin.value && !lightbox.value && !shownVersion.value
-      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
+      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: usage.palette("present", present) }]
       : []),
     ...(presents.value && !slidev.value
-      ? [{ label: "Open in new window", icon: "i-mingcute-external-link-line", onSelect: openWindow }]
+      ? [
+          {
+            label: "Open in new window",
+            icon: "i-mingcute-external-link-line",
+            onSelect: usage.palette("window", openWindow),
+          },
+        ]
       : []),
     ...(owner.value
       ? [
@@ -1214,7 +1267,13 @@ usePaletteOffer("drop", () => {
         ]
       : []),
     ...(drop.value.canTrash
-      ? [{ label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => void deleteDrop() }]
+      ? [
+          {
+            label: "Move to Trash",
+            icon: "i-mingcute-delete-2-line",
+            onSelect: usage.palette("trash", () => void deleteDrop()),
+          },
+        ]
       : []),
   ]
 
@@ -1231,7 +1290,7 @@ usePaletteOffer("drop", () => {
                 icon: "i-mingcute-chat-3-line",
                 kbds: ["C"],
                 active: commentMode.value,
-                onSelect: toggleCommentMode,
+                onSelect: usage.palette("comments", toggleCommentMode),
               },
             ]
           : []),
@@ -1240,10 +1299,16 @@ usePaletteOffer("drop", () => {
           icon: "i-mingcute-list-check-line",
           kbds: canUseCommentMode.value ? undefined : ["C"],
           active: listOpen,
-          onSelect: toggleComments,
+          onSelect: usage.palette("list", toggleComments),
         },
         ...(canCommentOnPage.value
-          ? [{ label: "Comment on the whole page", icon: "i-mingcute-file-line", onSelect: () => void commentOnPage() }]
+          ? [
+              {
+                label: "Comment on the whole page",
+                icon: "i-mingcute-file-line",
+                onSelect: usage.palette("page", () => void commentOnPage()),
+              },
+            ]
           : []),
         ...(canMarkArea.value
           ? [
@@ -1251,7 +1316,7 @@ usePaletteOffer("drop", () => {
                 label: "Comment on an area",
                 icon: "i-mingcute-message-1-line",
                 kbds: ["R"],
-                onSelect: toggleCommentArea,
+                onSelect: usage.palette("area", toggleCommentArea),
               },
             ]
           : []),
@@ -1265,7 +1330,7 @@ usePaletteOffer("drop", () => {
               label: style.label,
               icon: style.icon,
               active: review === style.value,
-              onSelect: () => (commentStyleModel.value = style.value),
+              onSelect: usage.palette(`style-${style.value}`, () => (commentStyleModel.value = style.value)),
             }))
           : []),
         ...(!lightbox.value && !shownVersion.value && framed.value && pinned.value.length > 0
@@ -1274,7 +1339,7 @@ usePaletteOffer("drop", () => {
                 label: "Hide comments",
                 icon: overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",
                 active: !overlays.pins,
-                onSelect: () => toggleOverlay("pins"),
+                onSelect: usage.palette("pins", () => toggleOverlay("pins")),
               },
             ]
           : []),
@@ -1290,7 +1355,7 @@ usePaletteOffer("drop", () => {
             icon: tip.icon,
             kbds: [tip.key],
             active: marking.value && pen.tip === id,
-            onSelect: () => annotations.mark(id),
+            onSelect: usage.palette("mark", () => annotations.mark(id)),
           })),
           ...(marking.value
             ? [
@@ -1340,7 +1405,7 @@ usePaletteOffer("drop", () => {
             icon: "i-mingcute-aiming-2-line",
             kbds: ["S"],
             active: tool.value === "measure",
-            onSelect: () => setTool("measure"),
+            onSelect: usage.palette("measure", () => setTool("measure")),
           },
         ]
       : []),
@@ -1351,7 +1416,7 @@ usePaletteOffer("drop", () => {
             icon: "i-mingcute-ruler-line",
             kbds: ["U"],
             active: overlays.rulers,
-            onSelect: () => toggleOverlay("rulers"),
+            onSelect: usage.palette("rulers", () => toggleOverlay("rulers")),
           },
         ]
       : []),
@@ -1362,7 +1427,7 @@ usePaletteOffer("drop", () => {
             icon: "i-mingcute-layout-grid-line",
             kbds: ["X"],
             active: overlays.xray,
-            onSelect: () => toggleOverlay("xray"),
+            onSelect: usage.palette("xray", () => toggleOverlay("xray")),
           },
         ]
       : []),
@@ -1372,7 +1437,10 @@ usePaletteOffer("drop", () => {
             label: "Device mode",
             icon: "i-mingcute-device-line",
             active: deviceSize.value.on,
-            onSelect: () => (deviceSize.value = { ...deviceSize.value, on: !deviceSize.value.on }),
+            onSelect: usage.palette(
+              "device",
+              () => (deviceSize.value = { ...deviceSize.value, on: !deviceSize.value.on }),
+            ),
           },
         ]
       : []),
@@ -1382,7 +1450,7 @@ usePaletteOffer("drop", () => {
       icon: "i-mingcute-zazen-line",
       kbds: ["Z"],
       active: zen.value,
-      onSelect: toggleZen,
+      onSelect: usage.palette("zen", toggleZen),
     },
     ...(widens.value
       ? widths.map((width) => ({
@@ -1391,7 +1459,7 @@ usePaletteOffer("drop", () => {
           icon: "i-mingcute-text-line",
           kbds: ["W"],
           active: docWidth.value === width.value,
-          onSelect: () => (docWidth.value = width.value),
+          onSelect: usage.palette("width", () => (docWidth.value = width.value)),
         }))
       : []),
     ...(presence.people.value.length
@@ -1411,7 +1479,7 @@ usePaletteOffer("drop", () => {
             suffix: `v${shownVersion.value?.version ?? drop.value.version} · ${timeAgo(shownAt.value, now.value)}`,
             icon: "i-mingcute-history-line",
             kbds: canvasShown.value ? undefined : ["H"],
-            onSelect: () => showDetails(true),
+            onSelect: usage.palette("details", () => showDetails(true)),
           },
         ]
       : []),
@@ -1420,7 +1488,7 @@ usePaletteOffer("drop", () => {
       suffix: [detailsChip.value, `dropped ${timeAgo(drop.value.createdAt, now.value)}`].filter(Boolean).join(" · "),
       icon: "i-mingcute-information-line",
       kbds: ["I"],
-      onSelect: () => showDetails(Boolean(detailsChip.value)),
+      onSelect: usage.palette("details", () => showDetails(Boolean(detailsChip.value))),
     },
   ]
 
@@ -1526,7 +1594,7 @@ usePaletteOffer("drop", () => {
       { id: "links", label: "Links", items: links },
     ],
   }
-})
+}
 
 const sameFrame = (comment: DropComment, at: number | undefined, pdfPage: number | undefined) =>
   (at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05) &&
@@ -1931,6 +1999,7 @@ watch(
                 <UButton
                   aria-label="Drop"
                   data-review-home
+                  data-usage="home"
                   color="neutral"
                   size="xs"
                   :to="visitor ? '/' : '/drops'"
@@ -2030,6 +2099,7 @@ watch(
                 size="xs"
                 v-if="slidev && contentOrigin && !lightbox && !shownVersion"
                 color="neutral"
+                data-usage="present"
                 icon="i-mingcute-presentation-2-line"
                 label="Present"
                 variant="ghost"
@@ -2134,6 +2204,7 @@ watch(
                     <UButton
                       size="xs"
                       color="neutral"
+                      data-usage="edit"
                       icon="i-mingcute-pencil-line"
                       label="Edit"
                       :loading="live.opening.value"
@@ -2153,6 +2224,7 @@ watch(
                       size="xs"
                       :aria-pressed="zen"
                       color="neutral"
+                      data-usage="zen"
                       icon="i-mingcute-zazen-line"
                       label="Zen"
                       variant="ghost"

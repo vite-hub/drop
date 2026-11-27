@@ -22,6 +22,7 @@ const button = {
   "aria-label": "Copy prompt for your agent",
   class: "[animation:pop-in_200ms_var(--ease-out)]",
   color: "neutral",
+  "data-usage": "copy-prompt",
   icon: "i-mingcute-copy-2-line",
   size: "xs",
   variant: "ghost",

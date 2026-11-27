@@ -58,6 +58,7 @@ export function useViewerAnnotations(options: {
   reviewOpen?: Ref<boolean>
   shot?: (file: File | null) => void
   onPageClick?: () => void
+  onShortcut?: (key: string, action: () => boolean | undefined) => void
 }) {
   const { drop, editing } = options
   const selection = ref<Selection | null>(null)
@@ -142,12 +143,14 @@ export function useViewerAnnotations(options: {
     focusGeneration++
     popover.value = selection.value = null
     tool.value = tool.value === next ? "browse" : next
+    return true
   }
   const toggleArea = () => setTool("comment")
   function toggleOverlay(name: keyof ViewerOverlays) {
     if (!(options.enabled?.value ?? true)) return
     if (name === "xray" && !inspectsPage.value) return
     overlays[name] = !overlays[name]
+    return true
   }
   const inspectsPage = computed(() => !options.canvas?.value && ["html", "app"].includes(drop.value.kind))
   watch(
@@ -176,7 +179,7 @@ export function useViewerAnnotations(options: {
   watch(tool, (value) => value !== "mark" && (finishing.value = false))
   function mark(tip: MarkTip = pen.tip) {
     pen.tip = tip
-    if (tool.value !== "mark") setTool("mark")
+    return tool.value === "mark" || setTool("mark")
   }
   function resize(step: number) {
     const sizes = MARK_TIPS[pen.tip].sizes
@@ -311,14 +314,18 @@ export function useViewerAnnotations(options: {
     if (key === "c" || key === "e") return commentOnSelection(key === "e")
     if (drop.value.kind === "app" && (under ?? "browse") === "browse") return
     if (key === "v") setTool("browse")
-    if (key === "r") setTool("comment")
-    if (key === "s") setTool("measure")
-    if (key === "u") toggleOverlay("rulers")
-    if (key === "x") toggleOverlay("xray")
-    if (key === "b") mark("marker")
-    if (key === "p") mark("pen")
-    if (key === "a") mark("arrow")
-    if (key === "t") mark("text")
+    const run = (action: () => boolean | undefined) => {
+      if (options.onShortcut) options.onShortcut(key, action)
+      else action()
+    }
+    if (key === "r") run(() => setTool("comment"))
+    if (key === "s") run(() => setTool("measure"))
+    if (key === "u") run(() => toggleOverlay("rulers"))
+    if (key === "x") run(() => toggleOverlay("xray"))
+    if (key === "b") run(() => mark("marker"))
+    if (key === "p") run(() => mark("pen"))
+    if (key === "a") run(() => mark("arrow"))
+    if (key === "t") run(() => mark("text"))
     if (key === "[" && tool.value === "mark") resize(-1)
     if (key === "]" && tool.value === "mark") resize(1)
   }

@@ -55,7 +55,13 @@ function viewer(kind = "markdown", optionsOverride = {}) {
 
 test("entering a prototype canvas clears inspection and blocks toolbar and frame shortcuts", () => {
   const canvas = ref(false)
-  const state = viewer("html", { canvas })
+  const pressed = []
+  const state = viewer("html", {
+    canvas,
+    onShortcut: (key, action) => {
+      if (action()) pressed.push(key)
+    },
+  })
   state.setTool("measure")
   state.toggleOverlay("xray")
   assert.equal(state.frameTool.value, "measure")
@@ -70,16 +76,23 @@ test("entering a prototype canvas clears inspection and blocks toolbar and frame
   for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
   assert.equal(state.frameTool.value, "browse")
   assert.equal(state.overlays.xray, false)
+  assert.deepEqual(pressed, [])
 
   canvas.value = false
   for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
   assert.equal(state.frameTool.value, "measure")
   assert.equal(state.overlays.xray, true)
+  assert.deepEqual(pressed, ["s", "x"])
 })
 const frame = { left: 0, top: 0, scale: 1 }
 
-test("a frame Marker retry releases Done without leaving Marker mode or losing strokes", () => {
-  const annotations = viewer()
+test("a frame Marker retry releases Done and app browse keys do not dispatch shortcuts", () => {
+  const pressed = []
+  const annotations = viewer("app", {
+    onShortcut: (key, action) => {
+      if (action()) pressed.push(key)
+    },
+  })
   let receive
   const globals = {
     useCopy: () => ({ copy: () => {} }),
@@ -107,9 +120,17 @@ test("a frame Marker retry releases Done without leaving Marker mode or losing s
         bottom: ref(0),
         width: ref("readable"),
         annotations,
+        toggleZen: () => pressed.push("z"),
       }),
     )
-    annotations.setTool("mark")
+    receive({ type: "key", key: "z", tool: "browse" }, frame)
+    receive({ type: "key", key: "b", tool: "browse" }, frame)
+    assert.deepEqual(pressed, [])
+    assert.equal(annotations.frameTool.value, "browse")
+    receive({ type: "key", key: "z", tool: "comment" }, frame)
+    receive({ type: "key", key: "b", tool: "comment" }, frame)
+    assert.deepEqual(pressed, ["z", "b"])
+    assert.equal(annotations.frameTool.value, "mark")
     receive({ type: "marks", count: 1 }, frame)
     annotations.finishing.value = true
     receive({ type: "mark-retry" }, frame)

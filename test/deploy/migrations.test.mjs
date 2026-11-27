@@ -115,6 +115,13 @@ test.each(["fresh database", "existing Wrangler ledger", "ledger with pins"])(
         [...applied, ...expected].map((migration) => migration.name),
       )
       assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE name = 'drops'").get())
+      database.exec(
+        "INSERT INTO ui_usage (day, release, kind, mode, control, via, count) VALUES ('2026-11-27', '0.1.0', 'markdown', 'browse', 'zen', 'click', 1) ON CONFLICT DO UPDATE SET count = count + excluded.count",
+      )
+      database.exec(
+        "INSERT INTO ui_usage (day, release, kind, mode, control, via, count) VALUES ('2026-11-27', '0.1.0', 'markdown', 'browse', 'zen', 'click', 2) ON CONFLICT DO UPDATE SET count = count + excluded.count",
+      )
+      assert.equal(database.prepare("SELECT count FROM ui_usage").get().count, 3)
       if (applied.length) {
         if (scenario !== "ledger with pins") {
           database.exec("INSERT INTO drop_pins (user_id, drop_id, at) VALUES ('reader', 'doc', 42)")

@@ -4,6 +4,7 @@ import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlit
 import { quotaReservations } from "./quotas"
 import { abuseReports } from "./trust"
 import { skillSettings } from "./skills"
+import { uiUsage } from "./usage"
 import { reviewSubmissions } from "./review-submissions"
 import { invitation, member, organization, subscription } from "./teams"
 import {
@@ -151,6 +152,7 @@ export {
   quotaReservations,
   abuseReports,
   skillSettings,
+  uiUsage,
   reviewSubmissions,
   blobCleanup,
   codeImages,
@@ -210,6 +212,7 @@ export default defineDatabase({
     rateLimit,
     session,
     subscription,
+    uiUsage,
     user,
     verification,
   },
