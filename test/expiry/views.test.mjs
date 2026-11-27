@@ -7,6 +7,7 @@ const { default: detailHandler } = await import("../../server/api/drops/[id].get
 const { default: visitHandler } = await import("../../server/api/drops/[id]/visit.post.ts")
 const { default: cleanup } = await import("../../server/schedules/cleanup.ts")
 const { DAY_MS } = await import("../../shared/expiry.ts")
+const { CLIENT_IP_HEADERS, VIEWER_IP_HEADERS } = await import("../../shared/client-ip.ts")
 
 migrate()
 beforeEach(reset)
@@ -101,6 +102,30 @@ test("without a client IP header, views count by the runtime address, whatever h
   assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 1, agent: 0 })
   await visitFrom("192.0.2.8", {})
   assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 2, agent: 0 })
+})
+
+test("on Deno Deploy, visitors behind one edge peer count apart by the last X-Forwarded-For value", async () => {
+  vi.useFakeTimers({ toFake: ["Date"], now })
+  insertDrop("doc", { visibility: "shared" })
+  state.clientIpHeader = CLIENT_IP_HEADERS.deno ?? ""
+  state.viewerIpHeader = VIEWER_IP_HEADERS.deno
+  const visitThroughEdge = (headers) => {
+    state.who = null
+    const event = request("/api/drops/doc/visit", { method: "POST", id: "doc", headers: { ...beacon, ...headers } })
+    // srvx sets `ip` from Deno's connection, which is the edge on Deno Deploy (nitrojs/nitro#4719).
+    Object.defineProperty(event.req, "ip", { value: "34.120.0.1" })
+    return visitHandler(event)
+  }
+  await visitThroughEdge({ "x-forwarded-for": "198.51.100.7" })
+  await visitThroughEdge({ "x-forwarded-for": "192.0.2.8" })
+  assert.deepEqual(await viewsOf("doc"), { person: 0, anonymous: 2, agent: 0 }, "two clients, one edge, one browser")
+  await visitThroughEdge({ "x-forwarded-for": "203.0.113.1, 198.51.100.7" })
+  await visitThroughEdge({ "x-forwarded-for": "203.0.113.2,192.0.2.8" })
+  assert.deepEqual(
+    await viewsOf("doc"),
+    { person: 0, anonymous: 2, agent: 0 },
+    "values the client sends don't add views",
+  )
 })
 
 test("anonymous views distinguish IPv6 addresses in the same /64", async () => {

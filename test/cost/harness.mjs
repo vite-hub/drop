@@ -229,6 +229,7 @@ export function reset() {
   state.failBurst = false
   delete state.burstRetryAfter
   delete state.clientIpHeader
+  delete state.viewerIpHeader
   state.ogRenders.length = 0
   state.refreshedLinks.length = 0
   state.ogBrowser = true

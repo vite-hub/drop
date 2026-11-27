@@ -5,7 +5,7 @@ import { useServerEnv } from "vite-hub/env"
 import { DAY_MS } from "#shared/expiry"
 import type { ViewerKind } from "#shared/types"
 import { dropViewers, dropViews } from "../databases/default/index"
-import { clientAddress } from "./client-address"
+import { viewerAddress } from "./client-address"
 import type { DropRow } from "./drops"
 import { isHumanVisit } from "./expiry"
 import type { Identity } from "./identity"
@@ -35,7 +35,7 @@ export async function countView(event: H3Event, row: Viewed, who: Identity | nul
 
 async function visitorId(event: H3Event, dropId: string, day: number) {
   const headers = event.req.headers
-  const address = clientAddress(event) ?? ""
+  const address = viewerAddress(event) ?? ""
   const secret = useServerEnv(event).auth?.secret?.unseal() || "drop-views"
   const key = await crypto.subtle.importKey(
     "raw",

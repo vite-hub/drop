@@ -5,7 +5,7 @@ import evlog from "evlog/nitro/v3"
 import type { NuxtConfig } from "nuxt/schema"
 import type { NuxtSecurityRouteRules } from "nuxt-security"
 import { env } from "vite-hub/env"
-import { CLIENT_IP_HEADERS } from "./shared/client-ip.ts"
+import { CLIENT_IP_HEADERS, VIEWER_IP_HEADERS } from "./shared/client-ip.ts"
 import { DROP_PAGE_ROUTES } from "./shared/csp.ts"
 import { DEFAULT_EXPIRY_DAYS } from "./shared/expiry.ts"
 import { ROBOTS_DISALLOW } from "./shared/robots.ts"
@@ -217,6 +217,7 @@ export default defineNuxtConfig({
     deployment: { host },
     seoIndex: false,
     clientIpHeader: CLIENT_IP_HEADERS[host] ?? "",
+    viewerIpHeader: VIEWER_IP_HEADERS[host] ?? "",
     public: { realtime: liveEditing },
   },
 

@@ -5,3 +5,7 @@ import { forwardedAddress } from "#shared/client-ip"
 export function clientAddress(event: H3Event): string | undefined {
   return forwardedAddress(event.req.headers, useRuntimeConfig().clientIpHeader) || getRequestIP(event)
 }
+
+export function viewerAddress(event: H3Event): string | undefined {
+  return forwardedAddress(event.req.headers, useRuntimeConfig().viewerIpHeader) || getRequestIP(event)
+}

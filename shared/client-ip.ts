@@ -4,6 +4,8 @@ export const CLIENT_IP_HEADERS: Readonly<Record<string, string>> = {
   vps: "x-forwarded-for",
 }
 
+export const VIEWER_IP_HEADERS: Readonly<Record<string, string>> = { ...CLIENT_IP_HEADERS, deno: "x-forwarded-for" }
+
 export function forwardedAddress(headers: Headers, header: string): string | undefined {
   if (!header) return undefined
   return headers
