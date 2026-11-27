@@ -2,7 +2,6 @@
 import { RelativeTime } from "vite-hub/ui"
 import type { TabsItem } from "@nuxt/ui"
 import { PLAN_TEMPLATE } from "#shared/plan-template"
-import type { SendEndpoint, SendTestResult } from "~/utils/comment-send"
 
 definePageMeta({ middleware: () => void useAgentList() })
 
@@ -22,32 +21,6 @@ const tabsUi = {
 
 const client = ref<McpClient>("claude")
 const { agents, status, disconnect } = useAgents()
-
-const endpoint = ref<SendEndpoint | null>(null)
-const tested = ref<SendTestResult | null>(null)
-const testing = ref(false)
-const loadEndpoint = async () => {
-  endpoint.value = await dropSend.endpoint()
-}
-const pairable = ["T3 Code", "Claude Code", "Codex"]
-async function sendTest() {
-  testing.value = true
-  try {
-    tested.value = await dropSend.test()
-  } finally {
-    testing.value = false
-  }
-}
-async function removeEndpoint() {
-  await dropSend.remove()
-  tested.value = null
-}
-let unwatchEndpoint: (() => void) | undefined
-onMounted(() => {
-  void loadEndpoint()
-  unwatchEndpoint = dropSend.onChange(() => void loadEndpoint())
-})
-onBeforeUnmount(() => unwatchEndpoint?.())
 </script>
 
 <template>
@@ -90,56 +63,6 @@ onBeforeUnmount(() => unwatchEndpoint?.())
         Once it's connected, ask it for something to review, like “Write a one-page plan for what we're building next
         and drop it for review.” It answers with the link.
       </p>
-    </UCard>
-
-    <UCard class="mt-4" :ui="{ body: 'p-5 sm:p-5' }">
-      <h2 class="font-medium text-highlighted">Send comments to</h2>
-      <div
-        v-if="!endpoint"
-        class="mt-4 flex items-center gap-3 rounded-lg border border-dashed border-default px-4 py-3"
-      >
-        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated ring-1 ring-default ring-inset">
-          <UIcon name="i-mingcute-send-plane-line" class="size-4 text-muted" />
-        </span>
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-highlighted">Connect from any Send button.</p>
-          <p class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-            <span v-for="name in pairable" :key="name" class="inline-flex items-center gap-1">
-              <AgentIcon :name="name" kind="agent" class="size-3.5" />{{ name }}
-            </span>
-          </p>
-        </div>
-      </div>
-      <div v-else class="mt-4 flex items-center gap-3 rounded-lg border border-default px-4 py-3">
-        <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-elevated ring-1 ring-default ring-inset">
-          <AgentIcon :name="endpoint.agent.name" kind="agent" class="size-5" />
-        </span>
-        <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium text-highlighted">{{ endpoint.agent.name }} · Default</p>
-          <p v-if="tested?.status === 'delivered'" class="flex items-center gap-1 truncate text-xs text-success">
-            <UIcon name="i-mingcute-check-circle-line" class="size-3.5 shrink-0" />{{
-              tested.code === null ? "In the inbox" : `Delivered · ${tested.code} in ${tested.ms} ms`
-            }}
-          </p>
-          <p v-else-if="tested" class="flex items-center gap-1 truncate text-xs text-error">
-            <UIcon name="i-mingcute-alert-octagon-line" class="size-3.5 shrink-0" />Not delivered · {{ tested.reason }}
-          </p>
-          <p v-else class="truncate text-xs text-muted">
-            {{ endpoint.agent.host ?? "Inbox" }}
-            <template v-if="endpoint.lastSentAt"> · last sent <RelativeTime :at="endpoint.lastSentAt" /> </template>
-          </p>
-        </div>
-        <UButton
-          color="neutral"
-          icon="i-mingcute-send-plane-line"
-          label="Test default"
-          :loading="testing"
-          size="sm"
-          variant="ghost"
-          @click="sendTest"
-        />
-        <UButton color="neutral" label="Disconnect all" size="sm" variant="ghost" @click="removeEndpoint" />
-      </div>
     </UCard>
 
     <section class="mt-8">

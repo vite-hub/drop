@@ -100,6 +100,31 @@ test("pins and areas on a canvas item move with it in the same frame as the pan"
   }
 }, 30_000)
 
+test("with Space down in the page, letting go of ⌘ puts the Hand down, so a click comments again", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, { bar: true })
+    await page.evaluate(() => send({ type: "tool", tool: "comment", clickComments: true }))
+    await frame.waitForFunction(() => document.querySelector("drop-comments").shadowRoot.querySelector(".draw"))
+    await frame.evaluate(() => {
+      document.activeElement?.blur()
+      window.focus()
+    })
+    // On a Mac, Space let go while ⌘ is down sends no keyup: only ⌘'s keyup reaches the page.
+    await page.keyboard.down(" ")
+    await frame.waitForFunction(() => document.documentElement.dataset.prototypeHand === "")
+    await page.keyboard.down("Meta")
+    await page.keyboard.up("Meta")
+    await frame.waitForFunction(() => !("prototypeHand" in document.documentElement.dataset))
+    const two = await frame.locator("#v-two").boundingBox()
+    await page.mouse.click(two.x + 100, two.y + 100)
+    await page.waitForFunction(() => posts.some((m) => m.type === "area"))
+    await page.keyboard.up(" ")
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
 test("an area drawn across two canvas items goes on the one it covers most, and stays on it while it's written", async () => {
   const browser = await chromium.launch()
   try {

@@ -45,6 +45,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
 
   const room = shallowRef<RealtimeRoom>()
   const tick = ref(0)
+  const notices = ref(0)
   let generation = 0
   function leave() {
     generation++
@@ -72,6 +73,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
       joined.setLocal("active", active.value)
       joined.setLocal("at", options.at())
       joined.onUpdate(() => tick.value++)
+      joined.onNotice(() => notices.value++)
       room.value = joined
     },
     { immediate: true },
@@ -137,7 +139,7 @@ export function usePresence(drop: Ref<DropDetail>, options: { at: () => string |
     return [...current.states().values()].map((state) => stateOf(state).comments ?? "").join()
   })
 
-  return { people, cursors, sharing, showCursors, point, activity, commented, commentsChange }
+  return { people, cursors, sharing, showCursors, point, activity, commented, commentsChange, notices }
 }
 
 export type Presence = ReturnType<typeof usePresence>

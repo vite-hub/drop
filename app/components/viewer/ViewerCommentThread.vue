@@ -15,6 +15,7 @@ const props = defineProps<{
   draft?: string
   draftError?: string
   floating?: boolean
+  agentPrompt?: (comment: DropComment) => string | undefined
 }>()
 const emit = defineEmits<{
   submit: [body: string, files: File[], mentions: string[]]
@@ -41,27 +42,8 @@ const lookup = async (query: string) => {
 }
 const error = ref<string | undefined>(props.draftError)
 watch(body, () => (error.value = undefined))
-const busy = computed(() => Boolean(draft?.waiting.value))
 const files = draft?.images.files ?? ref<File[]>([])
 const problem = computed(() => draft?.images.problem.value)
-const composerBody = computed({
-  get: () => body.value,
-  set: (value) => {
-    if (!busy.value) body.value = value
-  },
-})
-const composerFiles = computed({
-  get: () => files.value,
-  set: (value) => {
-    if (!busy.value) files.value = value
-  },
-})
-const composerMentions = computed({
-  get: () => mentions.value,
-  set: (value) => {
-    if (!busy.value) mentions.value = value
-  },
-})
 
 const suggesting = computed(() => props.pending?.suggestion !== undefined)
 const suggestion = computed({
@@ -78,7 +60,6 @@ onMounted(() => {
 })
 
 function send(submit?: CommentComposerSubmit) {
-  if (busy.value) return
   const text = submit?.body ?? body.value
   const changed = suggesting.value && suggestion.value !== props.pending?.quote
   if (!text.trim() && !files.value.length && !changed) return
@@ -96,6 +77,17 @@ defineExpose({
 })
 
 const thread = computed(() => (props.comment ? dropComments.thread(props.comment) : undefined))
+const prompt = computed(() =>
+  props.comment && props.agentPrompt && !props.comment.delivery && !props.comment.resolved
+    ? props.agentPrompt(props.comment)
+    : undefined,
+)
+const t3Link = computed(() => {
+  if (!prompt.value) return undefined
+  const url = new URL("https://app.t3.codes/new")
+  url.searchParams.set("prompt", prompt.value)
+  return url.href
+})
 const versionTo = useVersionTo()
 const state = injectDrop()!
 const earlier = computed(() =>
@@ -142,13 +134,12 @@ const edit = (messageId: string, text: string, ids: string[]) =>
         {{ pending.quote }}
       </p>
       <CommentComposer
-        v-model="composerBody"
-        v-model:files="composerFiles"
-        v-model:mentions="composerMentions"
+        v-model="body"
+        v-model:files="files"
+        v-model:mentions="mentions"
         :accept="accept"
         allow-empty
         :autofocus="false"
-        :busy="busy"
         :error="error || problem"
         :guard="false"
         layout="row"
@@ -192,7 +183,6 @@ const edit = (messageId: string, text: string, ids: string[]) =>
                 color="neutral"
                 :disabled="suggestion === pending.quote && !body.trim()"
                 icon="i-mingcute-arrow-up-line"
-                :loading="busy"
                 size="sm"
                 variant="ghost"
                 @click="send()"
@@ -236,6 +226,33 @@ const edit = (messageId: string, text: string, ids: string[]) =>
             @click="emit('accept', comment.id)"
           />
         </UTooltip>
+        <template v-if="prompt">
+          <UTooltip text="Open in T3 Code">
+            <UButton
+              aria-label="Open in T3 Code"
+              color="neutral"
+              data-action="open-in-t3-code"
+              rel="noopener noreferrer"
+              size="xs"
+              target="_blank"
+              :to="t3Link"
+              variant="ghost"
+            >
+              <AgentIcon class="size-3.5" kind="agent" name="T3 Code" />
+            </UButton>
+          </UTooltip>
+          <UTooltip text="Copy a prompt for your agent">
+            <DropCopyButton
+              aria-label="Copy prompt"
+              color="neutral"
+              data-action="copy-prompt"
+              icon="i-mingcute-copy-2-line"
+              size="xs"
+              :value="prompt"
+              variant="ghost"
+            />
+          </UTooltip>
+        </template>
         <UTooltip v-if="!comment.delivery" text="Copy link">
           <UButton
             aria-label="Copy link"

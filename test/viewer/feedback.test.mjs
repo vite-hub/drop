@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "vite-plus/test"
 import { needsLook } from "../../app/utils/comment-threads.ts"
-import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "../../shared/feedback.ts"
+import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswer } from "../../shared/feedback.ts"
 
 test("copied image-only feedback includes fetchable comment and reply images", () => {
   const output = feedbackMarkdown(
@@ -95,6 +95,19 @@ const reply = (fields) => ({
   createdAt: 2,
   attachments: [],
   ...fields,
+})
+
+test("feedback on a capture links to the site review and targets the site rather than the image", () => {
+  const site = { id: "site-id", kind: "site", title: "Storefront", link: "storefront", slug: "review" }
+  const target = feedbackPromptTarget(
+    { id: "capture-id", kind: "image", title: "Screenshot", isOwner: true, ancestors: [site] },
+    "https://drop.test/d/capture",
+  )
+  const prompt = promptMarkdown(target.drop, target.url, [thread(4)])
+  assert.match(prompt, /comment 4 on "Storefront"/)
+  assert.match(prompt, /https:\/\/drop\.test\/d\/storefront\/review/)
+  assert.match(prompt, /read_drop for drop site-id\. Fix the site/)
+  assert.doesNotMatch(prompt, /capture-id|publish the next version/)
 })
 
 test("a resolved thread with a reply since asks for a look", () => {

@@ -366,12 +366,14 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // Each read takes a number, and only the latest one may draw: a read that started before a sent comment was saved
   // would erase its pin.
   let reads = 0;
+  let primaryComments = false;
   async function refresh() {
     if (!token) return;
     here = pageKey();
     const read = ++reads;
     try {
-      const response = await call(api + "?page=" + encodeURIComponent(here));
+      const path = api + (primaryComments ? "/refresh" : "") + "?page=" + encodeURIComponent(here);
+      const response = await call(path, primaryComments ? { method: "POST" } : undefined);
       const answer = await response.json();
       if (read !== reads || here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
@@ -1467,13 +1469,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     joining = true;
     try {
       const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
-      const client = await import(drop + "/review-presence.js?v=2");
+      const client = await import(drop + "/review-presence.js?v=3");
       if (!token || presence) return;
       const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);
       room.setLocal("at", herePage());
       presence = { room, you: answer.you && answer.you.id, expiresAt: Number(answer.expiresAt) || 0, comments: "" };
       room.onUpdate(onPresence);
+      room.onNotice(() => {
+        primaryComments = true;
+        void refresh();
+      });
     } catch (e) {
       // Not shared with this reviewer, no Realtime on this Drop, or a page whose CSP blocks the client: no faces.
     } finally {

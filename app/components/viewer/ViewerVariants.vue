@@ -63,12 +63,18 @@ const release = () => {
   if (holding) emit("command", "release")
   holding = false
 }
-useEventListener("keyup", (event: KeyboardEvent) => {
-  if (event.key !== " " || !holding) return
-  event.preventDefault()
-  release()
-})
+useEventListener(
+  "keyup",
+  (event: KeyboardEvent) => {
+    if (!holding || (event.key !== " " && event.key !== "Meta")) return
+    if (event.key === " ") event.preventDefault()
+    release()
+  },
+  { capture: true },
+)
 useEventListener("blur", release)
+useEventListener(document, "visibilitychange", () => document.hidden && release())
+onBeforeUnmount(release)
 
 const tool = computed(() => props.state.tool ?? "move")
 const zoomItems = computed<DropdownMenuItem[][]>(() => [

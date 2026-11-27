@@ -3,7 +3,7 @@ import type { DocWidth } from "#shared/documents"
 import type { DetailsAction } from "~/components/viewer/ViewerDetailsSegment.vue"
 import type { PdfPage } from "~/components/viewer/ViewerPdf.vue"
 import type { VideoFrame } from "~/components/viewer/ViewerVideo.vue"
-import { breakpointsTailwind, promiseTimeout } from "@vueuse/core"
+import { breakpointsTailwind } from "@vueuse/core"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { ViewerVariants } from "~/composables/useViewerFrame"
 import { expiryLabel } from "#shared/expiry"
@@ -12,7 +12,7 @@ import { isPdf, videoType } from "#shared/plans"
 import { clock, startTime } from "#shared/video-time"
 import type { DocHeader, DocHeaderFact, DocHeaderFolder, DocHeaderKindIcon, DocHeaderWho } from "#shared/doc-header"
 import { knownAgent } from "#shared/agents"
-import { feedbackMarkdown, promptMarkdown, waitingForAnswer } from "#shared/feedback"
+import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswer } from "#shared/feedback"
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
@@ -48,6 +48,7 @@ const siteReview =
     ? useApi<SiteReviewItem[]>(() => `/api/drops/${drop.value.id}/review`, {
         key: () => keys.review(drop.value.id),
         default: () => [],
+        onRequest: state.commentRead,
       })
     : undefined
 const screenshots = computed(() => new Map((siteReview?.data.value ?? []).map((item) => [item.id, item.screenshot])))
@@ -69,7 +70,8 @@ const { data: me } = useMe()
 const visitor = computed(() => publicView && !me.value)
 const openCount = computed(() => comments.value.filter(needsLook).length)
 const second = useNow({ scheduler: (update) => useIntervalFn(update, 1000) })
-const deliveryCount = computed(() => waitingCount(comments.value, second.value.getTime()))
+const outbox = useCommentsOutbox()
+const deliveryCount = computed(() => waitingCount(comments.value, outbox.clock(second.value.getTime())))
 const link = useShareUrl(drop)
 const now = useRelativeNow()
 const trashed = computed(() => drop.value.trashedAt !== null)
@@ -275,11 +277,15 @@ const presence = usePresence(drop, {
   enabled: () => !visitor.value && !trashed.value,
 })
 state.onWrote(() => presence.commented())
-watch(presence.commentsChange, (change, before) => {
-  if (change === before) return
+function refreshComments() {
   void state.comments.refresh()
   void siteReview?.refresh()
+}
+watch([presence.commentsChange, presence.notices], () => {
+  state.preferPrimaryComments()
+  refreshComments()
 })
+useEventListener("focus", refreshComments)
 
 function startEdit() {
   if (lightbox.value) return
@@ -918,8 +924,13 @@ const readerId = computed(
     "",
 )
 const waiting = computed(() => waitingForAnswer(publishedComments.value, { me: readerId.value }))
-const canSend = computed(() => Boolean(me.value) && drop.value.canComment && !drop.value.siteScreenshot)
-const prompt = () => promptMarkdown(drop.value, feedbackLink.value, waiting.value, pageErrors.value.length)
+const promptTarget = computed(() => feedbackPromptTarget(drop.value, feedbackLink.value))
+const prompt = () =>
+  promptMarkdown(promptTarget.value.drop, promptTarget.value.url, waiting.value, pageErrors.value.length)
+const threadPrompt = (comment: DropComment) => {
+  const thread = waiting.value.find((item) => item.id === comment.id)
+  if (thread) return promptMarkdown(promptTarget.value.drop, promptTarget.value.url, [thread])
+}
 function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
@@ -985,37 +996,22 @@ watch(shownVersion, (version) => {
   }
 })
 
-const SHOT_WAIT = 1500
-
-async function submit(body: string, files: File[] = [], mentions: string[] = []) {
-  const open = popover.value
-  if (open?.type !== "new" || reviewDraft.waiting.value) return
-  const draftScope = reviewDraft.scope.value
-  const before = reviewDraft.images.picks.value.length
-  reviewDraft.waiting.value = true
-  try {
-    await Promise.race([annotations.waitForShot(), promiseTimeout(SHOT_WAIT)])
-    if (popover.value !== open || reviewDraft.scope.value !== draftScope) return
-    const attached = reviewDraft.images.picks.value.length === before ? files : reviewDraft.images.files.value
-    const sent = await state.addComment(
-      { ...open.pending, ...(isApp.value ? { page: page.value } : {}) },
-      body,
-      attached,
-      mentions,
-    )
-    if (reviewDraft.scope.value !== draftScope) return
-    if ("value" in sent) {
-      reviewDraft.clear()
-      if (popover.value === open) {
-        popover.value = null
-        send({ type: "clear-selection" })
-        return showSent(sent.value.id)
-      }
-    } else if (popover.value === open) await popoverRef.value?.fail(sent.error)
-  } finally {
-    reviewDraft.waiting.value = false
-  }
-}
+const { submit } = usePinSubmit({
+  popover,
+  draft: reviewDraft,
+  page: () => (isApp.value ? page.value : undefined),
+  shown: () => autoShot,
+  shotFor: (id) => annotations.shotFor(id),
+  ready: () => Boolean(outbox.ready()),
+  prepare: () => outbox.writable(),
+  addComment: state.addComment,
+  closed: () => send({ type: "clear-selection" }),
+  sent: showSent,
+  fail: async (reason) => {
+    await nextTick()
+    await popoverRef.value?.fail(reason)
+  },
+})
 
 async function keepFocus() {
   await nextTick()
@@ -1667,6 +1663,7 @@ watch(
       :draft="popover.type === 'new' ? popover.body : undefined"
       :draft-error="popover.type === 'new' ? popover.error : undefined"
       :floating="pinThread"
+      :agent-prompt="threadPrompt"
       :can-accept="canAccept"
       :accepting="Boolean(accepting) && accepting === threadComment?.id"
       :version="drop.version"
@@ -2057,16 +2054,8 @@ watch(
                 @pins="toggleOverlay('pins')"
               >
                 <template #tools>
-                  <ViewerCommentSend
-                    v-if="canSend"
-                    v-show="!lightbox && !commentMode"
-                    :comments="publishedComments"
-                    :drop="drop.id"
-                    :prompt="prompt"
-                    :send="dropSend"
-                  />
                   <ViewerCopyPrompt
-                    v-if="(pageErrors.length || (!canSend && waiting.length)) && !lightbox && !commentMode"
+                    v-if="(pageErrors.length || waiting.length) && !lightbox && !commentMode"
                     :count="waiting.length"
                     :errors="pageErrors.length"
                     :signed-in="Boolean(me)"

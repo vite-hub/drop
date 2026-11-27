@@ -106,6 +106,7 @@ export const state = (globalThis.dropTest = {
   failBurst: false,
   ogRenders: [],
   refreshedLinks: [],
+  notices: [],
   ogBrowser: true,
   failDelete: false,
   failServe: false,
@@ -232,6 +233,8 @@ export function reset() {
   delete state.viewerIpHeader
   state.ogRenders.length = 0
   state.refreshedLinks.length = 0
+  state.notices.length = 0
+  delete state.authSecret
   state.ogBrowser = true
   state.quotasEnabled = false
   state.shareApproval = false

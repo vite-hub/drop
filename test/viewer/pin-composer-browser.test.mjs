@@ -86,7 +86,9 @@ writeFileSync(
     ...(dock.value ? { pending: { kind: "page", selector: "" } } : {}),
     onSubmit: (body, files, mentions) => {
       submissions.push({ body, files: files.map(file => file.name), ...(mentions.length ? { mentions } : {}) })
-      draft.waiting.value = true
+      // As DropViewer does: the comment goes to the outbox and the draft starts over.
+      draft.clear()
+      draft.mentions.value = []
     },
     onCancel: () => {
       cancellations++
@@ -131,89 +133,48 @@ const pastePicture = (page, name) =>
     field.dispatchEvent(new ClipboardEvent("paste", { clipboardData: clipboard, cancelable: true, bubbles: true }))
   }, name)
 
-test(
-  "compact drafts stay unchanged while waiting for a screenshot, then become editable again",
-  { timeout: 60_000 },
-  async () => {
-    const browser = await chromium.launch()
-    try {
-      const page = await open(browser)
-      const field = page.locator("textarea")
-      // The bubble around the box is its frame, so the box draws no edge of its own on focus (Drop comment #14).
-      const box = page.locator('[data-slot="comment-composer"]')
-      assert.equal(await box.getAttribute("data-frame"), "none")
-      assert.equal(await box.getAttribute("data-size"), "sm")
-      await field.focus()
-      const group = page.locator('[data-slot="prompt-input-group"]')
-      assert.equal(await group.evaluate((element) => getComputedStyle(element).borderTopColor), "rgba(0, 0, 0, 0)")
-      await field.fill("Keep this feedback")
-      await pastePicture(page, "original.png")
-      await field.press("Enter")
-      assert.deepEqual(await page.evaluate(() => submissions), [
-        { body: "Keep this feedback", files: ["original.png"] },
-      ])
+test("a compact draft sends at once and the next comment starts empty", { timeout: 60_000 }, async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await open(browser)
+    const field = page.locator("textarea")
+    // The bubble around the box is its frame, so the box draws no edge of its own on focus (Drop comment #14).
+    const box = page.locator('[data-slot="comment-composer"]')
+    assert.equal(await box.getAttribute("data-frame"), "none")
+    assert.equal(await box.getAttribute("data-size"), "sm")
+    await field.focus()
+    const group = page.locator('[data-slot="prompt-input-group"]')
+    assert.equal(await group.evaluate((element) => getComputedStyle(element).borderTopColor), "rgba(0, 0, 0, 0)")
+    await field.fill("Keep this feedback")
+    await pastePicture(page, "original.png")
+    await field.press("Enter")
+    assert.deepEqual(await page.evaluate(() => submissions), [{ body: "Keep this feedback", files: ["original.png"] }])
+    assert.equal(await field.inputValue(), "")
+    assert.deepEqual(await page.evaluate(() => draft.images.files.value), [])
 
-      // The frame's screenshot still joins the draft while the reader's edits are locked.
-      await page.evaluate(() => {
-        draft.images.add([new File(["shot"], "shot.png", { type: "image/png" })])
-      })
-      await field.focus()
-      await field.press("End")
-      await field.pressSequentially(" edits during waiting")
-      // The pictures sit in a stack beside the text; hovering it fans the cards out to their Remove buttons.
-      await page.locator('[data-slot="comment-image-stack"]').hover()
-      await page
-        .getByRole("button", { name: /^Remove / })
-        .first()
-        .click({ force: true })
-      await pastePicture(page, "replacement.png")
-      await field.press("Escape")
-      assert.equal(await page.evaluate(() => cancellations), 0)
-      assert.equal(await page.evaluate(() => unhandledEscapes), 0)
-      assert.equal(await field.inputValue(), "Keep this feedback")
-      assert.deepEqual(await page.evaluate(() => draft.images.files.value.map((file) => file.name)), [
-        "original.png",
-        "shot.png",
-      ])
+    // Nothing waits on the first: the next comment takes text and pictures and sends too.
+    await field.pressSequentially("And the next")
+    await pastePicture(page, "next.png")
+    await field.press("Enter")
+    assert.deepEqual(await page.evaluate(() => submissions.at(-1)), { body: "And the next", files: ["next.png"] })
+    assert.equal(await field.inputValue(), "")
 
-      // Once the wait is over, the controls work again, with the draft and its screenshot.
-      await page.evaluate(() => {
-        draft.waiting.value = false
-      })
-      await field.press("End")
-      await field.pressSequentially(" retry")
-      await page.locator('[data-slot="comment-image-stack"]').hover()
-      await page
-        .getByRole("button", { name: /^Remove / })
-        .first()
-        .click()
-      await pastePicture(page, "replacement.png")
-      await field.press("Enter")
-      assert.deepEqual(await page.evaluate(() => submissions.at(-1)), {
-        body: "Keep this feedback retry",
-        files: ["shot.png", "replacement.png"],
-      })
-
-      // Escape still discards an idle draft once the submission is no longer in flight: the first press asks, the second
-      // discards, as in every ViteHub comment box.
-      await page.evaluate(() => {
-        draft.waiting.value = false
-      })
-      await page.waitForTimeout(2100)
-      await field.press("Escape")
-      assert.equal(await page.evaluate(() => cancellations), 0)
-      await field.press("Escape")
-      assert.equal(await page.evaluate(() => cancellations), 1)
-      assert.equal(await field.inputValue(), "")
-      assert.deepEqual(await page.evaluate(() => draft.images.files.value), [])
-    } finally {
-      await browser.close()
-    }
-  },
-)
+    // Escape discards an idle draft: the first press asks, the second discards, as in every ViteHub comment box.
+    await field.fill("Not this one")
+    await page.waitForTimeout(2100)
+    await field.press("Escape")
+    assert.equal(await page.evaluate(() => cancellations), 0)
+    await field.press("Escape")
+    assert.equal(await page.evaluate(() => cancellations), 1)
+    assert.equal(await page.evaluate(() => unhandledEscapes), 0)
+    assert.equal(await field.inputValue(), "")
+  } finally {
+    await browser.close()
+  }
+})
 
 test(
-  "mention choices remain visible, survive replacement, and cannot mutate a draft waiting for its screenshot",
+  "mention choices remain visible, survive replacement, and Send leaves the draft empty",
   { timeout: 60_000 },
   async () => {
     const browser = await chromium.launch()
@@ -240,36 +201,17 @@ test(
       await page.getByRole("button", { name: "Comment", exact: true }).click()
       assert.deepEqual(await page.evaluate(() => submissions.at(-1).mentions), ["ana"])
       assert.deepEqual(await page.evaluate(() => submissions.at(-1).files), ["retained.png"])
-
-      await page.evaluate(() => {
-        draft.waiting.value = false
-        draft.clear()
-      })
       assert.equal(await field.inputValue(), "")
       assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
 
+      // Send with a lookup still open sends what was typed and empties the draft.
       await page.evaluate(() => replaceComposer(false))
-
-      // Each attempt starts with a lookup opened before the real Send-button interaction.
-      for (const selection of ["keyboard", "pointer"]) {
-        await field.fill("@An")
-        await option.waitFor()
-        await page.getByRole("button", { name: "Comment", exact: true }).click()
-        if (selection === "keyboard") {
-          await field.focus()
-          await field.press("Enter")
-        } else {
-          await option.click({ force: true })
-        }
-        assert.equal(await field.inputValue(), "@An", selection)
-        assert.deepEqual(await page.evaluate(() => draft.mentions.value), [], selection)
-        await page.evaluate(() => {
-          draft.waiting.value = false
-          draft.clear()
-        })
-        assert.equal(await field.inputValue(), "")
-        assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
-      }
+      await field.fill("@An")
+      await option.waitFor()
+      await page.getByRole("button", { name: "Comment", exact: true }).click()
+      assert.equal(await page.evaluate(() => submissions.at(-1).body), "@An")
+      assert.equal(await field.inputValue(), "")
+      assert.deepEqual(await page.evaluate(() => draft.mentions.value), [])
     } finally {
       await browser.close()
     }
