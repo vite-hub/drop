@@ -183,6 +183,7 @@ export default defineNuxtConfig({
             freeKept: env.number({ source: env.source("DROP_FREE_KEPT"), default: DEFAULT_FREE_KEPT }),
           },
           teams: env.boolean({ source: env.source("DROP_TEAMS"), default: false }),
+          usageCounts: env.boolean({ source: env.source("DROP_USAGE_COUNTS"), default: true }),
           billing: {
             stripeSecretKey: env({ secret: true, optional: true, source: env.source("STRIPE_SECRET_KEY") }),
             stripeWebhookSecret: env({ secret: true, optional: true, source: env.source("STRIPE_WEBHOOK_SECRET") }),

@@ -38,7 +38,7 @@ onMounted(() => {
 function focusTrigger() {
   root.value?.querySelector<HTMLButtonElement>("[data-review-trigger]")?.focus({ preventScroll: true })
 }
-defineExpose({ focusTrigger, top })
+defineExpose({ focusTrigger, top, toolbar })
 
 const handle = useTemplateRef<HTMLElement>("handle")
 const collapsed = computed(() => Boolean(props.folded) && !peek.value)

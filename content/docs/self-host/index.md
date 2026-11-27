@@ -135,6 +135,65 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 
 **Browser errors.** ViteHub reports uncaught errors on `browserError`. Failures Drop catches go through its own reporter with the response status, request ID, and drop when known. It skips refusals, aborts, offline browsers, pages that are closing, and 5xx responses that carry Drop's own error body.
 
+## Usage counts {#usage}
+
+**Drop counts which review pill controls people press**, and how often each was on screen, so you can tell which controls earn their place. The counts carry no user, drop, or IP address: the browser sends tallies, and the server adds them to one row per day in the `ui_usage` table.
+
+| Column | What it holds |
+| --- | --- |
+| `day` | The UTC date, such as `2026-11-27`. |
+| `release` | The version and commit that answered, such as `0.1.0+90c558bb`. |
+| `kind` | The kind of drop open: `markdown`, `html`, `site`, and so on. |
+| `mode` | `comment` while comment mode was on, `browse` otherwise. |
+| `control` | The control, such as `comments`, `area`, `share`, or `zen`. `shared/ui-usage.ts` lists them all. |
+| `via` | `shown` when it came on screen, or how it was pressed: `click`, `key`, or `palette` for ⌘K. |
+| `count` | How many times that day. |
+
+**Shown** counts each time a control appears in the pill on a page view, so a control that stays put counts once per drop opened. Controls in the **+** menu count as shown when the menu opens. A shortcut or ⌘K press counts even when the control wasn't on screen, and `area` and `page` have no pill button, so they only count presses.
+
+**How it travels.** The browser holds its tallies and sends them as one `ui.usage` event to `/api/client-events` when the page hides, 30 seconds after the first press, or after 200 distinct tallies. Each batch is logged like any client event and has its own rate limit, 30 a minute per address.
+
+**Turn it off** with `DROP_USAGE_COUNTS=false`. The browser then counts and sends nothing, and the server answers a stray batch without storing or logging it. Restart to apply, as with any setting.
+
+| Variable | What it does |
+| --- | --- |
+| [DROP_USAGE_COUNTS]{.font-mono .text-xs} | Set false to stop counting pill controls. Defaults to true. |
+
+### Read the counts {#usage-query}
+
+Presses against times shown, per control, for a date range. On Cloudflare:
+
+```sh
+npx wrangler d1 execute <your-d1-database> --remote --command "
+  SELECT control,
+    SUM(CASE WHEN via = 'shown' THEN count ELSE 0 END) AS shown,
+    SUM(CASE WHEN via = 'click' THEN count ELSE 0 END) AS clicks,
+    SUM(CASE WHEN via = 'key' THEN count ELSE 0 END) AS keys,
+    SUM(CASE WHEN via = 'palette' THEN count ELSE 0 END) AS palette,
+    SUM(CASE WHEN via <> 'shown' THEN count ELSE 0 END) AS pressed
+  FROM ui_usage
+  WHERE day BETWEEN '2026-11-01' AND '2026-11-30'
+  GROUP BY control
+  ORDER BY pressed DESC"
+```
+
+On a VPS, run the same `SELECT` with `sqlite3` against the file `DROP_DATABASE_URL` names, `.data/database/drop.db` by default. Add `kind` or `mode` to the `SELECT` and `GROUP BY` to split by drop kind or by comment mode, and filter on `release` to compare two versions.
+
+### Other client events {#client-events}
+
+The browser reports a few other moments through the same route. Each is one log event with `action: "client-event"` and the event under `client`; none is stored in the database, and `DROP_USAGE_COUNTS` doesn't affect them.
+
+| Event | When |
+| --- | --- |
+| `card.shown` | Someone got Drop's card instead of a drop, with the `reason`: signed out, no access, expired, and so on. |
+| `signin.clicked` | Someone pressed a sign-in button, with the `mode` (`github` or `proxy`) and `via` (`button` or `card`). |
+| `signin.switch_account` | Someone signed in opened the sign-in page to switch accounts. |
+| `signin.failed` | Sign-in failed in the browser, with the error `code` and `status` when known. |
+| `consent.allowed`, `consent.denied` | Someone answered an agent's request to connect. |
+| `consent.invalid_link` | Someone opened a connect link that was broken or expired. |
+| `consent.failed` | Answering the request failed, with the `code` and `status` when known. |
+| `ui.usage` | A batch of the pill counts above. |
+
 ## Database and migrations {#database}
 
 VPS and Docker builds use local SQLite on persistent disk by default. The other hosts each use their own Cloudflare D1 database, over D1's HTTP API outside Cloudflare. All of them apply the migrations in `server/databases/default/migrations`, one folder each.

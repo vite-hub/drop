@@ -42,6 +42,7 @@ const item =
         class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
         :class="on && 'bg-inverted text-inverted hover:bg-inverted hover:text-inverted'"
         data-review-trigger
+        data-usage="comments"
         type="button"
         @click="emit('toggle')"
       >
@@ -67,6 +68,7 @@ const item =
       <button
         aria-label="Hide comments"
         :aria-pressed="!pinsShown"
+        data-usage="pins"
         class="-ml-1 grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100 pointer-coarse:ml-0"
         type="button"
         @click="emit('pins')"
@@ -99,6 +101,7 @@ const item =
           <button
             :aria-label="option.label"
             :aria-pressed="style === option.value"
+            :data-usage="`style-${option.value}`"
             class="grid size-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-highlighted aria-pressed:bg-elevated aria-pressed:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96 motion-reduce:active:scale-100"
             type="button"
             @click="style = option.value"
@@ -113,7 +116,14 @@ const item =
           <UIcon name="i-mingcute-file-line" class="size-3.5" />Whole page
         </button>
       </UTooltip>
-      <button aria-controls="drop-comments" :aria-expanded="listOpen" :class="item" type="button" @click="emit('list')">
+      <button
+        aria-controls="drop-comments"
+        :aria-expanded="listOpen"
+        :class="item"
+        data-usage="list"
+        type="button"
+        @click="emit('list')"
+      >
         <UIcon name="i-mingcute-list-check-line" class="size-3.5" />All comments
         <span v-if="count && !listOpen" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
           count

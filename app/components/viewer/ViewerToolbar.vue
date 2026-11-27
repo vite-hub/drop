@@ -92,6 +92,7 @@ const groups = computed(() =>
             :aria-keyshortcuts="item.kbd"
             :aria-label="item.label"
             :aria-pressed="item.on"
+            :data-usage="item.id"
             class="grid size-8 shrink-0 place-items-center rounded-md outline-none select-none [-webkit-tap-highlight-color:transparent] focus-visible:ring-2 focus-visible:ring-tool/50 motion-safe:transition-[scale,background-color,color] motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-[0.96]"
             :class="item.on ? 'bg-tool text-white' : 'text-highlighted hover:bg-elevated'"
             type="button"
@@ -107,7 +108,7 @@ const groups = computed(() =>
     </template>
     <template v-if="sizable">
       <div v-if="groups.length" aria-hidden="true" class="w-1 shrink-0" />
-      <div aria-label="Device" class="flex items-center" role="group">
+      <div aria-label="Device" class="flex items-center" data-usage="device" role="group">
         <ViewerDeviceButton />
       </div>
     </template>

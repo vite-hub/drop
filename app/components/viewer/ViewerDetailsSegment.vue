@@ -74,7 +74,13 @@ const popoverUi = {
       <span v-if="$slots.tools" aria-hidden="true" class="w-1 shrink-0" />
       <slot name="lifetime" />
       <UPopover v-if="chip" v-model:open="popOpen" :content="{ side: 'top', sideOffset: 10 }" :ui="popoverUi">
-        <button :aria-keyshortcuts="history ? 'H' : undefined" :aria-label="chipLabel" :class="chipClass" type="button">
+        <button
+          :aria-keyshortcuts="history ? 'H' : undefined"
+          :aria-label="chipLabel"
+          :class="chipClass"
+          data-usage="details"
+          type="button"
+        >
           <UIcon :name="history ? 'i-mingcute-history-line' : 'i-mingcute-document-2-line'" class="size-3.5" />{{
             chip
           }}
@@ -87,7 +93,7 @@ const popoverUi = {
         </template>
       </UPopover>
       <UTooltip v-if="width" text="Reading width" :kbds="['W']" :content="{ side: 'top', sideOffset: 8 }">
-        <button aria-keyshortcuts="W" :class="chipClass" type="button" @click="emit('width')">
+        <button aria-keyshortcuts="W" :class="chipClass" data-usage="width" type="button" @click="emit('width')">
           <UIcon name="i-mingcute-text-line" class="size-3.5" /><span class="sr-only">Reading width: </span>{{ width }}
         </button>
       </UTooltip>
@@ -99,7 +105,7 @@ const popoverUi = {
         :kbds="action.kbd ? [action.kbd] : undefined"
         :content="{ side: 'top', sideOffset: 8 }"
       >
-        <NuxtLink v-if="action.to" :aria-label="action.label" :class="square" :to="action.to">
+        <NuxtLink v-if="action.to" :aria-label="action.label" :class="square" :data-usage="action.id" :to="action.to">
           <UIcon :name="action.icon" class="size-4" />
         </NuxtLink>
         <button
@@ -107,6 +113,7 @@ const popoverUi = {
           :aria-label="action.label"
           :aria-pressed="action.pressed"
           :class="square"
+          :data-usage="action.id"
           type="button"
           @click="action.press?.()"
         >
@@ -124,6 +131,7 @@ const popoverUi = {
           <button
             :aria-label="action.label"
             :class="[square, 'hover:text-error']"
+            :data-usage="action.id"
             type="button"
             @click="action.press?.()"
           >
@@ -140,6 +148,7 @@ const popoverUi = {
       aria-keyshortcuts="I"
       :aria-label="open ? 'Close' : 'More'"
       :class="[square, open && 'bg-inverted text-inverted hover:bg-inverted hover:text-inverted']"
+      data-usage="more"
       type="button"
       @click="open = !open"
     >

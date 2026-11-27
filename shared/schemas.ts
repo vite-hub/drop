@@ -5,6 +5,8 @@ import { MAX_SLUG, slugify } from "./links"
 import { MIB } from "./quotas"
 import { MAX_REVIEW_PAGE, SITE_ADDRESS_RULE, siteAddress } from "./review"
 import { SHARES } from "./share"
+import { DROP_KINDS } from "./types"
+import { MAX_USAGE_COUNTS, UI_CONTROLS, UI_MODES, UI_VIAS } from "./ui-usage"
 
 export const MAX_FILE_BYTES = 4 * MIB
 
@@ -275,4 +277,20 @@ export const ClientEventSchema = v.variant("event", [
     event: v.picklist(["signin.switch_account", "consent.allowed", "consent.denied", "consent.invalid_link"]),
   }),
   v.strictObject({ event: v.picklist(["signin.failed", "consent.failed"]), ...failure }),
+  v.strictObject({
+    event: v.literal("ui.usage"),
+    counts: v.pipe(
+      v.array(
+        v.strictObject({
+          kind: v.picklist(DROP_KINDS),
+          mode: v.picklist(UI_MODES),
+          control: v.picklist(UI_CONTROLS),
+          via: v.picklist(UI_VIAS),
+          count: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10_000)),
+        }),
+      ),
+      v.minLength(1),
+      v.maxLength(MAX_USAGE_COUNTS),
+    ),
+  }),
 ])

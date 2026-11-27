@@ -16,6 +16,7 @@ import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswe
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
+import { KEY_CONTROLS } from "#shared/ui-usage"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type {
   DropComment,
@@ -121,7 +122,7 @@ const siteRef = useTemplateRef<{
   pending: boolean
 }>("siteRef")
 const commentsRef = useTemplateRef<{ focusComposer: () => void; focusComment: (id: string) => void }>("commentsRef")
-const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number }>("reviewDock")
+const reviewDock = useTemplateRef<{ focusTrigger: () => void; top: number; toolbar: HTMLElement | null }>("reviewDock")
 function showComments() {
   if (!hasComments.value || editing.value) return
   shareOpen.value = false
@@ -142,6 +143,12 @@ function toggleComments() {
   else showComments()
 }
 const commentMode = ref(false)
+const usage = useUiUsage({
+  pill: () => reviewDock.value?.toolbar,
+  kind: () => drop.value.kind,
+  commenting: () => commentMode.value,
+  view: () => drop.value.id,
+})
 function toggleCommentMode() {
   if (!hasComments.value || editing.value || trashed.value) return
   if (!canUseCommentMode.value) return toggleComments()
@@ -544,6 +551,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     openDrop: (id) => void router.push(`/drops/${id}`),
     palette: usePaletteOpener(),
     toggleZen,
+    pressed: (key) => key !== "c" && key !== "e" && usage.press(KEY_CONTROLS[key], "key"),
     escape: leaveZen,
     errors: pageErrors,
   })
@@ -620,31 +628,33 @@ function present() {
   openPath("/presenter/1")
 }
 
-defineShortcuts({
-  c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
-  e: () => (selection.value ? commentOnSelection(true) : edit()),
-  h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
-  i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
-  r: toggleCommentArea,
-  v: () => {
-    tool.value = "browse"
-    if (canvasShown.value) canvasTool("move")
-  },
-  s: () => framed.value && setTool("measure"),
-  b: () => canMark.value && annotations.mark("marker"),
-  p: () => canMark.value && annotations.mark("pen"),
-  a: () => canMark.value && annotations.mark("arrow"),
-  t: () => canMark.value && annotations.mark("text"),
-  meta_z: () => undoMark(),
-  u: () => framed.value && toggleOverlay("rulers"),
-  x: () => framed.value && toggleOverlay("xray"),
-  l: () => !editing.value && copyLink("Link copied"),
-  d: () => !editing.value && download(),
-  m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
-  w: () => widens.value && nextWidth(),
-  z: toggleZen,
-  meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
-})
+defineShortcuts(
+  usage.keys({
+    c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
+    e: () => (selection.value ? commentOnSelection(true) : edit()),
+    h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
+    i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
+    r: toggleCommentArea,
+    v: () => {
+      tool.value = "browse"
+      if (canvasShown.value) canvasTool("move")
+    },
+    s: () => framed.value && setTool("measure"),
+    b: () => canMark.value && annotations.mark("marker"),
+    p: () => canMark.value && annotations.mark("pen"),
+    a: () => canMark.value && annotations.mark("arrow"),
+    t: () => canMark.value && annotations.mark("text"),
+    meta_z: () => undoMark(),
+    u: () => framed.value && toggleOverlay("rulers"),
+    x: () => framed.value && toggleOverlay("xray"),
+    l: () => !editing.value && copyLink("Link copied"),
+    d: () => !editing.value && download(),
+    m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
+    w: () => widens.value && nextWidth(),
+    z: toggleZen,
+    meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
+  }),
+)
 const typing = (event: KeyboardEvent) =>
   event.target instanceof HTMLElement &&
   (event.target.isContentEditable || /^(input|textarea|select)$/i.test(event.target.tagName))
@@ -1129,7 +1139,8 @@ const shownAt = computed(() => {
   const version = shownVersion.value?.version ?? drop.value.version
   return drop.value.versions.find((item) => item.version === version)?.createdAt ?? drop.value.updatedAt
 })
-usePaletteOffer("drop", () => {
+usePaletteOffer("drop", () => usage.palette(dropPalette()))
+function dropPalette() {
   if (visitor.value) return null
   const title = drop.value.title
   if (editing.value)
@@ -1526,7 +1537,7 @@ usePaletteOffer("drop", () => {
       { id: "links", label: "Links", items: links },
     ],
   }
-})
+}
 
 const sameFrame = (comment: DropComment, at: number | undefined, pdfPage: number | undefined) =>
   (at === undefined ? comment.at === null : comment.at !== null && Math.abs(comment.at - at) < 0.05) &&
@@ -1931,6 +1942,7 @@ watch(
                 <UButton
                   aria-label="Drop"
                   data-review-home
+                  data-usage="home"
                   color="neutral"
                   size="xs"
                   :to="visitor ? '/' : '/drops'"
@@ -2030,6 +2042,7 @@ watch(
                 size="xs"
                 v-if="slidev && contentOrigin && !lightbox && !shownVersion"
                 color="neutral"
+                data-usage="present"
                 icon="i-mingcute-presentation-2-line"
                 label="Present"
                 variant="ghost"
@@ -2134,6 +2147,7 @@ watch(
                     <UButton
                       size="xs"
                       color="neutral"
+                      data-usage="edit"
                       icon="i-mingcute-pencil-line"
                       label="Edit"
                       :loading="live.opening.value"
@@ -2153,6 +2167,7 @@ watch(
                       size="xs"
                       :aria-pressed="zen"
                       color="neutral"
+                      data-usage="zen"
                       icon="i-mingcute-zazen-line"
                       label="Zen"
                       variant="ghost"

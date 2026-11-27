@@ -58,6 +58,7 @@ function focusPanel(event: Event) {
       ref="trigger"
       aria-label="Share drop"
       class="shrink-0"
+      data-usage="share"
       color="neutral"
       :icon="SHARE_ICONS[drop.share]"
       label="Share"
