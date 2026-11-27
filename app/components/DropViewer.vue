@@ -476,8 +476,11 @@ function toggleCommentArea() {
   if (canUseCommentMode.value && !trashed.value) {
     if (commentMode.value) return
     commentMode.value = true
-  } else showComments()
-  return true
+    return true
+  }
+  const wasOpen = commentsOpen.value
+  showComments()
+  return !wasOpen && commentsOpen.value
 }
 if (route.query.changes && hasHistory.value) showDetails(true)
 
