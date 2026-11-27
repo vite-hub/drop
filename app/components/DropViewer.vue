@@ -1017,7 +1017,7 @@ const showEditTool = computed(
   () =>
     !lightbox.value &&
     !shownVersion.value &&
-    (drop.value.canEdit || (drop.value.kind === "markdown" && drop.value.editNote)),
+    Boolean(drop.value.canEdit || (drop.value.kind === "markdown" && drop.value.editNote)),
 )
 watch(shownVersion, (version) => {
   if (version) {
