@@ -2055,7 +2055,7 @@ watch(
               >
                 <template #tools>
                   <ViewerCopyPrompt
-                    v-if="(pageErrors.length || waiting.length) && !lightbox && !commentMode"
+                    v-if="(pageErrors.length || waiting.length) && !lightbox"
                     :count="waiting.length"
                     :errors="pageErrors.length"
                     :signed-in="Boolean(me)"
