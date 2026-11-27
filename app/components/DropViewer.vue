@@ -2038,7 +2038,6 @@ watch(
               <ViewerCommentsSegment
                 v-model:on="commentMode"
                 v-model:style="commentStyleModel"
-                :can-comment="canCommentOnPage"
                 :can-use-mode="canUseCommentMode"
                 :count="openCount"
                 :waiting="deliveryCount"
@@ -2053,7 +2052,6 @@ watch(
                 :pins-shown="overlays.pins"
                 @toggle="toggleCommentMode"
                 @list="toggleComments"
-                @page="commentOnPage"
                 @pins="toggleOverlay('pins')"
               >
                 <template #tools>

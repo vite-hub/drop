@@ -88,7 +88,7 @@ To find a drop in any folder, use [Search](/docs/features#search).
 | A PDF's page | Press **Comment on page** in the bar over the pages, then click a spot or drag an area on the page. Its pin stays on that page and opens the page and its thread again. The comment keeps the page's number and carries the page as its image, so agents see it. |
 | An element or part of a page | Pick **Comment** in the toolbar under the page, or press :kbd[R]. Click an element to pin a comment to it, or drag a rectangle. The tool stays on for the next one. |
 | Anything you'd rather draw on | Pick **Marker** in the toolbar, or press :kbd[B] while you point at it. See [Marker](#marker). |
-| The whole page | Write in the box at the bottom of the Comments panel. |
+| The whole page | Write in the box at the bottom of the Comments panel, or pick **Comment on the whole page** in the command palette (:kbd[⌘K]). |
 
 A comment shows the moment you send it, images too, with a clock on its pin until Drop has it. **With no network** it waits in the browser, stays through a reload, and goes out once the network is back. After a couple of seconds it says **Waiting to send**, and the toolbar counts what waits. Closing the tab or signing out while one hasn't gone out asks first.
 

@@ -332,8 +332,8 @@ async function selectText(page, words, body) {
   await newComment(page).press("Enter")
 }
 async function pageComment(page, body) {
-  await startCommenting(page)
-  await page.getByRole("button", { name: "Whole page" }).click()
+  await page.keyboard.press("ControlOrMeta+k")
+  await page.getByRole("option", { name: "Comment on the whole page" }).click()
   const box = page.getByRole("textbox", { name: "Comment" }).last()
   await box.waitFor()
   await box.fill(body)
