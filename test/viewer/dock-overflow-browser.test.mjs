@@ -81,6 +81,7 @@ const entry = `
       const open = Vue.ref(false)
       const params = new URL(location.href).searchParams
       const withPrompt = params.has("prompt")
+      const commenting = params.has("commenting")
       const zen = params.has("zen")
       const button = label => Vue.h("button", null, label)
       if (zen) return () => Vue.h(Dock, { open: false, heading: "none", overlay: true, folded: true }, {
@@ -94,7 +95,7 @@ const entry = `
       return () => [Vue.h(Dock, { ref: dock, open: false, heading: "none", overlay: true }, {
         toolbar: () => withPrompt ? [
           ...["Drop", "View", "Mark"].map(label => Vue.h("button", { style: { width: "44px" } }, label)),
-          Vue.h(Comments, { on: false, count: 1, listOpen: false, canComment: true, canUseMode: true, pins: true, pinsShown: true }, {
+          Vue.h(Comments, { on: commenting, count: 1, listOpen: false, canUseMode: true, pins: true, pinsShown: true }, {
             tools: () => Vue.h("button", { "aria-label": "Copy prompt" }),
           }),
           ...["Share", "Tools", "More"].map(label => Vue.h("button", { style: { width: "44px" } }, label)),
@@ -109,7 +110,7 @@ const entry = `
             }),
             spacer(),
             Vue.h(Toolbar, { tool: "browse", sizable: false, tools: ["mark"], views: [] }),
-            Vue.h(Comments, { on: false, count: params.has("pins") ? 42 : 0, canComment: true, canUseMode: true, listOpen: false, pins: params.has("pins"), pinsShown: false, onToggle: () => { window.toggles = (window.toggles ?? 0) + 1 } }),
+            Vue.h(Comments, { on: false, count: params.has("pins") ? 42 : 0, canUseMode: true, listOpen: false, pins: params.has("pins"), pinsShown: false, onToggle: () => { window.toggles = (window.toggles ?? 0) + 1 } }),
             spacer(),
             Vue.h("button", { "aria-label": "Share drop", class: "inline-flex shrink-0 items-center" }, [Vue.h("span", { class: "iconify" }), Vue.h("span", { class: "review-share-label" }, "Share")]),
           ] : []),
@@ -435,3 +436,18 @@ for (const width of [320, 640, 667, 1440])
       await browser.close()
     }
   }, 30_000)
+
+test("comment mode offers All comments, with no Whole page or Stop commenting buttons", async () => {
+  const browser = await chromium.launch()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 600 }, reducedMotion: "reduce" })
+    await openDock(page, "?prompt&commenting")
+    const actions = page.getByRole("group", { name: "Comment actions" })
+    await actions.getByRole("button", { name: /^All comments/ }).waitFor()
+    assert.equal(await actions.getByRole("button", { name: "Whole page" }).count(), 0)
+    assert.equal(await page.getByRole("button", { name: "Stop commenting" }).count(), 0)
+    assert.equal(await page.getByRole("button", { name: "Hide comments" }).count(), 1)
+  } finally {
+    await browser.close()
+  }
+}, 30_000)

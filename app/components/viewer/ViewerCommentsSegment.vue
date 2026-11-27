@@ -7,12 +7,11 @@ defineProps<{
   count: number
   waiting?: number
   listOpen: boolean
-  canComment: boolean
   canUseMode: boolean
   pins?: boolean
   pinsShown?: boolean
 }>()
-const emit = defineEmits<{ page: []; list: []; toggle: []; pins: [] }>()
+const emit = defineEmits<{ list: []; toggle: []; pins: [] }>()
 
 const styles = [
   { value: "card", label: "Cards beside the text", icon: "i-mingcute-layout-right-line" },
@@ -108,27 +107,12 @@ const item =
         </UTooltip>
         <span aria-hidden="true" class="w-1 shrink-0" />
       </template>
-      <UTooltip v-if="canComment" text="Comment on the whole page" :content="{ side: 'top', sideOffset: 8 }">
-        <button :class="item" type="button" @click="emit('page')">
-          <UIcon name="i-mingcute-file-line" class="size-3.5" />Whole page
-        </button>
-      </UTooltip>
       <button aria-controls="drop-comments" :aria-expanded="listOpen" :class="item" type="button" @click="emit('list')">
         <UIcon name="i-mingcute-list-check-line" class="size-3.5" />All comments
         <span v-if="count && !listOpen" class="rounded bg-elevated px-1 text-[10px] leading-[17px] tabular-nums">{{
           count
         }}</span>
       </button>
-      <UTooltip text="Stop commenting" :kbds="['Esc']" :content="{ side: 'top', sideOffset: 8 }">
-        <button
-          aria-label="Stop commenting"
-          class="grid size-7 shrink-0 place-items-center rounded-md text-toned transition-colors hover:bg-elevated hover:text-highlighted focus-visible:outline-2 focus-visible:outline-inverted active:scale-96"
-          type="button"
-          @click="on = false"
-        >
-          <UIcon name="i-mingcute-close-line" class="size-4" />
-        </button>
-      </UTooltip>
     </div>
   </div>
 </template>
