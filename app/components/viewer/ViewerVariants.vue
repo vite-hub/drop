@@ -3,12 +3,15 @@ import type { DropdownMenuItem } from "@nuxt/ui"
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
 const props = defineProps<{ state: ViewerVariants }>()
-const emit = defineEmits<{ command: [command: PickerCommand, index?: number] }>()
+const emit = defineEmits<{ command: [command: PickerCommand, index?: number]; view: [hash: string] }>()
 const group = useTemplateRef<HTMLElement>("group")
 const shown = computed(() => props.state.variants[props.state.current]!)
 const count = computed(() => props.state.variants.length)
 
+// The address names the item in focus (#v-…), or where the canvas looks (#@v-…,x,y,zoomz), which the picker reports
+// once the reader moves the camera, as Google Maps keeps its map in the address.
 const named = () => props.state.variants.findIndex((variant) => variant.id && `#${variant.id}` === location.hash)
+const viewed = () => location.hash.startsWith("#@")
 let opened = false
 watch(
   () => props.state,
@@ -17,10 +20,14 @@ watch(
       opened = true
       const at = named()
       if (at >= 0 && (state.canvas || at !== state.current)) return emit("command", "show", at)
+      if (viewed()) return emit("view", location.hash)
     }
     if (!state.canvas && shown.value.id) {
       if (location.hash !== `#${shown.value.id}`) history.replaceState(history.state, "", `#${shown.value.id}`)
-    } else if (state.canvas && named() >= 0)
+    } else if (state.canvas && state.view) {
+      const hash = new URL(`#${state.view}`, location.href).hash
+      if (location.hash !== hash) history.replaceState(history.state, "", hash)
+    } else if (state.canvas && (named() >= 0 || viewed()))
       history.replaceState(history.state, "", location.pathname + location.search)
   },
   { immediate: true },
@@ -29,6 +36,7 @@ watch(
 useEventListener("hashchange", () => {
   const at = named()
   if (at >= 0) emit("command", "show", at)
+  else if (viewed()) emit("view", location.hash)
 })
 
 let navigating = false

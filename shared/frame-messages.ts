@@ -137,6 +137,8 @@ export const FrameMessage = v.variant("type", [
       canvas: v.boolean(),
       zoom: v.pipe(v.number(), v.minValue(0), v.maxValue(1000)),
       tool: v.optional(v.picklist(["move", "hand"])),
+      // Where the canvas is looking, for the address (`@<id>,<x>,<y>,<zoom>z`); empty when it fits everything.
+      view: v.optional(v.pipe(v.string(), v.maxLength(400), v.regex(/^(@.+,-?[\d.]+,-?[\d.]+,[\d.]+z)?$/))),
     }),
     v.check((message) => message.current < message.variants.length),
   ),

@@ -16,7 +16,9 @@
 // `data-x` and `data-y` (plane px) on an item place it on the canvas; items without them follow in rows to the right,
 // a new row once one passes 5600px. The page remembers the canvas camera and where the reader moved items (never
 // content); Reset layout forgets the moves. ⌘Z or Ctrl+Z takes back a move or a Reset layout, ⇧⌘Z or Ctrl+Y redoes it.
-// The URL hash (#v-…) names the item in focus.
+// The URL hash names the item in focus (#v-…), or on the canvas where the reader is looking, as Google Maps keeps its
+// map in the address: #@v-…,x,y,zoomz puts the screen's middle x, y plane px from that item's top-left corner at zoom
+// percent, so a link or a reload opens on the same spot. Fit all clears it.
 // Inside Drop the camera is remembered per version: a new version opens fitted.
 // `variantchange` fires on document ({ detail: { id, label, visible } }) whenever the visible set or the current item
 // changes: `visible` lists the ids on screen, so an item animates while `visible.includes(its id)`. `canvasmove` fires
@@ -288,7 +290,7 @@
   }
 
   let mode = "", current = -1, gesture = null, space = false, tool = "move", frame = 0, settleTimer = 0, touched = false, suppressUntil = 0;
-  let synced = false, reportedZoom = 0;
+  let synced = false, reportedZoom = 0, placed = false, wanted = null, shared = "";
   let dockBottom = 72, fitted = null;
   let labelFocusFrame = 0;
   const cam = saved.camera ? { ...saved.camera } : { x: 48, y: 64, z: 1 };
@@ -555,7 +557,7 @@
   // After a gesture: save, and let Drop's comment pins measure their anchors again.
   function settle() {
     clearTimeout(settleTimer);
-    settleTimer = setTimeout(() => { settleTimer = 0; save(); window.dispatchEvent(new Event("resize")); }, 160);
+    settleTimer = setTimeout(() => { settleTimer = 0; save(); share(); window.dispatchEvent(new Event("resize")); }, 160);
   }
   function save() {
     const positions = {};
@@ -584,6 +586,45 @@
     bound(); schedule(); settle();
   }
   function reset() { cam.x = 48; cam.y = 64; cam.z = 1; touched = true; fitted = null; bound(); schedule(); settle(); }
+  // The view in the address: the screen's middle (between the labels and the bar), from the item nearest it, so it
+  // lands on the same spot for a reader whose items stand elsewhere (moved, or on another version) or whose screen is
+  // another size. Fitting everything has none: a link without one fits the reader's own screen.
+  const VIEW = /^@(.+),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)z$/;
+  const middle = () => { const v = view(); return { x: v.w / 2, y: (56 + v.h - dockBottom) / 2 }; };
+  function viewOf(text) {
+    let s = text;
+    try { s = decodeURIComponent(text); } catch {}
+    const m = VIEW.exec(s), it = m && items.find((it) => it.el.id === m[1]);
+    const ox = it && Number(m[2]), oy = it && Number(m[3]), z = it && Number(m[4]) / 100;
+    return it && finite(ox) && finite(oy) && z > 0 ? { it, ox, oy, z } : null;
+  }
+  function viewText() {
+    const anchors = items.filter((it) => it.el.id);
+    if (mode !== "canvas" || fitted === items || !anchors.length) return "";
+    const m = middle(), px = (m.x - cam.x) / cam.z, py = (m.y - cam.y) / cam.z;
+    const gap = (it) => { const b = box(it); return Math.hypot(Math.max(b.x - px, 0, px - b.x - b.w), Math.max(b.y - py, 0, py - b.y - b.h)); };
+    const it = anchors.reduce((a, b) => (gap(b) < gap(a) ? b : a));
+    return `@${it.el.id},${Math.round(px - it.x)},${Math.round(py - it.y)},${Math.round(cam.z * 1000) / 10}z`;
+  }
+  function look(v) {
+    const m = middle();
+    cam.z = clamp(v.z, MIN_Z, MAX_Z);
+    cam.x = m.x - (v.it.x + v.ox) * cam.z; cam.y = m.y - (v.it.y + v.oy) * cam.z;
+    touched = true; fitted = null; bound(); schedule(); settle();
+  }
+  // A view from the address or Drop: on the canvas once it's laid out.
+  function goTo(v) {
+    wanted = v;
+    if (mode !== "canvas") toCanvas();
+    else if (placed) { wanted = null; look(v); }
+  }
+  function share() {
+    const next = viewText();
+    if (next === shared) return;
+    shared = next;
+    if (mode === "canvas") hash(next);
+    report();
+  }
   // Reset layout: forget this reader's moves, so every item stands where the page places it, and fit them all.
   function relayout() {
     if (gesture?.kind === "move") return;
@@ -643,12 +684,15 @@
     // Coming back from focus centres that item; the first visit fits everything, unless a camera is saved.
     const go = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       if (mode !== "canvas" || gesture?.kind === "move") return;
-      if (from) reveal(from);
+      placed = true;
+      if (wanted) { look(wanted); wanted = null; }
+      else if (from) reveal(from);
       else if (!saved.camera && !touched) fit();
-      else { bound(); schedule(); }
+      else { bound(); schedule(); settle(); }
     }));
     (document.fonts ? document.fonts.ready : Promise.resolve()).then(go, go);
-    hash(null);
+    // An item's id leaves the address; a view on its way stays.
+    if (!wanted) hash(null);
     window.dispatchEvent(new Event("resize"));
     announce();
     save();
@@ -684,6 +728,7 @@
     noteText.title = it.el.dataset.note || "";
     noteText.hidden = !it.el.dataset.note;
     try { localStorage.setItem(key, it.el.id); } catch {}
+    shared = "";
     hash(it.el.id);
     rest();
     // Comment pins measure their anchors on resize, so they follow the item that just appeared.
@@ -691,11 +736,11 @@
     announce();
   }
 
-  // The hash names the item in focus; the canvas has none.
-  function hash(id) {
+  // The hash names the item in focus, or the canvas's view; a canvas fitted to everything has none.
+  function hash(text) {
     try {
-      if (id) history.replaceState(history.state, "", "#" + id);
-      else if (find(location.hash.slice(1)) >= 0) history.replaceState(history.state, "", location.pathname + location.search);
+      if (text) { if (location.hash !== "#" + text) history.replaceState(history.state, "", "#" + text); }
+      else if (find(location.hash.slice(1)) >= 0 || location.hash.startsWith("#@")) history.replaceState(history.state, "", location.pathname + location.search);
     } catch {}
   }
 
@@ -711,7 +756,7 @@
     if (!hosted || !synced || !several) return;
     reportedZoom = Math.round(cam.z * 100);
     const list = variants.map((el) => ({ id: el.id, label: nameOf(el), note: el.dataset.note || "" }));
-    parent.postMessage({ __drop: true, type: "variants", variants: list, current: Math.max(current, 0), canvas: mode === "canvas", zoom: reportedZoom, tool }, "*");
+    parent.postMessage({ __drop: true, type: "variants", variants: list, current: Math.max(current, 0), canvas: mode === "canvas", zoom: reportedZoom, tool, view: shared }, "*");
   }
   const commands = {
     sync: () => { synced = true; report(); },
@@ -719,6 +764,8 @@
     prev: () => mode === "focus" && toFocus(current - 1),
     next: () => mode === "focus" && toFocus(current + 1),
     canvas: () => toCanvas(),
+    // The view in Drop's address; one that names no item here is dropped there.
+    view: (m) => { const v = typeof m.hash === "string" && viewOf(m.hash.replace(/^#/, "")); if (v) goTo(v); else report(); },
     "zoom-in": () => mode === "canvas" && zoomCenter(1.25),
     "zoom-out": () => mode === "canvas" && zoomCenter(1 / 1.25),
     fit: () => mode === "canvas" && fit(),
@@ -751,7 +798,10 @@
   $(".layout").onclick = relayout;
   moveButton.onclick = () => pick("move");
   handButton.onclick = () => pick("hand");
-  window.addEventListener("hashchange", () => { const i = find(location.hash.slice(1)); if (i >= 0) toFocus(i); });
+  window.addEventListener("hashchange", () => {
+    const i = find(location.hash.slice(1)), v = viewOf(location.hash.slice(1));
+    if (i >= 0) toFocus(i); else if (v) goTo(v);
+  });
 
   const typing = (t) => t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName));
   const interactive = (t) => t === host || typing(t) || (t && t.closest && t.closest("a[href], button, summary, [tabindex], [contenteditable]"));
@@ -1015,10 +1065,11 @@
   if (hosted || !several) bar.remove();
   document.body.append(host);
   if (bar.isConnected) new ResizeObserver(dockMinimap).observe(bar);
-  // A hash names an item to open in focus; otherwise two or more items open on the canvas.
-  const named = find(location.hash.slice(1));
+  // A hash names an item to open in focus or a view of the canvas; otherwise two or more items open on the canvas.
+  const named = find(location.hash.slice(1)), opening = several ? viewOf(location.hash.slice(1)) : null;
   current = Math.max(find(remembered()), 0);
   if (named >= 0) toFocus(named);
+  else if (opening) goTo(opening);
   else if (!several || /^(single|picker)$/.test(document.body.dataset.layout || "")) toFocus(current);
   else toCanvas();
 })();

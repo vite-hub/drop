@@ -935,6 +935,9 @@ function copyLink(announce?: string) {
   if (owner.value && drop.value.share === "private") return void (shareOpen.value = true)
   const url = new URL(link.value)
   if (isApp.value && appAt.value !== "/") url.searchParams.set("path", appAt.value)
+  // A prototype's link opens on what the reader sees: the item in focus, or where the canvas looks.
+  const shown = variants.value && !editing.value && !lightbox.value && !shownVersion.value ? variants.value : null
+  if (shown) url.hash = shown.canvas ? (shown.view ?? "") : (shown.variants[shown.current]?.id ?? "")
   void copy(url.href, { key: "link", announce })
 }
 const canMarkArea = computed(
@@ -1956,6 +1959,7 @@ watch(
                   (command, index) =>
                     command === 'move' || command === 'hand' ? canvasTool(command) : picker(command, index)
                 "
+                @view="(hash) => send({ type: 'picker', do: 'view', hash })"
               />
               <span aria-hidden="true" class="w-1 shrink-0" :class="prototypeCanvas && 'max-sm:hidden'" />
             </template>

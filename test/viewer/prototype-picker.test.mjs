@@ -464,6 +464,87 @@ test("the canvas keeps its camera for the version it was moved on, and a new ver
   }
 })
 
+test("the address keeps where the canvas looks, so a link opens there on another screen, and Fit clears it", async () => {
+  const browser = await chromium.launch()
+  try {
+    const html = injectRuntime(
+      page("").replaceAll("<section ", '<section data-width="800" data-height="500" '),
+      false,
+      0,
+      true,
+    )
+    const open = async (viewport, hash = "") => {
+      // A fresh context each time: no camera remembered, so only the address can place it.
+      const context = await browser.newContext({ viewport })
+      await context.route("https://picker.test/view", (route) =>
+        route.fulfill({ contentType: "text/html", body: html }),
+      )
+      const tab = await context.newPage()
+      await tab.goto(`https://picker.test/view${hash}`)
+      await tab.waitForFunction(() => /scale\(/.test(document.getElementById("v-one").style.transform))
+      return tab
+    }
+    const scale = (tab) =>
+      tab.evaluate(() => Number(document.getElementById("v-two").style.transform.match(/scale\(([\d.]+)\)/)[1]))
+    const middleOf = (tab, id) =>
+      tab.evaluate((id) => {
+        const r = document.getElementById(id).getBoundingClientRect()
+        return { x: innerWidth / 2 - r.left, y: (56 + innerHeight - 72) / 2 - r.top }
+      }, id)
+
+    const tab = await open({ width: 1000, height: 700 })
+    await tab.waitForTimeout(400)
+    assert.equal(new URL(tab.url()).hash, "", "fitted to everything, the address names no view")
+    await tab.keyboard.press("2")
+    await tab.keyboard.press("Escape")
+    await tab.waitForFunction(() => location.hash.startsWith("#@v-two,"))
+    await tab.keyboard.press("0")
+    for (let n = 0; n < 3; n++) await tab.keyboard.press("+")
+    await tab.mouse.move(500, 350)
+    await tab.mouse.wheel(120, 60)
+    await tab.waitForFunction(() => /^#@v-\w+,-?\d+,-?\d+,195.3z$/.test(location.hash))
+    const hash = await tab.evaluate(() => location.hash)
+    const [, id, x, y] = hash.match(/^#@([\w-]+),(-?\d+),(-?\d+),/)
+    // Opened again without it, the camera this reader left comes back and puts its view in the address.
+    await tab.waitForTimeout(300)
+    await tab.goto("https://picker.test/view")
+    await tab.waitForFunction((hash) => location.hash === hash, hash)
+
+    // A link opens on the same spot at the same zoom, on a bigger screen too, and keeps the same address.
+    for (const viewport of [
+      { width: 1000, height: 700 },
+      { width: 1400, height: 900 },
+    ]) {
+      const other = await open(viewport, hash)
+      await other.waitForFunction(
+        (zoom) => document.getElementById("v-two").style.transform.endsWith(`scale(${zoom})`),
+        1.953,
+      )
+      const middle = await middleOf(other, id)
+      assert.ok(Math.abs(middle.x / (await scale(other)) - Number(x)) < 1.5, `x on ${viewport.width}px`)
+      assert.ok(Math.abs(middle.y / (await scale(other)) - Number(y)) < 1.5, `y on ${viewport.width}px`)
+      await other.waitForTimeout(400)
+      assert.equal(await other.evaluate(() => location.hash), hash)
+      // Fit all clears it: a link then fits the reader's own screen.
+      await other.keyboard.press("Shift+Digit1")
+      await other.waitForFunction(() => location.hash === "")
+      await other.context().close()
+    }
+    // A view naming no item here opens fitted, and an item's id still opens it in focus.
+    const gone = await open({ width: 1000, height: 700 }, "#@v-gone,10,10,300z")
+    await gone.waitForTimeout(400)
+    assert.notEqual(await scale(gone), 3)
+    assert.equal((await look(gone)).canvas, true)
+    await gone.evaluate(() => (location.hash = "#@v-three,400,250,50z"))
+    await gone.waitForFunction(() => document.getElementById("v-three").style.transform.endsWith("scale(0.5)"))
+    await gone.evaluate(() => (location.hash = "#v-three"))
+    await gone.waitForFunction(() => document.documentElement.dataset.prototypeLayout !== "canvas")
+    assert.deepEqual((await look(gone)).shown, ["v-three"])
+  } finally {
+    await browser.close()
+  }
+}, 20000)
+
 test("the canvas camera stops before the last item leaves the screen, and the minimap moves it", async () => {
   const browser = await chromium.launch()
   try {
@@ -1069,9 +1150,18 @@ test("inside Drop's viewer the page reports to Drop's bar and takes its commands
         canvas: true,
         zoom: undefined,
         tool: "move",
+        view: "",
       },
     )
     assert.ok(parseFrameMessage(report), "Drop's viewer accepts what the picker posts")
+    // Drop hands over the view in its address; the picker reports it back once it's there, and drops one it can't place.
+    await hosted.evaluate(() => send({ type: "picker", do: "view", hash: "#@v-two,100,50,150z" }))
+    await hosted.waitForFunction(() => reports.at(-1).view === "@v-two,100,50,150z" && reports.at(-1).zoom === 150)
+    assert.ok(parseFrameMessage(await last()))
+    const count = await hosted.evaluate(() => reports.length)
+    await hosted.evaluate(() => send({ type: "picker", do: "view", hash: "#@v-gone,1,1,100z" }))
+    await hosted.waitForFunction((count) => reports.length > count, count)
+    assert.equal((await last()).view, "@v-two,100,50,150z", "a view it can't place leaves the camera where it was")
 
     const events = () => frame.evaluate(() => window.changes)
     await frame.evaluate(() => {
