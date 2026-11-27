@@ -3,6 +3,7 @@ import geist from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff
 import { provideRelativeNow } from "vite-hub/ui"
 
 provideRelativeNow(useRelativeNow())
+useUiUsageEnabled()
 
 const origin = useRequestURL().origin
 useSeoMeta({

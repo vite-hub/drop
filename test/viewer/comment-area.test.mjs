@@ -55,7 +55,13 @@ function viewer(kind = "markdown", optionsOverride = {}) {
 
 test("entering a prototype canvas clears inspection and blocks toolbar and frame shortcuts", () => {
   const canvas = ref(false)
-  const state = viewer("html", { canvas })
+  const pressed = []
+  const state = viewer("html", {
+    canvas,
+    onShortcut: (key, action) => {
+      if (action()) pressed.push(key)
+    },
+  })
   state.setTool("measure")
   state.toggleOverlay("xray")
   assert.equal(state.frameTool.value, "measure")
@@ -70,11 +76,13 @@ test("entering a prototype canvas clears inspection and blocks toolbar and frame
   for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
   assert.equal(state.frameTool.value, "browse")
   assert.equal(state.overlays.xray, false)
+  assert.deepEqual(pressed, [])
 
   canvas.value = false
   for (const key of ["s", "x"]) state.receive({ type: "key", key }, frame)
   assert.equal(state.frameTool.value, "measure")
   assert.equal(state.overlays.xray, true)
+  assert.deepEqual(pressed, ["s", "x"])
 })
 const frame = { left: 0, top: 0, scale: 1 }
 

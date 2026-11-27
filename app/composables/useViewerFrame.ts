@@ -54,7 +54,6 @@ export function useViewerFrame(options: {
   openDrop?: (id: string) => void
   palette?: () => void
   toggleZen?: () => void
-  pressed?: (key: string) => void
   escape?: () => boolean
   errors?: Ref<DropRuntimeError[]>
 }) {
@@ -341,7 +340,6 @@ export function useViewerFrame(options: {
         if (options.variantBar) variants.value = { ...message }
         return
       case "key":
-        options.pressed?.(message.key)
         if (message.key === "meta_k") return options.palette?.()
         if (message.key === "z")
           return isApp.value && (message.tool ?? "browse") === "browse" ? undefined : options.toggleZen?.()

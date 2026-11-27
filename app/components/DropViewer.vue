@@ -16,7 +16,6 @@ import { feedbackMarkdown, feedbackPromptTarget, promptMarkdown, waitingForAnswe
 import { describeTime } from "comark-time"
 import { resourceLabel } from "#shared/resources"
 import { SHARE_ICONS } from "#shared/share"
-import { KEY_CONTROLS } from "#shared/ui-usage"
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type {
   DropComment,
@@ -148,6 +147,7 @@ const usage = useUiUsage({
   kind: () => drop.value.kind,
   commenting: () => commentMode.value,
   view: () => drop.value.id,
+  hidden: () => Boolean(siteRef.value?.capturing),
 })
 function toggleCommentMode() {
   if (!hasComments.value || editing.value || trashed.value) return
@@ -193,6 +193,7 @@ const annotations = useViewerAnnotations({
   editing,
   enabled: annotationsEnabled,
   canvas: prototypeCanvas,
+  onShortcut: usage.key,
   reviewOpen: computed({
     get: () => commentMode.value || commentsOpen.value,
     set: (value: boolean) => {
@@ -550,8 +551,7 @@ const { srcdoc, contentOrigin, frameSrc, frameKey, frameScheme, ready, send, unp
     },
     openDrop: (id) => void router.push(`/drops/${id}`),
     palette: usePaletteOpener(),
-    toggleZen,
-    pressed: (key) => key !== "c" && key !== "e" && usage.press(KEY_CONTROLS[key], "key"),
+    toggleZen: zenShortcut,
     escape: leaveZen,
     errors: pageErrors,
   })
@@ -628,33 +628,52 @@ function present() {
   openPath("/presenter/1")
 }
 
-defineShortcuts(
-  usage.keys({
-    c: () => (selection.value ? commentOnSelection() : toggleCommentMode()),
-    e: () => (selection.value ? commentOnSelection(true) : edit()),
-    h: () => (canvasShown.value ? canvasTool("hand") : hasHistory.value && showDetails(true)),
-    i: () => (detailsOpen.value ? (detailsOpen.value = false) : showDetails()),
-    r: toggleCommentArea,
-    v: () => {
-      tool.value = "browse"
-      if (canvasShown.value) canvasTool("move")
-    },
-    s: () => framed.value && setTool("measure"),
-    b: () => canMark.value && annotations.mark("marker"),
-    p: () => canMark.value && annotations.mark("pen"),
-    a: () => canMark.value && annotations.mark("arrow"),
-    t: () => canMark.value && annotations.mark("text"),
-    meta_z: () => undoMark(),
-    u: () => framed.value && toggleOverlay("rulers"),
-    x: () => framed.value && toggleOverlay("xray"),
-    l: () => !editing.value && copyLink("Link copied"),
-    d: () => !editing.value && download(),
-    m: () => !editing.value && copiesMarkdown.value && void copyMarkdown("Markdown copied"),
-    w: () => widens.value && nextWidth(),
-    z: toggleZen,
-    meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
-  }),
-)
+function runShortcut(action: () => unknown) {
+  action()
+  return true
+}
+function zenShortcut() {
+  usage.key("z", () => runShortcut(toggleZen))
+}
+defineShortcuts({
+  c: () => {
+    if (selection.value) return commentOnSelection()
+    usage.key("c", () => hasComments.value && !editing.value && !trashed.value && runShortcut(toggleCommentMode))
+  },
+  e: () => {
+    if (selection.value) return commentOnSelection(true)
+    usage.key("e", () => !editing.value && showEditTool.value && runShortcut(edit))
+  },
+  h: () => {
+    if (canvasShown.value) return canvasTool("hand")
+    usage.key("h", () => hasHistory.value && !editing.value && runShortcut(() => showDetails(true)))
+  },
+  i: () =>
+    usage.key("i", () => {
+      if (detailsOpen.value) return runShortcut(() => (detailsOpen.value = false))
+      return !editing.value && runShortcut(showDetails)
+    }),
+  r: () => usage.key("r", () => canMarkArea.value && runShortcut(toggleCommentArea)),
+  v: () => {
+    tool.value = "browse"
+    if (canvasShown.value) canvasTool("move")
+  },
+  s: () => usage.key("s", () => framed.value && setTool("measure")),
+  b: () => usage.key("b", () => canMark.value && annotations.mark("marker")),
+  p: () => usage.key("p", () => canMark.value && annotations.mark("pen")),
+  a: () => usage.key("a", () => canMark.value && annotations.mark("arrow")),
+  t: () => usage.key("t", () => canMark.value && annotations.mark("text")),
+  meta_z: () => undoMark(),
+  u: () => usage.key("u", () => framed.value && toggleOverlay("rulers")),
+  x: () => usage.key("x", () => framed.value && toggleOverlay("xray")),
+  l: () => !editing.value && copyLink("Link copied"),
+  d: () => usage.key("d", () => !editing.value && Boolean(drop.value.url) && runShortcut(download)),
+  m: () =>
+    usage.key("m", () => !editing.value && copiesMarkdown.value && runShortcut(() => copyMarkdown("Markdown copied"))),
+  w: () => usage.key("w", () => widens.value && runShortcut(nextWidth)),
+  z: zenShortcut,
+  meta_s: { usingInput: true, handler: () => editing.value && void live.publish() },
+})
 const typing = (event: KeyboardEvent) =>
   event.target instanceof HTMLElement &&
   (event.target.isContentEditable || /^(input|textarea|select)$/i.test(event.target.tagName))
