@@ -1,7 +1,7 @@
 import type { CommandPaletteItem } from "@nuxt/ui"
 import type { MaybeRefOrGetter } from "vue"
 import type { DropKind } from "#shared/types"
-import { isUiControl, KEY_CONTROLS, PALETTE_CONTROLS, type UiControl, type UiVia } from "#shared/ui-usage"
+import { isUiControl, KEY_CONTROLS, type UiControl, type UiVia } from "#shared/ui-usage"
 
 declare module "h3" {
   interface H3EventContext {
@@ -94,30 +94,10 @@ export function useUiUsage(options: {
 
   return {
     key,
-    palette<T extends { groups: { id: string; items: CommandPaletteItem[] }[] } | null>(offer: T): T {
-      if (!offer) return offer
-      return {
-        ...offer,
-        groups: offer.groups.map((group) =>
-          !["actions", "comments", "marker", "view"].includes(group.id)
-            ? group
-            : {
-                ...group,
-                items: group.items.map((item) => {
-                  const control =
-                    item.label && Object.hasOwn(PALETTE_CONTROLS, item.label) ? PALETTE_CONTROLS[item.label] : undefined
-                  const select = item.onSelect
-                  if (!control || !select) return item
-                  return {
-                    ...item,
-                    onSelect: (event: Event) => {
-                      count(control, "palette")
-                      return select(event)
-                    },
-                  }
-                }),
-              },
-        ),
+    palette(control: UiControl, select: NonNullable<CommandPaletteItem["onSelect"]>) {
+      return (event: Event) => {
+        count(control, "palette")
+        return select(event)
       }
     },
   }

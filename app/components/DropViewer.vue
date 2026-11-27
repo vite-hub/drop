@@ -1158,7 +1158,7 @@ const shownAt = computed(() => {
   const version = shownVersion.value?.version ?? drop.value.version
   return drop.value.versions.find((item) => item.version === version)?.createdAt ?? drop.value.updatedAt
 })
-usePaletteOffer("drop", () => usage.palette(dropPalette()))
+usePaletteOffer("drop", dropPalette)
 function dropPalette() {
   if (visitor.value) return null
   const title = drop.value.title
@@ -1198,24 +1198,35 @@ function dropPalette() {
             label: "Edit together",
             icon: "i-mingcute-pencil-line",
             kbds: ["E"],
-            onSelect: () => {
+            onSelect: usage.palette("edit", () => {
               if (!drop.value.canEdit) showDetails()
               edit()
-            },
+            }),
           },
         ]
       : []),
-    { label: "Share…", icon: SHARE_ICONS[drop.value.share], onSelect: () => (shareOpen.value = true) },
+    {
+      label: "Share…",
+      icon: SHARE_ICONS[drop.value.share],
+      onSelect: usage.palette("share", () => (shareOpen.value = true)),
+    },
     { label: "Copy link", icon: "i-mingcute-link-line", kbds: ["L"], onSelect: () => copyLink("Link copied") },
     ...(canPin.value
       ? [
           drop.value.pinned
-            ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: () => togglePin() }
-            : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: () => togglePin() },
+            ? { label: "Unpin", icon: "i-mingcute-pin-fill", onSelect: usage.palette("pin", () => togglePin()) }
+            : { label: "Pin", icon: "i-mingcute-pin-line", onSelect: usage.palette("pin", () => togglePin()) },
         ]
       : []),
     ...(drop.value.url
-      ? [{ label: "Download original", icon: "i-mingcute-download-2-line", kbds: ["D"], onSelect: download }]
+      ? [
+          {
+            label: "Download original",
+            icon: "i-mingcute-download-2-line",
+            kbds: ["D"],
+            onSelect: usage.palette("download", download),
+          },
+        ]
       : []),
     ...(copiesMarkdown.value
       ? [
@@ -1223,16 +1234,22 @@ function dropPalette() {
             label: "Copy as Markdown",
             icon: "i-mingcute-markdown-line",
             kbds: ["M"],
-            onSelect: () => void copyMarkdown("Markdown copied"),
+            onSelect: usage.palette("markdown", () => void copyMarkdown("Markdown copied")),
           },
         ]
       : []),
     ...(printsPdf.value ? [{ label: "Export as PDF", icon: "i-mingcute-pdf-line", onSelect: exportPdf }] : []),
     ...(slidev.value && contentOrigin.value && !lightbox.value && !shownVersion.value
-      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: present }]
+      ? [{ label: "Present", icon: "i-mingcute-presentation-2-line", onSelect: usage.palette("present", present) }]
       : []),
     ...(presents.value && !slidev.value
-      ? [{ label: "Open in new window", icon: "i-mingcute-external-link-line", onSelect: openWindow }]
+      ? [
+          {
+            label: "Open in new window",
+            icon: "i-mingcute-external-link-line",
+            onSelect: usage.palette("window", openWindow),
+          },
+        ]
       : []),
     ...(owner.value
       ? [
@@ -1244,7 +1261,13 @@ function dropPalette() {
         ]
       : []),
     ...(drop.value.canTrash
-      ? [{ label: "Move to Trash", icon: "i-mingcute-delete-2-line", onSelect: () => void deleteDrop() }]
+      ? [
+          {
+            label: "Move to Trash",
+            icon: "i-mingcute-delete-2-line",
+            onSelect: usage.palette("trash", () => void deleteDrop()),
+          },
+        ]
       : []),
   ]
 
@@ -1261,7 +1284,7 @@ function dropPalette() {
                 icon: "i-mingcute-chat-3-line",
                 kbds: ["C"],
                 active: commentMode.value,
-                onSelect: toggleCommentMode,
+                onSelect: usage.palette("comments", toggleCommentMode),
               },
             ]
           : []),
@@ -1270,10 +1293,16 @@ function dropPalette() {
           icon: "i-mingcute-list-check-line",
           kbds: canUseCommentMode.value ? undefined : ["C"],
           active: listOpen,
-          onSelect: toggleComments,
+          onSelect: usage.palette("list", toggleComments),
         },
         ...(canCommentOnPage.value
-          ? [{ label: "Comment on the whole page", icon: "i-mingcute-file-line", onSelect: () => void commentOnPage() }]
+          ? [
+              {
+                label: "Comment on the whole page",
+                icon: "i-mingcute-file-line",
+                onSelect: usage.palette("page", () => void commentOnPage()),
+              },
+            ]
           : []),
         ...(canMarkArea.value
           ? [
@@ -1281,7 +1310,7 @@ function dropPalette() {
                 label: "Comment on an area",
                 icon: "i-mingcute-message-1-line",
                 kbds: ["R"],
-                onSelect: toggleCommentArea,
+                onSelect: usage.palette("area", toggleCommentArea),
               },
             ]
           : []),
@@ -1295,7 +1324,7 @@ function dropPalette() {
               label: style.label,
               icon: style.icon,
               active: review === style.value,
-              onSelect: () => (commentStyleModel.value = style.value),
+              onSelect: usage.palette(`style-${style.value}`, () => (commentStyleModel.value = style.value)),
             }))
           : []),
         ...(!lightbox.value && !shownVersion.value && framed.value && pinned.value.length > 0
@@ -1304,7 +1333,7 @@ function dropPalette() {
                 label: "Hide comments",
                 icon: overlays.pins ? "i-mingcute-eye-line" : "i-mingcute-eye-close-line",
                 active: !overlays.pins,
-                onSelect: () => toggleOverlay("pins"),
+                onSelect: usage.palette("pins", () => toggleOverlay("pins")),
               },
             ]
           : []),
@@ -1320,7 +1349,7 @@ function dropPalette() {
             icon: tip.icon,
             kbds: [tip.key],
             active: marking.value && pen.tip === id,
-            onSelect: () => annotations.mark(id),
+            onSelect: usage.palette("mark", () => annotations.mark(id)),
           })),
           ...(marking.value
             ? [
@@ -1370,7 +1399,7 @@ function dropPalette() {
             icon: "i-mingcute-aiming-2-line",
             kbds: ["S"],
             active: tool.value === "measure",
-            onSelect: () => setTool("measure"),
+            onSelect: usage.palette("measure", () => setTool("measure")),
           },
         ]
       : []),
@@ -1381,7 +1410,7 @@ function dropPalette() {
             icon: "i-mingcute-ruler-line",
             kbds: ["U"],
             active: overlays.rulers,
-            onSelect: () => toggleOverlay("rulers"),
+            onSelect: usage.palette("rulers", () => toggleOverlay("rulers")),
           },
         ]
       : []),
@@ -1392,7 +1421,7 @@ function dropPalette() {
             icon: "i-mingcute-layout-grid-line",
             kbds: ["X"],
             active: overlays.xray,
-            onSelect: () => toggleOverlay("xray"),
+            onSelect: usage.palette("xray", () => toggleOverlay("xray")),
           },
         ]
       : []),
@@ -1402,7 +1431,10 @@ function dropPalette() {
             label: "Device mode",
             icon: "i-mingcute-device-line",
             active: deviceSize.value.on,
-            onSelect: () => (deviceSize.value = { ...deviceSize.value, on: !deviceSize.value.on }),
+            onSelect: usage.palette(
+              "device",
+              () => (deviceSize.value = { ...deviceSize.value, on: !deviceSize.value.on }),
+            ),
           },
         ]
       : []),
@@ -1412,7 +1444,7 @@ function dropPalette() {
       icon: "i-mingcute-zazen-line",
       kbds: ["Z"],
       active: zen.value,
-      onSelect: toggleZen,
+      onSelect: usage.palette("zen", toggleZen),
     },
     ...(widens.value
       ? widths.map((width) => ({
@@ -1421,7 +1453,7 @@ function dropPalette() {
           icon: "i-mingcute-text-line",
           kbds: ["W"],
           active: docWidth.value === width.value,
-          onSelect: () => (docWidth.value = width.value),
+          onSelect: usage.palette("width", () => (docWidth.value = width.value)),
         }))
       : []),
     ...(presence.people.value.length
@@ -1441,7 +1473,7 @@ function dropPalette() {
             suffix: `v${shownVersion.value?.version ?? drop.value.version} · ${timeAgo(shownAt.value, now.value)}`,
             icon: "i-mingcute-history-line",
             kbds: canvasShown.value ? undefined : ["H"],
-            onSelect: () => showDetails(true),
+            onSelect: usage.palette("details", () => showDetails(true)),
           },
         ]
       : []),
@@ -1450,7 +1482,7 @@ function dropPalette() {
       suffix: [detailsChip.value, `dropped ${timeAgo(drop.value.createdAt, now.value)}`].filter(Boolean).join(" · "),
       icon: "i-mingcute-information-line",
       kbds: ["I"],
-      onSelect: () => showDetails(Boolean(detailsChip.value)),
+      onSelect: usage.palette("details", () => showDetails(Boolean(detailsChip.value))),
     },
   ]
 
