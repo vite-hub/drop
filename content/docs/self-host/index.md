@@ -149,7 +149,7 @@ Drop writes one structured [evlog](https://www.evlog.dev) event per request: who
 | `via` | `shown` when it came on screen, or how it was pressed: `click`, `key`, or `palette` for ⌘K. |
 | `count` | How many times that day. |
 
-**Shown** counts each time a control appears in the pill on a page view, so a control that stays put counts once per drop opened. Controls in the **+** menu count as shown when the menu opens. A shortcut or ⌘K press counts even when the control wasn't on screen, and `area` and `page` have no pill button, so they only count presses.
+**Shown** counts each time a control appears in the pill on a page view, so a control that stays put counts once per drop opened, even across mode changes. The impression is attributed to the mode in which it appeared; a press is attributed to the mode in which it happened. Controls in the **+** menu count as shown when the menu opens. A shortcut or ⌘K press counts even when the control wasn't on screen, and `area` and `page` have no pill button, so they only count presses.
 
 **How it travels.** The browser holds its tallies and sends them as one `ui.usage` event to `/api/client-events` when the page hides, 30 seconds after the first press, or after 200 distinct tallies. Each batch is logged like any client event and has its own rate limit, 30 a minute per address.
 
@@ -177,7 +177,7 @@ npx wrangler d1 execute <your-d1-database> --remote --command "
   ORDER BY pressed DESC"
 ```
 
-On a VPS, run the same `SELECT` with `sqlite3` against the file `DROP_DATABASE_URL` names, `.data/database/drop.db` by default. Add `kind` or `mode` to the `SELECT` and `GROUP BY` to split by drop kind or by comment mode, and filter on `release` to compare two versions.
+On a VPS, run the same `SELECT` with `sqlite3` against the file `DROP_DATABASE_URL` names, `.data/database/drop.db` by default. Add `kind` to the `SELECT` and `GROUP BY` to split by drop kind, and filter on `release` to compare two versions. Group by `mode` to compare press totals by mode, not presses per impression: a control pressed in comment mode may have appeared in browse mode.
 
 ### Other client events {#client-events}
 

@@ -472,9 +472,12 @@ watch(
   (pending, before) => (pending || before) && send({ type: pending ? "hold-selection" : "clear-selection" }),
 )
 function toggleCommentArea() {
-  if (!canMarkArea.value) return
-  if (canUseCommentMode.value && !editing.value && !trashed.value) commentMode.value = true
-  else showComments()
+  if (!canMarkArea.value || editing.value) return
+  if (canUseCommentMode.value && !trashed.value) {
+    if (commentMode.value) return
+    commentMode.value = true
+  } else showComments()
+  return true
 }
 if (route.query.changes && hasHistory.value) showDetails(true)
 
@@ -653,7 +656,7 @@ defineShortcuts({
       if (detailsOpen.value) return runShortcut(() => (detailsOpen.value = false))
       return !editing.value && runShortcut(showDetails)
     }),
-  r: () => usage.key("r", () => canMarkArea.value && runShortcut(toggleCommentArea)),
+  r: () => usage.key("r", toggleCommentArea),
   v: () => {
     tool.value = "browse"
     if (canvasShown.value) canvasTool("move")

@@ -27,7 +27,8 @@ export function useUiUsage(options: {
   hidden: () => boolean
 }) {
   const counting = useUiUsageEnabled()
-  const usage = import.meta.client
+  const client = typeof window !== "undefined"
+  const usage = client
     ? (counter ??= createUsageCounter({ on: () => counting.value, send: sendClientEvent }))
     : undefined
   const later = useTimeoutFn(flush, 30_000, { immediate: false })
@@ -41,7 +42,13 @@ export function useUiUsage(options: {
     else if (!later.isPending.value) later.start()
   }
   let shown = new Set<UiControl>()
+  let shownView: string | undefined
   function scan() {
+    const view = options.view()
+    if (view !== shownView) {
+      shown = new Set()
+      shownView = view
+    }
     const pill = toValue(options.pill)
     const now = new Set<UiControl>()
     if (pill && !options.hidden()) {
@@ -55,7 +62,7 @@ export function useUiUsage(options: {
   }
   const soon = useRafFn(scan, { once: true, immediate: false })
   const queue = () => counting.value && !soon.isActive.value && soon.resume()
-  if (import.meta.client && counting.value) {
+  if (client && counting.value) {
     useEventListener(
       () => toValue(options.pill),
       "click",
@@ -78,9 +85,7 @@ export function useUiUsage(options: {
     useResizeObserver(() => toValue(options.pill), queue)
     useEventListener(window, "resize", queue)
     watch(options.hidden, queue)
-    watch([() => toValue(options.pill), options.view, options.commenting], () => ((shown = new Set()), queue()), {
-      immediate: true,
-    })
+    watch([() => toValue(options.pill), options.view, options.commenting], queue, { immediate: true })
     useEventListener(window, "pagehide", flush)
     useEventListener(document, "visibilitychange", () => document.visibilityState === "hidden" && flush())
     onBeforeUnmount(flush)
