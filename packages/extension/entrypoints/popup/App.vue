@@ -58,7 +58,7 @@ const openOptions = () => browser.runtime.openOptionsPage()
 
       <div v-if="state && !state.account" class="flex flex-col gap-2 px-4 pt-4">
         <UButton color="neutral" block label="Connect to Drop" :loading="connecting" @click="connect" />
-        <p class="text-center text-xs text-muted">Measure and Marker work without it.</p>
+        <p class="text-center text-xs text-muted">Measure works without it.</p>
         <ConnectProblem :problem="problem" :detail="detail" :host="hostOf(state.drop)" />
       </div>
 

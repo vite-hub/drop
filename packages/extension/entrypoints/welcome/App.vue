@@ -187,8 +187,8 @@ function tryIt() {
           </li>
         </ol>
         <p class="rounded-lg bg-elevated p-4 text-sm text-muted">
-          You can disconnect this browser from your Drop at any time. If you skip this, Measure and Marker still work,
-          and Comment asks you to connect.
+          You can disconnect this browser from your Drop at any time. If you skip this, Measure still works, and Comment
+          and Highlight ask you to connect.
         </p>
         <ConnectProblem :problem="problem" :detail="detail" :host="host" />
       </section>
@@ -247,7 +247,7 @@ function tryIt() {
         </p>
         <div v-if="!connected" class="flex items-center gap-3 rounded-lg bg-elevated p-4 text-sm">
           <UIcon name="i-mingcute-information-line" class="size-5 shrink-0 text-muted" />
-          <span class="flex-1">Not connected yet. Measure and Marker work now. Comment asks you to connect.</span>
+          <span class="flex-1">Not connected yet. Measure works now. Comment and Highlight ask you to connect.</span>
           <UButton color="neutral" variant="outline" size="sm" label="Connect" :loading="connecting" @click="connect" />
         </div>
         <ConnectProblem :problem="problem" :detail="detail" :host="host" />

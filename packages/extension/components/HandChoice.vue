@@ -50,8 +50,8 @@ const choice = defineModel<Hand>("choice", { default: "press" })
       <p class="font-medium text-highlighted">Your browser will warn you next</p>
       <p class="mt-1 text-muted">
         It will say Drop can "read and change all your data on all websites". Browsers say that about every extension
-        that shows something on pages. Drop only draws the hand and your comments. It sends nothing until you press
-        Send, and then only to your Drop.
+        that shows something on pages. Drop only draws the hand and your comments. It tells your Drop which site you're
+        on only where you already have notes or a review, or when you press Comment or Highlight.
       </p>
     </div>
   </div>
