@@ -1,0 +1,241 @@
+{
+  "browser": "firefox",
+  "dpr": 2,
+  "headless": true,
+  "version": "128.14.0",
+  "addonId": "drop-spike@example.com",
+  "tabId": 2,
+  "startupEvents": [
+    {
+      "at": 1795867824028,
+      "detail": null,
+      "kind": "background-start"
+    },
+    {
+      "at": 1795867824113,
+      "detail": {
+        "reason": "install"
+      },
+      "kind": "installed"
+    },
+    {
+      "at": 1795867824119,
+      "detail": {
+        "url": "ws://127.0.0.1:47811/?from=onInstalled&browser=firefox"
+      },
+      "kind": "ws-open"
+    },
+    {
+      "at": 1795867824141,
+      "detail": {
+        "status": "complete",
+        "tabId": 1,
+        "url": "moz-extension://6f1c2a52-8d3e-4a1b-9c55-0e2f6a7b8c90/options.html"
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795867824236,
+      "detail": {
+        "status": "complete",
+        "tabId": 2,
+        "url": null
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795867824269,
+      "detail": {
+        "error": "Missing host permission for the tab",
+        "ok": false,
+        "via": "onUpdated-url-hidden"
+      },
+      "kind": "inject"
+    },
+    {
+      "at": 1795867824273,
+      "detail": {
+        "status": "complete",
+        "tabId": 2,
+        "url": null
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795867824283,
+      "detail": {
+        "error": "Missing host permission for the tab",
+        "ok": false,
+        "via": "onUpdated-url-hidden"
+      },
+      "kind": "inject"
+    },
+    {
+      "at": 1795867824370,
+      "detail": {
+        "status": "complete",
+        "tabId": 2,
+        "url": null
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795867824443,
+      "detail": {
+        "error": "Missing host permission for the tab",
+        "ok": false,
+        "via": "onUpdated-url-hidden"
+      },
+      "kind": "inject"
+    }
+  ],
+  "row7": {
+    "ok": true,
+    "ms": 240,
+    "value": {
+      "iconFound": true,
+      "paths": 1,
+      "buttonIconPaths": 1,
+      "navigatorOffline": true
+    }
+  },
+  "row1": {
+    "ok": true,
+    "ms": 331,
+    "value": {
+      "granted": true,
+      "contains": true
+    }
+  },
+  "row2": {
+    "noGesture": {
+      "ok": true,
+      "ms": 9,
+      "value": {
+        "error": "Missing host permission for the tab",
+        "ok": false
+      }
+    },
+    "chromeKeyCommand": {
+      "ok": true,
+      "ms": 2142,
+      "value": {
+        "capture": "see row3",
+        "overlay": {
+          "ok": true
+        },
+        "probe": {
+          "ok": true,
+          "url": "http://127.0.0.1:47810/page"
+        },
+        "via": "command"
+      }
+    },
+    "toolbarClick": {
+      "ok": true,
+      "ms": 2292,
+      "value": {
+        "capture": "png",
+        "overlay": {
+          "ok": true
+        },
+        "probe": {
+          "ok": true,
+          "url": "http://127.0.0.1:47810/page"
+        },
+        "via": "popup"
+      }
+    },
+    "beforeNav": {
+      "ok": true,
+      "ms": 23,
+      "value": {
+        "ok": true,
+        "url": "http://127.0.0.1:47810/page"
+      }
+    },
+    "sameOriginNav": {
+      "ok": true,
+      "ms": 117,
+      "value": {
+        "error": "Missing host permission for the tab",
+        "ok": false
+      }
+    },
+    "crossOriginNav": {
+      "ok": true,
+      "ms": 109,
+      "value": {
+        "error": "Missing host permission for the tab",
+        "ok": false
+      }
+    },
+    "grantPattern": "http://127.0.0.1/*",
+    "onUpdatedWithHost": {
+      "ok": true,
+      "ms": 2062,
+      "value": {
+        "grant": {
+          "granted": true,
+          "contains": true
+        },
+        "events": [
+          {
+            "at": 1795867830661,
+            "detail": {
+              "status": "complete",
+              "tabId": 2,
+              "url": "http://127.0.0.1:47810/page"
+            },
+            "kind": "onUpdated"
+          },
+          {
+            "at": 1795867830678,
+            "detail": {
+              "ok": true,
+              "url": "http://127.0.0.1:47810/page",
+              "via": "onUpdated"
+            },
+            "kind": "inject"
+          }
+        ]
+      }
+    }
+  },
+  "row3": {
+    "viewport": {
+      "dpr": 2,
+      "h": 418,
+      "w": 800
+    },
+    "image": {
+      "width": 1600,
+      "height": 836
+    },
+    "matches": true
+  },
+  "row4": {
+    "ok": true,
+    "ms": 387,
+    "value": {
+      "shadowHiddenFromPage": true,
+      "styleColor": "rgb(255, 0, 0)",
+      "stylePadding": "7px",
+      "sheetError": "Error: Accessing from Xray wrapper is not supported.",
+      "sheetColorViaPageRealm": "rgb(0, 0, 255)"
+    }
+  },
+  "row5": {
+    "ok": true,
+    "ms": 262,
+    "value": {
+      "sid": "08d46708eeb4",
+      "redirect": "https://fe96e29537035d343b3a0c3009fb4eb7ad1ca428.extensions.allizom.org/",
+      "result": {
+        "ok": true,
+        "url": "https://fe96e29537035d343b3a0c3009fb4eb7ad1ca428.extensions.allizom.org/?code=08d46708eeb4"
+      },
+      "sawCookie": true
+    }
+  }
+}

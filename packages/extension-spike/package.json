@@ -1,0 +1,30 @@
+{
+  "name": "@vite-hub/drop-extension-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Throwaway platform spike for a Drop browser extension (Chrome MV3, Firefox 128+).",
+  "type": "module",
+  "scripts": {
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "lint:firefox": "web-ext lint --source-dir .output/firefox-mv3",
+    "server": "node harness/server.mjs",
+    "e2e:chromium": "node harness/chromium.mjs",
+    "e2e:firefox": "node harness/firefox.mjs"
+  },
+  "devDependencies": {
+    "@iconify-json/mingcute": "1.2.10",
+    "@iconify/vue": "5.0.5",
+    "@nuxt/ui": "4.13.1",
+    "@wxt-dev/module-vue": "1.0.3",
+    "playwright": "1.65.1",
+    "puppeteer-core": "25.19.0",
+    "selenium-webdriver": "4.54.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "^6.0.3",
+    "vue": "3.5.46",
+    "web-ext": "10.8.0",
+    "ws": "8.23.0",
+    "wxt": "0.21.5"
+  }
+}

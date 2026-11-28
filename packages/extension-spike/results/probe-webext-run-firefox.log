@@ -1,0 +1,15 @@
+web-ext run --firefox <spike>/.browsers/ff128/firefox/firefox --source-dir <spike>/.output/firefox-mv3 --no-reload --no-input --pref extensions.webextensions.uuids={"drop-spike@example.com":"6f1c2a52-8d3e-4a1b-9c55-0e2f6a7b8c90"} --arg=-headless --arg=--remote-debugging-port=47812 --start-url http://127.0.0.1:47810/page --start-url moz-extension://6f1c2a52-8d3e-4a1b-9c55-0e2f6a7b8c90/options.html
+installed: true
+connected: firefox/128.14.0
+goto moz-extension: Protocol error (browsingContext.navigate): unknown error Error: NS_ERROR_NOT_AVAILABLE #checkLoadingState@chrome://remote/content/shared/Navigate.sys.mjs:286:28
+open pages: http://127.0.0.1:47810/page, about:blank
+puppeteer failed: the options start URL is not open
+web-ext output tail:
+    at process.emit (node:events:526:24)
+    at Signal.callbackTrampoline (node:internal/async_hooks:131:17) {
+  errno: 39,
+  code: 'ENOTEMPTY',
+  path: '/tmp/firefox-profilebzoPg3/',
+  syscall: 'rm'
+}
+

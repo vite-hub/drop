@@ -1,0 +1,9 @@
+$ grep -rl "api.iconify.design" .output
+exit 1
+$ grep -rlo "chat-3-line" .output
+.output/chrome-mv3/chunks/GrantPanel-bw6hbm2F.js
+.output/firefox-mv3/chunks/GrantPanel-bw6hbm2F.js
+.output/chrome-mv3/chunks/browser-Cr5pvCFi.js
+.output/chrome-mv3/chunks/popup-BsWqRLv1.js
+.output/firefox-mv3/chunks/popup-BsWqRLv1.js
+.output/firefox-mv3/chunks/browser-Cr5pvCFi.js

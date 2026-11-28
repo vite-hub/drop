@@ -1,0 +1,9 @@
+version firefox/128.14.0
+installExtension failed: Protocol error (webExtension.install): unknown command webExtension.install RemoteError@chrome://remote/content/shared/RemoteError.sys.mjs:8:8
+WebDriverError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:193:5
+UnknownCommandError@chrome://remote/content/shared/webdriver/Errors.sys.mjs:816:5
+execute@chrome://remote/content/shared/webdriver/Session.sys.mjs:387:13
+onPacket@chrome://remote/content/webdriver-bidi/WebDriverBiDiConnection.sys.mjs:204:37
+onMessage@chrome://remote/content/server/WebSocketTransport.sys.mjs:127:18
+handleEvent@chrome://remote/content/server/WebSocketTransport.sys.mjs:109:14
+

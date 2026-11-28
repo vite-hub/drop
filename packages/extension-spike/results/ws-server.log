@@ -1,0 +1,113 @@
+2026-11-28T11:13:32.796Z ws#1 open /?from=onInstalled
+2026-11-28T11:14:19.751Z ws#1 close code=1001 after 47.0s
+2026-11-28T11:14:47.864Z ws#2 open /?from=onInstalled
+2026-11-28T11:15:49.409Z ws#2 close code=1001 after 61.5s
+2026-11-28T11:16:12.547Z ws#3 open /?from=onInstalled
+2026-11-28T11:16:16.022Z ws#3 close code=1001 after 3.5s
+2026-11-28T11:17:59.704Z ws#4 open /?from=onInstalled
+2026-11-28T11:18:02.002Z ws#4 close code=1001 after 2.3s
+2026-11-28T11:18:16.467Z ws#5 open /?from=onInstalled
+2026-11-28T11:18:52.390Z ws#5 close code=1001 after 35.9s
+2026-11-28T11:20:11.561Z ws#6 open /?from=onInstalled
+2026-11-28T11:20:24.539Z ws#6 close code=1001 after 13.0s
+2026-11-28T11:20:37.483Z ws#7 open /?from=onInstalled
+2026-11-28T11:20:50.490Z ws#7 close code=1001 after 13.0s
+2026-11-28T11:20:52.587Z ws#8 open /?from=onInstalled
+2026-11-28T11:21:05.876Z ws#8 close code=1001 after 13.3s
+2026-11-28T11:21:15.226Z ws#9 open /?from=onInstalled
+2026-11-28T11:21:29.604Z ws#9 close code=1001 after 14.4s
+2026-11-28T11:21:34.414Z ws#10 open /?from=onInstalled
+2026-11-28T11:22:13.655Z ws#10 close code=1001 after 39.2s
+2026-11-28T11:22:34.521Z ws#11 open /?from=onInstalled
+2026-11-28T11:22:57.075Z ws#11 close code=1001 after 22.6s
+2026-11-28T11:22:58.140Z ws#12 open /?from=onInstalled
+2026-11-28T11:23:32.253Z ws#12 close code=1001 after 34.1s
+2026-11-28T11:23:51Z start chromium idle run
+2026-11-28T11:26:22Z start chromium idle run
+2026-11-28T11:26:52.343Z ws#13 open /?from=onInstalled
+2026-11-28T11:27:22.685Z ws#13 close code=1001 after 30.3s
+2026-11-28T11:31:52Z stop chromium idle run
+2026-11-28T11:32:32Z start firefox idle run
+2026-11-28T11:38:02Z stop firefox idle run
+2026-11-28T11:38:21.594Z start firefox idle run (temporary add-on via geckodriver)
+2026-11-28T11:43:52.366Z stop firefox idle run (temporary add-on via geckodriver)
+2026-11-28T11:52:41.162Z ws#14 open /?from=onInstalled
+2026-11-28T11:53:01.435Z ws#14 close code=1001 after 20.3s
+2026-11-28T11:53:46.946Z ws#15 open /?from=onInstalled
+2026-11-28T11:54:07.537Z ws#15 close code=1001 after 20.6s
+2026-11-28T11:54:34.294Z ws#16 open /?from=onInstalled
+2026-11-28T11:54:56.245Z ws#16 close code=1001 after 22.0s
+2026-11-28T11:55:21.812Z ws#17 open /?from=onInstalled
+2026-11-28T11:55:39.879Z ws#17 close code=1001 after 18.1s
+2026-11-28T11:56:01.174Z ws#18 open /?from=onInstalled
+2026-11-28T11:56:27.148Z ws#18 close code=1001 after 26.0s
+2026-11-28T11:57:11.436Z ws#19 open /?from=onInstalled
+2026-11-28T11:57:16.665Z ws#19 close code=1001 after 5.2s
+2026-11-28T11:57:51.708Z ws#20 open /?from=onInstalled
+2026-11-28T11:57:59.045Z ws#20 close code=1001 after 7.3s
+2026-11-28T11:58:14.826Z ws#21 open /?from=onInstalled
+2026-11-28T11:58:20.445Z ws#21 close code=1001 after 5.6s
+2026-11-28T11:58:52.363Z ws#22 open /?from=onInstalled
+2026-11-28T11:59:09.937Z ws#22 close code=1001 after 17.6s
+2026-11-28T11:59:16.429Z ws#23 open /?from=onInstalled
+2026-11-28T11:59:25.937Z ws#23 close code=1001 after 9.5s
+2026-11-28T11:59:51Z start firefox idle run
+2026-11-28T11:59:53.502Z ws#24 open /?from=onInstalled&browser=firefox
+2026-11-28T12:00:03.478Z ws#25 open /?from=onInstalled&browser=chrome
+2026-11-28T12:00:23.477Z ws#24 close code=1001 after 30.0s
+2026-11-28T12:00:36.636Z ws#25 close code=1001 after 33.2s
+2026-11-28T12:00:37.884Z ws#26 open /?from=onInstalled&browser=chrome
+2026-11-28T12:01:12.749Z ws#26 close code=1001 after 34.9s
+2026-11-28T12:01:22.977Z ws#27 open /?from=onInstalled&browser=chrome
+2026-11-28T12:01:36.516Z ws#27 close code=1001 after 13.5s
+2026-11-28T12:01:38.399Z ws#28 open /?from=onInstalled&browser=chrome
+2026-11-28T12:01:49.859Z ws#28 close code=1001 after 11.5s
+2026-11-28T12:02:16.678Z ws#29 open /?from=onInstalled&browser=firefox
+2026-11-28T12:02:31.691Z ws#29 close code=1001 after 15.0s
+2026-11-28T12:02:40.018Z ws#30 open /?from=onInstalled&browser=firefox
+2026-11-28T12:02:51.788Z ws#30 close code=1001 after 11.8s
+2026-11-28T12:05:17.915Z ws#31 open /?from=onInstalled&browser=firefox
+2026-11-28T12:05:27.163Z ws#31 close code=1001 after 9.2s
+2026-11-28T12:05:34Z start firefox idle run
+2026-11-28T12:05:36.986Z ws#32 open /?from=onInstalled&browser=firefox
+2026-11-28T12:05:51.645Z ws#33 open /?from=onInstalled&browser=firefox
+2026-11-28T12:06:00.155Z ws#33 close code=1001 after 8.5s
+2026-11-28T12:06:06.959Z ws#32 close code=1001 after 30.0s
+2026-11-28T12:06:09.182Z ws#34 open /?from=onInstalled&browser=firefox
+2026-11-28T12:06:20.346Z ws#34 close code=1001 after 11.2s
+2026-11-28T12:06:37.356Z ws#35 open /?from=onInstalled&browser=firefox
+2026-11-28T12:06:58.944Z ws#35 close code=1001 after 21.6s
+2026-11-28T12:07:34.935Z ws#36 open /?from=onInstalled&browser=firefox
+2026-11-28T12:07:47.459Z ws#36 close code=1001 after 12.5s
+2026-11-28T12:10:08.567Z ws#37 open /?from=onInstalled&browser=firefox
+2026-11-28T12:10:20.391Z ws#37 close code=1001 after 11.8s
+2026-11-28T12:10:23.953Z ws#38 open /?from=onInstalled&browser=firefox
+2026-11-28T12:10:33.191Z ws#38 close code=1001 after 9.2s
+2026-11-28T12:10:50.882Z ws#39 open /?from=onInstalled&browser=firefox
+2026-11-28T12:11:04.269Z ws#39 close code=1001 after 13.4s
+2026-11-28T12:11:04Z stop firefox idle run
+2026-11-28T12:11:17.081Z ws#40 open /?from=onInstalled&browser=firefox
+2026-11-28T12:11:28.735Z ws#40 close code=1001 after 11.7s
+2026-11-28T12:12:31Z server restarted with SPIKE_WS_PUSH_SECONDS=20
+2026-11-28T12:12:39Z start chromium idle run
+2026-11-28T12:12:40.834Z ws#1 open /?from=onInstalled&browser=chrome
+2026-11-28T12:13:00.384Z ws#2 open /?from=onInstalled&browser=firefox
+2026-11-28T12:13:01.422Z ws#2 close code=1006 after 1.0s
+2026-11-28T12:15:43Z start firefox idle run
+2026-11-28T12:16:13.840Z ws#3 open /?from=onInstalled&browser=firefox
+2026-11-28T12:16:19.047Z ws#4 open /?from=onInstalled&browser=firefox
+2026-11-28T12:16:24.694Z ws#4 close code=1006 after 5.6s
+2026-11-28T12:16:44.594Z ws#3 close code=1001 after 30.8s
+2026-11-28T12:16:57.230Z ws#5 open /?from=onInstalled&browser=firefox
+2026-11-28T12:17:21.653Z ws#5 close code=1006 after 24.4s
+2026-11-28T12:18:04.647Z ws#6 open /?from=onInstalled&browser=chrome
+2026-11-28T12:18:09Z stop chromium idle run
+2026-11-28T12:18:09.743Z ws#1 close code=1001 after 328.9s
+2026-11-28T12:18:38.894Z ws#6 close code=1001 after 34.2s
+2026-11-28T12:18:45.792Z ws#7 open /?from=onInstalled&browser=chrome
+2026-11-28T12:19:04.999Z ws#7 close code=1001 after 19.2s
+2026-11-28T12:19:08.397Z ws#8 open /?from=onInstalled&browser=chrome
+2026-11-28T12:19:43.160Z ws#8 close code=1001 after 34.8s
+2026-11-28T12:19:47.975Z ws#9 open /?from=onInstalled&browser=chrome
+2026-11-28T12:20:00.253Z ws#9 close code=1001 after 12.3s
+2026-11-28T12:21:13Z stop firefox idle run

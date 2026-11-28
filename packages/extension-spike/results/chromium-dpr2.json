@@ -1,0 +1,128 @@
+{
+  "browser": "chromium",
+  "dpr": 2,
+  "headless": true,
+  "version": "159.0.8154.6",
+  "extensionId": "mclcojapkbalpiomlpndnoknichalcdo",
+  "tabId": 1724890478,
+  "startupEvents": [],
+  "row7": {
+    "ok": true,
+    "ms": 227,
+    "value": {
+      "icon": {
+        "tag": "svg",
+        "paths": 1,
+        "size": 24
+      },
+      "buttonIconPaths": 1,
+      "requests": [
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/options.html",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/options-DOCloYRK.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/browser-Cr5pvCFi.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/GrantPanel-bw6hbm2F.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/assets/browser-BBkQ4bHB.css",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/Toast-BKtlsco9.js"
+      ]
+    }
+  },
+  "row1": {
+    "ok": false,
+    "ms": 15105,
+    "error": "page.waitForFunction: Timeout 15000ms exceeded."
+  },
+  "row2": {
+    "noGesture": {
+      "ok": true,
+      "ms": 4,
+      "value": {
+        "ok": false,
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host."
+      }
+    },
+    "keyboardCommand": {
+      "ok": true,
+      "ms": 1508,
+      "value": []
+    },
+    "triggerAction": {
+      "ok": true,
+      "ms": 770,
+      "value": {
+        "capture": "see row3",
+        "overlay": {
+          "ok": true
+        },
+        "probe": {
+          "ok": true,
+          "url": "http://127.0.0.1:47810/page"
+        },
+        "via": "popup"
+      }
+    },
+    "beforeNav": {
+      "ok": true,
+      "ms": 7,
+      "value": {
+        "ok": true,
+        "url": "http://127.0.0.1:47810/page"
+      }
+    },
+    "sameOriginNav": {
+      "ok": true,
+      "ms": 133,
+      "value": {
+        "ok": true,
+        "url": "http://127.0.0.1:47810/page2"
+      }
+    },
+    "crossOriginNav": {
+      "ok": true,
+      "ms": 23,
+      "value": {
+        "ok": false,
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host."
+      }
+    },
+    "onUpdatedWithHost": {
+      "ok": false,
+      "ms": 16231,
+      "error": "page.waitForFunction: Timeout 15000ms exceeded."
+    }
+  },
+  "row3": {
+    "viewport": {
+      "w": 800,
+      "h": 513,
+      "dpr": 2
+    },
+    "image": {
+      "width": 1600,
+      "height": 1026
+    },
+    "matches": true
+  },
+  "row4": {
+    "ok": true,
+    "ms": 184,
+    "value": {
+      "shadowHiddenFromPage": true,
+      "styleColor": "rgb(255, 0, 0)",
+      "stylePadding": "7px",
+      "sheetColor": "rgb(0, 0, 255)"
+    }
+  },
+  "row5": {
+    "ok": true,
+    "ms": 54,
+    "value": {
+      "sid": "658e18a7f27c",
+      "redirect": "https://mclcojapkbalpiomlpndnoknichalcdo.chromiumapp.org/",
+      "result": {
+        "ok": true,
+        "url": "https://mclcojapkbalpiomlpndnoknichalcdo.chromiumapp.org/?code=658e18a7f27c"
+      },
+      "sawCookie": true
+    }
+  }
+}

@@ -1,0 +1,12 @@
+.browsers/
+.output/
+.wxt/
+*.log
+*.pid
+auto-imports.d.ts
+components.d.ts
+# results/ is committed as the spike's evidence, minus runtime files.
+!results/*.log
+results/*.pid
+results/*-browser.log
+results/server.log

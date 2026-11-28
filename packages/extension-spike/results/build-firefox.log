@@ -1,0 +1,29 @@
+heavy: got slimbook-heavy.lock after 3s
+$ wxt build -b firefox
+WXT 0.21.5
+ℹ Building firefox-mv3 for production with Vite 8.3.8
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin nuxt:ui:icons load (51%, 2.3s, 762 calls)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+1 callback is listed without a time. Its calls overlapped, so the time inside one call includes work from other calls. To find its cost, profile the build with `node --cpu-prof`:
+  - plugin vite:build-html transform (3 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+ WARN  Firefox requires data_collection_permissions for new extensions from November 3, 2025. Existing extensions are exempt for now.
+For more details, see: https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/
+To suppress this warning, set suppressWarnings.firefoxDataCollection to true in your wxt config.
+✔ Built extension in 9.400 s
+  ├─ .output/firefox-mv3/manifest.json                  720 B    
+  ├─ .output/firefox-mv3/options.html                   575 B    
+  ├─ .output/firefox-mv3/popup.html                     490 B    
+  ├─ .output/firefox-mv3/welcome.html                   575 B    
+  ├─ .output/firefox-mv3/background.js                  3.10 kB  
+  ├─ .output/firefox-mv3/chunks/browser-Cr5pvCFi.js     230.44 kB
+  ├─ .output/firefox-mv3/chunks/GrantPanel-bw6hbm2F.js  1.09 kB  
+  ├─ .output/firefox-mv3/chunks/options-DOCloYRK.js     275 B    
+  ├─ .output/firefox-mv3/chunks/popup-BsWqRLv1.js       609 B    
+  ├─ .output/firefox-mv3/chunks/Toast-BKtlsco9.js       29.15 kB 
+  ├─ .output/firefox-mv3/chunks/welcome-BBBEvQdy.js     366 B    
+  ├─ .output/firefox-mv3/content-scripts/overlay.js     4.53 kB  
+  └─ .output/firefox-mv3/assets/browser-BBkQ4bHB.css    214.96 kB
+Σ Total size: 486.87 kB                               
+✔ Finished in 14.2 s

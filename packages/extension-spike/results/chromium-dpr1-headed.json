@@ -1,0 +1,234 @@
+{
+  "browser": "chromium",
+  "dpr": 1,
+  "headless": false,
+  "version": "159.0.8154.6",
+  "extensionId": "mclcojapkbalpiomlpndnoknichalcdo",
+  "tabId": 1875724177,
+  "startupEvents": [
+    {
+      "at": 1795868325789,
+      "kind": "background-start"
+    },
+    {
+      "at": 1795868325910,
+      "detail": {
+        "reason": "install"
+      },
+      "kind": "installed"
+    },
+    {
+      "at": 1795868325915,
+      "detail": {
+        "url": "ws://127.0.0.1:47811/?from=onInstalled&browser=chrome"
+      },
+      "kind": "ws-open"
+    },
+    {
+      "at": 1795868327642,
+      "detail": {
+        "status": "complete",
+        "tabId": 1875724177,
+        "url": null
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795868327753,
+      "detail": {
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host.",
+        "ok": false,
+        "via": "onUpdated-url-hidden"
+      },
+      "kind": "inject"
+    },
+    {
+      "at": 1795868327996,
+      "detail": {
+        "status": "complete",
+        "tabId": 1875724177,
+        "url": null
+      },
+      "kind": "onUpdated"
+    },
+    {
+      "at": 1795868328116,
+      "detail": {
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host.",
+        "ok": false,
+        "via": "onUpdated-url-hidden"
+      },
+      "kind": "inject"
+    }
+  ],
+  "row7": {
+    "ok": true,
+    "ms": 2417,
+    "value": {
+      "icon": {
+        "tag": "svg",
+        "paths": 1,
+        "size": 24
+      },
+      "buttonIconPaths": 1,
+      "requests": [
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/options.html",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/options-DOCloYRK.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/browser-Cr5pvCFi.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/GrantPanel-bw6hbm2F.js",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/assets/browser-BBkQ4bHB.css",
+        "chrome-extension://mclcojapkbalpiomlpndnoknichalcdo/chunks/Toast-BKtlsco9.js"
+      ]
+    }
+  },
+  "row1": {
+    "ok": true,
+    "ms": 2350,
+    "value": {
+      "granted": true,
+      "contains": true
+    }
+  },
+  "row2": {
+    "noGesture": {
+      "ok": true,
+      "ms": 1365,
+      "value": {
+        "ok": false,
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host."
+      }
+    },
+    "keyboardCommand": {
+      "ok": true,
+      "ms": 1610,
+      "value": []
+    },
+    "xtestCommand": {
+      "ok": true,
+      "ms": 2337,
+      "value": [
+        {
+          "at": 1795868336091,
+          "detail": {
+            "command": "review-page",
+            "tabId": 1875724177
+          },
+          "kind": "command"
+        },
+        {
+          "at": 1795868336095,
+          "detail": {
+            "ok": true,
+            "url": "http://127.0.0.1:47810/page",
+            "via": "command"
+          },
+          "kind": "inject"
+        }
+      ]
+    },
+    "triggerAction": {
+      "ok": true,
+      "ms": 821,
+      "value": {
+        "capture": "see row3",
+        "overlay": {
+          "ok": true
+        },
+        "probe": {
+          "ok": true,
+          "url": "http://127.0.0.1:47810/page"
+        },
+        "via": "popup"
+      }
+    },
+    "beforeNav": {
+      "ok": true,
+      "ms": 4,
+      "value": {
+        "ok": true,
+        "url": "http://127.0.0.1:47810/page"
+      }
+    },
+    "sameOriginNav": {
+      "ok": true,
+      "ms": 217,
+      "value": {
+        "ok": true,
+        "url": "http://127.0.0.1:47810/page2"
+      }
+    },
+    "crossOriginNav": {
+      "ok": true,
+      "ms": 63,
+      "value": {
+        "ok": false,
+        "error": "Cannot access contents of the page. Extension manifest must request permission to access the respective host."
+      }
+    },
+    "onUpdatedWithHost": {
+      "ok": true,
+      "ms": 4125,
+      "value": {
+        "grant": {
+          "granted": true,
+          "contains": true
+        },
+        "events": [
+          {
+            "at": 1795868342366,
+            "detail": {
+              "status": "complete",
+              "tabId": 1875724177,
+              "url": "http://127.0.0.1:47810/page"
+            },
+            "kind": "onUpdated"
+          },
+          {
+            "at": 1795868342367,
+            "detail": {
+              "ok": true,
+              "url": "http://127.0.0.1:47810/page",
+              "via": "onUpdated"
+            },
+            "kind": "inject"
+          }
+        ]
+      }
+    }
+  },
+  "row3": {
+    "viewport": {
+      "w": 800,
+      "h": 513,
+      "dpr": 1
+    },
+    "image": {
+      "width": 800,
+      "height": 513
+    },
+    "matches": true
+  },
+  "row4": {
+    "ok": true,
+    "ms": 412,
+    "value": {
+      "shadowHiddenFromPage": true,
+      "styleColor": "rgb(255, 0, 0)",
+      "stylePadding": "7px",
+      "sheetColor": "rgb(0, 0, 255)"
+    }
+  },
+  "row5": {
+    "ok": true,
+    "ms": 842,
+    "value": {
+      "sid": "874bbeebd9e3",
+      "redirect": "https://mclcojapkbalpiomlpndnoknichalcdo.chromiumapp.org/",
+      "result": {
+        "ok": true,
+        "url": "https://mclcojapkbalpiomlpndnoknichalcdo.chromiumapp.org/?code=874bbeebd9e3"
+      },
+      "sawCookie": true
+    }
+  }
+}
