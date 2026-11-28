@@ -1,0 +1,37 @@
+{
+  "name": "@vite-hub/drop-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drop's browser extension for Chrome and Firefox: the review pill on any site, linked to your Drop.",
+  "license": "BUSL-1.1",
+  "type": "module",
+  "scripts": {
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "dev": "wxt",
+    "lint:firefox": "web-ext lint --source-dir .output/firefox-mv3",
+    "postinstall": "wxt prepare",
+    "test": "vp test",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "e2e:chromium": "node harness/chromium.mjs",
+    "e2e:firefox": "node harness/firefox.mjs",
+    "zip": "wxt zip && wxt zip -b firefox"
+  },
+  "devDependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@iconify-json/mingcute": "^1.2.10",
+    "@iconify/vue": "5.0.5",
+    "@nuxt/ui": "4.13.1",
+    "@wxt-dev/module-vue": "1.0.3",
+    "playwright": "1.65.1",
+    "selenium-webdriver": "4.54.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "^6.0.3",
+    "vite-plus": "catalog:",
+    "vue": "3.5.46",
+    "vue-tsc": "^3.3.14",
+    "web-ext": "10.8.0",
+    "wxt": "0.21.5"
+  }
+}

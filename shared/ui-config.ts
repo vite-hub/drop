@@ -1,0 +1,193 @@
+const floating = "bg-default ring ring-default rounded-lg shadow-md"
+const surface = `${floating} [animation:pop-in_120ms_var(--ease-out)]`
+
+export const customizeIcon = (content: string) => content.replaceAll('stroke-width="2"', 'stroke-width="1.75"')
+
+export const iconAliases: Record<string, string> = {
+  "lucide-arrow-left": "mingcute:arrow-left-line",
+  "lucide-arrow-up": "mingcute:arrow-up-line",
+  "lucide-arrow-up-right": "mingcute:arrow-right-up-line",
+  "lucide-bold": "mingcute:bold-line",
+  "lucide-check": "mingcute:check-line",
+  "lucide-circle-alert": "mingcute:alert-octagon-line",
+  "lucide-code": "mingcute:code-line",
+  "lucide-copy": "mingcute:copy-2-line",
+  "lucide-external-link": "mingcute:arrow-right-up-line",
+  "lucide-file": "mingcute:file-line",
+  "lucide-heading-1": "mingcute:heading-1-line",
+  "lucide-heading-2": "mingcute:heading-2-line",
+  "lucide-heading-3": "mingcute:heading-3-line",
+  "lucide-image": "mingcute:pic-line",
+  "lucide-inbox": "mingcute:inbox-line",
+  "lucide-italic": "mingcute:italic-line",
+  "lucide-list": "mingcute:list-check-line",
+  "lucide-list-ordered": "mingcute:list-ordered-line",
+  "lucide-loader-circle": "mingcute:loading-line",
+  "lucide-message-circle": "mingcute:chat-3-line",
+  "lucide-minus": "mingcute:minimize-line",
+  "lucide-pencil": "mingcute:edit-2-line",
+  "lucide-plus": "mingcute:add-line",
+  "lucide-quote": "mingcute:blockquote-line",
+  "lucide-refresh-cw": "mingcute:refresh-2-line",
+  "lucide-rotate-ccw": "mingcute:refresh-anticlockwise-1-line",
+  "lucide-send": "mingcute:send-plane-line",
+  "lucide-square": "mingcute:stop-line",
+  "lucide-square-code": "mingcute:terminal-box-line",
+  "lucide-square-pen": "mingcute:edit-line",
+  "lucide-strikethrough": "mingcute:strikethrough-line",
+  "lucide-trash-2": "mingcute:delete-2-line",
+  "lucide-type": "mingcute:text-line",
+  "lucide-x": "mingcute:close-line",
+}
+
+export const ui = {
+  colors: { primary: "neutral", neutral: "neutral" },
+  icons: {
+    arrowDown: "i-mingcute-arrow-down-line",
+    arrowLeft: "i-mingcute-arrow-left-line",
+    arrowRight: "i-mingcute-arrow-right-line",
+    arrowUp: "i-mingcute-arrow-up-line",
+    caution: "i-mingcute-warning-line",
+    check: "i-mingcute-check-line",
+    chevronDoubleLeft: "i-mingcute-arrows-left-line",
+    chevronDoubleRight: "i-mingcute-arrows-right-line",
+    chevronDown: "i-mingcute-down-line",
+    chevronLeft: "i-mingcute-left-line",
+    chevronRight: "i-mingcute-right-line",
+    chevronUp: "i-mingcute-up-line",
+    close: "i-mingcute-close-line",
+    copy: "i-mingcute-copy-2-line",
+    copyCheck: "i-mingcute-check-line",
+    dark: "i-mingcute-moon-line",
+    drag: "i-mingcute-dots-line",
+    ellipsis: "i-mingcute-more-1-fill",
+    error: "i-mingcute-close-circle-line",
+    external: "i-mingcute-arrow-right-up-line",
+    eye: "i-mingcute-eye-2-line",
+    eyeOff: "i-mingcute-eye-close-line",
+    file: "i-mingcute-file-line",
+    folder: "i-mingcute-folder-line",
+    folderOpen: "i-mingcute-folder-open-line",
+    hash: "i-mingcute-hashtag-line",
+    info: "i-mingcute-information-line",
+    light: "i-mingcute-sun-line",
+    loading: "i-mingcute-loading-line",
+    menu: "i-mingcute-menu-line",
+    minus: "i-mingcute-minimize-line",
+    panelClose: "i-mingcute-layout-left-line",
+    panelOpen: "i-mingcute-layout-left-line",
+    plus: "i-mingcute-add-line",
+    reload: "i-mingcute-refresh-anticlockwise-1-line",
+    search: "i-mingcute-search-line",
+    stop: "i-mingcute-stop-line",
+    star: "i-mingcute-star-line",
+    success: "i-mingcute-check-circle-line",
+    system: "i-mingcute-computer-line",
+    tip: "i-mingcute-bulb-line",
+    upload: "i-mingcute-upload-2-line",
+    warning: "i-mingcute-alert-line",
+  },
+  button: {
+    slots: {
+      base: "transition-[color,background-color,border-color,box-shadow,scale] duration-150 ease-out motion-safe:active:not-disabled:not-aria-disabled:scale-[0.96]",
+    },
+    variants: {
+      size: {
+        xs: { base: "h-7 px-2 text-xs gap-1", leadingIcon: "size-3.5", trailingIcon: "size-3.5" },
+        sm: { base: "h-8 px-3 text-sm gap-1.5", leadingIcon: "size-4", trailingIcon: "size-4" },
+        md: { base: "h-9 px-4 text-sm gap-2", leadingIcon: "size-4", trailingIcon: "size-4" },
+        lg: { base: "h-10 px-6 text-sm gap-2", leadingIcon: "size-4", trailingIcon: "size-4" },
+      },
+    },
+    compoundVariants: [
+      { square: true, size: "xs", class: "w-7 p-0 justify-center" },
+      { square: true, size: "sm", class: "w-8 p-0 justify-center" },
+      { square: true, size: "md", class: "w-9 p-0 justify-center" },
+      { square: true, size: "lg", class: "w-10 p-0 justify-center" },
+      { color: "neutral", variant: "outline", class: "ring-default shadow-xs dark:bg-elevated/40" },
+    ],
+  },
+  input: {
+    variants: {
+      size: {
+        sm: { base: "h-8 px-3 text-base md:text-sm" },
+        md: { base: "h-9 px-3 text-base md:text-sm" },
+        lg: { base: "h-10 px-3 text-base md:text-sm" },
+      },
+    },
+    compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs" }],
+  },
+  textarea: {
+    compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs text-base md:text-sm" }],
+  },
+  select: {
+    variants: { size: { sm: { base: "h-8 px-3 text-sm" }, md: { base: "h-9 px-3 text-sm" } } },
+    compoundVariants: [{ color: "neutral", variant: "outline", class: "shadow-xs" }],
+  },
+  card: {
+    slots: { root: "rounded-xl", header: "p-6 pb-0", body: "p-6", footer: "p-6 pt-0" },
+  },
+  tabs: {
+    slots: { trailingBadge: "tabular-nums" },
+    compoundVariants: [
+      {
+        color: "neutral",
+        variant: "pill",
+        class: {
+          indicator: "bg-default dark:bg-accented shadow-xs",
+          trigger:
+            "data-[state=active]:text-highlighted in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-default dark:in-[[data-slot=list]:not(:has([data-slot=indicator]))]:data-[state=active]:before:bg-accented",
+        },
+      },
+    ],
+  },
+  dropdownMenu: {
+    slots: { content: `${floating} p-1`, item: "rounded-md before:rounded-md" },
+  },
+  popover: { slots: { content: floating } },
+  tooltip: {
+    slots: { content: "bg-inverted text-inverted ring-0 shadow-none rounded-md h-auto px-3 py-1.5 text-xs" },
+  },
+  modal: {
+    slots: { content: "ring-default" },
+    variants: {
+      transition: {
+        true: {
+          overlay: "data-[state=closed]:animate-[fade-out_150ms_var(--ease-out)]",
+          content: "data-[state=closed]:animate-[scale-out_150ms_var(--ease-out)]",
+        },
+      },
+    },
+  },
+  slideover: {
+    variants: {
+      transition: { true: { overlay: "data-[state=closed]:animate-[fade-out_150ms_var(--ease-out)]" } },
+    },
+    compoundVariants: [
+      {
+        transition: true,
+        side: "right",
+        class: { content: "data-[state=closed]:animate-[slide-out-to-right_150ms_var(--ease-out)]" },
+      },
+    ],
+  },
+  editorToolbar: {
+    slots: { base: "gap-1", separator: "my-1 bg-(--ui-border)" },
+    variants: { layout: { bubble: { base: `${surface} p-0.5` } } },
+  },
+  editorSuggestionMenu: {
+    slots: {
+      content: `min-w-56 max-w-60 max-h-96 ${surface} ring-0 flex flex-col overflow-hidden`,
+      label: "font-mono text-[11px] font-normal uppercase tracking-[0.08em] text-muted",
+    },
+  },
+  editorEmojiMenu: {
+    slots: { content: `min-w-56 max-w-64 max-h-80 ${surface} ring-0 flex flex-col overflow-hidden` },
+  },
+  editorMentionMenu: {
+    slots: { content: `min-w-56 max-w-64 max-h-80 ${surface} ring-0 flex flex-col overflow-hidden` },
+  },
+  editorDragHandle: {
+    slots: { handle: "cursor-grab px-0.5 text-dimmed hover:text-muted" },
+  },
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "include": ["../../app/components/DropMark.vue", "../../shared/ui-config.ts", "**/*", ".wxt/wxt.d.ts"]
+}
