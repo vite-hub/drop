@@ -76,7 +76,9 @@ The `images` manifest accepts PNG, JPEG, GIF, and WebP files.
 
 For images on disk, publish the doc with them in one call. Write each image as `./<name>` in the Markdown, as in `![alt](./A.png)` or `::screenshot{src="./A.png"}`, and pass `images: [{ name: "A.png" }, …]`, up to 30, with `markdown` or a `.md` `file`. Drop stores the doc with each `./<name>` replaced by that image's `fileUrl`, and the reply lists an `uploadUrl` for each image (in the upload's JSON for a `.md` file). Run `curl -T <path> '<uploadUrl>'` for each, within 15 minutes; until then the doc shows that image as missing. A link to a `./<name>.png` that isn't in `images` stops the publish. With `previous`, `./<name>` also finds the images the doc already has, the latest of each name, so pass only new or changed ones in `images`.
 
-Otherwise publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change.
+If retrying an image PUT returns `409`, publish the doc again with `previous` and the failed image in `images` to get a fresh upload URL.
+
+To publish an image separately or attach a recording, use `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change.
 
 An image in a doc, either way, belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
 

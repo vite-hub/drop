@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { beforeEach, test } from "vite-plus/test"
+import { beforeEach, test, vi } from "vite-plus/test"
 import { H3Event, toResponse } from "h3"
 import { createMcpHandler } from "nitro-mcp-toolkit"
 import { migrate, objects, reset, sql, state, who } from "../cost/harness.mjs"
@@ -7,6 +7,7 @@ const { default: publish } = await import("../../server/mcp/tools/publish.ts")
 const { default: imagePut } = await import("../../server/api/uploads/images/[ticket].put.ts")
 const { default: uploadPut } = await import("../../server/api/uploads/[ticket].put.ts")
 const { deleteDrop, deleteExpiredDrops, findDrop } = await import("../../server/utils/drops.ts")
+const { drainBlobCleanup } = await import("../../server/utils/drops/write.ts")
 const { requireBlobAccess } = await import("../../server/utils/content-access.ts")
 
 migrate()
@@ -332,6 +333,62 @@ test("a failed attachment insert deletes the blob and allows the URL to be retri
   await upload(uploadUrl)
   assert.equal(objects.has(key), true)
   assert.equal(children(doc.id).length, 1)
+})
+
+test("queued image cleanup cannot race a successful upload retry", async () => {
+  const doc = (await call({ markdown: "![](./A.png)", images: [{ name: "A.png" }], lifetime: "review" }))
+    .structuredContent
+  const { uploadUrl, fileUrl, expiresAt } = doc.images[0]
+  const key = new URL(fileUrl).pathname.split("/").pop()
+  state.who = null
+  const remove = state.blob.delete
+  const deletionStarted = Promise.withResolvers()
+  const resumeDeletion = Promise.withResolvers()
+  const deletion = vi.spyOn(state.blob, "delete").mockImplementationOnce(async () => [new Error("delete failed")])
+  let drain
+  let clock
+  try {
+    sql.exec(`CREATE TRIGGER fail_doc_image BEFORE INSERT ON drops WHEN NEW.kind = 'image'
+      BEGIN SELECT RAISE(ABORT, 'injected image insert failure'); END;`)
+    try {
+      await assert.rejects(upload(uploadUrl), /injected image insert failure/)
+    } finally {
+      sql.exec("DROP TRIGGER fail_doc_image")
+    }
+    assert.equal(objects.has(key), true)
+    deletion.mockImplementationOnce(async (keys) => {
+      deletionStarted.resolve()
+      await resumeDeletion.promise
+      return remove(keys)
+    })
+    drain = drainBlobCleanup()
+    await Promise.race([drain, deletionStarted.promise])
+    await assert.rejects(upload(uploadUrl), { status: 409, statusText: /Publish the doc with previous and images/ })
+    assert.equal(deletion.mock.calls.length, 1, "cleanup must wait until the ticket expires")
+    assert.equal(children(doc.id).length, 0)
+
+    clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse(expiresAt))
+    drain = drainBlobCleanup()
+    await Promise.race([drain, deletionStarted.promise])
+    assert.equal(deletion.mock.calls.length, 2, "expired cleanup is eligible to run")
+    await assert.rejects(upload(uploadUrl), { status: 403 })
+
+    state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
+    const replacement = (await call({ markdown: "![](./A.png)", previous: doc.id, images: [{ name: "A.png" }] }))
+      .structuredContent.images[0]
+    state.who = null
+    await upload(replacement.uploadUrl)
+    resumeDeletion.resolve()
+    await drain
+    assert.equal(objects.has(key), false)
+    assert.equal(sql.prepare("SELECT COUNT(*) AS n FROM blob_cleanup").get().n, 0)
+    assert.equal(objects.has(children(doc.id)[0].blob_key), true)
+  } finally {
+    resumeDeletion.resolve()
+    await drain
+    deletion.mockRestore()
+    clock?.mockRestore()
+  }
 })
 
 test("over 30 images, a link to an image not passed, a repeated name, or images without a Markdown doc are refused", async () => {

@@ -229,12 +229,11 @@ export async function storeDocImage(
     { drops: 0, bytes: bytes.byteLength, writes: 1, docImage: true },
     event,
     async (quota) => {
-      const pendingCleanup = () =>
-        db.select({ key: blobCleanup.blobKey }).from(blobCleanup).where(eq(blobCleanup.blobKey, ticket.b))
-      if ((await pendingCleanup()).length) {
-        await deleteBlobKeys([ticket.b])
-        if ((await pendingCleanup()).length) throw storageFailure("Image cleanup is still pending.")
-      }
+      const [pendingCleanup] = await db
+        .select({ key: blobCleanup.blobKey })
+        .from(blobCleanup)
+        .where(eq(blobCleanup.blobKey, ticket.b))
+      if (pendingCleanup || ticket.e <= Date.now()) throw usedImageUpload()
       const [storageError] = await blob.put(ticket.b, bytes, { contentType })
       if (storageError) throw storageFailure(storageError)
       const row: DropRow = {
@@ -249,7 +248,7 @@ export async function storeDocImage(
       try {
         await quota.commit([db.insert(drops).values(row)])
       } catch (error) {
-        await deleteBlobKeys([ticket.b])
+        await deleteBlobKeys([ticket.b], ticket.e)
         throw error
       }
       return row
