@@ -23,6 +23,14 @@ test("comark-quiz's relayed messages carry block ids, option keys, and how a rec
     choice: [],
     correct: null,
   })
+  assert.deepEqual(answer({ id: "lunch", kind: "poll", choice: ["tacos"], note: " Spicy, please \n" }).detail, {
+    id: "lunch",
+    kind: "poll",
+    choice: ["tacos"],
+    correct: null,
+    note: "Spicy, please",
+  })
+  assert.equal(answer({ id: "capital", kind: "question", choice: ["paris"], note: "Hi" }).detail.note, undefined)
   assert.deepEqual(answer({ id: "card", kind: "recall", choice: ["knew"], correct: null }).detail, {
     id: "card",
     kind: "recall",
@@ -37,6 +45,8 @@ test("comark-quiz's relayed messages carry block ids, option keys, and how a rec
     { id: "q", kind: "question", choice: ["k".repeat(65)] },
     { id: "q", kind: "poll", choice: Array.from({ length: 21 }, (_, n) => `k${n}`) },
     { id: "q", kind: "poll", choice: [1] },
+    { id: "q", kind: "poll", choice: [], note: "x".repeat(2001) },
+    { id: "q", kind: "poll", choice: [], note: 7 },
     { id: "q", kind: "recall", choice: ["knew", "missed"] },
     { id: "q", kind: "recall", choice: ["maybe"] },
     { id: "q", kind: "survey", choice: ["a"] },

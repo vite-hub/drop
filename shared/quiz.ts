@@ -4,6 +4,7 @@ export const MAX_QUIZ_BLOCKS = 200
 const MAX_QUIZ_ID = 100
 const MAX_QUIZ_KEY = 64
 const MAX_QUIZ_CHOICES = 20
+export const MAX_QUIZ_NOTE = 2000
 
 export const QUIZ_KINDS = ["question", "poll", "recall"] as const
 export type QuizKind = (typeof QUIZ_KINDS)[number]
@@ -21,7 +22,13 @@ const correct = v.nullish(v.boolean(), null)
 
 export const QuizAnswerInput = v.variant("kind", [
   v.object({ id: QuizId, kind: v.literal("question"), choice: keys(1), correct }),
-  v.object({ id: QuizId, kind: v.literal("poll"), choice: keys(0), correct }),
+  v.object({
+    id: QuizId,
+    kind: v.literal("poll"),
+    choice: keys(0),
+    correct,
+    note: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(MAX_QUIZ_NOTE))),
+  }),
   v.object({
     id: QuizId,
     kind: v.literal("recall"),

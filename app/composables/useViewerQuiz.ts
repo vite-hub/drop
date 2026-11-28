@@ -35,7 +35,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
         answers: Object.fromEntries(
           shown.flatMap((id) => {
             const value = answer(id)
-            return value ? [[id, { choice: [...value.choice], correct: value.correct }]] : []
+            if (!value) return []
+            const { choice, correct, note } = value
+            return [[id, { choice: [...choice], correct, ...(note === undefined ? {} : { note }) }]]
           }),
         ),
         results: Object.fromEntries(
@@ -62,7 +64,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     const order = { session, sequence, issuedAt }
     const current = () => session === order.session && sequences.get(answer.id) === sequence
     failedPolls.delete(answer.id)
-    answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
+    answers.set(answer.id, shownAnswer(answer))
     try {
       const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, {
         method: "POST",
@@ -81,7 +83,10 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
       if (answer.kind === "poll") {
         failedPolls.add(answer.id)
         const saved = confirmed.get(answer.id)?.saved
-        answers.set(answer.id, saved?.answer ?? before ?? { choice: [], correct: null })
+        answers.set(
+          answer.id,
+          saved?.answer ?? before ?? { choice: [], correct: null, ...(answer.note === undefined ? {} : { note: "" }) },
+        )
         if (saved?.results) results.set(answer.id, saved.results)
         else results.delete(answer.id)
       }
@@ -103,3 +108,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
 
   return { receive }
 }
+
+const shownAnswer = (answer: Extract<QuizMessage, { type: "comark-quiz:answer" }>["detail"]): QuizAnswer => ({
+  choice: answer.choice,
+  correct: answer.correct,
+  ...(answer.kind === "poll" && answer.note !== undefined ? { note: answer.note } : {}),
+})
