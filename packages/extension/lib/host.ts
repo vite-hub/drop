@@ -127,7 +127,7 @@ export async function host(request: ReviewHostRequest, from: HostSender): Promis
         await browser.tabs.create({ url: browser.runtime.getURL("/welcome.html") })
         throw new Error("Connect the extension to your Drop first.")
       }
-      const held = await reviewSession(origin, target, { create: true })
+      const held = await reviewSession(origin, target, { create: target === NOTES_TARGET.id })
       if (!held) throw new Error("Drop didn't connect.")
       await pick(origin, target)
       return held.reply

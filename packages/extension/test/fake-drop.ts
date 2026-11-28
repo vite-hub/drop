@@ -99,6 +99,7 @@ export function createFakeDrop(drop = DROP) {
   function session(body: { origin?: string; target?: string; create?: boolean }) {
     const { origin, target, create } = body
     if (!origin || !target) return json({ message: "origin and target are required" }, { status: 400 })
+    if (create && target !== NOTES_TARGET.id) return json({ message: "Only notes can be created." }, { status: 400 })
     let dropId: string | undefined
     if (target === NOTES_TARGET.id) {
       dropId = notesDrops.get(origin)
@@ -108,7 +109,7 @@ export function createFakeDrop(drop = DROP) {
         notesDrops.set(origin, dropId)
       }
     } else if ((reviews.get(origin) ?? []).some((covering) => covering.id === target)) dropId = target
-    if (!dropId) return json({ message: "That review doesn't cover this site." }, { status: 403 })
+    if (!dropId) return json({ message: "That review doesn't cover this site." }, { status: 404 })
     const token = id("review")
     reviewTokens.set(token, { origin, drop: dropId })
     issued.add(token)
