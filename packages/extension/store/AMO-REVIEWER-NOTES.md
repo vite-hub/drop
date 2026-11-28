@@ -52,4 +52,7 @@ supports Firefox 128 ESR, so `strict_min_version` stays at 128.0; older versions
 leaves the browser goes only to the Drop the person connects: the origin of each site they press Drop on
 (browsingActivity), and what they review there: comments, element references and screenshots (websiteContent).
 
+The privacy policy is [PRIVACY.md](PRIVACY.md), published at https://drop.vitehub.dev/docs/extension#privacy.
+[PRIVACY-CLAIMS.md](PRIVACY-CLAIMS.md) names the test behind each of its claims.
+
 <!-- TODO(Maxi): approve this wording and these two types before submitting. -->
