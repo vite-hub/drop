@@ -971,7 +971,10 @@ function copyLink(announce?: string) {
   const url = new URL(link.value)
   if (isApp.value && appAt.value !== "/") url.searchParams.set("path", appAt.value)
   const shown = variants.value && !editing.value && !lightbox.value && !shownVersion.value ? variants.value : null
-  if (shown) url.hash = shown.canvas ? (shown.view ?? "") : (shown.variants[shown.current]?.id ?? "")
+  if (shown)
+    url.hash = shown.canvas
+      ? canvasViewHash(shown.view ?? "", drop.value.version)
+      : (shown.variants[shown.current]?.id ?? "")
   void copy(url.href, { key: "link", announce })
 }
 const canMarkArea = computed(
@@ -2023,6 +2026,7 @@ watch(
             <template v-if="variants && !editing && !lightbox && !shownVersion">
               <LazyViewerVariants
                 :state="variants"
+                :version="drop.version"
                 @command="
                   (command, index) =>
                     command === 'move' || command === 'hand' ? canvasTool(command) : picker(command, index)

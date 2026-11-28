@@ -2,7 +2,7 @@
 import type { DropdownMenuItem } from "@nuxt/ui"
 import type { PickerCommand, ViewerVariants } from "~/composables/useViewerFrame"
 
-const props = defineProps<{ state: ViewerVariants }>()
+const props = defineProps<{ state: ViewerVariants; version: number }>()
 const emit = defineEmits<{ command: [command: PickerCommand, index?: number]; view: [hash: string] }>()
 const group = useTemplateRef<HTMLElement>("group")
 const shown = computed(() => props.state.variants[props.state.current]!)
@@ -10,6 +10,7 @@ const count = computed(() => props.state.variants.length)
 
 const named = () => props.state.variants.findIndex((variant) => variant.id && `#${variant.id}` === location.hash)
 const viewed = () => location.hash.startsWith("#@")
+const viewHere = () => canvasViewOn(location.hash, props.version)
 let opened = false
 watch(
   () => props.state,
@@ -18,12 +19,13 @@ watch(
       opened = true
       const at = named()
       if (at >= 0 && (state.canvas || at !== state.current)) return emit("command", "show", at)
-      if (viewed()) return emit("view", location.hash)
+      const view = viewHere()
+      if (view) return emit("view", view)
     }
     if (!state.canvas && shown.value.id) {
       if (location.hash !== `#${shown.value.id}`) history.replaceState(history.state, "", `#${shown.value.id}`)
     } else if (state.canvas && state.view) {
-      const hash = new URL(`#${state.view}`, location.href).hash
+      const hash = new URL(canvasViewHash(state.view, props.version), location.href).hash
       if (location.hash !== hash) history.replaceState(history.state, "", hash)
     } else if (state.canvas && (named() >= 0 || viewed()))
       history.replaceState(history.state, "", location.pathname + location.search)
@@ -33,8 +35,9 @@ watch(
 
 useEventListener("hashchange", () => {
   const at = named()
+  const view = viewHere()
   if (at >= 0) emit("command", "show", at)
-  else if (viewed()) emit("view", location.hash)
+  else if (view) emit("view", view)
 })
 
 let navigating = false

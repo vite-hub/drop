@@ -337,7 +337,7 @@ export function useViewerFrame(options: {
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":
-        if (options.variantBar) variants.value = { ...message }
+        if (options.variantBar && ready.value) variants.value = { ...message }
         return
       case "key":
         if (message.key === "meta_k") return options.palette?.()
