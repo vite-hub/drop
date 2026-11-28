@@ -137,6 +137,31 @@ function capProseImageWidths(nodes: MarkdownNode[]): void {
   }
 }
 
+const isWideImage = (node: MarkdownNode): boolean =>
+  Array.isArray(node) &&
+  node[0] === "img" &&
+  typeof node[1].class === "string" &&
+  node[1].class.split(/\s+/).includes("wide")
+
+function widenImages(nodes: MarkdownNode[]): void {
+  for (const node of nodes) {
+    if (!Array.isArray(node) || node[0] === null) continue
+    const [tag, attrs, ...children] = node
+    if (tag === "comments" || tag === "comments-render") widenImages(children)
+    if (tag !== "p") continue
+    const content = children.filter((child) => typeof child !== "string" || child.trim())
+    if (content.length !== 1) continue
+    const [only] = content
+    const linked = Array.isArray(only) && only[0] === "a" ? only.slice(2) : []
+    const image = isWideImage(only!) ? only : (linked as MarkdownNode[]).find(isWideImage)
+    if (!Array.isArray(image)) continue
+    attrs["data-wide"] = ""
+    const width = Number(image[1].width)
+    if (Number.isSafeInteger(width) && width > 0)
+      attrs.style = `${typeof attrs.style === "string" ? `${attrs.style};` : ""}--comark-wide-width:${width}px`
+  }
+}
+
 function markScrollableTables(nodes: MarkdownNode[]): void {
   for (const node of nodes) {
     if (!Array.isArray(node) || node[0] === null) continue
@@ -308,6 +333,7 @@ async function renderMarkdownBody(
   try {
     const document = await parseForReaders(renameLegacyProps(markdown))
     capProseImageWidths(document.nodes)
+    widenImages(document.nodes)
     markScrollableTables(document.nodes)
     const supersedes = supersedesHref(document.frontmatter.supersedes)
     const revision = supersedes

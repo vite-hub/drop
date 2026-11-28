@@ -22,7 +22,7 @@ test("Markdown image width caps are rendered without typed CSS attributes", asyn
   assert.doesNotMatch(document, /<img(?=[^>]+alt="Plain")(?=[^>]+--drop-image-width)/)
 })
 
-test("a direct Markdown page fits portrait images without stretching the zoom or resizing screenshots", async () => {
+test("a direct Markdown page shows portrait images at their own size without stretching the zoom or resizing screenshots", async () => {
   const origin = "https://portrait.test"
   const path = "/f/portrait.md"
   const image = `${origin}/portrait.svg`
@@ -93,10 +93,11 @@ Mark.
     assert.equal(await screenshot.evaluate((img) => getComputedStyle(img).maxHeight), "none")
 
     for (const [alt, expected] of [
-      ["Bold portrait", [224, 560]],
+      // A portrait narrower than the column keeps its size, however tall: a reader scrolls past it.
+      ["Bold portrait", [400, 1000]],
       // A thumbnail: comark-zoom gives an image in a table cell with no size written a 3:2 box.
       ["Table portrait", [96, 64]],
-      ["Sized portrait", [224, 560]],
+      ["Sized portrait", [400, 1000]],
       ["Thumbnail", [80, 200]],
       ["Width-only thumbnail", [80, 200]],
     ]) {
