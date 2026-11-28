@@ -12,7 +12,7 @@ import type { Identity } from "./identity"
 import { withDropQuota } from "./quotas"
 import { seal, unseal } from "./review"
 
-export const MAX_DOC_IMAGES = 30
+const MAX_DOC_IMAGES = 30
 const UPLOAD_MINUTES = 15
 const IMAGE_NAME = /^[^/\\\s"'()<>{}[\]]+\.(?:png|jpe?g|gif|webp|avif|svg)$/
 
