@@ -31,14 +31,20 @@ export async function noticeComments(event: H3Event, drop: Pick<DropRow, "id">, 
   )
 }
 
-const Ticket = v.object({ d: v.string(), u: v.string(), o: v.string(), e: v.number() })
+const Ticket = v.object({ d: v.string(), u: v.string(), o: v.string(), e: v.number(), x: v.optional(v.literal(1)) })
 
 const TICKET_MS = 3_600_000
 
 export async function presenceTicket(event: H3Event, claims: ReviewClaims, now = Date.now()) {
   if (!claims.u) return null
   const expiresAt = Math.min(now + TICKET_MS, claims.e)
-  const ticket = await seal(event, "presence", { d: claims.d, u: claims.u, o: claims.o, e: expiresAt })
+  const ticket = await seal(event, "presence", {
+    d: claims.d,
+    u: claims.u,
+    o: claims.o,
+    e: expiresAt,
+    ...(claims.x ? { x: claims.x } : {}),
+  })
   return { ticket, expiresAt }
 }
 
@@ -46,6 +52,7 @@ interface Member {
   who: Identity
   drop: DropRow
   origin: string | null
+  extension?: true
 }
 
 const members = new WeakMap<object, Member | null>()
@@ -62,10 +69,10 @@ async function resolve(event: H3Event, request: Request, now: number): Promise<M
   const text = params.get("ticket")
   if (text !== null) {
     const ticket = await unseal(event, "presence", Ticket, text)
-    if (!ticket || ticket.e <= now || request.headers.get("origin") !== ticket.o) return null
+    if (!ticket || ticket.e <= now || (!ticket.x && request.headers.get("origin") !== ticket.o)) return null
     const [who, drop] = await Promise.all([reviewer({ u: ticket.u }), findDrop(ticket.d, event)])
     if (!who || drop?.kind !== "site" || !drop.siteUrl || !siteMatches(drop.siteUrl, ticket.o)) return null
-    return { who, drop, origin: ticket.o }
+    return { who, drop, origin: ticket.o, ...(ticket.x ? { extension: true as const } : {}) }
   }
   const id = params.get("drop")
   if (!id) return null
@@ -77,7 +84,7 @@ async function resolve(event: H3Event, request: Request, now: number): Promise<M
 
 export async function presenceOrigin(event: H3Event, request: Request, origin: string) {
   const member = await memberOf(event, request)
-  return member?.origin === origin
+  return Boolean(member?.extension) || member?.origin === origin
 }
 
 export async function presenceIdentity(event: H3Event, request: Request) {

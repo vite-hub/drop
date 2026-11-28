@@ -1,0 +1,155 @@
+diff --git a/dist/internal/server.d.ts b/dist/internal/server.d.ts
+index 7d3c0c1cb54f38f975b71b049a6fbc7ac1e575d4..4b5945605a7cedf9d394c4304732e3ece1243354 100644
+--- a/dist/internal/server.d.ts
++++ b/dist/internal/server.d.ts
+@@ -1,5 +1,5 @@
+ /// <reference path="../host-declarations.d.ts" />
+-import { C as requireCaller, D as withAnonymousAuthorization, E as useAuth, M as findVerifiedAuthUserId, N as getAuthForDefinition, O as withAuth, S as requireAuthorization, T as toAuthRequest, _ as handleAuthRequest, a as authRoute, b as requireAuth, c as createAuth, d as createAuthHandler, f as createAuthRequestRuntimeOptions, g as handleAuth, h as getAuthEvents, i as assertAuthOrigin, j as createBetterAuthOptions, k as withAuthorization, l as createAuthAccessHandler, m as getAuthConsoleForRequest, n as AuthSignOutOptions, o as can, p as getAuth, r as aggregateAuthEvents, s as checkAuthMember, t as AuthEventReadErrorCode, u as createAuthForRequest, v as listAuthEvents, w as signOut, x as requireAuthAccessRoutes, y as requireAbility } from "../server-Cun232hb.js";
++import { C as requireCaller, D as withAnonymousAuthorization, E as useAuth, M as findVerifiedAuthUserId, N as getAuthForDefinition, O as withAuth, S as requireAuthorization, T as toAuthRequest, _ as handleAuthRequest, a as authRoute, b as requireAuth, c as createAuth, d as createAuthHandler, f as createAuthRequestRuntimeOptions, g as handleAuth, h as getAuthEvents, i as assertAuthOrigin, j as createBetterAuthOptions, k as withAuthorization, l as createAuthAccessHandler, m as getAuthConsoleForRequest, n as AuthSignOutOptions, o as can, p as getAuth, r as aggregateAuthEvents, s as checkAuthMember, t as AuthEventReadErrorCode, u as createAuthForRequest, v as listAuthEvents, w as signOut, x as requireAuthAccessRoutes, y as requireAbility } from "../server-C83RRpBa.js";
+ import { a as setAuthAccessIdentityResolver, o as setAuthRuntimeEnvResolver, s as resetAuth } from "../server-DL9MSuyj.js";
+ import { n as AbilityErrorData, t as AbilityError } from "../ability-error-C1c30O6E.js";
+ export { AbilityError, type AbilityErrorData, AuthEventReadErrorCode, AuthSignOutOptions, aggregateAuthEvents, assertAuthOrigin, can, checkAuthMember, createAuth, createAuthAccessHandler, createAuthForRequest, createAuthHandler, createAuthRequestRuntimeOptions, createBetterAuthOptions, authRoute as default, findVerifiedAuthUserId, getAuth, getAuthConsoleForRequest, getAuthEvents, getAuthForDefinition, handleAuth, handleAuthRequest, listAuthEvents, requireAbility, requireAuth, requireAuthAccessRoutes, requireAuthorization, requireCaller, resetAuth, setAuthAccessIdentityResolver, setAuthRuntimeEnvResolver, signOut, toAuthRequest, useAuth, withAnonymousAuthorization, withAuth, withAuthorization };
+\ No newline at end of file
+diff --git a/dist/internal/server.js b/dist/internal/server.js
+index 36f26aba7916c05a6086e8c2cf97e7f50daf802f..af1e64497e2d2c5293d1b598f060b38147cc89ac 100644
+--- a/dist/internal/server.js
++++ b/dist/internal/server.js
+@@ -2,5 +2,5 @@ import { n as resetAuth } from "../runtime-state-C0Rd1W4m.js";
+ import { a as getAuthForDefinition, i as findVerifiedAuthUserId, n as createBetterAuthOptions } from "../auth-instance-BpI9Ps8A.js";
+ import { setAuthAccessIdentityResolver, setAuthRuntimeEnvResolver } from "../runtime/server.js";
+ import { t as AbilityError } from "../ability-error-D3-u8k1A.js";
+-import { C as toAuthRequest, D as withAuthorization, E as withAuth, S as signOut, T as withAnonymousAuthorization, _ as requireAbility, a as checkAuthMember, b as requireAuthorization, c as createAuthForRequest, d as getAuth, f as getAuthConsoleForRequest, g as listAuthEvents, h as handleAuthRequest, i as can, l as createAuthHandler, m as handleAuth, n as assertAuthOrigin, o as createAuth, p as getAuthEvents, r as authRoute, s as createAuthAccessHandler, t as aggregateAuthEvents, u as createAuthRequestRuntimeOptions, v as requireAuth, w as useAuth, x as requireCaller, y as requireAuthAccessRoutes } from "../server-_eUOlAJ8.js";
++import { C as toAuthRequest, D as withAuthorization, E as withAuth, S as signOut, T as withAnonymousAuthorization, _ as requireAbility, a as checkAuthMember, b as requireAuthorization, c as createAuthForRequest, d as getAuth, f as getAuthConsoleForRequest, g as listAuthEvents, h as handleAuthRequest, i as can, l as createAuthHandler, m as handleAuth, n as assertAuthOrigin, o as createAuth, p as getAuthEvents, r as authRoute, s as createAuthAccessHandler, t as aggregateAuthEvents, u as createAuthRequestRuntimeOptions, v as requireAuth, w as useAuth, x as requireCaller, y as requireAuthAccessRoutes } from "../server-CLwyN4Ay.js";
+ export { AbilityError, aggregateAuthEvents, assertAuthOrigin, can, checkAuthMember, createAuth, createAuthAccessHandler, createAuthForRequest, createAuthHandler, createAuthRequestRuntimeOptions, createBetterAuthOptions, authRoute as default, findVerifiedAuthUserId, getAuth, getAuthConsoleForRequest, getAuthEvents, getAuthForDefinition, handleAuth, handleAuthRequest, listAuthEvents, requireAbility, requireAuth, requireAuthAccessRoutes, requireAuthorization, requireCaller, resetAuth, setAuthAccessIdentityResolver, setAuthRuntimeEnvResolver, signOut, toAuthRequest, useAuth, withAnonymousAuthorization, withAuth, withAuthorization };
+diff --git a/dist/mcp-token-DzGivm7f.js b/dist/mcp-token-Ctcb2FpY.js
+similarity index 88%
+rename from dist/mcp-token-DzGivm7f.js
+rename to dist/mcp-token-Ctcb2FpY.js
+index d03bccb4b16eb6e79911edb7f6c567415d96cb3e..82fa2f379a954cd62adbda73b0949b9dfcaae1cb 100644
+--- a/dist/mcp-token-DzGivm7f.js
++++ b/dist/mcp-token-Ctcb2FpY.js
+@@ -110,13 +110,30 @@ async function verifyMcpRequest(request, options = {}) {
+ /** The token of an `Authorization: Bearer` header. */
+ const bearerToken = (headers) => /^Bearer\s+(\S+)$/i.exec(headers.get("authorization") ?? "")?.[1];
+ /**
+-* Check an MCP access token for any `mcpOAuth()` resource at the origin of the request, for `requireCaller()`, which
+-* accepts the token on every route of the app.
++* Check an MCP access token for `requireCaller()` on any route of the app. The token must name the `mcpOAuth()` resource
++* of the origin with the longest matching path. At that path, prefer an exact query match, then a resource without a
++* query. If the path is outside every resource or the origin has just one resource, use the first resource of the origin.
+ */
+-async function verifyAppAccessToken(token, origin, pathname, instance) {
++async function verifyAppAccessToken(token, origin, url, instance) {
+ 	const auth = mcpOAuthAuth(instance);
+ 	const state = await stateOf(auth);
+-	return await verifyToken(token, auth, state, state.resources.filter((entry) => new URL(entry).origin === origin), pathname);
++	return await verifyToken(token, auth, state, appResourceAt(state.resources, origin, url), url.pathname);
++}
++function appResourceAt(resources, origin, url) {
++	const atOrigin = resources.map((identifier) => ({
++		identifier,
++		url: new URL(identifier)
++	})).filter((entry) => entry.url.origin === origin);
++	if (atOrigin.length <= 1) return atOrigin[0]?.identifier;
++	const path = url.pathname.replace(/\/+$/, "");
++	const matching = atOrigin.map((entry) => ({
++		...entry,
++		path: entry.url.pathname.replace(/\/+$/, "")
++	})).filter((entry) => path === entry.path || path.startsWith(`${entry.path}/`)).sort((first, second) => second.path.length - first.path.length);
++	const longest = matching[0]?.path;
++	if (longest === void 0) return atOrigin[0]?.identifier;
++	const atPath = matching.filter((entry) => entry.path === longest);
++	return (atPath.find((entry) => entry.url.search === url.search) ?? atPath.find((entry) => !entry.url.search))?.identifier;
+ }
+ async function verifyToken(token, auth, state, resource, path) {
+ 	const refuse = (reason, detail, clientId, cause) => [mcpErrors.AUTH_MCP_TOKEN_INVALID({
+diff --git a/dist/mcp.js b/dist/mcp.js
+index ea8cba9639ff0bcf81dc59e248c81a3f3d17041e..07e3f3ced7884ebffadc0c0ce921c317978f4e3e 100644
+--- a/dist/mcp.js
++++ b/dist/mcp.js
+@@ -1,6 +1,6 @@
+ import { t as isRecord } from "./object-CAK6UYR5.js";
+ import { r as mcpRegistrationPluginId } from "./mcp-config-C7srUMIZ.js";
+-import { c as verifyMcpRequest, i as mcpTokenInvalidReasons, n as baseScopes, o as pathOf, r as deleteUnusedMcpClients, s as stateOf, t as appAuth } from "./mcp-token-DzGivm7f.js";
++import { c as verifyMcpRequest, i as mcpTokenInvalidReasons, n as baseScopes, o as pathOf, r as deleteUnusedMcpClients, s as stateOf, t as appAuth } from "./mcp-token-Ctcb2FpY.js";
+ import { APIError, createAuthMiddleware } from "better-auth/api";
+ import { oauthProvider, oauthProviderAuthServerMetadata, oauthProviderOpenIdConfigMetadata } from "@better-auth/oauth-provider";
+ import { jwt } from "better-auth/plugins";
+diff --git a/dist/runtime/console.d.ts b/dist/runtime/console.d.ts
+index 15a60174199611c620a8289c42a4a46551377281..78ce780eacf10e52c53e3b9b927376fcd93e8b65 100644
+--- a/dist/runtime/console.d.ts
++++ b/dist/runtime/console.d.ts
+@@ -1,3 +1,3 @@
+ import "../server.js";
+-import { A as authForRequest, r as aggregateAuthEvents, v as listAuthEvents } from "../server-Cun232hb.js";
++import { A as authForRequest, r as aggregateAuthEvents, v as listAuthEvents } from "../server-C83RRpBa.js";
+ export { aggregateAuthEvents, authForRequest, listAuthEvents };
+\ No newline at end of file
+diff --git a/dist/runtime/console.js b/dist/runtime/console.js
+index 39be82c8ae28423d46ba275a6aa3f5b1ddd42012..fcefcc45722500a2f48d9021eb87ab24d6d1a9d2 100644
+--- a/dist/runtime/console.js
++++ b/dist/runtime/console.js
+@@ -1,4 +1,4 @@
+-import { g as listAuthEvents, t as aggregateAuthEvents } from "../server-_eUOlAJ8.js";
++import { g as listAuthEvents, t as aggregateAuthEvents } from "../server-CLwyN4Ay.js";
+ import { t as authForRequest } from "../auth-instance-BpI9Ps8A.js";
+ import "../server.js";
+ export { aggregateAuthEvents, authForRequest, listAuthEvents };
+diff --git a/dist/server-Cun232hb.d.ts b/dist/server-C83RRpBa.d.ts
+similarity index 98%
+rename from dist/server-Cun232hb.d.ts
+rename to dist/server-C83RRpBa.d.ts
+index 18ae16fc987b5ed46d63d75ec7ae29b10b81032e..90455affac913d09543dd8d970153c5865640d5c 100644
+--- a/dist/server-Cun232hb.d.ts
++++ b/dist/server-C83RRpBa.d.ts
+@@ -137,7 +137,9 @@ declare function requireAuthorization<TInput extends AuthRequestInput>(event: TI
+ declare function requireAuthorization<TInput extends AuthRequestInput>(event: TInput, authorize: AccessAuthorizeOption<TInput & ViteHubContext, false>, definition: AuthDefinition | undefined): Promise<CoreAuthorization>;
+ /**
+  * Return who calls: a person with an Auth Session (`kind: "browser"`), or an Agent with an MCP access token of
+- * `mcpOAuth()` (`kind: "agent"`), checked like `verifyMcpRequest()` for any `mcpOAuth()` resource of the origin. Like
++ * `mcpOAuth()` (`kind: "agent"`), checked like `verifyMcpRequest()`. The longest matching resource path wins. At that
++ * path, the query must match exactly unless a resource has no query. On other paths, or when the origin has just one
++ * resource, the token must name the first resource of the origin. Like
+  * `verifyMcpRequest()`, it accepts `jwt()` and an `oauthProvider()` with `resources` that the app adds without
+  * `mcpOAuth()`. A bearer token that is not a JWT, such as a session token of `bearer()`, is read as a session.
+  * Returns `AUTH_SIGNED_OUT` without either, and `AUTH_MCP_TOKEN_INVALID` for a JWT bearer token that fails a check.
+diff --git a/dist/server-_eUOlAJ8.js b/dist/server-CLwyN4Ay.js
+similarity index 99%
+rename from dist/server-_eUOlAJ8.js
+rename to dist/server-CLwyN4Ay.js
+index 4907cddcc8b06dce7f60ea235b9cca4005a674bd..39268fadd04f6b47b42f1d2369a277cd500b9ee6 100644
+--- a/dist/server-_eUOlAJ8.js
++++ b/dist/server-CLwyN4Ay.js
+@@ -847,9 +847,9 @@ async function readCaller(event, definition) {
+ 		const auth = authForRequest(request, authRequestEvent(event), definition);
+ 		const { options } = await auth.$context;
+ 		if (isJwsToken(token) && mcpOAuthResources(options.plugins).length) {
+-			const { verifyAppAccessToken } = await import("./mcp-token-DzGivm7f.js").then((n) => n.a);
++			const { verifyAppAccessToken } = await import("./mcp-token-Ctcb2FpY.js").then((n) => n.a);
+ 			const url = new URL(request.url);
+-			const [error, caller] = await verifyAppAccessToken(token, trustsProxyHeaders(options) ? forwardedRequestOrigin(request) : url.origin, url.pathname, auth);
++			const [error, caller] = await verifyAppAccessToken(token, trustsProxyHeaders(options) ? forwardedRequestOrigin(request) : url.origin, url, auth);
+ 			if (error) return [error, void 0];
+ 			return [void 0, Object.freeze({
+ 				client: {
+diff --git a/dist/server.d.ts b/dist/server.d.ts
+index 1d0aa94798b93684bd7115c672e7b8ae826c492a..5962a4830d188d31f5a70f24194e04d751bae223 100644
+--- a/dist/server.d.ts
++++ b/dist/server.d.ts
+@@ -1,5 +1,5 @@
+ /// <reference path="./host-declarations.d.ts" />
+-import { C as requireCaller, D as withAnonymousAuthorization, E as useAuth, F as AuthCallerError, I as AuthCallerErrorCode, L as AuthCallerResult, O as withAuth, P as AuthCaller, R as AuthCallerUser, S as requireAuthorization, a as authRoute, b as requireAuth, d as createAuthHandler, g as handleAuth, h as getAuthEvents, k as withAuthorization, m as getAuthConsoleForRequest, o as can, r as aggregateAuthEvents, s as checkAuthMember, t as AuthEventReadErrorCode, v as listAuthEvents, w as signOut, y as requireAbility, z as AuthMemberErrorCode } from "./server-Cun232hb.js";
++import { C as requireCaller, D as withAnonymousAuthorization, E as useAuth, F as AuthCallerError, I as AuthCallerErrorCode, L as AuthCallerResult, O as withAuth, P as AuthCaller, R as AuthCallerUser, S as requireAuthorization, a as authRoute, b as requireAuth, d as createAuthHandler, g as handleAuth, h as getAuthEvents, k as withAuthorization, m as getAuthConsoleForRequest, o as can, r as aggregateAuthEvents, s as checkAuthMember, t as AuthEventReadErrorCode, v as listAuthEvents, w as signOut, y as requireAbility, z as AuthMemberErrorCode } from "./server-C83RRpBa.js";
+ import { a as McpTokenInvalidData, o as McpTokenInvalidError, s as McpTokenInvalidReason } from "./mcp-token-CmQbXbTu.js";
+ import { n as AbilityErrorData, t as AbilityError } from "./ability-error-C1c30O6E.js";
+ export { AbilityError, type AbilityErrorData, type AuthCaller, type AuthCallerError, type AuthCallerErrorCode, type AuthCallerResult, type AuthCallerUser, type AuthEventReadErrorCode, type AuthMemberErrorCode, type McpTokenInvalidData, type McpTokenInvalidError, type McpTokenInvalidReason, aggregateAuthEvents, can, checkAuthMember, createAuthHandler, authRoute as default, getAuthConsoleForRequest, getAuthEvents, handleAuth, listAuthEvents, requireAbility, requireAuth, requireAuthorization, requireCaller, signOut, useAuth, withAnonymousAuthorization, withAuth, withAuthorization };
+\ No newline at end of file
+diff --git a/dist/server.js b/dist/server.js
+index e7f101f5ee6c3d360a3b9c9e31a34df5b2128412..a58f9ce6e1b23601666a98e23362fcf4f424efbd 100644
+--- a/dist/server.js
++++ b/dist/server.js
+@@ -1,3 +1,3 @@
+ import { t as AbilityError } from "./ability-error-D3-u8k1A.js";
+-import { D as withAuthorization, E as withAuth, S as signOut, T as withAnonymousAuthorization, _ as requireAbility, a as checkAuthMember, b as requireAuthorization, f as getAuthConsoleForRequest, g as listAuthEvents, i as can, l as createAuthHandler, m as handleAuth, p as getAuthEvents, r as authRoute, t as aggregateAuthEvents, v as requireAuth, w as useAuth, x as requireCaller } from "./server-_eUOlAJ8.js";
++import { D as withAuthorization, E as withAuth, S as signOut, T as withAnonymousAuthorization, _ as requireAbility, a as checkAuthMember, b as requireAuthorization, f as getAuthConsoleForRequest, g as listAuthEvents, i as can, l as createAuthHandler, m as handleAuth, p as getAuthEvents, r as authRoute, t as aggregateAuthEvents, v as requireAuth, w as useAuth, x as requireCaller } from "./server-CLwyN4Ay.js";
+ export { AbilityError, aggregateAuthEvents, can, checkAuthMember, createAuthHandler, authRoute as default, getAuthConsoleForRequest, getAuthEvents, handleAuth, listAuthEvents, requireAbility, requireAuth, requireAuthorization, requireCaller, signOut, useAuth, withAnonymousAuthorization, withAuth, withAuthorization };

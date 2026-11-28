@@ -51,6 +51,7 @@ async function keptCount(ownerId: string) {
         isNull(drops.parentId),
         eq(drops.teamFolder, false),
         isNull(drops.trashedAt),
+        isNull(drops.role),
       ),
     )
   return row?.kept ?? 0

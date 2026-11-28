@@ -50,6 +50,9 @@ overrides:
   vite@*: "catalog:"
 
 patchedDependencies:
+  # requireCaller() took a token for any mcpOAuth() resource on every route; this takes only the resource at the request
+  # path (vite-hub/vitehub#5689). Delete with the next ViteHub bump that includes it.
+  "@vite-hub/auth@0.0.0-preview-bb58bb9": patches/@vite-hub__auth@0.0.0-preview-bb58bb9.patch
   # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
   # screenshot the same fit check (onmax/comark-ui#491). Delete with the next comark-ui bump that includes it.

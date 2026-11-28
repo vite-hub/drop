@@ -35,6 +35,8 @@
         "skills/**/*.js",
         // `pnpm doctor` loads it with --config.
         "doctor.config.ts",
+        // The contract between review.js and the browser extension, which imports its types.
+        "shared/review-host.ts",
       ],
       "project": [
         "app/**/*.{ts,vue,css}",

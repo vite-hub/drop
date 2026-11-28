@@ -20,7 +20,10 @@ export async function trashDrop(row: DropRow, now = Date.now()) {
 }
 
 export async function restoreDrop(row: DropRow, now = Date.now()) {
-  await db.update(drops).set({ trashedAt: null, trashReason: null, lastAccessedAt: now }).where(eq(drops.id, row.id))
+  const restored = { trashedAt: null, trashReason: null, lastAccessedAt: now }
+  const restore = (fields: Partial<typeof drops.$inferInsert>) =>
+    db.update(drops).set(fields).where(eq(drops.id, row.id))
+  await (row.role ? restore(restored).catch(() => restore({ ...restored, role: null })) : restore(restored))
 }
 
 export async function deleteDrop(row: DropRow, gone = new Set<string>()) {

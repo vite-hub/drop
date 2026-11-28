@@ -177,6 +177,16 @@ export const ReviewTokenSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(60))),
 })
 
+export const NotesTargetsSchema = v.object({
+  origin: v.pipe(v.string(), v.maxLength(300)),
+})
+
+export const NotesSessionSchema = v.object({
+  origin: v.pipe(v.string(), v.maxLength(300)),
+  target: v.pipe(v.string(), v.maxLength(64)),
+  create: v.optional(v.boolean()),
+})
+
 export const ReviewOpenSchema = v.union([
   v.object({ token: v.pipe(v.string(), v.maxLength(2048)) }),
   v.object({ doc: v.pipe(v.string(), v.maxLength(2048)) }),

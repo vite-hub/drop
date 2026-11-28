@@ -36,6 +36,10 @@ const OPEN = {
   "GET /api/review/related": "review.js: checks its review token",
   "OPTIONS /api/review/related": "review.js: CORS preflight",
   "POST /api/review/presence": "review.js: checks its review token",
+  "GET /api/review/notes/hello": "browser extension: names this Drop before it links, and says nothing about anyone",
+  "GET /api/review/notes/index": "browser extension: checks its notes OAuth token and consent",
+  "POST /api/review/notes/targets": "browser extension: checks its notes OAuth token and consent",
+  "POST /api/review/notes/session": "browser extension: checks its notes OAuth token and consent",
   "OPTIONS /api/review/presence": "review.js: CORS preflight",
   "PUT /api/uploads/x": "checks its one-use upload ticket",
   "GET /d/x.md": "checks the drop's share",
@@ -63,8 +67,8 @@ function routeOf(file) {
   const method = METHODS.has(last.at(-1)) ? last.pop().toUpperCase() : "*"
   parts.push(last.join("."))
   let fill = 0
+  if (parts.at(-1) === "index") parts.pop()
   const path = parts
-    .filter((part) => part !== "index")
     .map((part) =>
       part.replace(/\[\.\.\.[^\]]+\]/g, "x/y").replace(/\[[^\]]+\]/g, () => String.fromCharCode(120 + fill++)),
     )

@@ -48,8 +48,9 @@ export const requireRateLimit = async (...args) => {
 }`,
   "vite-hub/schedule": "export const defineSchedule = value => value",
   // The hourly cleanup's MCP client sweep needs the app's Auth, which tests don't build; it only counts the calls.
+  // verifyMcpRequest is the real one: the notes routes pass the Auth that a test builds.
   "vite-hub/auth/mcp":
-    "export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }",
+    'export { verifyMcpRequest } from "@vite-hub/auth/mcp"; export const deleteUnusedMcpClients = async () => { globalThis.dropTest.mcpCleanups = (globalThis.dropTest.mcpCleanups ?? 0) + 1; return [undefined, { deleted: 0 }] }',
   // ViteHub Auth's VITEHUB_MEMBERS check, on the test's emails: `state.members` lists them, empty lets everyone in.
   "vite-hub/auth/server": `import { sql } from "drizzle-orm"
 export const checkAuthMember = async (userId) => {

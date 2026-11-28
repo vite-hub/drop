@@ -33,7 +33,7 @@ export default defineDoctorConfig({
     "typescript/boundaries/no-inherited-key-lookup": "off",
     "typescript/boundaries/no-cross-realm-builtin-instanceof": "off",
     "vue/ssr/data-allow-mismatch-surgical": "off",
-    "nuxt/middleware/no-route-middleware-api-security": ["warn", { guards: ["requireAdmin"] }],
+    "nuxt/middleware/no-route-middleware-api-security": ["warn", { guards: ["requireAdmin", "notesCaller"] }],
   },
   overrides: [
     {

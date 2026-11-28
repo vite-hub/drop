@@ -148,6 +148,7 @@ export function imageDrop(
     draftImage: false,
     teamId: parent.teamId,
     resources: null,
+    role: null,
   }
 }
 
