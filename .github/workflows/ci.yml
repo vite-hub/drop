@@ -42,7 +42,8 @@ jobs:
       # `run`: pnpm 11's own `pnpm doctor` checks the pnpm install, not the project.
       - run: pnpm run doctor
       # Firefox too: the doc header's copy and the zoom's comment layer have Firefox tests (Drop comment #12).
-      - run: pnpm exec playwright install --with-deps chromium firefox
+      # WebKit: Export as PDF has a test for Safari's video that stops before its first frame.
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm test
       - run: pnpm --filter @vite-hub/drop test
       - run: pnpm build
