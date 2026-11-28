@@ -1,7 +1,7 @@
 import { browser } from "wxt/browser"
-import { checkDrop, currentDrop, originPattern, type DropCheck } from "./deployment"
+import { checkDrop, currentDrop, DEFAULT_DROP, originPattern, type DropCheck } from "./deployment"
 import { blocked, inject, markClosed, onTabLoaded, openTabs, probe, type Policy } from "./injection"
-import type { Hand, SiteState, State } from "./messages"
+import type { Hand, LinkProblem, LinkResult, SiteState, State } from "./messages"
 import { host, start } from "./host"
 import { indexed, siteIndex } from "./notes"
 import { link, linked, unlink } from "./oauth"
@@ -73,7 +73,47 @@ const CHECK_ERRORS: Record<Extract<DropCheck, { ok: false }>["error"], string> =
   "invalid-address": "That isn't a Drop address. Use https://, or http:// on this computer.",
   unreachable: "Couldn't reach that address.",
   "not-a-drop": "That address answered, but it isn't a Drop.",
+  outdated: "This Drop needs an update before the extension works.",
+  redirects: "That address sends visitors to another one. Use the address your Drop shows.",
+  elsewhere: "That Drop lives at another address. Use the address your Drop shows.",
   "server-error": "That Drop has a problem right now. Try again later.",
+}
+
+async function remember(checked: Extract<DropCheck, { ok: true }>) {
+  await local.set("hello", {
+    drop: checked.drop,
+    name: checked.name,
+    ...(checked.content ? { content: checked.content } : {}),
+  })
+}
+
+async function connect(): Promise<LinkResult> {
+  const drop = await currentDrop()
+  let ended: LinkProblem | undefined
+  const launch = (url: string) =>
+    browser.identity.launchWebAuthFlow({ url, interactive: true }).then(
+      (returned) => {
+        if (!returned) ended = "closed"
+        else if (new URL(returned).searchParams.get("error") === "access_denied") ended = "denied"
+        return returned
+      },
+      (error: unknown) => {
+        if (error instanceof Error && /did not approve|cancel/i.test(error.message)) ended = "closed"
+        throw error
+      },
+    )
+  try {
+    await link(drop, { launch, redirectUri: browser.identity.getRedirectURL() })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return { ok: false, problem: ended ?? "failed", detail, state: await state() }
+  }
+  if ((await local.get("hello"))?.drop !== drop) {
+    const checked = await checkDrop(drop)
+    if (checked.ok) await remember(checked)
+  }
+  void refreshIndex()
+  return { ok: true, state: await state() }
 }
 
 const pageHandlers: PageHandlers = {
@@ -84,18 +124,15 @@ const pageHandlers: PageHandlers = {
     if (!checked.ok) throw new Error(CHECK_ERRORS[checked.error])
     if (checked.drop !== (await currentDrop())) await unlink()
     await local.set("drop", checked.drop)
-    await local.set("hello", {
-      drop: checked.drop,
-      name: checked.name,
-      ...(checked.content ? { content: checked.content } : {}),
-    })
+    await remember(checked)
     return state()
   },
-  async "link.start"() {
-    await link(await currentDrop())
-    void refreshIndex()
+  async "deployment.reset"() {
+    if ((await currentDrop()) !== DEFAULT_DROP) await unlink()
+    await local.remove("drop")
     return state()
   },
+  "link.start": connect,
   async "link.remove"() {
     await unlink()
     return state()
