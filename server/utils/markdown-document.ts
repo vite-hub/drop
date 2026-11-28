@@ -154,8 +154,13 @@ function widenImages(nodes: MarkdownNode[]): void {
     const content = children.filter(hasContent)
     if (content.length !== 1) continue
     const [only] = content
-    const linked = Array.isArray(only) && only[0] === "a" ? only.slice(2).filter(hasContent) : []
-    const image = linked.length === 1 ? linked[0] : only
+    let image = only
+    if (Array.isArray(only) && only[0] === "a") {
+      const [, , ...linkChildren] = only
+      const linked = linkChildren.filter(hasContent)
+      if (linked.length !== 1) continue
+      image = linked[0]
+    }
     if (!Array.isArray(image) || !isWideImage(image)) continue
     attrs["data-wide"] = ""
     const width = Number(image[1].width)
