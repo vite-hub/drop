@@ -135,6 +135,7 @@ export async function createFolder(
       trashedAt: null,
       trashReason: null,
       parentId: parent?.id ?? null,
+      parentVersion: null,
       siteUrl: null,
       publishToken: null,
       draftImage: false,

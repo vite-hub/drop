@@ -30,13 +30,13 @@ const styles = (
   )
 ).join("\n")
 
-async function open(browser, width) {
+async function open(browser, width, height = 900) {
   const { html } = await renderMarkdownCached("carousel-bleed.md", async () => source)
   const escaped = planDocument("markdown", source, false, html)
     .replace("</head>", `<style>${styles}</style></head>`)
     .replaceAll("&", "&amp;")
     .replaceAll('"', "&quot;")
-  const page = await browser.newPage({ viewport: { width, height: 900 } })
+  const page = await browser.newPage({ viewport: { width, height } })
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
     if (url.hostname !== "drop.test" || url.pathname !== "/") return route.abort()
@@ -63,13 +63,14 @@ async function open(browser, width) {
       carousel: box(".typeset > .cc"),
       outline: outline?.getClientRects().length ? outline.getBoundingClientRect() : null,
       viewport: document.documentElement.clientWidth,
+      frame: window.innerWidth,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
 }
 
 test(
-  "a carousel's slides run past the text into the room on its right, clear of the outline",
+  "a carousel's slides run past the text to the frame's edge, or stop clear of the outline",
   { timeout: 30000 },
   async () => {
     const browser = await chromium.launch()
@@ -87,8 +88,18 @@ test(
       )
       assert.equal(desktop.overflow, 0)
 
+      // A frame beside the viewer's panel, too narrow for the outline's column, and short enough to scroll, so the
+      // slides run under its classic scrollbar without the page scrolling sideways. Playwright hides
+      // scrollbars in headless Chromium, so this browser keeps them.
+      const scrollbars = await chromium.launch({ ignoreDefaultArgs: ["--hide-scrollbars"] })
+      const narrow = await open(scrollbars, 974, 500).finally(() => scrollbars.close())
+      assert.equal(narrow.outline, null)
+      assert.ok(narrow.viewport < narrow.frame, "the frame scrolls, so its scrollbar takes room")
+      assert.ok(narrow.track.right > narrow.viewport, `slides end at ${narrow.track.right}, short of the scrollbar`)
+      assert.equal(narrow.overflow, 0)
+
       const phone = await open(browser, 390)
-      assert.ok(phone.track.right <= phone.viewport, `track ends at ${phone.track.right} in ${phone.viewport}`)
+      assert.equal(Math.round(phone.track.right), phone.frame, "the slides run to the screen's edge")
       assert.equal(phone.overflow, 0)
     } finally {
       await browser.close()

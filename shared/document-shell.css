@@ -238,11 +238,19 @@ p.render-error {
   --comark-grain: none;
 }
 
-/* A carousel's slides run past the text column into the same room on its right, so the next photos peek in there,
-   while its counter and arrows stay under the column. The side outline keeps clear of them as it does of wide blocks.
-   A carousel inside a compare stays inside it. */
+/* A carousel's slides run past the text column into the room on its right, so the next photos peek in there, while its
+   counter and arrows stay under the column. With no outline column beside them they run to the frame's edge, where a
+   photo cut off reads as more to come; with one they stop 1.5rem short of it, as wide blocks do. A carousel inside a
+   compare stays inside it. */
 .typeset > .cc {
-  --cc-bleed: max(0px, var(--comark-wide-end, 0px));
+  --cc-bleed: max(0px, calc(var(--comark-wide-end, 0px) + 1.5rem - min(1.5rem, var(--comark-rail-width, 0px))));
+}
+
+/* A classic scrollbar sits inside 100vw, so slides that reach the frame's edge pass under it. The page clips them there
+   rather than scrolling sideways; clip, unlike hidden, keeps sticky headers working. */
+:root:has(.typeset > .cc),
+:root:has(.typeset > .cc) body {
+  overflow-x: clip;
 }
 
 /* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
@@ -250,6 +258,9 @@ p.render-error {
 :is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) {
   --comark-wide-start: 0px;
   --comark-wide-end: 0px;
+}
+:is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) > .cc {
+  --cc-bleed: 0px;
 }
 
 :is(.typeset, .typeset > .cr) > div:is([data-width], [data-fit])[data-fold][data-cols] > table > * > tr > [data-row] {

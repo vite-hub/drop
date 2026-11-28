@@ -94,7 +94,7 @@ export async function keyedName(event: H3Event, purpose: string, value: string) 
   return hex(mac.subarray(0, 16))
 }
 
-type SealPurpose = "token" | "choice" | "doc" | "upload" | "app-files" | "presence"
+type SealPurpose = "token" | "choice" | "doc" | "upload" | "image" | "app-files" | "presence"
 
 const sealRoot = async (event: H3Event) => hex(await sha256(encoder.encode(`review-token:${authSecret(event)}`)))
 
@@ -400,6 +400,7 @@ export async function createSiteDrop(
       trashedAt: null,
       trashReason: null,
       parentId: folder?.id ?? null,
+      parentVersion: null,
       siteUrl,
       publishToken: null,
       draftImage: false,
