@@ -7,6 +7,7 @@ import { textValue } from "../../shared/utils/text.ts"
 import { useAppFiles } from "../../app/composables/useAppFiles.ts"
 import { useSetQuery } from "../../app/composables/useSetQuery.ts"
 import { useViewerFrame } from "../../app/composables/useViewerFrame.ts"
+import { saveMediaSpot } from "../../app/lib/media-resume.client.ts"
 
 const ORIGIN = "https://abc-drop.drop.test"
 const page = (body) => `<!doctype html><html><head></head><body>${body}</body></html>`
@@ -73,8 +74,12 @@ function openApp(query, { hash = "", files: given, router, served = false } = {}
     useEventListener: () => {},
     useViewerQuiz: () => ({ receive: () => {} }),
     useDropFrame: (_frame, _origin, handler) => {
-      receive = handler
-      return { ready: ref(false), send: (message) => sent.push(message) }
+      const ready = ref(false)
+      receive = (message) => {
+        if (message.type === "ready") ready.value = true
+        handler(message)
+      }
+      return { ready, send: (message) => sent.push(message) }
     },
   }))
     vi.stubGlobal(name, value)
@@ -95,7 +100,13 @@ function openApp(query, { hash = "", files: given, router, served = false } = {}
       inset: ref(0),
       bottom: ref(0),
       width: ref("readable"),
-      annotations: { frameTool: ref("browse"), overlays: {}, draftingArea: ref(null), popover: ref(null) },
+      annotations: {
+        frameTool: ref("browse"),
+        overlays: {},
+        draftingArea: ref(null),
+        popover: ref(null),
+        penStyle: ref({ tool: "pen" }),
+      },
     }),
   )
   const settle = async () => {
@@ -138,6 +149,40 @@ test("a hand-written link's hash after the query belongs to the app's address, a
     await settle()
     assert.equal(route.query.path, "/integrations/components")
     assert.equal(route.hash, "", "the old page's hash would land on the new page")
+  } finally {
+    stop()
+  }
+})
+
+test("a mounted app frame gets the destination's saved playback on same-document navigation", async () => {
+  const { app, viewer, sent, receive, settle, stop } = openApp({}, { files: { "index.html": page("App") } })
+  const storage = new Map()
+  vi.stubGlobal("localStorage", {
+    getItem: (key) => storage.get(key),
+    setItem: (key, value) => storage.set(key, value),
+  })
+  const clip = { source: `${ORIGIN}/training.webm`, at: 12, duration: 20 }
+  try {
+    saveMediaSpot(JSON.stringify(["d1", null, "/training"]), 0, clip.source, clip.at, clip.duration)
+    receive({ type: "host", path: "/" })
+    receive({ type: "ready" })
+    await settle()
+    const key = viewer.frameKey.value
+    assert.deepEqual(sent.find(({ type }) => type === "media-times")?.times, {})
+    sent.length = 0
+
+    receive({ type: "location", path: "/training" })
+    await settle()
+    assert.equal(app.page.value, "index.html", "both routes use the same app entry point")
+    assert.equal(viewer.frameKey.value, key, "the existing frame stays mounted")
+    assert.deepEqual(
+      sent.filter(({ type }) => type === "media-times"),
+      [{ type: "media-times", path: "/training", times: { 0: clip } }],
+    )
+    sent.length = 0
+    receive({ type: "location", path: "/training?tab=notes#details" })
+    await settle()
+    assert.ok(!sent.some(({ type }) => type === "media-times"))
   } finally {
     stop()
   }

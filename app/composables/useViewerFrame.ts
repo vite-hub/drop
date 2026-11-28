@@ -68,9 +68,8 @@ export function useViewerFrame(options: {
   const mounted = useMounted()
   const dark = computed(() => colorMode.value === "dark")
   const isApp = computed(() => drop.value.kind === "app")
-  const mediaScope = computed(() =>
-    JSON.stringify([drop.value.id, drop.value.version, isApp.value ? page.value : null]),
-  )
+  const mediaPath = computed(() => (isApp.value ? location.value.replace(/[?#].*$/s, "") : null))
+  const mediaScope = computed(() => JSON.stringify([drop.value.id, drop.value.version, mediaPath.value]))
   const trashed = computed(() => drop.value.trashedAt !== null)
 
   const imageBlob = shallowRef<Blob>()
@@ -228,6 +227,12 @@ export function useViewerFrame(options: {
   const reading = new Map<string, string[]>()
 
   const quiz = useViewerQuiz(drop, (message) => send(message))
+  const restoreMedia = () =>
+    send({
+      type: "media-times",
+      path: contentOrigin.value ? mediaPath.value : null,
+      times: readMediaSpots(mediaScope.value),
+    })
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
       case "comark-quiz:ready":
@@ -278,10 +283,13 @@ export function useViewerFrame(options: {
         reading.set(target, [...(reading.get(target) ?? []), message.id])
         return send({ type: "read", page: target })
       }
-      case "location":
+      case "location": {
+        const before = mediaPath.value
         followFrame(message.path)
         frameDocument = srcdoc.value
+        if (ready.value && before !== mediaPath.value) restoreMedia()
         return
+      }
       case "navigate":
         if (isApp.value) page.value = message.path
         return
@@ -340,7 +348,7 @@ export function useViewerFrame(options: {
       case "ready":
         variants.value = null
         frameTool.value = "browse"
-        send({ type: "media-times", times: readMediaSpots(mediaScope.value) })
+        restoreMedia()
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":

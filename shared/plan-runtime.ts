@@ -2108,8 +2108,9 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // Each video and audio starts where this reader stopped it last time. Drop keeps the spots (the frame's own storage
   // is gone on reload) and sends them as media-times; the frame reports a player's spot as it plays, pauses or seeks.
   let mediaSpots = {};
+  let mediaPath = null;
   const mediaReported = new WeakMap();
-  const mediaResumed = new WeakMap();
+  let mediaResumed = new WeakMap();
   const mediaIndex = (el) => Array.prototype.indexOf.call(document.querySelectorAll("video, audio"), el);
   const mediaSource = (el) => {
     const url = el.currentSrc;
@@ -2118,6 +2119,7 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (/^https?:/.test(url) && url.length <= 2048) return url;
   };
   const resumeMedia = (el) => {
+    if (mediaPath !== null && mediaPath !== location.pathname) return;
     const spot = mediaSpots[mediaIndex(el)];
     const source = mediaSource(el);
     if (!source || mediaResumed.get(el) === source || spot?.source !== source || el.readyState < 1 || !(el.duration > 0)) return;
@@ -2139,6 +2141,10 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   for (const type of ["loadedmetadata", "timeupdate", "pause", "seeked", "ended"]) document.addEventListener(type, reportMedia, true);
   window.addEventListener("message", (e) => {
     if (e.source !== parent || !e.data || !e.data.__drop || e.data.type !== "media-times") return;
+    const path = typeof e.data.path === "string" ? e.data.path : null;
+    if (path !== null && path !== location.pathname) return;
+    if (path !== mediaPath) mediaResumed = new WeakMap();
+    mediaPath = path;
     mediaSpots = e.data.times && typeof e.data.times === "object" ? e.data.times : {};
     document.querySelectorAll("video, audio").forEach(resumeMedia);
   });

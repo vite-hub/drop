@@ -5,14 +5,15 @@ import { test } from "vite-plus/test"
 import { previewSandbox } from "../../app/utils/feedback.ts"
 import { parseFrameMessage } from "../../shared/frame-messages.ts"
 import { planDocument } from "../../shared/documents.ts"
+import { injectRuntime } from "../../shared/plan-runtime.ts"
+import { buildProjectDocument } from "../../shared/project-bundle.ts"
 
 // A 20-second clip.
 const CLIP = await readFile(new URL("fixtures/clip.webm", import.meta.url))
 const SOURCE = "https://drop.test/clip.webm"
 const REPLACEMENT = "https://drop.test/replacement.webm"
 
-// A Markdown doc with a video in the viewer's frame, the way DropViewer renders one without a content origin.
-async function open(browser, source = SOURCE) {
+async function open(browser, source = SOURCE, { app = false } = {}) {
   const html = planDocument(
     "markdown",
     "# Launch film",
@@ -36,9 +37,18 @@ async function open(browser, source = SOURCE) {
         body: CLIP.subarray(Number(from), end + 1),
       })
     }
+    if (app && url.pathname === "/home") {
+      const files = {
+        "index.html": `<!doctype html><html><head></head><body><video src="${source}" preload="metadata"></video></body></html>`,
+      }
+      return route.fulfill({
+        contentType: "text/html",
+        body: injectRuntime(buildProjectDocument(files, "index.html"), false, 0, true),
+      })
+    }
     return route.fulfill({
       contentType: "text/html",
-      body: `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>
+      body: `${app ? '<iframe src="/home"></iframe>' : `<iframe sandbox="${previewSandbox("markdown")}" srcdoc="${escaped}"></iframe>`}
         <script>window.posts = []; addEventListener("message", (e) => { if (e.data?.__drop) window.posts.push(e.data); });
           window.tell = (message) => frames[0].postMessage({ __drop: true, ...message }, "*");</script>`,
     })
@@ -86,6 +96,34 @@ test("a video in a doc reports where the reader stopped it, and starts there nex
       assert.equal(await videoTime(other.frame), 0)
       await other.page.close()
     }
+  } finally {
+    await browser.close()
+  }
+}, 30_000)
+
+test("an app restores a distinct destination clip without reloading the frame", async () => {
+  const browser = await chromium.launch()
+  try {
+    const { page, frame } = await open(browser, SOURCE, { app: true })
+    assert.equal(await videoTime(frame), 0)
+    await frame.evaluate((source) => {
+      window.sameDocument = true
+      history.pushState({}, "", "/training")
+      const video = document.createElement("video")
+      video.preload = "metadata"
+      video.src = source
+      document.querySelector("video").replaceWith(video)
+    }, REPLACEMENT)
+    await page.waitForFunction(() =>
+      window.posts.some((message) => message.type === "location" && message.path === "/training"),
+    )
+    assert.equal(await videoTime(frame), 0)
+    await page.evaluate((source) => {
+      window.tell({ type: "media-times", path: "/home", times: { 0: { source, at: 7, duration: 20 } } })
+      window.tell({ type: "media-times", path: "/training", times: { 0: { source, at: 12, duration: 20 } } })
+    }, REPLACEMENT)
+    await frame.waitForFunction(() => document.querySelector("video").currentTime === 12)
+    assert.equal(await frame.evaluate(() => window.sameDocument), true)
   } finally {
     await browser.close()
   }
