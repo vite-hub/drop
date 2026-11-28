@@ -73,9 +73,21 @@ test("a database without the answers table gets it on the first read, index and 
     sql
       .prepare("PRAGMA table_info(drop_answers)")
       .all()
-      .slice(-8)
+      .slice(-11)
       .map((column) => column.name),
-    ["first_session", "first_sequence", "session", "sequence", "first_issued_at", "issued_at", "note", "note_at"],
+    [
+      "first_session",
+      "first_sequence",
+      "session",
+      "sequence",
+      "first_issued_at",
+      "issued_at",
+      "note",
+      "note_at",
+      "note_session",
+      "note_sequence",
+      "note_issued_at",
+    ],
   )
 })
 
@@ -452,6 +464,36 @@ test("a legacy note keeps its best known timestamp when the vote changes", async
     sql.exec("DROP TABLE drop_answers")
     await answersOf("doc", "ada")
   }
+})
+
+test("poll choice and note take the latest action independently", async () => {
+  const session = crypto.randomUUID()
+  const otherSession = crypto.randomUUID()
+  const save = (sequence, choice, note, page = session) =>
+    recordAnswer(
+      "doc",
+      "ada",
+      {
+        id: "next",
+        kind: "poll",
+        choice: [choice],
+        correct: null,
+        note,
+        order: { session: page, sequence, issuedAt: 1000 + sequence },
+      },
+      20_000 + sequence,
+    )
+
+  await save(2, "workers")
+  assert.deepEqual(await save(1, "streams", "New note"), { choice: ["workers"], correct: null, note: "New note" })
+  await save(4, "streams", undefined, otherSession)
+  assert.deepEqual(await save(3, "workers", ""), { choice: ["streams"], correct: null, note: "" })
+  assert.equal((await save(1, "workers", "Delayed", otherSession)).note, "")
+  assert.equal((await save(6, "workers", "Newest", otherSession)).note, "Newest")
+  assert.equal((await save(5, "streams", "Delayed")).note, "Newest")
+  assert.deepEqual((await pollNotes("doc")).get("next"), [
+    { voter: "Someone", choice: ["workers"], note: "Newest", at: 20_006 },
+  ])
 })
 
 test("a voter's note is kept with their vote, comes back only to them, and an edit or an empty note replaces it", async () => {

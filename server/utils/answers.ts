@@ -24,6 +24,9 @@ const ADDED_COLUMNS = {
   issued_at: "integer",
   note: "text",
   note_at: "integer",
+  note_session: "text",
+  note_sequence: "integer",
+  note_issued_at: "integer",
 }
 let table: Promise<void> | undefined
 function ensureTable() {
@@ -58,6 +61,19 @@ const reading = <T>(read: () => Promise<T>) =>
 export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity | null) =>
   who?.actorKind === "browser" && row.kind === "markdown" && !row.expired
 
+function newerOrder(session: string, sequence: string, issuedAt: string, savedAt: string) {
+  const page = sql.raw(session)
+  const number = sql.raw(sequence)
+  const issued = sql.raw(issuedAt)
+  const previousIssuedAt = sql`min(${issued}, (${sql.raw(savedAt)} + 1) * 1000 - 1)`
+  return sql`CASE
+    WHEN excluded.${page} = ${page} THEN excluded.${number} > ${number}
+    WHEN excluded.${issued} IS NOT NULL THEN ${issued} IS NULL OR excluded.${issued} > ${previousIssuedAt}
+      OR (excluded.${issued} = ${previousIssuedAt} AND excluded.${page} > ${page})
+    WHEN excluded.${page} IS NOT NULL THEN ${issued} IS NULL
+    ELSE ${page} IS NULL END`
+}
+
 export async function recordAnswer(link: string, userId: string, answer: QuizAnswerRequest, now = Date.now()) {
   await ensureTable()
   const choice = JSON.stringify(answer.choice)
@@ -67,25 +83,23 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
   const issuedAt = answer.order?.issuedAt === undefined ? null : Math.min(answer.order.issuedAt, (now + 1) * 1000 - 1)
   const note = answer.kind === "poll" ? answer.note : undefined
   const previousFirstIssuedAt = sql`min(first_issued_at, (created_at + 1) * 1000 - 1)`
-  const previousIssuedAt = sql`min(issued_at, (updated_at + 1) * 1000 - 1)`
   const first = sql`(excluded.first_session = first_session AND excluded.first_sequence < first_sequence)
     OR (excluded.first_session <> first_session AND (excluded.first_issued_at < ${previousFirstIssuedAt}
       OR (excluded.first_issued_at = ${previousFirstIssuedAt} AND excluded.first_session < first_session)))`
-  const latest = sql`CASE
-    WHEN excluded.session = session THEN excluded.sequence > sequence
-    WHEN excluded.issued_at IS NOT NULL THEN issued_at IS NULL OR excluded.issued_at > ${previousIssuedAt}
-      OR (excluded.issued_at = ${previousIssuedAt} AND excluded.session > session)
-    WHEN excluded.session IS NOT NULL THEN issued_at IS NULL
-    ELSE session IS NULL END`
+  const latest = newerOrder("session", "sequence", "issued_at", "updated_at")
+  const latestNote = sql`excluded.note_at IS NOT NULL AND ${newerOrder("note_session", "note_sequence", "note_issued_at", "note_at")}`
   const kept = await db.all<{
     choice: string
     correct: number | null
     note: string | null
   }>(sql`INSERT INTO drop_answers
       (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at,
-       first_session, first_sequence, session, sequence, first_issued_at, issued_at, note, note_at)
+       first_session, first_sequence, session, sequence, first_issued_at, issued_at, note, note_at,
+       note_session, note_sequence, note_issued_at)
     SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now},
-      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}, ${note || null}, ${note ? now : null}
+      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}, ${note || null},
+      ${note === undefined ? null : now}, ${note === undefined ? null : session},
+      ${note === undefined ? null : sequence}, ${note === undefined ? null : issuedAt}
     WHERE EXISTS (SELECT 1 FROM drop_answers WHERE link = ${link} AND question = ${answer.id})
       OR (SELECT count(DISTINCT question) FROM drop_answers WHERE link = ${link}) < ${MAX_QUIZ_BLOCKS}
     ON CONFLICT (link, question, user_id) DO UPDATE SET
@@ -101,9 +115,12 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
       session = CASE WHEN ${latest} THEN excluded.session ELSE session END,
       sequence = CASE WHEN ${latest} THEN excluded.sequence ELSE sequence END,
       issued_at = CASE WHEN ${latest} THEN COALESCE(excluded.issued_at, issued_at) ELSE issued_at END,
-      note = CASE WHEN ${note === undefined ? sql`0` : latest} THEN excluded.note ELSE note END,
-      note_at = CASE WHEN ${note === undefined ? sql`0` : latest} THEN excluded.note_at
-        WHEN note IS NOT NULL THEN COALESCE(note_at, updated_at) ELSE NULL END,
+      note = CASE WHEN ${latestNote} THEN excluded.note ELSE note END,
+      note_at = CASE WHEN ${latestNote} THEN excluded.note_at
+        WHEN note IS NOT NULL THEN COALESCE(note_at, updated_at) ELSE note_at END,
+      note_session = CASE WHEN ${latestNote} THEN excluded.note_session ELSE note_session END,
+      note_sequence = CASE WHEN ${latestNote} THEN excluded.note_sequence ELSE note_sequence END,
+      note_issued_at = CASE WHEN ${latestNote} THEN COALESCE(excluded.note_issued_at, note_issued_at) ELSE note_issued_at END,
       attempts = attempts + 1
     RETURNING choice, correct, note`)
   const row = kept[0]

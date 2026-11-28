@@ -32,6 +32,16 @@ async function open(browser) {
   return page
 }
 
+const optionKeys = (frame) =>
+  frame.evaluate(() =>
+    Object.fromEntries(
+      [...document.querySelectorAll("[data-key]")].map((option) => [
+        option.textContent.trim().toLowerCase(),
+        option.dataset.key,
+      ]),
+    ),
+  )
+
 // What the viewer posts from the doc's state: the reader's own vote and note, and the counts. Option keys are hashes of their text.
 const state = ({ pizza, tacos }, note) => ({
   type: "comark-quiz:state",
@@ -52,14 +62,7 @@ test(
       const ready = await page.evaluate(() => window.quiz.find((m) => m.type === "comark-quiz:ready").detail.ids)
       assert.deepEqual(ready, ["lunch"])
 
-      const keys = await frame.evaluate(() =>
-        Object.fromEntries(
-          [...document.querySelectorAll("[data-key]")].map((option) => [
-            option.textContent.trim().toLowerCase(),
-            option.dataset.key,
-          ]),
-        ),
-      )
+      const keys = await optionKeys(frame)
       const post = (message) =>
         page.evaluate((message) => document.querySelector("iframe").contentWindow.postMessage(message, "*"), message)
       await post(state(keys, "Somewhere with a terrace"))
@@ -97,14 +100,7 @@ test("a vote in a stale tab cannot undo a note edit or clear", { timeout: 30000 
     for (let index = 0; index < 2; index++) {
       const page = await open(browser)
       const frame = page.frames()[1]
-      const keys = await frame.evaluate(() =>
-        Object.fromEntries(
-          [...document.querySelectorAll("[data-key]")].map((option) => [
-            option.textContent.trim().toLowerCase(),
-            option.dataset.key,
-          ]),
-        ),
-      )
+      const keys = await optionKeys(frame)
       await page.evaluate(
         (message) => document.querySelector("iframe").contentWindow.postMessage(message, "*"),
         state(keys, "Old note"),
@@ -135,6 +131,60 @@ test("a vote in a stale tab cannot undo a note edit or clear", { timeout: 30000 
       assert.equal(vote.saved.note, note)
       assert.equal(Object.hasOwn(vote.answer, "note"), false)
       assert.deepEqual(vote.saved.choice, [voter.keys[option.toLowerCase()]])
+    }
+  } finally {
+    await browser.close()
+  }
+})
+
+test("reversed frame actions keep the latest choice and explicit note", { timeout: 30000 }, async () => {
+  migrate()
+  const browser = await chromium.launch()
+  try {
+    const page = await open(browser)
+    const frame = page.frames()[1]
+    const { pizza, tacos } = await optionKeys(frame)
+    await page.evaluate(
+      (message) => document.querySelector("iframe").contentWindow.postMessage(message, "*"),
+      state({ pizza, tacos }, "Old note"),
+    )
+    await frame.getByText("Your note: Old note").waitFor()
+
+    let sequence = 0
+    const session = crypto.randomUUID()
+    async function sentAnswer() {
+      await page.waitForFunction(() => window.quiz.some((message) => message.type === "comark-quiz:answer"))
+      const detail = await page.evaluate(
+        () => window.quiz.splice(0).find((message) => message.type === "comark-quiz:answer").detail,
+      )
+      return { ...detail, order: { session, sequence: ++sequence } }
+    }
+    async function editNote(note) {
+      await frame.getByRole("button", { name: /^(Edit|Add a) note$/ }).click()
+      await frame.getByRole("textbox", { name: "Add a note to your vote" }).fill(note)
+      await frame.getByRole("button", { name: "Send note" }).click()
+      const answer = await sentAnswer()
+      assert.equal(answer.note, note)
+      return answer
+    }
+    const save = (answer) => recordAnswer("reversed-poll-note", "reader", answer)
+    for (const [note, option, key] of [
+      ["New note", "Pizza", pizza],
+      ["", "Tacos", tacos],
+    ]) {
+      const edit = await editNote(note)
+      await frame.getByRole("button", { name: "Change vote" }).click()
+      await frame.getByRole("radio", { name: option }).click()
+      const vote = await sentAnswer()
+      assert.equal(Object.hasOwn(vote, "note"), false)
+      assert.deepEqual((await save(vote)).choice, [key])
+      assert.deepEqual(await save(edit), { choice: [key], correct: null, note })
+    }
+
+    for (const note of ["Newer edit", ""]) {
+      const delayed = await editNote("Delayed edit")
+      assert.equal((await save(await editNote(note))).note, note)
+      assert.equal((await save(delayed)).note, note)
     }
   } finally {
     await browser.close()
