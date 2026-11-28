@@ -1,0 +1,50 @@
+diff --git a/dist/html.mjs b/dist/html.mjs
+--- a/dist/html.mjs
++++ b/dist/html.mjs
+@@ -332,7 +332,7 @@
+ 		model.selected = new Set(keys);
+ 		model.result = keys.length === model.correct.size && keys.every((key) => model.correct.has(key)) ? "correct" : "incorrect";
+ 	}
+-	function announce(model, choice, correct) {
++	function announce(model, choice, correct, writeNote = false) {
+ 		model.live = true;
+ 		model.local = false;
+ 		const answer = {
+@@ -347,7 +347,9 @@
+ 		const detail = {
+ 			id: model.id,
+ 			kind: model.kind,
+-			...answer,
++			choice,
++			correct,
++			...(model.noted && writeNote ? { note: model.note } : {}),
+ 			first: !fired.has(model.id)
+ 		};
+ 		fired.add(model.id);
+@@ -606,20 +608,23 @@
+ 		dismissNote(model);
+ 		model.changing = false;
+ 		paint(model, false);
+-		announce(model, model.vote, null);
++		announce(model, model.vote, null, true);
+ 		focus(part(model, "[data-action='note']"));
+ 	}
+ 	function vote(model) {
+ 		const choice = model.keys.filter((_, at) => model.inputs[at]?.checked);
++		let writeNote = false;
+ 		if (model.noting) {
+-			model.note = normalizeNote(field(model)?.value ?? "");
++			const note = normalizeNote(field(model)?.value ?? "");
++			writeNote = note !== model.note;
++			model.note = note;
+ 			dismissNote(model);
+ 		}
+ 		model.vote = choice.length ? choice : null;
+ 		model.changing = false;
+ 		model.prompted = false;
+ 		paint(model, false);
+-		announce(model, choice, null);
++		announce(model, choice, null, writeNote);
+ 	}
+ 	document.addEventListener("click", (event) => {
+ 		const input = inputOf(event.target);

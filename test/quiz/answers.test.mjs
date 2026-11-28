@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { H3Event } from "h3"
 import { beforeEach, test, vi } from "vite-plus/test"
 import { insertDrop, insertVersion, migrate, reset, sql, state, who } from "../cost/harness.mjs"
-const { answersOf, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
+const { answersOf, pollNotes, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
 const { cachedMarkdown } = await import("../../server/utils/markdown-cache.ts")
 const { MAX_QUIZ_BLOCKS } = await import("../../shared/quiz.ts")
 const { default: answersPost } = await import("../../server/api/drops/[id]/answers.post.ts")
@@ -73,9 +73,9 @@ test("a database without the answers table gets it on the first read, index and 
     sql
       .prepare("PRAGMA table_info(drop_answers)")
       .all()
-      .slice(-7)
+      .slice(-8)
       .map((column) => column.name),
-    ["first_session", "first_sequence", "session", "sequence", "first_issued_at", "issued_at", "note"],
+    ["first_session", "first_sequence", "session", "sequence", "first_issued_at", "issued_at", "note", "note_at"],
   )
 })
 
@@ -433,6 +433,21 @@ test("a table from before notes gets the column on the first read, and its votes
   try {
     assert.deepEqual((await answersOf("doc", "ada"))[0].latest, { choice: ["streams"], correct: null, note: "" })
     assert.ok(sql.prepare("SELECT 1 FROM pragma_table_info('drop_answers') WHERE name = 'note'").get())
+  } finally {
+    sql.exec("DROP TABLE drop_answers")
+    await answersOf("doc", "ada")
+  }
+})
+
+test("a legacy note keeps its best known timestamp when the vote changes", async () => {
+  const vote = { id: "next", kind: "poll", correct: null }
+  await recordAnswer("doc", "ada", { ...vote, choice: ["streams"], note: "Legacy" }, 1000)
+  sql.exec("ALTER TABLE drop_answers DROP COLUMN note_at")
+  try {
+    assert.equal((await pollNotes("doc")).get("next")[0].at, 1000)
+    await recordAnswer("doc", "ada", { ...vote, choice: ["workers"] }, 2000)
+    const [note] = (await pollNotes("doc")).get("next")
+    assert.deepEqual(note, { voter: "Someone", choice: ["workers"], note: "Legacy", at: 1000 })
   } finally {
     sql.exec("DROP TABLE drop_answers")
     await answersOf("doc", "ada")

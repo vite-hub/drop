@@ -88,15 +88,16 @@ export function mcpAnswers(
   notes?: Map<string, PollNote[]>,
 ) {
   const own = new Map(mine.map((answer) => [answer.id, answer]))
-  const ids = new Set([...order].filter((id) => results.has(id) || own.has(id)))
-  for (const id of [...results.keys(), ...own.keys()].sort()) ids.add(id)
+  const answered = new Set([...results.keys(), ...own.keys(), ...(notes?.keys() ?? [])])
+  const ids = new Set([...order].filter((id) => answered.has(id)))
+  for (const id of [...answered].sort()) ids.add(id)
   return Array.from(ids, (id) => {
     const result = results.get(id)
     const user = own.get(id)
     const noted = notes?.get(id)
     return {
       id,
-      kind: user?.kind ?? result?.kind ?? "question",
+      kind: user?.kind ?? result?.kind ?? (noted ? "poll" : "question"),
       ...(result ? { people: result.total, counts: result.counts } : {}),
       ...(noted ? { notes: noted.map((note) => ({ ...note, at: new Date(note.at).toISOString() })) } : {}),
       ...(user

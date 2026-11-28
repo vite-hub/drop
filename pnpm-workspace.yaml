@@ -55,6 +55,8 @@ patchedDependencies:
   # left edge (onmax/comark-ui#503, which took in #502). The pkg.pr.new build Drop pins keeps comark-ui's version, 0.14.3.
   # Delete with the next comark-ui bump that includes #503.
   comark-carousel@0.14.3: patches/comark-carousel@0.14.3.patch
+  # Keep a vote-only event from writing the note cached in its tab. Drop this patch once the pin emits only note edits.
+  comark-quiz@0.14.3: patches/comark-quiz@0.14.3.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.

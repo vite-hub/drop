@@ -23,6 +23,7 @@ const ADDED_COLUMNS = {
   first_issued_at: "integer",
   issued_at: "integer",
   note: "text",
+  note_at: "integer",
 }
 let table: Promise<void> | undefined
 function ensureTable() {
@@ -82,9 +83,9 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
     note: string | null
   }>(sql`INSERT INTO drop_answers
       (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at,
-       first_session, first_sequence, session, sequence, first_issued_at, issued_at, note)
+       first_session, first_sequence, session, sequence, first_issued_at, issued_at, note, note_at)
     SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now},
-      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}, ${note || null}
+      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}, ${note || null}, ${note ? now : null}
     WHERE EXISTS (SELECT 1 FROM drop_answers WHERE link = ${link} AND question = ${answer.id})
       OR (SELECT count(DISTINCT question) FROM drop_answers WHERE link = ${link}) < ${MAX_QUIZ_BLOCKS}
     ON CONFLICT (link, question, user_id) DO UPDATE SET
@@ -101,6 +102,8 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
       sequence = CASE WHEN ${latest} THEN excluded.sequence ELSE sequence END,
       issued_at = CASE WHEN ${latest} THEN COALESCE(excluded.issued_at, issued_at) ELSE issued_at END,
       note = CASE WHEN ${note === undefined ? sql`0` : latest} THEN excluded.note ELSE note END,
+      note_at = CASE WHEN ${note === undefined ? sql`0` : latest} THEN excluded.note_at
+        WHEN note IS NOT NULL THEN COALESCE(note_at, updated_at) ELSE NULL END,
       attempts = attempts + 1
     RETURNING choice, correct, note`)
   const row = kept[0]
@@ -170,16 +173,16 @@ export interface PollNote {
 
 export async function pollNotes(link: string): Promise<Map<string, PollNote[]>> {
   const rows = await reading(() =>
-    db.all<{ question: string; voter: string | null; choice: string; note: string; updated_at: number }>(sql`
-      SELECT a.question, u.name AS voter, a.choice, a.note, a.updated_at FROM drop_answers a
+    db.all<{ question: string; voter: string | null; choice: string; note: string; at: number }>(sql`
+      SELECT a.question, u.name AS voter, a.choice, a.note, COALESCE(a.note_at, a.updated_at) AS at FROM drop_answers a
       LEFT JOIN user u ON u.id = a.user_id
       WHERE a.link = ${link} AND a.kind = 'poll' AND a.note IS NOT NULL
-      ORDER BY a.updated_at, a.user_id`),
+      ORDER BY at, a.user_id`),
   )
   const notes = new Map<string, PollNote[]>()
   for (const row of rows) {
     const list = notes.get(row.question) ?? []
-    list.push({ voter: row.voter ?? "Someone", choice: v.parse(Keys, row.choice), note: row.note, at: row.updated_at })
+    list.push({ voter: row.voter ?? "Someone", choice: v.parse(Keys, row.choice), note: row.note, at: row.at })
     notes.set(row.question, list)
   }
   return notes

@@ -3,8 +3,10 @@ import { chromium } from "playwright"
 import { test, vi } from "vite-plus/test"
 import { previewSandbox } from "../../app/utils/feedback.ts"
 import { planDocument } from "../../shared/documents.ts"
+import { migrate } from "../cost/harness.mjs"
 
 const { renderMarkdownCached } = await import("../../server/utils/markdown-document.ts")
+const { recordAnswer } = await import("../../server/utils/answers.ts")
 
 const source = `# Lunch\n\n::poll{#lunch note}\nWhere do we eat on Friday?\n\n- [ ] Pizza\n- [ ] Tacos\n::\n`
 
@@ -86,3 +88,55 @@ test(
     }
   },
 )
+
+test("a vote in a stale tab cannot undo a note edit or clear", { timeout: 30000 }, async () => {
+  migrate()
+  const browser = await chromium.launch()
+  try {
+    const tabs = []
+    for (let index = 0; index < 2; index++) {
+      const page = await open(browser)
+      const frame = page.frames()[1]
+      const keys = await frame.evaluate(() =>
+        Object.fromEntries(
+          [...document.querySelectorAll("[data-key]")].map((option) => [
+            option.textContent.trim().toLowerCase(),
+            option.dataset.key,
+          ]),
+        ),
+      )
+      await page.evaluate(
+        (message) => document.querySelector("iframe").contentWindow.postMessage(message, "*"),
+        state(keys, "Old note"),
+      )
+      await frame.getByText("Your note: Old note").waitFor()
+      tabs.push({ page, frame, keys })
+    }
+    const [editor, voter] = tabs
+    async function persist({ page }) {
+      await page.waitForFunction(() => window.quiz.some((message) => message.type === "comark-quiz:answer"))
+      const answer = await page.evaluate(
+        () => window.quiz.splice(0).find((message) => message.type === "comark-quiz:answer").detail,
+      )
+      return { answer, saved: await recordAnswer("poll-note", "reader", answer) }
+    }
+    for (const [note, option] of [
+      ["New note", "Pizza"],
+      ["", "Tacos"],
+    ]) {
+      await editor.frame.getByRole("button", { name: "Edit note" }).click()
+      await editor.frame.getByRole("textbox", { name: "Add a note to your vote" }).fill(note)
+      await editor.frame.getByRole("button", { name: "Send note" }).click()
+      assert.equal((await persist(editor)).saved.note, note)
+
+      await voter.frame.getByRole("button", { name: "Change vote" }).click()
+      await voter.frame.getByRole("radio", { name: option }).click()
+      const vote = await persist(voter)
+      assert.equal(vote.saved.note, note)
+      assert.equal(Object.hasOwn(vote.answer, "note"), false)
+      assert.deepEqual(vote.saved.choice, [voter.keys[option.toLowerCase()]])
+    }
+  } finally {
+    await browser.close()
+  }
+})
