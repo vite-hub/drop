@@ -152,7 +152,9 @@ try {
 
   out.checks.link = await step("the extension links to the Drop through OAuth", async () => {
     await background("deployment.set", { drop: DROP })
-    const state = await background("link.start")
+    const linked = await background("link.start")
+    if (!linked.ok) throw new Error(`not linked: ${linked.problem} ${linked.detail}`)
+    const { state } = linked
     if (!state.account) throw new Error("not linked")
     return state.account
   })
