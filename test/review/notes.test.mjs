@@ -16,6 +16,7 @@ const { default: schema } = await import("../../server/databases/default/index.t
 const { dropOAuth } = await import("../../server/utils/oauth-resources.ts")
 const { readReviewToken, signReviewToken } = await import("../../server/utils/review.ts")
 const { getUsage } = await import("../../server/utils/quotas.ts")
+const { findDrop, listFolder } = await import("../../server/utils/drops.ts")
 const { presenceIdentity, presenceOrigin, presenceRoom } = await import("../../server/utils/presence.ts")
 const { default: hello } = await import("../../server/api/review/notes/hello.get.ts")
 const { default: notesIndex } = await import("../../server/api/review/notes/index/index.get.ts")
@@ -241,6 +242,25 @@ test("each exact origin gets its own notes drop in the same folder", async () =>
       .map((row) => row.site_url),
     [SITE, OTHER],
   )
+})
+
+test("the notes folder names each site's registrable domain, so subdomains sit together", async () => {
+  for (const origin of [SITE, OTHER, "https://foo.org", "http://localhost:4000"])
+    assert.equal((await openSession({ origin, target: "notes", create: true })).status, 200)
+  const folder = await findDrop(sql.prepare("SELECT id FROM drops WHERE role = 'notes-folder'").get().id)
+  const children = await listFolder(folder, undefined, { who: ada })
+  assert.deepEqual(
+    children
+      .map(({ title, role, domain }) => ({ title, role, domain }))
+      .toSorted((a, b) => a.title.localeCompare(b.title)),
+    [
+      { title: "app.acme.example.com", role: "notes", domain: "example.com" },
+      { title: "docs.acme.example.com", role: "notes", domain: "example.com" },
+      { title: "foo.org", role: "notes", domain: "foo.org" },
+      { title: "localhost:4000", role: "notes", domain: "localhost" },
+    ],
+  )
+  assert.equal(folder.role, "notes-folder")
 })
 
 test("without create, missing notes answer 404 and make nothing", async () => {

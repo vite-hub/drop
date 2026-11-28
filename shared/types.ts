@@ -8,6 +8,7 @@ import type { DropMode, Share } from "./share"
 export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board", "link"] as const
 export type DropKind = (typeof DROP_KINDS)[number]
 export const DROP_ROLES = ["notes-folder", "notes"] as const
+type DropRole = (typeof DROP_ROLES)[number]
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]
 export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const
@@ -56,6 +57,8 @@ export interface DropSummary {
   snippet?: string
   owner?: { name: string; image: string | null }
   pinned?: boolean
+  role?: DropRole
+  domain?: string
 }
 
 export interface DropPeek {
