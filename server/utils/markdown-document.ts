@@ -137,10 +137,10 @@ function capProseImageWidths(nodes: MarkdownNode[]): void {
   }
 }
 
-const isWideImage = (node: MarkdownNode): boolean =>
+const isWideImage = (node: unknown): boolean =>
   Array.isArray(node) &&
   node[0] === "img" &&
-  typeof node[1].class === "string" &&
+  typeof node[1]?.class === "string" &&
   node[1].class.split(/\s+/).includes("wide")
 
 function widenImages(nodes: MarkdownNode[]): void {
@@ -153,7 +153,7 @@ function widenImages(nodes: MarkdownNode[]): void {
     if (content.length !== 1) continue
     const [only] = content
     const linked = Array.isArray(only) && only[0] === "a" ? only.slice(2) : []
-    const image = isWideImage(only!) ? only : (linked as MarkdownNode[]).find(isWideImage)
+    const image = isWideImage(only) ? only : linked.find(isWideImage)
     if (!Array.isArray(image)) continue
     attrs["data-wide"] = ""
     const width = Number(image[1].width)
