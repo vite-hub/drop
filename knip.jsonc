@@ -74,8 +74,16 @@
     },
     // @vite-hub/drop-extension, the browser extension. WXT finds entrypoints/ by convention.
     "packages/extension": {
-      "entry": ["entrypoints/**/*.{ts,vue}", "harness/*.mjs", "test/**/*.ts"],
-      "project": ["entrypoints/**/*.{ts,vue}", "components/**/*.vue", "lib/**/*.ts", "assets/**/*.ts", "harness/*.mjs", "test/**/*.ts"],
+      "entry": ["entrypoints/**/*.{ts,vue}", "harness/*.mjs", "scripts/*.ts", "test/**/*.ts"],
+      "project": [
+        "entrypoints/**/*.{ts,vue}",
+        "components/**/*.vue",
+        "lib/**/*.ts",
+        "assets/**/*.ts",
+        "harness/*.mjs",
+        "scripts/*.ts",
+        "test/**/*.ts",
+      ],
       "ignoreDependencies": [
         // assets/main.css imports these stylesheets, and @nuxt/ui/vite reads the icon collection by name.
         "@fontsource-variable/geist",

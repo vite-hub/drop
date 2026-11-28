@@ -45,4 +45,6 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium firefox
       - run: pnpm test
       - run: pnpm --filter @vite-hub/drop test
+      - run: pnpm --filter @vite-hub/drop-extension typecheck
+      - run: pnpm --filter @vite-hub/drop-extension test
       - run: pnpm build

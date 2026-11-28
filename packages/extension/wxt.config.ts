@@ -11,6 +11,9 @@ const REVIEW_SCRIPT = fileURLToPath(new URL("../../shared/review-script.ts", imp
 const REVIEW_MODULE = "virtual:drop-review"
 const CLOSED_SHADOW = 'host.attachShadow({ mode: "closed" })'
 const E2E = process.env.DROP_E2E === "1"
+const BETA = process.env.DROP_BETA
+const BETA_RELEASE = "https://github.com/vite-hub/drop/releases/download/extension-beta/"
+const NAME = BETA ? "Drop Beta" : "Drop"
 
 function dropReview(): Plugin {
   const resolved = `\0${REVIEW_MODULE}`
@@ -39,14 +42,15 @@ export default defineConfig({
   ...(E2E ? { outDir: ".output-e2e" } : {}),
   manifestVersion: 3,
   manifest: ({ browser }) => ({
-    name: "Drop",
+    name: NAME,
+    ...(BETA ? { version: BETA } : {}),
     description: "Review any site with your Drop: comment on the page, see who else is there.",
     permissions: ["activeTab", "scripting", "storage", "identity", "contextMenus"],
     optional_host_permissions: ["<all_urls>"],
     ...(E2E ? { host_permissions: ["<all_urls>"] } : {}),
     ...(E2E && browser === "firefox" ? { content_security_policy: { extension_pages: "script-src 'self'" } } : {}),
     action: {
-      default_title: "Drop",
+      default_title: NAME,
       default_popup: "popup.html",
       ...(browser === "firefox" ? { default_area: "navbar" } : {}),
     },
@@ -60,8 +64,9 @@ export default defineConfig({
       ? {
           browser_specific_settings: {
             gecko: {
-              id: "drop@vitehub.dev",
+              id: BETA ? "drop-beta@vitehub.dev" : "drop@vitehub.dev",
               strict_min_version: "128.0",
+              ...(BETA ? { update_url: `${BETA_RELEASE}updates.json` } : {}),
               data_collection_permissions: { required: ["browsingActivity", "websiteContent"] },
             },
           },
