@@ -67,7 +67,8 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .row { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .row .icon { margin-left: -2px; }
 .target { display: block; width: fit-content; max-width: 100%; margin: 0 0 8px; padding: 2px 8px; overflow: hidden; border-radius: 10px; background: var(--soft); color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.head select { max-width: 160px; height: 26px; padding: 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
+.head select { min-width: 0; max-width: 160px; margin-right: auto; text-overflow: ellipsis; height: 26px; padding: 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
+.head:has(select:not([hidden])) .title { display: none; }
 .who { flex: 1; min-width: 0; padding-left: 2px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .msg { margin: 6px 0 0; color: var(--error); font-size: 13px; }
 .empty { padding: 16px 12px; color: var(--muted); }
