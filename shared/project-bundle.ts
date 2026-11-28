@@ -25,12 +25,18 @@ export function pageAt(pages: string[], path: string): string | null {
 export const pageUrl = (page: string): string =>
   encodeURI(`/${page.replace(/(^|\/)index\.html$/, "$1").replace(/\.html$/, "")}`)
 
-export function appPageFor(pages: string[], location: string): string {
+export function appStaticPageFor(pages: string[], location: string): string | null {
   let path = location.replace(/[?#].*$/s, "")
   try {
     path = decodeURIComponent(path)
   } catch {}
-  return pageAt(pages, path) ?? ["404.html", "200.html"].find((page) => pages.includes(page)) ?? "index.html"
+  return pageAt(pages, path)
+}
+
+export function appPageFor(pages: string[], location: string): string {
+  return (
+    appStaticPageFor(pages, location) ?? ["404.html", "200.html"].find((page) => pages.includes(page)) ?? "index.html"
+  )
 }
 
 export const MAX_LISTED_PAGES = 100

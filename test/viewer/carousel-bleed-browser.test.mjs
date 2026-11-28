@@ -18,6 +18,7 @@ const source = [
   `## Photos\n\n${paragraph}`,
   `::carousel{title="Cabins" columns=3}\n${slides}\n::`,
   `## Prices\n\n${paragraph}\n\n${paragraph}`,
+  `::carousel{title="Lakeside" columns=3}\n${["Deck", "Sauna", "Kitchen", "Loft"].map((name) => `![${name}](/${name}.png)`).join("\n\n")}\n::`,
   `## Getting there\n\n${paragraph}`,
 ].join("\n\n")
 
@@ -30,6 +31,12 @@ const styles = (
   )
 ).join("\n")
 
+// A 1×1 PNG, so the photo slides load something.
+const pixel = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+)
+
 async function open(browser, width, height = 900) {
   const { html } = await renderMarkdownCached("carousel-bleed.md", async () => source)
   const escaped = planDocument("markdown", source, false, html)
@@ -39,6 +46,8 @@ async function open(browser, width, height = 900) {
   const page = await browser.newPage({ viewport: { width, height } })
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url())
+    if (url.hostname === "drop.test" && url.pathname.endsWith(".png"))
+      return route.fulfill({ contentType: "image/png", body: pixel })
     if (url.hostname !== "drop.test" || url.pathname !== "/") return route.abort()
     return route.fulfill({
       contentType: "text/html; charset=utf-8",
@@ -62,6 +71,18 @@ async function open(browser, width, height = 900) {
       slide: box(".cc-slide"),
       carousel: box(".typeset > .cc"),
       outline: outline?.getClientRects().length ? outline.getBoundingClientRect() : null,
+      photo: (() => {
+        const slide = document.querySelector(".cc-slide:has(> img)")
+        const img = slide.querySelector("img").getBoundingClientRect()
+        const { backgroundColor, paddingTop } = getComputedStyle(slide)
+        return {
+          slide: slide.getBoundingClientRect().width,
+          width: img.width,
+          height: img.height,
+          backgroundColor,
+          paddingTop,
+        }
+      })(),
       viewport: document.documentElement.clientWidth,
       frame: window.innerWidth,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -87,6 +108,11 @@ test(
         `outline at ${desktop.outline.left}, slides end at ${desktop.track.right}`,
       )
       assert.equal(desktop.overflow, 0)
+      // A slide that is one photo is the photo itself: no panel around it, filling the slide at 4:3.
+      assert.equal(desktop.photo.backgroundColor, "rgba(0, 0, 0, 0)")
+      assert.equal(desktop.photo.paddingTop, "0px")
+      assert.ok(Math.abs(desktop.photo.width - desktop.photo.slide) < 1, JSON.stringify(desktop.photo))
+      assert.ok(Math.abs(desktop.photo.height - (desktop.photo.width * 3) / 4) < 1, JSON.stringify(desktop.photo))
 
       // A frame beside the viewer's panel, too narrow for the outline's column, and short enough to scroll, so the
       // slides run under its classic scrollbar without the page scrolling sideways. Playwright hides

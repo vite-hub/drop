@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DropComment } from "#shared/types"
 import { clock } from "#shared/video-time"
+import { mediaSpotFor, readMediaSpots, saveMediaSpot } from "~/lib/media-resume.client"
 
 export type VideoFrame = {
   src: string
@@ -15,6 +16,7 @@ const props = defineProps<{
   title: string
   link: string
   start?: number
+  resume?: string
   comments?: DropComment[]
   canComment?: boolean
 }>()
@@ -47,11 +49,27 @@ onMounted(measure)
 onMounted(() => {
   const element = video.value
   now.value = element?.currentTime ?? 0
-  if (!props.start || !element) return
-  const go = () => (element.currentTime = Math.min(props.start!, element.duration || props.start!))
+  if (!element || (props.start === undefined && !props.resume)) return
+  const go = () => {
+    const at =
+      props.start ??
+      (props.resume ? mediaSpotFor(readMediaSpots(props.resume), 0, props.src, element.duration) : undefined)
+    if (at === undefined) return
+    const target = Math.min(at, element.duration || at)
+    if (element.currentTime !== target) element.currentTime = target
+  }
   if (element.readyState >= HTMLMediaElement.HAVE_METADATA) go()
   else element.addEventListener("loadedmetadata", go, { once: true })
 })
+let savedAt = 0
+function saveSpot(event: Event) {
+  const element = video.value
+  if (!props.resume || !element) return
+  if (event.type === "timeupdate" && performance.now() - savedAt < 2000) return
+  savedAt = performance.now()
+  saveMediaSpot(props.resume, 0, props.src, event.type === "ended" ? 0 : element.currentTime, element.duration)
+}
+useEventListener(video, ["timeupdate", "pause", "seeked", "ended"], saveSpot)
 
 const { copy, copied } = useCopy()
 const notify = useNotify()
