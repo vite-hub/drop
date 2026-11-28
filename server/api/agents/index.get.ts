@@ -4,6 +4,8 @@ import { db } from "vite-hub/database"
 import { oauthClient, oauthConsent } from "../../databases/default/index"
 import { requireIdentity } from "../../utils/identity"
 
+const EXTENSION_REDIRECT = /https:\/\/[a-z0-9-]+\.(?:chromiumapp\.org|extensions\.allizom\.org)\//
+
 export default defineHandler(async (event) => {
   const who = await requireIdentity(event)
   const rows = await db
@@ -11,6 +13,7 @@ export default defineHandler(async (event) => {
       id: oauthConsent.id,
       clientId: oauthConsent.clientId,
       name: oauthClient.name,
+      redirects: oauthClient.redirectUris,
       createdAt: oauthConsent.createdAt,
     })
     .from(oauthConsent)
@@ -19,7 +22,7 @@ export default defineHandler(async (event) => {
     .orderBy(desc(oauthConsent.createdAt))
   return rows.map((row) => ({
     id: row.id,
-    name: row.name || "MCP client",
+    name: EXTENSION_REDIRECT.test(row.redirects ?? "") ? "Browser extension" : row.name || "MCP client",
     connectedAt: row.createdAt?.getTime() ?? null,
   }))
 })

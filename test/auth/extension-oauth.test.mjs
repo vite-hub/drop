@@ -2,8 +2,8 @@
 // its own resource, `/api/review/notes`, that `/mcp` refuses and that an MCP token can't replace?
 //
 // Each step is one test, so the run reads as a pass/fail table. A failing step is a finding about the authorization
-// server or the token checks, not a bug in this file. "today" is Drop's `mcpOAuth()` from server/auth.ts; "two
-// resources" is the same call with `resource: [mcp, notes]`, the smallest change that lets the notes resource exist.
+// server or the token checks, not a bug in this file. "today" is Drop's `mcpOAuth()` before the extension, with /mcp
+// only; "two resources" is server/auth.ts's `dropOAuth()`, which adds the notes resource with its 300 s tokens.
 import assert from "node:assert/strict"
 import { createHash, randomBytes } from "node:crypto"
 import { readdirSync } from "node:fs"
@@ -15,6 +15,7 @@ import { getMigrations } from "better-auth/db/migration"
 // The package itself: vitest swaps `vite-hub/auth/mcp` for a stub (test/stubs.ts).
 import { mcpOAuth, verifyMcpRequest } from "@vite-hub/auth/mcp"
 import { afterAll, test } from "vite-plus/test"
+import { dropOAuth, NOTES_TOKEN_SECONDS } from "../../server/utils/oauth-resources.ts"
 
 const origin = "https://drop.example.com"
 const mcp = `${origin}/mcp`
@@ -28,20 +29,14 @@ const scope = "openid profile email offline_access"
 const claims = (token) => JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"))
 const audiences = (token) => [claims(token).aud].flat()
 
-async function setUp(resource) {
+async function setUp(oauth) {
   const database = new DatabaseSync(":memory:")
   const options = {
     database,
     baseURL: origin,
     secret: "test-secret-for-extension-oauth-probe-1234567890",
     emailAndPassword: { enabled: true },
-    plugins: [
-      ...mcpOAuth({
-        resource,
-        loginPage: "/oauth",
-        provider: { codeExpiresIn: 30 * 60, enforcePerClientResources: false },
-      }),
-    ],
+    plugins: [...mcpOAuth(oauth)],
   }
   await (await getMigrations(options)).runMigrations()
   const auth = betterAuth(options)
@@ -133,12 +128,12 @@ const { verifyAppAccessToken } = Object.values(await import(pathToFileURL(join(d
 
 /**
  * Drop's real check on every route, `/mcp` included: server/utils/identity.ts → `requireCaller()` → `readCaller()`
- * (@vite-hub/auth dist/server-*.js) → `verifyAppAccessToken(token, origin, pathname, auth)`, which accepts a token
- * whose audience is any `mcpOAuth()` resource at the request origin, whatever the route.
+ * (@vite-hub/auth dist/server-*.js) → `verifyAppAccessToken(token, origin, url, auth)`, which takes the `mcpOAuth()`
+ * resource at the request's path, or the first one at its origin when no path matches.
  */
 async function requireCallerAccepts(auth, url, accessToken) {
-  const { origin, pathname } = new URL(url)
-  const [error] = await verifyAppAccessToken(accessToken, origin, pathname, auth)
+  const parsed = new URL(url)
+  const [error] = await verifyAppAccessToken(accessToken, parsed.origin, parsed, auth)
   return error ? error.data?.reason : "ok"
 }
 
@@ -154,8 +149,12 @@ async function strictMcpAccepts(auth, accessToken) {
   return error ? error.data?.reason : "ok"
 }
 
-const today = await setUp(mcp)
-const two = await setUp([mcp, notes])
+const today = await setUp({
+  resource: mcp,
+  loginPage: "/oauth",
+  provider: { codeExpiresIn: 30 * 60, enforcePerClientResources: false },
+})
+const two = await setUp(dropOAuth(origin))
 afterAll(() => {
   today.database.close()
   two.database.close()
@@ -173,7 +172,6 @@ test("1. DCR registers the extension as a public client with Chrome's and Firefo
   state.client = second.body.client_id
 })
 
-// Drop's server/auth.ts has only /mcp today, so this runs on the two-resource setup, as Drop will be once it adds notes.
 test("2a. two resources: authorize with resource=/api/review/notes", async () => {
   const result = await authorize(two, state.client, { resource: notes })
   assert.ok(result.code, `Refused: ${result.error}: ${result.description}`)
@@ -293,10 +291,12 @@ test("5a. revoking the client the way DELETE /api/agents/<id> does makes the ref
   assert.equal(refreshed.body.error, "invalid_grant")
 })
 
-test("5b. after revoking, the notes access token already issued stops working", async () => {
-  const left = Math.round(claims(state.notes.access_token).exp - Date.now() / 1000)
-  const result = await notesRouteAccepts(two.auth, state.notes.access_token)
-  assert.equal(typeof result, "string", `Still accepted, for ${left} s more until exp`)
+// The signature check alone keeps accepting a revoked token until it expires, so the notes resource caps its life at
+// 300 s, and Drop's notes routes also require the consent row (test/review/notes.test.mjs).
+test("5b. after revoking, the notes access token already issued lives at most 300 s", async () => {
+  const { exp, iat } = claims(state.notes.access_token)
+  assert.ok(exp - iat <= NOTES_TOKEN_SECONDS, `The notes token lives ${exp - iat} s`)
+  assert.equal(typeof (await notesRouteAccepts(two.auth, state.notes.access_token)), "object")
 })
 
 test("5c. disabling the revoked client stops its issued access token", async () => {

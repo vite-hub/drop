@@ -98,6 +98,7 @@ export async function createLinkDrop(
       draftImage: false,
       teamId: null,
       resources: null,
+      role: null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     logDrop(event, row, { change: "create" })

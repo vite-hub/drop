@@ -64,6 +64,7 @@ export async function createFolder(
     share?: Share
     team?: boolean
     teamId?: string
+    role?: "notes-folder"
   },
   event?: H3Event,
 ) {
@@ -91,17 +92,19 @@ export async function createFolder(
   const ownerId = team ? who.userId : (parent?.ownerId ?? who.userId)
   const life = parent
     ? lifetimeFields(who, {}, parent, event)
-    : team
+    : team || input.role
       ? { lifetime: "keep" as const, keepReason: null }
       : lifetimeFields(who, input, null, event)
-  await requireKeepSlot(ownerId, life, false, !parent && !team)
-  const { share, publicUntil } = input.share
-    ? shareFields(
-        input.share,
-        { kind: "folder", teamFolder: team, team: Boolean(teamId) || modeFor(parent, event) === "team" },
-        event,
-      )
-    : { share: team ? ("team" as const) : defaultShare(modeFor(parent, event)), publicUntil: null }
+  await requireKeepSlot(ownerId, life, false, !parent && !team && !input.role)
+  const { share, publicUntil } = input.role
+    ? { share: "private" as const, publicUntil: null }
+    : input.share
+      ? shareFields(
+          input.share,
+          { kind: "folder", teamFolder: team, team: Boolean(teamId) || modeFor(parent, event) === "team" },
+          event,
+        )
+      : { share: team ? ("team" as const) : defaultShare(modeFor(parent, event)), publicUntil: null }
   const note = input.note?.trim().slice(0, MAX_FOLDER_DESCRIPTION) || null
   return withDropQuota(ownerId, { drops: 0, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
@@ -140,6 +143,7 @@ export async function createFolder(
       publishToken: null,
       draftImage: false,
       resources: null,
+      role: input.role ?? null,
     }
     await quota.commit([db.insert(drops).values(row), ...(parent ? [touchFolder(parent.id, now)] : [])])
     logDrop(event, row, { change: "create" })

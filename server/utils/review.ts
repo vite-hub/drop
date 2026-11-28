@@ -67,6 +67,7 @@ const ReviewClaims = v.object({
   o: v.string(),
   e: v.number(),
   g: v.optional(v.pipe(v.string(), v.startsWith("guest:"), v.maxLength(80))),
+  x: v.optional(v.literal(1)),
 })
 export type ReviewClaims = v.InferOutput<typeof ReviewClaims>
 
@@ -114,8 +115,10 @@ export async function unseal<T extends v.GenericSchema>(
   return error ? null : value
 }
 
+const EXTENSION_TOKEN_MS = 300_000
+
 export async function signReviewToken(event: H3Event, claims: Omit<ReviewClaims, "e">, now = Date.now()) {
-  const full: ReviewClaims = { ...claims, e: now + REVIEW_TOKEN_HOURS * 3_600_000 }
+  const full: ReviewClaims = { ...claims, e: now + (claims.x ? EXTENSION_TOKEN_MS : REVIEW_TOKEN_HOURS * 3_600_000) }
   return { token: await seal(event, "token", full), expiresAt: full.e }
 }
 
@@ -145,6 +148,7 @@ function sitesCovering(origin: string) {
         inArray(drops.siteUrl, addresses),
         isNull(drops.trashedAt),
         isNull(drops.quarantinedAt),
+        isNull(drops.role),
       )
     : null
 }
@@ -234,13 +238,14 @@ export async function reviewSession(event: H3Event) {
   event.res.headers.set("Cache-Control", "no-store")
   const token = event.req.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1]
   const claims = token ? await readReviewToken(event, token) : null
-  const site = claims && claims.o === origin ? await findDrop(claims.d, event) : null
-  if (claims && site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, origin)) {
-    event.res.headers.set("Access-Control-Allow-Origin", origin)
+  const extension = claims?.x === 1
+  const site = claims && (extension || claims.o === origin) ? await findDrop(claims.d, event) : null
+  if (claims && site?.kind === "site" && site.siteUrl && siteMatches(site.siteUrl, claims.o)) {
+    if (!extension) event.res.headers.set("Access-Control-Allow-Origin", origin)
     const who = await reviewer(claims)
     const guest = who || !token ? null : (claims.g ?? (await guestIdOf(token)))
     if (who !== false && permissions(site, who).comment) return { site, claims, who, guest }
-  } else if (await covered(origin)) event.res.headers.set("Access-Control-Allow-Origin", origin)
+  } else if (!extension && (await covered(origin))) event.res.headers.set("Access-Control-Allow-Origin", origin)
   throw new HTTPError({ status: 401, statusText: "Your review session ended. Connect again to comment." })
 }
 
@@ -349,6 +354,7 @@ export async function createSiteDrop(
     slug?: string
     share?: Share
     folder?: DropRow
+    role?: "notes"
   },
   event?: H3Event,
 ) {
@@ -365,9 +371,11 @@ export async function createSiteDrop(
   const life = folder ? lifetimeFields(who, {}, folder, event) : lifetimeFields(who, input, null, event)
   await requireKeepSlot(ownerId, life, false, !folder)
   const mode = modeFor(folder, event)
-  const { share, publicUntil } = input.share
-    ? shareFields(input.share, { kind: "site", team: mode === "team" }, event)
-    : { share: defaultShare(mode), publicUntil: null }
+  const { share, publicUntil } = input.role
+    ? { share: "private" as const, publicUntil: null }
+    : input.share
+      ? shareFields(input.share, { kind: "site", team: mode === "team" }, event)
+      : { share: defaultShare(mode), publicUntil: null }
   return withDropQuota(ownerId, { drops: 1, bytes: 0, writes: 0 }, event, async (quota) => {
     const now = Date.now()
     const host = siteHost(siteUrl)
@@ -406,6 +414,7 @@ export async function createSiteDrop(
       draftImage: false,
       teamId: null,
       resources: null,
+      role: input.role ?? null,
     }
     await quota.commit([db.insert(drops).values(row), ...(folder ? [touchFolder(folder.id, now)] : [])])
     logDrop(event, row, { change: "create" })

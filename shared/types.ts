@@ -7,6 +7,7 @@ import type { DropMode, Share } from "./share"
 
 export const DROP_KINDS = ["markdown", "html", "image", "file", "app", "folder", "site", "board", "link"] as const
 export type DropKind = (typeof DROP_KINDS)[number]
+export const DROP_ROLES = ["notes-folder", "notes"] as const
 export const ACTOR_KINDS = ["agent", "browser"] as const
 export type ActorKind = (typeof ACTOR_KINDS)[number]
 export const VIEWER_KINDS = ["person", "anonymous", "agent"] as const

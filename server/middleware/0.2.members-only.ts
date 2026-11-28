@@ -5,7 +5,8 @@ import { membersOnly } from "../utils/members"
 const PUBLIC_LINK =
   /^\/(?:d\/[^/]+(?:\/[^/]*)?|f\/[^/]+|api\/me|api\/links\/[^/]+|api\/drops\/(?!peeks$|tree$)[^/]+(?:\/(?:comments|visit))?|api\/comments\/[^/]+\/replies|_vitehub\/realtime\/latest\/[^/]+|(?:api\/)?_vitehub\/comments\/attachments\/[^/]+)$/
 
-const REVIEW_SCRIPT = /^\/api\/review\/(?:comments(?:\/[^/]+(?:\/replies)?)?|images\/[^/]+|related|presence)$/
+const REVIEW_SCRIPT =
+  /^\/api\/review\/(?:comments(?:\/[^/]+(?:\/replies)?)?|images\/[^/]+|related|presence|notes\/(?:hello|index|targets|session))$/
 
 const PRESENCE_ROOM = /^\/(?:api\/)?_vitehub\/realtime\/presence\/[^/]+$/
 

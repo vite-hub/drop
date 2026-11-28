@@ -66,6 +66,11 @@ async function contentLabel(event: H3Event, dropId: string): Promise<string> {
 
 export const perDropOrigins = (event: H3Event) => !!configured(event)?.perDrop
 
+export function contentOriginPattern(event: H3Event) {
+  const config = configured(event)
+  return config ? `${config.protocol}//${config.host}${config.port ? `:${config.port}` : ""}` : undefined
+}
+
 export async function contentOrigin(event: H3Event, dropId: string): Promise<string | null> {
   const config = configured(event)
   if (!config) return null

@@ -320,6 +320,7 @@ export async function createDocDrop(
         teamId: null,
         siteUrl: null,
         resources: own?.resources ?? null,
+        role: own?.role ?? null,
       }
       try {
         const write = own
@@ -653,6 +654,7 @@ export async function publishApp(
           parentVersion: null,
           siteUrl: null,
           resources: own?.resources ?? null,
+          role: own?.role ?? null,
         }
         const fileRows = [
           ...kept.map((file) => ({ dropId: id, path: file.path, blobKey: file.blobKey, size: file.size })),

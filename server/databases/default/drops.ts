@@ -4,6 +4,7 @@ import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } fro
 import {
   ACTOR_KINDS,
   DROP_KINDS,
+  DROP_ROLES,
   type DropResource,
   type DropRuntimeError,
   VIEWER_KINDS,
@@ -52,6 +53,7 @@ export const drops = sqliteTable(
     publishToken: text("publish_token"),
     teamId: text("team_id"),
     resources: text("resources", { mode: "json" }).$type<DropResource[]>(),
+    role: text("role", { enum: DROP_ROLES }),
   },
   (table) => [
     index("drops_owner_idx").on(table.ownerId, table.updatedAt),
@@ -60,6 +62,12 @@ export const drops = sqliteTable(
     index("drops_trash_idx").on(table.trashedAt),
     index("drops_parent_idx").on(table.parentId),
     index("drops_share_idx").on(table.share, table.updatedAt),
+    uniqueIndex("drops_notes_folder_idx")
+      .on(table.ownerId)
+      .where(sql`${table.role} = 'notes-folder' and ${table.trashedAt} is null`),
+    uniqueIndex("drops_notes_idx")
+      .on(table.parentId, table.siteUrl)
+      .where(sql`${table.role} = 'notes' and ${table.trashedAt} is null`),
   ],
 )
 

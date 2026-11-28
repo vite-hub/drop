@@ -29,6 +29,7 @@ import {
 } from "./utils/teams"
 import { currentRoleAdapter } from "./utils/current-role-adapter"
 import { lazyClient } from "./utils/lazy-client"
+import { dropOAuth } from "./utils/oauth-resources"
 import { teamLimitAdapter } from "./utils/team-limit-adapter"
 import { TIERS } from "#shared/quotas"
 
@@ -195,14 +196,7 @@ export default defineAuth(({ env, requestOrigin }) => {
             }),
           ]
         : []),
-      ...mcpOAuth({
-        resource: `${requestOrigin}/mcp`,
-        loginPage: "/oauth",
-        provider: {
-          codeExpiresIn: 30 * 60,
-          enforcePerClientResources: false,
-        },
-      }),
+      ...mcpOAuth(dropOAuth(requestOrigin)),
       oauthLog(),
     ],
   }
