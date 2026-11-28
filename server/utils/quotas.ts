@@ -113,6 +113,7 @@ interface Cost {
   bytes: number
   writes: number
   targetId?: string
+  docImage?: boolean
   app?: { files: number; bytes: number }
 }
 
@@ -142,7 +143,7 @@ export async function withDropQuota<T>(
     if (cost.app.bytes > usage.app.bytes)
       throw new DropQuotaError(quotaFailure("appBytes", cost.app.bytes, usage.app.bytes))
   }
-  const burst = event && (await publishBurst(event, ownerId))
+  const burst = event && (await publishBurst(event, ownerId, cost.docImage))
   if (burst && !burst.allowed) {
     if (burst.reason === "unavailable")
       throw new HTTPError({ status: 503, statusText: "Rate limiting is unavailable.", cause: burst.cause })

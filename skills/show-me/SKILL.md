@@ -125,7 +125,7 @@ The save button moves here.
 ::
 ```
 
-Marks, colors, and `::compare` for before and after are in the [comark-annotate docs](https://comark-annotate.onmax.me). Screenshots must be https URLs; publish a local one to Drop with `publish` and `file`, and use the `fileUrl` it returns.
+Marks, colors, and `::compare` for before and after are in the [comark-annotate docs](https://comark-annotate.onmax.me). Screenshots must be https URLs; publish a local one to Drop with `publish` and `file`, and use the `fileUrl` it returns, or write it as `./name.png` and publish the doc with `images`, as the vitehub-drop skill shows.
 
 - Write HTML (`format: "html"`) only when Markdown can't show the point: an interactive diagram, a custom layout, or a short slide deck. Match the product's colors, type, spacing, and components; use real labels and data; support desktop and mobile.
 

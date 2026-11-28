@@ -24,7 +24,7 @@ Call `list_folders` first. If a folder's description says it's for pull request 
 
    For a clipped capture, subtract the clip's `x` and `y` and divide by its `width` and `height`. An arrow's `to` is one point from the same numbers: the left middle of a label is `x` and `y + h / 2`, the middle of a button `x + w / 2` and `y + h / 2`.
 
-4. Publish each screenshot with `publish` and `file: { name }` (`share: "public"`, plus the folder or lifetime from [Where it lives](#where-it-lives)). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. Images already hosted elsewhere over `https` work too.
+4. Publish each screenshot with `publish` and `file: { name }` (`share: "public"`, plus the folder or lifetime from [Where it lives](#where-it-lives)). It answers with an `uploadUrl`; run `curl -T before.png '<uploadUrl>'`, which prints the drop with its `fileUrl`. With several screenshots, you can instead write each as `./before.png` in the doc and publish the doc with `images: [{ name: "before.png" }, …]`: the reply gives an `uploadUrl` per image, and the images share the doc's share and lifetime. Images already hosted elsewhere over `https` work too.
 
 ## Write
 

@@ -1,5 +1,3 @@
-// Fails the build when a built @font-face points at another font's file. Nuxt's parallel client and server builds once
-// mixed up CSS asset references, so "Geist Variable" loaded the Geist Mono Vietnamese file and spaces rendered 8px wide.
 import { readdirSync, readFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { join } from "node:path"

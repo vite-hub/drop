@@ -46,6 +46,7 @@ export const drops = sqliteTable(
     trashedAt: integer("trashed_at"),
     trashReason: text("trash_reason", { enum: ["deleted", "expired"] }),
     parentId: text("parent_id"),
+    parentVersion: integer("parent_version"),
     draftImage: integer("draft_image", { mode: "boolean" }).notNull().default(false),
     siteUrl: text("site_url"),
     publishToken: text("publish_token"),
