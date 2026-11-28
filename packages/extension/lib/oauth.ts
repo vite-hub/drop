@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser"
 import { hold, release } from "./secrets"
-import { local, type Link } from "./storage"
+import { local, session, type Access, type Link } from "./storage"
 
 export const SCOPE = "openid profile email offline_access"
 const EARLY = 30_000
@@ -111,16 +111,16 @@ async function save(drop: string, clientId: string, tokens: TokenResponse, previ
   const saved: Link = {
     drop,
     clientId,
-    accessToken: tokens.access_token,
     refreshToken,
-    expiresAt: Date.now() + tokens.expires_in * 1000,
     ...(previous?.name ? { name: previous.name } : {}),
     ...(previous?.email ? { email: previous.email } : {}),
     ...account(tokens.id_token),
   }
-  hold(saved.accessToken, saved.refreshToken)
+  const access: Access = { drop, token: tokens.access_token, expiresAt: Date.now() + tokens.expires_in * 1000 }
+  hold(access.token, saved.refreshToken)
   await local.set("link", saved)
-  return saved
+  await session.set("access", access)
+  return { ...saved, access }
 }
 
 export interface LinkDeps {
@@ -133,7 +133,7 @@ const browserLink = (): LinkDeps => ({
   redirectUri: browser.identity.getRedirectURL(),
 })
 
-export async function link(drop: string, deps: LinkDeps = browserLink()): Promise<Link> {
+export async function link(drop: string, deps: LinkDeps = browserLink()) {
   const discovery = await discover(drop)
   const clientId = await client(drop, discovery, deps.redirectUri)
   const { verifier, challenge } = await pkce()
@@ -178,9 +178,11 @@ export async function link(drop: string, deps: LinkDeps = browserLink()): Promis
   return save(drop, clientId, body)
 }
 
-let refreshing: Promise<Link> | undefined
+type Saved = Awaited<ReturnType<typeof save>>
 
-export function refresh(): Promise<Link> {
+let refreshing: Promise<Saved> | undefined
+
+export function refresh(): Promise<Saved> {
   refreshing ??= renew().finally(() => {
     refreshing = undefined
   })
@@ -210,9 +212,10 @@ async function renew() {
 export async function accessToken(): Promise<string> {
   const current = await local.get("link")
   if (!current) throw new Unlinked("Not linked.")
-  hold(current.accessToken, current.refreshToken)
-  if (current.expiresAt - EARLY > Date.now()) return current.accessToken
-  return (await refresh()).accessToken
+  const access = await session.get("access")
+  hold(access?.token, current.refreshToken)
+  if (access?.drop === current.drop && access.expiresAt - EARLY > Date.now()) return access.token
+  return (await refresh()).access.token
 }
 
 export async function linked() {
@@ -221,10 +224,12 @@ export async function linked() {
 
 export async function unlink({ revoke = true } = {}) {
   const current = await local.get("link")
+  const access = await session.get("access")
   await local.remove("link")
+  await session.remove("access")
   for (const listener of unlinkListeners) listener()
   if (!current) return
-  release(current.accessToken, current.refreshToken)
+  release(access?.token, current.refreshToken)
   if (!revoke) return
   try {
     const { revocation_endpoint: endpoint } = await discover(current.drop)

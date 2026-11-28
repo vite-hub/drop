@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test"
+import { fakeBrowser } from "wxt/testing/fake-browser"
 import { createFakeDrop, DROP, NOTES, REDIRECT, type FakeDrop } from "./fake-drop"
 
 let drop: FakeDrop
@@ -62,9 +63,12 @@ describe("link", () => {
     )
     expect(exchange.get("resource")).toBe(NOTES)
 
-    expect(link).toMatchObject({ drop: DROP, name: "Example Reviewer", email: "reviewer@example.com" })
-    expect(link.expiresAt).toBeGreaterThan(Date.now() + 250_000)
-    expect(await storage.local.get("link")).toEqual(link)
+    const { access, ...kept } = link
+    expect(kept).toMatchObject({ drop: DROP, name: "Example Reviewer", email: "reviewer@example.com" })
+    expect(access.expiresAt).toBeGreaterThan(Date.now() + 250_000)
+    expect(await storage.local.get("link")).toEqual(kept)
+    expect(JSON.stringify(await fakeBrowser.storage.local.get(null))).not.toContain(access.token)
+    expect(await storage.session.get("access")).toEqual(access)
   })
 
   test("reuses the registered client for the same Drop and redirect URI", async () => {
@@ -90,7 +94,7 @@ describe("refresh", () => {
   test("concurrent callers share one refresh, and the refresh token rotates once", async () => {
     const { oauth, storage } = await load()
     const { link } = await linkOnce(oauth)
-    vi.useFakeTimers({ now: link.expiresAt - 10_000, toFake: ["Date"] })
+    vi.useFakeTimers({ now: link.access.expiresAt - 10_000, toFake: ["Date"] })
 
     let open!: () => void
     drop.options.refreshGate = new Promise((resolve) => (open = resolve))
@@ -100,9 +104,9 @@ describe("refresh", () => {
 
     expect(drop.counts.refresh).toBe(1)
     expect(new Set(tokens).size).toBe(1)
-    expect(tokens[0]).not.toBe(link.accessToken)
+    expect(tokens[0]).not.toBe(link.access.token)
+    expect((await storage.session.get("access"))!.token).toBe(tokens[0])
     const renewed = (await storage.local.get("link"))!
-    expect(renewed.accessToken).toBe(tokens[0])
     expect(renewed.refreshToken).not.toBe(link.refreshToken)
     expect(renewed.name).toBe("Example Reviewer")
 
@@ -114,20 +118,21 @@ describe("refresh", () => {
   test("a fresh access token is returned without a refresh", async () => {
     const { oauth } = await load()
     const { link } = await linkOnce(oauth)
-    expect(await oauth.accessToken()).toBe(link.accessToken)
+    expect(await oauth.accessToken()).toBe(link.access.token)
     expect(drop.counts.refresh).toBe(0)
   })
 
   test("a refused refresh (400) unlinks", async () => {
     const { oauth, storage } = await load()
     const { link } = await linkOnce(oauth)
-    vi.useFakeTimers({ now: link.expiresAt, toFake: ["Date"] })
+    vi.useFakeTimers({ now: link.access.expiresAt, toFake: ["Date"] })
     drop.revokeAll()
     const unlinked = vi.fn()
     oauth.onUnlink(unlinked)
 
     await expect(oauth.accessToken()).rejects.toThrow(oauth.Unlinked)
     expect(await storage.local.get("link")).toBeUndefined()
+    expect(await storage.session.get("access")).toBeUndefined()
     expect(unlinked).toHaveBeenCalledOnce()
     await expect(oauth.accessToken()).rejects.toThrow(oauth.Unlinked)
   })
@@ -135,12 +140,13 @@ describe("refresh", () => {
   test("a Drop that's down (503) keeps the link", async () => {
     const { oauth, storage } = await load()
     const { link } = await linkOnce(oauth)
-    vi.useFakeTimers({ now: link.expiresAt, toFake: ["Date"] })
+    vi.useFakeTimers({ now: link.access.expiresAt, toFake: ["Date"] })
     drop.options.refreshStatus = 503
 
     const error: unknown = await oauth.accessToken().catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(oauth.LinkError)
     expect(error).not.toBeInstanceOf(oauth.Unlinked)
-    expect(await storage.local.get("link")).toEqual(link)
+    const { access: _access, ...kept } = link
+    expect(await storage.local.get("link")).toEqual(kept)
   })
 })

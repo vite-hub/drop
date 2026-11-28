@@ -2,10 +2,11 @@ import { browser } from "wxt/browser"
 import { checkDrop, currentDrop, originPattern, type DropCheck } from "./deployment"
 import { blocked, inject, markClosed, onTabLoaded, openTabs, probe, type Policy } from "./injection"
 import type { Hand, SiteState, State } from "./messages"
-import { notesIndex, notesTargets, reviewFetch, reviewSession } from "./notes"
+import { host, start } from "./host"
+import { indexed, siteIndex } from "./notes"
 import { link, linked, unlink } from "./oauth"
 import { listen, type ContentHandlers, type PageHandlers } from "./router"
-import { local } from "./storage"
+import { local, trustedOnly } from "./storage"
 
 const MENU_ID = "drop-comment"
 const ALL_SITES = "<all_urls>"
@@ -92,6 +93,7 @@ const pageHandlers: PageHandlers = {
   },
   async "link.start"() {
     await link(await currentDrop())
+    void refreshIndex()
     return state()
   },
   async "link.remove"() {
@@ -103,6 +105,7 @@ const pageHandlers: PageHandlers = {
       throw new Error("Allow Drop on every site first.")
     if (hand === "press") await browser.permissions.remove({ origins: [ALL_SITES] })
     await local.set("hand", hand)
+    if (hand === "everywhere") void refreshIndex()
     return state()
   },
   async "site.keep"({ origin: input, keep }) {
@@ -124,6 +127,7 @@ const pageHandlers: PageHandlers = {
     return state()
   },
   async "tab.inject"({ tabId }) {
+    void refreshIndex()
     return inject(tabId, await policy())
   },
 }
@@ -133,26 +137,22 @@ const contentHandlers: ContentHandlers = {
     await markClosed(tabId)
     return null
   },
-  async "review.session"({ target, create }, { origin }) {
-    const { expires } = await reviewSession(origin, { ...(target ? { target } : {}), ...(create ? { create } : {}) })
-    return { expires }
-  },
-  "review.fetch": (request, { origin }) => reviewFetch(origin, request),
-  async "review.presence"({ target }, { origin }) {
-    const reply = await reviewFetch(origin, {
-      path: "/api/review/presence",
-      method: "POST",
-      ...(target ? { target } : {}),
-    })
-    if (reply.status !== 200 || reply.text === undefined) throw new Error(`Presence answered ${reply.status}.`)
-    const ticket: unknown = JSON.parse(reply.text)
-    return ticket
-  },
-  "notes.index": () => notesIndex(),
-  "notes.targets": (_payload, { origin }) => notesTargets(origin),
+  "notes.targets": async (_payload, { origin }) => start(origin, await policy()),
+  "review.host": ({ request }, from) => host(request, from),
+}
+
+async function indexedSite(origin: string) {
+  const current = await linked()
+  if (current?.drop !== (await currentDrop())) return false
+  return indexed(await siteIndex().catch(() => undefined), origin)
+}
+
+function refreshIndex() {
+  return siteIndex({ fresh: true }).catch(() => undefined)
 }
 
 async function press(tabId: number) {
+  void refreshIndex()
   if (String(tabId) in (await openTabs())) {
     const shown = await browser.tabs.sendMessage(tabId, { type: "pill.toggle" }, { frameId: 0 }).catch(() => undefined)
     if (shown !== undefined) return
@@ -161,6 +161,7 @@ async function press(tabId: number) {
 }
 
 export function startBackground() {
+  void trustedOnly()
   listen({ page: pageHandlers, content: contentHandlers })
 
   browser.runtime.onInstalled.addListener(async ({ reason }) => {
@@ -187,7 +188,7 @@ export function startBackground() {
 
   browser.tabs.onUpdated.addListener((tabId, change, tab) => {
     if (change.status !== "complete") return
-    void (async () => onTabLoaded(tabId, tab, await policy(), await settings()))()
+    void (async () => onTabLoaded(tabId, tab, await policy(), await settings(), indexedSite))()
   })
 
   browser.tabs.onRemoved.addListener((tabId) => void markClosed(tabId))

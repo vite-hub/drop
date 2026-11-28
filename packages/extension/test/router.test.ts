@@ -14,13 +14,15 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllGlobals())
 
 const site = "https://example.com"
-// SAFETY: the router reads only the tab's id, so a tab with just an id stands in for a full Tab.
+const review = { id: "review-1", name: "Acme launch", access: "Team" }
+// SAFETY: the router reads only the tab's id and window, so a tab with just those stands in for a full Tab.
 const content = {
   id: "test-extension-id",
   url: `${site}/pricing?plan=team`,
   frameId: 0,
-  tab: { id: 7 },
+  tab: { id: 7, windowId: 1 },
 } as Browser.runtime.MessageSender
+const hostRequest = (request: object) => ({ type: "review.host", request: { v: 1, target: "notes", ...request } })
 const page = { id: "test-extension-id", url: "chrome-extension://test-extension-id/popup.html" }
 
 /**
@@ -52,20 +54,26 @@ describe("router", () => {
   test("no OAuth or review token reaches a content script", async () => {
     const { ask, toContent, tabMessages } = await background()
 
-    expect(await ask({ type: "review.session", create: true }, content)).toMatchObject({ ok: true })
-    expect(await ask({ type: "review.session" }, content)).toMatchObject({ ok: true })
-    expect(await ask({ type: "review.fetch", path: "/api/review/comments?page=%2F" }, content)).toMatchObject({
+    drop.reviews.set(site, [review])
+    expect(await ask({ type: "notes.targets" }, content)).toMatchObject({
       ok: true,
+      value: { drop: DROP, targets: [review, { id: "notes" }] },
     })
-    expect(await ask({ type: "review.fetch", path: "/api/review/images/abc" }, content)).toMatchObject({ ok: true })
-    expect(await ask({ type: "review.presence" }, content)).toMatchObject({
+    expect(await ask(hostRequest({ type: "connect", origin: site }), content)).toMatchObject({ ok: true })
+    expect(await ask(hostRequest({ type: "session" }), content)).toMatchObject({ ok: true })
+    expect(await ask(hostRequest({ type: "list", page: "/" }), content)).toMatchObject({ ok: true })
+    expect(
+      await ask(
+        hostRequest({ type: "upload", path: "/api/review/comments", data: { body: "Hi", page: "/" }, files: [] }),
+        content,
+      ),
+    ).toMatchObject({ ok: true, value: { status: 200 } })
+    expect(await ask(hostRequest({ type: "related", probe: true }), content)).toMatchObject({ ok: true })
+    expect(await ask(hostRequest({ type: "presence", target: review.id }), content)).toMatchObject({
       ok: true,
-      value: { ticket: "presence-ticket" },
+      value: { status: 200, text: expect.stringContaining("presence-ticket") },
     })
-    expect(await ask({ type: "notes.index" }, content)).toMatchObject({ ok: true })
-    expect(await ask({ type: "notes.targets" }, content)).toMatchObject({ ok: true })
-    // Refused and failing requests answer too, with errors that must not carry tokens either.
-    await ask({ type: "review.fetch", path: "/api/review/notes/session" }, content)
+    await ask(hostRequest({ type: "call", path: "/api/review/notes/session", method: "POST" }), content)
     await ask({ type: "state.get" }, content)
     await ask({ type: "pill.closed" }, content)
 
@@ -78,9 +86,9 @@ describe("router", () => {
 
   test("the site comes from the sender, never from the message", async () => {
     const { ask } = await background()
-    await ask({ type: "review.session", origin: "https://other.example.com" }, content)
+    await ask(hostRequest({ type: "connect", origin: "https://other.example.com" }), content)
     const request = drop.requests.findLast((r) => r.url.endsWith("/api/review/notes/session"))!
-    expect(JSON.parse(request.body!)).toEqual({ origin: site })
+    expect(JSON.parse(request.body!)).toEqual({ origin: site, target: "notes", create: true })
   })
 
   test("content scripts can't send page messages, and pages can't send content messages", async () => {
@@ -89,14 +97,14 @@ describe("router", () => {
       ok: false,
       error: "link.remove isn't answered here.",
     })
-    expect(await ask({ type: "review.fetch", path: "/api/review/comments" }, page)).toMatchObject({ ok: false })
+    expect(await ask(hostRequest({ type: "list", page: "/" }), page)).toMatchObject({ ok: false })
     expect(await ask({ type: "state.get" }, page)).toMatchObject({ ok: true, value: { drop: DROP } })
   })
 
   test("frames and other extensions get no answer", async () => {
     const { ask } = await background()
-    expect(await ask({ type: "notes.index" }, { ...content, frameId: 3 })).toMatchObject({ ok: false })
-    expect(await ask({ type: "notes.index" }, { ...content, id: "another-extension" })).toBeUndefined()
+    expect(await ask({ type: "notes.targets" }, { ...content, frameId: 3 })).toMatchObject({ ok: false })
+    expect(await ask({ type: "notes.targets" }, { ...content, id: "another-extension" })).toBeUndefined()
   })
 
   test("a reply that holds a token is refused", async () => {
@@ -105,10 +113,10 @@ describe("router", () => {
     hold("review-0123456789abcdef")
     const handlers = {
       page: {},
-      content: { "notes.index": async () => ({ leaked: "review-0123456789abcdef" }) },
+      content: { "notes.targets": async () => ({ leaked: "review-0123456789abcdef" }) },
     }
     // SAFETY: a partial handler table is enough for the one message this test sends.
-    const reply = await route({ type: "notes.index" }, content, handlers as never)
+    const reply = await route({ type: "notes.targets" }, content, handlers as never)
     expect(reply).toEqual({ ok: false, error: "Refused: the answer held a token." })
   })
 })

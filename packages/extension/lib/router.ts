@@ -5,6 +5,7 @@ import { leaks } from "./secrets"
 interface ContentSender {
   origin: string
   tabId: number
+  windowId: number
 }
 
 type Payload<T, K extends keyof T> = T[K] extends [infer P, unknown] ? P : never
@@ -26,7 +27,7 @@ function contentSender(sender: Sender): ContentSender | undefined {
   if (sender.tab?.id === undefined || sender.frameId !== 0 || !sender.url) return undefined
   const url = new URL(sender.url)
   if (url.protocol !== "https:" && url.protocol !== "http:") return undefined
-  return { origin: url.origin, tabId: sender.tab.id }
+  return { origin: url.origin, tabId: sender.tab.id, windowId: sender.tab.windowId }
 }
 
 type AnyReply = { ok: true; value: unknown } | { ok: false; error: string }

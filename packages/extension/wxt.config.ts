@@ -1,18 +1,50 @@
 import { fileURLToPath } from "node:url"
 import ui from "@nuxt/ui/vite"
+import { runnerImport, type Plugin } from "vite-plus"
 import { defineConfig } from "wxt"
+import type { reviewScript } from "../../shared/review-script"
 import { customizeIcon, ui as theme } from "../../shared/ui-config"
 
+const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 const LICENSE = fileURLToPath(new URL("../../LICENSE", import.meta.url))
+const REVIEW_SCRIPT = fileURLToPath(new URL("../../shared/review-script.ts", import.meta.url))
+const REVIEW_MODULE = "virtual:drop-review"
+const CLOSED_SHADOW = 'host.attachShadow({ mode: "closed" })'
+const E2E = process.env.DROP_E2E === "1"
+
+function dropReview(): Plugin {
+  const resolved = `\0${REVIEW_MODULE}`
+  return {
+    name: "drop-review",
+    resolveId: (source) => (source === REVIEW_MODULE ? resolved : undefined),
+    async load(id) {
+      if (id !== resolved) return undefined
+      const { module, dependencies } = await runnerImport<{ reviewScript: typeof reviewScript }>(REVIEW_SCRIPT, {
+        configFile: false,
+        root: ROOT,
+        logLevel: "error",
+      })
+      for (const file of dependencies) this.addWatchFile(file)
+      const script = module.reviewScript({ host: "extension" })
+      if (E2E && !script.includes(CLOSED_SHADOW))
+        throw new Error("The review script no longer attaches its shadow root.")
+      const body = E2E ? script.replace(CLOSED_SHADOW, 'host.attachShadow({ mode: "open" })') : script
+      return `export default function mountReview() {\n${body}\n}\n`
+    },
+  }
+}
 
 export default defineConfig({
   modules: ["@wxt-dev/module-vue"],
+  ...(E2E ? { outDir: ".output-e2e" } : {}),
   manifestVersion: 3,
   manifest: ({ browser }) => ({
     name: "Drop",
     description: "Review any site with your Drop: comment on the page, see who else is there.",
     permissions: ["activeTab", "scripting", "storage", "identity", "contextMenus"],
     optional_host_permissions: ["<all_urls>"],
+    ...(E2E ? { host_permissions: ["<all_urls>"] } : {}),
+    ...(E2E && browser === "firefox" ? { content_security_policy: { extension_pages: "script-src 'self'" } } : {}),
     action: {
       default_title: "Drop",
       default_popup: "popup.html",
@@ -51,6 +83,7 @@ export default defineConfig({
       ],
     },
     plugins: [
+      dropReview(),
       ui({
         ui: theme,
         icon: { customize: customizeIcon, clientBundle: { scan: true } },

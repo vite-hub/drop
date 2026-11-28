@@ -1,5 +1,7 @@
 import { browser } from "wxt/browser"
+import type { ReviewHostRequest } from "../../../shared/review-host"
 import type { DropCheck } from "./deployment"
+import type { PillStart } from "./host"
 
 export type Hand = "press" | "everywhere"
 
@@ -27,20 +29,6 @@ export type InjectResult =
   | { ok: true; origin: string }
   | { ok: false; reason: "no-grant" | "blocked" | "unsupported" | "failed"; error?: string }
 
-export interface ReviewFetch {
-  path: string
-  method?: "GET" | "POST" | "PATCH" | "DELETE"
-  body?: unknown
-  target?: string
-}
-
-export interface ReviewReply {
-  status: number
-  type?: string
-  text?: string
-  base64?: string
-}
-
 export interface PageRequests {
   "state.get": [{ tabId?: number }, State]
   "deployment.check": [{ drop: string }, DropCheck]
@@ -54,11 +42,8 @@ export interface PageRequests {
 
 export interface ContentRequests {
   "pill.closed": [Record<string, never>, null]
-  "review.session": [{ target?: string; create?: boolean }, { expires: number }]
-  "review.fetch": [ReviewFetch, ReviewReply]
-  "review.presence": [{ target?: string }, unknown]
-  "notes.index": [Record<string, never>, unknown]
-  "notes.targets": [Record<string, never>, unknown]
+  "notes.targets": [Record<string, never>, PillStart]
+  "review.host": [{ request: ReviewHostRequest }, unknown]
 }
 
 export type Requests = PageRequests & ContentRequests

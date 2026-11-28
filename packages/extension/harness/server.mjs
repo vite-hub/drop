@@ -15,9 +15,10 @@ const page = (host, path) =>
   `<!doctype html><html><head><meta charset="utf-8"><title>${host}${path}</title></head>` +
   `<body><h1>${host}</h1><p>${path}</p><a id="next" href="/next">next</a></body></html>`
 
-export function startServer() {
+export function startServer(local) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`)
+    if (local && (url.hostname === "localhost" || url.hostname.endsWith(".localhost"))) return local(req, res, url)
     if (
       !url.hostname.endsWith("example.com") &&
       !url.hostname.endsWith("example.org") &&

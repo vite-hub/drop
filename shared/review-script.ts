@@ -216,7 +216,7 @@ const GAUGE_STYLE =
 
 const PAGE_HEADER = String.raw`// A bookmarklet adds this script with a plain script element, where currentScript works too.
   const script = document.currentScript || Array.from(document.scripts).find((s) => /\/review\.js(?:[?#]|$)/.test(s.src));
-  if (!script || window.__dropReview) return;
+  if (!script || window.__dropReview || document.querySelector("drop-review")) return;
   window.__dropReview = true;
   const drop = new URL(script.src).origin;
   const stored = "drop-review:" + drop;
@@ -310,12 +310,14 @@ const EXTENSION_TRANSPORT = String.raw`// One message to the extension's backgro
     return answer;
   }
   const bytesOf = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  async function base64Of(blob) {
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let text = "";
-    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    return btoa(text);
-  }
+  // Firefox hands a content script page-made Blobs whose bytes it may not slice ("Permission denied to access property
+  // constructor"), so the bytes go as the data URL's text.
+  const base64Of = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { const url = String(reader.result); resolve(url.slice(url.indexOf(",") + 1)); };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
   // The background's answer, as the Response a fetch would give.
   async function answered(pending) {
     const answer = await pending;
@@ -1116,6 +1118,8 @@ export function reviewScript({ host }: { host: "page" | "extension" }) {
   }
   const rectOf = (a, b) => ({ left: Math.min(a.x, b.x), top: Math.min(a.y, b.y), right: Math.max(a.x, b.x), bottom: Math.max(a.y, b.y), width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) });
   const clamp = (value) => Math.min(1000, Math.max(0, Math.round(value)));
+  // crypto.randomUUID exists only in secure contexts. An http page, or *.localhost in Firefox, builds the UUID itself.
+  const uuid = () => crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
 
   function startDrawing() {
     if (sending) return say("Sending your comment…");
@@ -1626,7 +1630,7 @@ export function reviewScript({ host }: { host: "page" | "extension" }) {
       const ox = at(r.left, w), oy = at(r.top, h);
       const data = {
         body: body.slice(0, 4000), page: (location.pathname + location.search + location.hash).slice(0, 1000),
-        requestId: crypto.randomUUID(),
+        requestId: uuid(),
         selector: area.selector.slice(0, 2000), label: area.label.slice(0, 200), spot: area.spot,
         ox, oy, ow: Math.max(1, Math.min(1000 - ox, at(r.right, w) - ox)), oh: Math.max(1, Math.min(1000 - oy, at(r.bottom, h) - oy)),
         viewport: { width: w, height: h },
@@ -1754,7 +1758,7 @@ export function reviewScript({ host }: { host: "page" | "extension" }) {
   });
   // Tells the others the comments changed (Drop's viewers too), so they load them now.
   function commented() {
-    if (presence) presence.room.setLocal("comments", crypto.randomUUID());
+    if (presence) presence.room.setLocal("comments", uuid());
   }
 
   // The reviewer's pointer, at most every 50 ms, only while someone else is here to see it.
