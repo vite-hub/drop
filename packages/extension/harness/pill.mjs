@@ -210,6 +210,7 @@ try {
       })
       await page.waitForTimeout(500)
       if (sent(REVIEW.id).length) throw new Error("a script's click sent the comment")
+      if (fake.shots.size) throw new Error("a screenshot reached the Drop before Send")
 
       await ui.getByRole("button", { name: "Send" }).click()
       await ui.getByText("Sent as #1.").waitFor()
