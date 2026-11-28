@@ -1,5 +1,5 @@
 import type { AgentMetadata } from "#shared/agent"
-import { and, eq, exists, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm"
+import { and, eq, exists, inArray, isNotNull, isNull, lte, ne, sql } from "drizzle-orm"
 import { type H3Event, HTTPError } from "h3"
 import * as v from "valibot"
 import { blob, detectContentType } from "vite-hub/blob"
@@ -92,14 +92,14 @@ export function lifetimeFields(
   return { lifetime, keepReason: who.actorKind === "agent" ? reason! : null }
 }
 
-async function queueBlobCleanup(keys: string[]) {
+async function queueBlobCleanup(keys: string[], cleanupNotBefore: number) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
   try {
     for (const chunk of chunkParameters(unique, { per: 3 }))
       await db
         .insert(blobCleanup)
-        .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: Date.now() })))
+        .values(chunk.map((blobKey) => ({ id: crypto.randomUUID(), blobKey, createdAt: cleanupNotBefore })))
         .onConflictDoNothing()
   } catch (error) {
     background.error({ action: "blob-cleanup-queue", error: String(error) })
@@ -108,24 +108,30 @@ async function queueBlobCleanup(keys: string[]) {
 
 export async function drainBlobCleanup() {
   await deleteBlobKeys(
-    (await db.select({ key: blobCleanup.blobKey }).from(blobCleanup).limit(20)).map((item) => item.key),
+    (
+      await db
+        .select({ key: blobCleanup.blobKey })
+        .from(blobCleanup)
+        .where(lte(blobCleanup.createdAt, Date.now()))
+        .limit(20)
+    ).map((item) => item.key),
   )
 }
 
-export async function deleteBlobKeys(keys: string[]) {
+export async function deleteBlobKeys(keys: string[], cleanupNotBefore = Date.now()) {
   const unique = [...new Set(keys)]
   if (!unique.length) return
   try {
     await Promise.all(unique.map(deleteMarkdownCache))
   } catch (error) {
     background.error({ action: "markdown-cache-cleanup", error: String(error) })
-    await queueBlobCleanup(unique)
+    await queueBlobCleanup(unique, cleanupNotBefore)
     return
   }
   const [error] = await blob.delete(unique)
   if (error) {
     background.error({ action: "blob-cleanup", error: error.message, keys: unique.length })
-    await queueBlobCleanup(unique)
+    await queueBlobCleanup(unique, cleanupNotBefore)
     return
   }
   for (const chunk of chunkParameters(unique, { reserved: 10 }))
@@ -306,6 +312,7 @@ export async function createDocDrop(
         trashedAt: null,
         trashReason: null,
         parentId,
+        parentVersion: previous?.parentVersion ?? null,
         draftImage: Boolean(attachment),
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: own?.quarantinedAt ?? null,
@@ -643,6 +650,7 @@ export async function publishApp(
           trashedAt: null,
           trashReason: null,
           parentId,
+          parentVersion: null,
           siteUrl: null,
           resources: own?.resources ?? null,
         }

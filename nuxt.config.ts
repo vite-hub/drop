@@ -278,9 +278,6 @@ export default defineNuxtConfig({
   },
 
   experimental: {
-    // Nitro shares one Vite config between the client and server builds, so their CSS shares Vite's per-module CSS
-    // cache. Built in parallel, the server's asset references could land in the client CSS and point fonts at the
-    // wrong files. scripts/check-built-fonts.mjs fails the build if that comes back.
     parallelBuild: false,
     typescriptPlugin: true,
     checkOutdatedBuildInterval: 2 * 60_000,

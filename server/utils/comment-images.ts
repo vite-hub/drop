@@ -142,6 +142,7 @@ export function imageDrop(
     trashedAt: null,
     trashReason: null,
     parentId: parent.id,
+    parentVersion: null,
     siteUrl: null,
     publishToken: null,
     draftImage: false,
