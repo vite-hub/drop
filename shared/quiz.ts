@@ -4,7 +4,7 @@ export const MAX_QUIZ_BLOCKS = 200
 const MAX_QUIZ_ID = 100
 const MAX_QUIZ_KEY = 64
 const MAX_QUIZ_CHOICES = 20
-export const MAX_QUIZ_NOTE = 2000
+const MAX_QUIZ_NOTE = 2000
 
 export const QUIZ_KINDS = ["question", "poll", "recall"] as const
 export type QuizKind = (typeof QUIZ_KINDS)[number]
