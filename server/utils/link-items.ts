@@ -92,6 +92,7 @@ export async function createLinkDrop(
       trashedAt: null,
       trashReason: null,
       parentId: folder?.id ?? null,
+      parentVersion: null,
       siteUrl: href,
       publishToken: null,
       draftImage: false,

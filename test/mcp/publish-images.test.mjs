@@ -12,6 +12,7 @@ const { requireBlobAccess } = await import("../../server/utils/content-access.ts
 migrate()
 beforeEach(() => {
   reset()
+  state.burstCounts = undefined
   state.authSecret = "test-secret"
   state.who = { ...who, actorKind: "agent", actorName: "Claude Code" }
 })
@@ -186,7 +187,7 @@ test("with previous, ./name finds the images the doc has, and a new A.png replac
   ).structuredContent
   const who = state.who
   state.who = null
-  for (const image of first.images) await upload(image.uploadUrl)
+  await upload(first.images[1].uploadUrl)
   state.who = who
 
   const text = (await call({ previous: first.id, markdown: "# v2\n\n![](./B.png)", note: "Text only" }))
@@ -207,9 +208,17 @@ test("with previous, ./name finds the images the doc has, and a new A.png replac
   assert.equal(await source(first.id), `![](${swapped.images[0].fileUrl})\n![](${first.images[1].fileUrl})`)
   state.who = null
   await upload(swapped.images[0].uploadUrl)
+  await upload(first.images[0].uploadUrl)
   state.who = who
-  const again = (await call({ previous: first.id, markdown: "![](./A.png)", note: "Latest A" })).structuredContent
-  assert.equal(await source(again.id), `![](${swapped.images[0].fileUrl})`, "./A.png finds the newest A.png")
+  sql
+    .prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 205)
+    INSERT INTO drops (id, owner_id, kind, title, filename, blob_key, parent_id, parent_version, created_at, updated_at, actor_kind, actor_name)
+    SELECT 'filler-' || i, ?, 'image', 'Filler', 'filler-' || i || '.png', 'filler-' || i || '.png', ?, 3, ?, ?, 'agent', 'test' FROM n
+  `)
+    .run(who.userId, first.id, Date.now() + 1000, Date.now() + 1000)
+  const again = (await call({ previous: first.id, markdown: "![](./A.png)\n![](./B.png)", note: "Latest A, old B" }))
+    .structuredContent
+  assert.equal(await source(again.id), `![](${swapped.images[0].fileUrl})\n![](${first.images[1].fileUrl})`)
 })
 
 test("a Markdown file uploaded with curl gets its images' upload URLs in the reply", async () => {
@@ -221,6 +230,107 @@ test("a Markdown file uploaded with curl gets its images' upload URLs in the rep
   assert.equal(doc.images.length, 1)
   assert.equal(await source(doc.id), `![](${doc.images[0].fileUrl})`)
   await upload(doc.images[0].uploadUrl)
+  assert.equal(children(doc.id).length, 1)
+})
+
+test("rewrites parsed destinations without touching quoted prose, titles or nested code", async () => {
+  const markdown = [
+    'The old location was "./old.png".',
+    "",
+    '![card]( ./A.png "./title.png")',
+    "",
+    "> ```md",
+    "> ![](./old.png)",
+    "> ```",
+    "",
+    "    ![](./old.png)",
+    "",
+    "[unused]: <./A.png>",
+    "",
+    '::screenshot{src=./A.png alt="./old.png"}',
+    "::",
+  ].join("\n")
+  const result = await call({ markdown, images: [{ name: "A.png" }], lifetime: "review" })
+  assert.equal(result.isError, undefined, result.message)
+  const {
+    id,
+    images: [{ fileUrl }],
+  } = result.structuredContent
+  assert.equal(await source(id), markdown.replaceAll("./A.png", fileUrl))
+})
+
+test("rejects an oversized sealed Markdown manifest before issuing an upload URL", async () => {
+  const images = Array.from({ length: 30 }, (_, index) => ({ name: `${index}${"图".repeat(94)}.png` }))
+  const result = await call({ file: { name: "plan.md" }, images, lifetime: "review" })
+  assert.equal(result.isError, true)
+  assert.match(result.message, /shorten.*names/i)
+})
+
+test("all 30 uploads fit one owner window, but an additional image is rate limited", async () => {
+  state.burstCounts = new Map()
+  const images = Array.from({ length: 30 }, (_, index) => ({ name: `card-${index}.png` }))
+  const doc = (await call({ markdown: "# Cards", images, lifetime: "review" })).structuredContent
+  const next = (await call({ markdown: "# Extra", images: [{ name: "extra.png" }], lifetime: "review" }))
+    .structuredContent
+  state.who = null
+  for (const image of doc.images) await upload(image.uploadUrl)
+  assert.equal(children(doc.id).length, 30)
+  await assert.rejects(upload(next.images[0].uploadUrl), { status: 429 })
+})
+
+test("only supported filename extensions get tickets; each accepts its matching image bytes", async () => {
+  const formats = new Map([
+    ["a.png", png],
+    ["a.jpg", Buffer.from([0xff, 0xd8, 0xff, 0xdb])],
+    ["a.jpeg", Buffer.from([0xff, 0xd8, 0xff, 0xdb])],
+    ["a.gif", Buffer.from("GIF89a")],
+    ["a.webp", Buffer.from("RIFF\0\0\0\0WEBP")],
+  ])
+  for (const name of ["a.svg", "a.avif"]) {
+    const result = await call({ markdown: `![](./${name})`, images: [{ name }], lifetime: "review" })
+    assert.equal(result.isError, true)
+    assert.match(result.message, /Convert other formats/)
+  }
+  const doc = (
+    await call({ markdown: "# Formats", images: Array.from(formats.keys(), (name) => ({ name })), lifetime: "review" })
+  ).structuredContent
+  state.who = null
+  await assert.rejects(upload(doc.images[1].uploadUrl, png), { status: 415 })
+  for (const image of doc.images) await upload(image.uploadUrl, formats.get(image.name))
+  assert.equal(children(doc.id).length, formats.size)
+})
+
+test("Markdown upload preserves the existing invalid UTF-8 error", async () => {
+  const first = (await call({ markdown: "# Cards", lifetime: "review" })).structuredContent
+  const file = { name: "plan.md" }
+  const withImages = (await call({ file, images: [{ name: "A.png" }], lifetime: "review" })).structuredContent
+  const revision = (await call({ file, previous: first.id })).structuredContent
+  state.who = null
+  for (const { uploadUrl } of [withImages, revision]) {
+    await assert.rejects(put(uploadPut, uploadUrl, Buffer.from([0x80])), {
+      status: 400,
+      statusText: "Text files must contain valid UTF-8.",
+    })
+  }
+})
+
+test("a failed attachment insert deletes the blob and allows the URL to be retried", async () => {
+  const doc = (await call({ markdown: "![](./A.png)", images: [{ name: "A.png" }], lifetime: "review" }))
+    .structuredContent
+  const { uploadUrl, fileUrl } = doc.images[0]
+  const key = new URL(fileUrl).pathname.split("/").pop()
+  state.who = null
+  sql.exec(`CREATE TRIGGER fail_doc_image BEFORE INSERT ON drops WHEN NEW.kind = 'image'
+    BEGIN SELECT RAISE(ABORT, 'injected image insert failure'); END;`)
+  try {
+    await assert.rejects(upload(uploadUrl), /injected image insert failure/)
+    assert.equal(objects.has(key), false)
+    assert.equal(children(doc.id).length, 0)
+  } finally {
+    sql.exec("DROP TRIGGER fail_doc_image")
+  }
+  await upload(uploadUrl)
+  assert.equal(objects.has(key), true)
   assert.equal(children(doc.id).length, 1)
 })
 

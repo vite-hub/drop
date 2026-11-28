@@ -406,12 +406,18 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
-    if (MARKDOWN_FILE.test(filename) && (input.images?.length || previous)) {
+    if (MARKDOWN_FILE.test(filename) && bytes.byteLength <= MAX_FILE_BYTES && (input.images || previous)) {
+      let markdown: string
+      try {
+        markdown = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes)
+      } catch {
+        throw new HTTPError({ status: 400, statusText: "Text files must contain valid UTF-8." })
+      }
       planned = planImages(input.images ?? [], event.url.origin)
       const files = previous ? await attachedImages(previous, event.url.origin) : new Map<string, string>()
       for (const image of planned) files.set(image.name, image.fileUrl)
-      const linked = linkImages(new TextDecoder().decode(bytes), files)
-      if (input.images?.length && linked.missing.length)
+      const linked = await linkImages(markdown, files)
+      if (input.images && linked.missing.length)
         throw new HTTPError({
           status: 400,
           message: `The doc links to ${linked.missing.map((name) => `./${name}`).join(", ")}, which ${linked.missing.length === 1 ? "isn't" : "aren't"} in images${previous ? " or on the doc already" : ""}. Add ${linked.missing.length === 1 ? "it" : "them"} to images, or fix the link.`,
@@ -458,7 +464,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
-  const images = await Promise.all(planned.map((image) => signImageUpload(event, who, fresh, image)))
+  const images = await Promise.all(planned.map((image) => signImageUpload(event, who, row, image)))
   const result = {
     ...drop,
     ...(images.length ? { images } : {}),

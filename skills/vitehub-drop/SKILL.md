@@ -72,6 +72,8 @@ If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the p
 
 ## Images and recordings in a doc
 
+The `images` manifest accepts PNG, JPEG, GIF, and WebP files.
+
 For images on disk, publish the doc with them in one call. Write each image as `./<name>` in the Markdown, as in `![alt](./A.png)` or `::screenshot{src="./A.png"}`, and pass `images: [{ name: "A.png" }, …]`, up to 30, with `markdown` or a `.md` `file`. Drop stores the doc with each `./<name>` replaced by that image's `fileUrl`, and the reply lists an `uploadUrl` for each image (in the upload's JSON for a `.md` file). Run `curl -T <path> '<uploadUrl>'` for each, within 15 minutes; until then the doc shows that image as missing. A link to a `./<name>.png` that isn't in `images` stops the publish. With `previous`, `./<name>` also finds the images the doc already has, the latest of each name, so pass only new or changed ones in `images`.
 
 Otherwise publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change.

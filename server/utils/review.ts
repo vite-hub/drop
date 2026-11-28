@@ -400,6 +400,7 @@ export async function createSiteDrop(
       trashedAt: null,
       trashReason: null,
       parentId: folder?.id ?? null,
+      parentVersion: null,
       siteUrl,
       publishToken: null,
       draftImage: false,

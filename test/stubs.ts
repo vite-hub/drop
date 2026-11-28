@@ -34,8 +34,12 @@ export const defineCachedFunction = (fn, options) => define(fn, { storage, group
   "vite-hub/rate-limit": `import { HTTPError } from "h3"
 export const checkRateLimit = async (_event, bucket, options) => {
   globalThis.dropTest.bursts.push({ bucket, ...options })
+  const counts = globalThis.dropTest.burstCounts
+  const key = JSON.stringify([bucket, options.key])
+  const count = counts ? (counts.get(key) ?? 0) + 1 : 0
+  counts?.set(key, count)
   const retryAfter = "burstRetryAfter" in globalThis.dropTest ? globalThis.dropTest.burstRetryAfter : 42
-  return [undefined, globalThis.dropTest.failBurst ? { allowed: false, reason: "limited", retryAfter, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
+  return [undefined, globalThis.dropTest.failBurst || count > options.limit ? { allowed: false, reason: "limited", retryAfter, limit: options.limit, windowMs: 60000 } : { allowed: true, limit: options.limit, windowMs: 60000 }]
 }
 export const requireRateLimit = async (...args) => {
   const [, decision] = await checkRateLimit(...args)

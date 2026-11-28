@@ -306,6 +306,7 @@ export async function createDocDrop(
         trashedAt: null,
         trashReason: null,
         parentId,
+        parentVersion: previous?.parentVersion ?? null,
         draftImage: Boolean(attachment),
         shareReview: isPublic(share.share) ? await shareReviewFor(ownerId, event) : null,
         quarantinedAt: own?.quarantinedAt ?? null,
@@ -643,6 +644,7 @@ export async function publishApp(
           trashedAt: null,
           trashReason: null,
           parentId,
+          parentVersion: null,
           siteUrl: null,
           resources: own?.resources ?? null,
         }
