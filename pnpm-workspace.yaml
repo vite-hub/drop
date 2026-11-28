@@ -56,8 +56,9 @@ patchedDependencies:
   comark-annotate@0.14.3: patches/comark-annotate@0.14.3.patch
   # Lets a top-level carousel's slides run past the text column into the room on its right (--cc-bleed), with the next
   # photos peeking in, and makes the side outline keep clear of them, as it does of wide blocks (onmax/comark-ui#495). A
-  # slide that is one image shows the photo filling the slide at 4:3, with no panel (onmax/comark-ui#502). Delete both
-  # with the next comark-ui bump that includes #502.
+  # slide that is one image shows the photo filling the slide at 4:3, with no panel (onmax/comark-ui#502), and scrolled
+  # to the end, the last page lines up with the text column (onmax/comark-ui#503). Delete both with the next comark-ui
+  # bump that includes #502 and #503.
   comark-carousel@0.14.3: patches/comark-carousel@0.14.3.patch
   comark-outline@0.14.3: patches/comark-outline@0.14.3.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.

@@ -1,16 +1,17 @@
-diff --git a/dist/client-LnAaCQm_.mjs b/dist/client-I-TJCh4n.mjs
-similarity index 83%
+diff --git a/dist/client-LnAaCQm_.mjs b/dist/client-CBA3gLzU.mjs
+similarity index 80%
 rename from dist/client-LnAaCQm_.mjs
-rename to dist/client-I-TJCh4n.mjs
-index f6daf9265b55edab5587418a74e367c9c70d0aa4..a1fccfc0aff72fbf94289218c9d9e88b7ab2d488 100644
+rename to dist/client-CBA3gLzU.mjs
+index f6daf9265b55edab5587418a74e367c9c70d0aa4..d66c373a9a62e93bc81bfe8bee08f41b6cf2717d 100644
 --- a/dist/client-LnAaCQm_.mjs
-+++ b/dist/client-I-TJCh4n.mjs
-@@ -14,34 +14,42 @@ function scripted(ready, root, rules) {
++++ b/dist/client-CBA3gLzU.mjs
+@@ -14,34 +14,45 @@ function scripted(ready, root, rules) {
  }
  //#endregion
  //#region src/styles.ts
 +const inlineSizeUnit = "10000px";
 +const inlineSizeRatio = `tan(atan2(100cqi,${inlineSizeUnit}))`;
++const overhang = `calc((${inlineSizeRatio} - var(--_cc-column-ratio)) * ${inlineSizeUnit})`;
 +const photo = ".cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)";
  /**
  * The carousel styles. The script adds them to the page once. Theme the controls with the shared `--comark-*` tokens,
@@ -29,9 +30,11 @@ index f6daf9265b55edab5587418a74e367c9c70d0aa4..a1fccfc0aff72fbf94289218c9d9e88b
 -	".cc-track{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory}",
 -	".cc-track>.cc-slide{min-width:0;scroll-snap-align:start;align-content:start;padding:var(--cc-padding,1rem);border-radius:var(--_comark-radius);background:var(--cc-surface,color-mix(in srgb,var(--_comark-foreground) 4%,transparent))}",
 +	`.cc-run{--_cc-column-ratio:${inlineSizeRatio};container-type:inline-size;margin-inline-end:calc(-1 * max(0px,var(--cc-bleed,0px)))}`,
-+	".cc-track{position:relative;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory}",
-+	`.cc-grid{margin-inline-end:calc((${inlineSizeRatio} - var(--_cc-column-ratio)) * ${inlineSizeUnit});display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem)}`,
++	`.cc-track{position:relative;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scroll-padding-inline-end:${overhang}}`,
++	`.cc-grid{margin-inline-end:${overhang};display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem)}`,
 +	".cc-grid>.cc-slide{min-width:0;scroll-snap-align:start;align-content:start;padding:var(--cc-padding,1rem);border-radius:var(--_comark-radius);background:var(--cc-surface,color-mix(in srgb,var(--_comark-foreground) 4%,transparent))}",
++	".cc-grid>.cc-slide:last-child{position:relative}",
++	`.cc-grid>.cc-slide:last-child::after{content:"";position:absolute;top:0;inset-inline-start:100%;width:${overhang};height:1px;pointer-events:none}`,
  	".cc-slide>:nth-child(1 of :not(style,script)),.cc-slide>.ck:nth-child(1 of :not(style,script))>pre{margin-top:0!important}",
  	".cc-slide>:nth-last-child(1 of :not(style,script)),.cc-slide>.ck:nth-last-child(1 of :not(style,script))>pre{margin-bottom:0!important}",
 -	".cc-track>.cc-slide:has(>:is(pre,.ck):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))){padding:0;background:none}",
@@ -56,7 +59,7 @@ index f6daf9265b55edab5587418a74e367c9c70d0aa4..a1fccfc0aff72fbf94289218c9d9e88b
  	".cc-count{color:var(--_comark-muted);font-size:.875rem;line-height:1.25rem;font-variant-numeric:tabular-nums}",
  	".cc-steps{display:flex;gap:.5rem}",
  	".cc-step{display:inline-grid;place-items:center;width:var(--cc-button-size,2rem);height:var(--cc-button-size,2rem);padding:0;border:1px solid var(--_comark-border);border-radius:9999px;background:var(--_comark-background);color:var(--_comark-foreground);cursor:pointer;touch-action:manipulation;transition:background .15s,opacity .15s}",
-@@ -76,8 +84,8 @@ function start(css) {
+@@ -76,8 +87,8 @@ function start(css) {
  	}
  	document.documentElement.setAttribute("data-carousel-ready", "");
  	const parts = (root) => {
@@ -67,7 +70,26 @@ index f6daf9265b55edab5587418a74e367c9c70d0aa4..a1fccfc0aff72fbf94289218c9d9e88b
  		const step = (by) => root.querySelector(`:scope>.cc-controls [data-carousel-step='${by}']`);
  		return {
  			track,
-@@ -175,8 +183,8 @@ function start(css) {
+@@ -89,7 +100,8 @@ function start(css) {
+ 	};
+ 	const rtl = (track) => getComputedStyle(track).direction === "rtl";
+ 	function geometry(track, slides) {
+-		const width = track.clientWidth;
++		const overhang = Math.max(0, track.offsetWidth - track.closest(".cc").clientWidth);
++		const width = track.clientWidth - overhang;
+ 		const bounds = track.getBoundingClientRect();
+ 		const scale = bounds.width / track.offsetWidth || 1;
+ 		const direction = rtl(track) ? -1 : 1;
+@@ -106,7 +118,7 @@ function start(css) {
+ 		const shown = pitch > 0 ? Math.min(slides.length, 1 + Math.max(0, Math.floor((width - first.width / scale + 1) / pitch))) : 1;
+ 		const lastStart = slides.length - shown;
+ 		const panelEnd = starts.at(-1) + panels.at(-1).width / scale;
+-		const end = Math.max(0, Math.min(starts[lastStart], panelEnd - width, track.scrollWidth - width));
++		const end = Math.max(0, Math.min(starts[lastStart], panelEnd - width, track.scrollWidth - track.clientWidth));
+ 		const atEnd = end - scrolled <= 1;
+ 		const stops = starts.slice(0, lastStart + 1).map((start) => Math.max(0, Math.min(start, end)));
+ 		return {
+@@ -175,8 +187,8 @@ function start(css) {
  	});
  	const observe = (node) => {
  		if (!(node instanceof Element)) return;
@@ -92,20 +114,20 @@ index eab817f7a8e98bffb11a250bf9c33a26db67f219..319379183852c3acd3ba74c61cca5415
   */
  export declare const css: string;
 diff --git a/dist/client.mjs b/dist/client.mjs
-index 1142892c853c2ba9b2c2ab2193bfa3bcf410a76d..34a7a6659a553f88bff46f0546a874ef3c4d1a6e 100644
+index 1142892c853c2ba9b2c2ab2193bfa3bcf410a76d..cdc4b43d2a08a2a575d5d71202521472ea61bb75 100644
 --- a/dist/client.mjs
 +++ b/dist/client.mjs
 @@ -1 +1 @@
 -export { n as css, t as start } from "./client-LnAaCQm_.mjs";
-+export { n as css, t as start } from "./client-I-TJCh4n.mjs";
++export { n as css, t as start } from "./client-CBA3gLzU.mjs";
 diff --git a/dist/html.mjs b/dist/html.mjs
-index 3460d27bf2f1a74288eec0762dbf4cb7e49380d7..7d496879c01a2aaf74ec7fb6b42e6cb6b3077a02 100644
+index 3460d27bf2f1a74288eec0762dbf4cb7e49380d7..e1af034aec3ad348c78dc936219bef378f681a34 100644
 --- a/dist/html.mjs
 +++ b/dist/html.mjs
 @@ -1,5 +1,5 @@
  import { n as rawText, r as scalar, t as src_default } from "./src-CP4zQ4YX.mjs";
 -import { n as css, t as start } from "./client-LnAaCQm_.mjs";
-+import { n as css, t as start } from "./client-I-TJCh4n.mjs";
++import { n as css, t as start } from "./client-CBA3gLzU.mjs";
  import { resolveAttributes } from "comark/render";
  import { escapeHtml } from "comark/utils";
  import { runtime as runtime$1, scripts as scripts$1 } from "comark-zoom/html";
@@ -119,13 +141,13 @@ index 3460d27bf2f1a74288eec0762dbf4cb7e49380d7..7d496879c01a2aaf74ec7fb6b42e6cb6
  /**
  * A carousel around slides that are already HTML, for plugins that build their own slides and decide what zooms
 diff --git a/dist/react.mjs b/dist/react.mjs
-index 86eab45d1efb7c18b4d7a27cd916c12e9b2a6123..f7f871780f14cc6bf3a61517b7effc31b99346d7 100644
+index 86eab45d1efb7c18b4d7a27cd916c12e9b2a6123..f63e9b116fac84cc538bc28d14b845931a0bb288 100644
 --- a/dist/react.mjs
 +++ b/dist/react.mjs
 @@ -1,5 +1,5 @@
  import { t as src_default } from "./src-CP4zQ4YX.mjs";
 -import { n as css$1, t as start$1 } from "./client-LnAaCQm_.mjs";
-+import { n as css$1, t as start$1 } from "./client-I-TJCh4n.mjs";
++import { n as css$1, t as start$1 } from "./client-CBA3gLzU.mjs";
  import { css, start } from "comark-zoom/client";
  import { createElement, useEffect } from "react";
  //#region src/react.ts
@@ -139,13 +161,13 @@ index 86eab45d1efb7c18b4d7a27cd916c12e9b2a6123..f7f871780f14cc6bf3a61517b7effc31
  /** `:::slide` for `@comark/react`. */
  function Slide({ index, count, title, zoom, children }) {
 diff --git a/dist/style.css b/dist/style.css
-index 60c486b4662b2ca06d62855910affa808a348779..3c47528604a561e56ce7955c1ccc2429a475461e 100644
+index 60c486b4662b2ca06d62855910affa808a348779..ed718ba9e56b20dd30a18e53e34b5b27d080f52e 100644
 --- a/dist/style.css
 +++ b/dist/style.css
 @@ -1 +1 @@
 -@layer comark{:where(.cc){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#fff)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#0a0a0a)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#737373)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,#e5e5e5)));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#f5f5f5)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#a1a1a1)));--_comark-radius:var(--comark-radius,calc(var(--ui-radius,var(--radius,.625rem)/2)*2));--_comark-font:var(--comark-font,var(--font-sans,ui-sans-serif,system-ui,sans-serif))}@media (prefers-color-scheme:dark){:where(:not(.light,.light *)):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}}:where(.dark,.dark *):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}:where(.cc){--cc-columns:1}.cc{position:relative;margin:1.5rem 0;container-type:inline-size}.cc[data-carousel-columns='2']{--cc-columns:2}.cc[data-carousel-columns='3']{--cc-columns:3}.cc-track{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory}.cc-track>.cc-slide{min-width:0;scroll-snap-align:start;align-content:start;padding:var(--cc-padding,1rem);border-radius:var(--_comark-radius);background:var(--cc-surface,color-mix(in srgb,var(--_comark-foreground) 4%,transparent))}.cc-slide>:nth-child(1 of :not(style,script)),.cc-slide>.ck:nth-child(1 of :not(style,script))>pre{margin-top:0!important}.cc-slide>:nth-last-child(1 of :not(style,script)),.cc-slide>.ck:nth-last-child(1 of :not(style,script))>pre{margin-bottom:0!important}.cc-track>.cc-slide:has(>:is(pre,.ck):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))){padding:0;background:none}.cc-track>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child){align-content:center}.cc-slide img{max-width:100%;height:auto}.cc-slide>img,.cc-slide>a>img{display:block;margin-inline:auto}.cc-track [data-zoom]:focus-visible{outline-offset:-2px}@container (max-width:36rem){.cc-track{grid-auto-columns:100%}.cc-track:has(>.cc-slide+.cc-slide){grid-auto-columns:calc(100% - var(--cc-peek,3rem))}.cc-track>.cc-slide{padding:calc(var(--cc-padding,1rem) / 2)}.cc-track>.cc-slide:last-child{scroll-snap-align:end}}.cc-controls{display:none;align-items:center;justify-content:space-between;gap:.5rem;margin-top:.75rem}[data-carousel-ready] .cc .cc-track{scrollbar-width:none}[data-carousel-ready] .cc .cc-track::-webkit-scrollbar{display:none}[data-carousel-ready] .cc .cc-controls{display:flex}@media (scripting:enabled){.cc[data-comark-mounts] .cc-track{scrollbar-width:none}.cc[data-comark-mounts] .cc-track::-webkit-scrollbar{display:none}.cc[data-comark-mounts] .cc-controls{display:flex}}@container (min-width:36.01rem){.cc[data-carousel-fits] .cc-controls{display:none!important}}.cc-count{color:var(--_comark-muted);font-size:.875rem;line-height:1.25rem;font-variant-numeric:tabular-nums}.cc-steps{display:flex;gap:.5rem}.cc-step{display:inline-grid;place-items:center;width:var(--cc-button-size,2rem);height:var(--cc-button-size,2rem);padding:0;border:1px solid var(--_comark-border);border-radius:9999px;background:var(--_comark-background);color:var(--_comark-foreground);cursor:pointer;touch-action:manipulation;transition:background .15s,opacity .15s}.cc-step:hover:not([aria-disabled='true']){background:var(--_comark-accent)}.cc-step:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--_comark-ring) 50%,transparent)}.cc-step[aria-disabled='true']{opacity:.5;cursor:default}.cc-step svg{width:1rem;height:1rem}.cc:dir(rtl) .cc-step svg{scale:-1 1}@media (pointer:coarse){.cc-step{width:max(var(--cc-button-size,2rem),2.5rem);height:max(var(--cc-button-size,2rem),2.5rem)}}}
 \ No newline at end of file
-+@layer comark{@property --_cc-column-ratio{syntax:"<number>";inherits:true;initial-value:0}:where(.cc){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#fff)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#0a0a0a)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#737373)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,#e5e5e5)));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#f5f5f5)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#a1a1a1)));--_comark-radius:var(--comark-radius,calc(var(--ui-radius,var(--radius,.625rem)/2)*2));--_comark-font:var(--comark-font,var(--font-sans,ui-sans-serif,system-ui,sans-serif))}@media (prefers-color-scheme:dark){:where(:not(.light,.light *)):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}}:where(.dark,.dark *):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}:where(.cc){--cc-columns:1}.cc{position:relative;margin:1.5rem 0;container:cc/inline-size}.cc[data-carousel-columns='2']{--cc-columns:2}.cc[data-carousel-columns='3']{--cc-columns:3}.cc-run{--_cc-column-ratio:tan(atan2(100cqi,10000px));container-type:inline-size;margin-inline-end:calc(-1 * max(0px,var(--cc-bleed,0px)))}.cc-track{position:relative;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory}.cc-grid{margin-inline-end:calc((tan(atan2(100cqi,10000px)) - var(--_cc-column-ratio)) * 10000px);display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem)}.cc-grid>.cc-slide{min-width:0;scroll-snap-align:start;align-content:start;padding:var(--cc-padding,1rem);border-radius:var(--_comark-radius);background:var(--cc-surface,color-mix(in srgb,var(--_comark-foreground) 4%,transparent))}.cc-slide>:nth-child(1 of :not(style,script)),.cc-slide>.ck:nth-child(1 of :not(style,script))>pre{margin-top:0!important}.cc-slide>:nth-last-child(1 of :not(style,script)),.cc-slide>.ck:nth-last-child(1 of :not(style,script))>pre{margin-bottom:0!important}.cc-grid>.cc-slide:has(>:is(pre,.ck):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))){padding:0;background:none}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child){padding:0;background:none}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>a{display:block}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>img,.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>a>img{width:100%;aspect-ratio:var(--cc-ratio,4/3);object-fit:cover;border-radius:var(--_comark-radius)}.cc-slide img{max-width:100%;height:auto}.cc-slide>img,.cc-slide>a>img{display:block;margin-inline:auto}.cc-track [data-zoom]:focus-visible{outline-offset:-2px}@container cc (max-width:36rem){.cc-grid{grid-auto-columns:100%}.cc-grid:has(>.cc-slide+.cc-slide){grid-auto-columns:calc(100% - var(--cc-peek,3rem))}.cc-grid>.cc-slide{padding:calc(var(--cc-padding,1rem) / 2)}.cc-grid>.cc-slide:last-child{scroll-snap-align:end}}.cc-controls{display:none;align-items:center;justify-content:space-between;gap:.5rem;margin-top:.75rem}[data-carousel-ready] .cc .cc-track{scrollbar-width:none}[data-carousel-ready] .cc .cc-track::-webkit-scrollbar{display:none}[data-carousel-ready] .cc .cc-controls{display:flex}@media (scripting:enabled){.cc[data-comark-mounts] .cc-track{scrollbar-width:none}.cc[data-comark-mounts] .cc-track::-webkit-scrollbar{display:none}.cc[data-comark-mounts] .cc-controls{display:flex}}@container cc (min-width:36.01rem){.cc[data-carousel-fits] .cc-controls{display:none!important}}.cc-count{color:var(--_comark-muted);font-size:.875rem;line-height:1.25rem;font-variant-numeric:tabular-nums}.cc-steps{display:flex;gap:.5rem}.cc-step{display:inline-grid;place-items:center;width:var(--cc-button-size,2rem);height:var(--cc-button-size,2rem);padding:0;border:1px solid var(--_comark-border);border-radius:9999px;background:var(--_comark-background);color:var(--_comark-foreground);cursor:pointer;touch-action:manipulation;transition:background .15s,opacity .15s}.cc-step:hover:not([aria-disabled='true']){background:var(--_comark-accent)}.cc-step:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--_comark-ring) 50%,transparent)}.cc-step[aria-disabled='true']{opacity:.5;cursor:default}.cc-step svg{width:1rem;height:1rem}.cc:dir(rtl) .cc-step svg{scale:-1 1}@media (pointer:coarse){.cc-step{width:max(var(--cc-button-size,2rem),2.5rem);height:max(var(--cc-button-size,2rem),2.5rem)}}}
++@layer comark{@property --_cc-column-ratio{syntax:"<number>";inherits:true;initial-value:0}:where(.cc){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#fff)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#0a0a0a)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#737373)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,#e5e5e5)));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#f5f5f5)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#a1a1a1)));--_comark-radius:var(--comark-radius,calc(var(--ui-radius,var(--radius,.625rem)/2)*2));--_comark-font:var(--comark-font,var(--font-sans,ui-sans-serif,system-ui,sans-serif))}@media (prefers-color-scheme:dark){:where(:not(.light,.light *)):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}}:where(.dark,.dark *):is(:where(.cc)){--_comark-background:var(--comark-background,var(--ui-bg,var(--background,#0a0a0a)));--_comark-foreground:var(--comark-foreground,var(--ui-text-highlighted,var(--foreground,#fafafa)));--_comark-muted:var(--comark-muted,var(--ui-text-muted,var(--muted-foreground,#a1a1a1)));--_comark-border:var(--comark-border,var(--ui-border,var(--border,rgb(255 255 255/.1))));--_comark-accent:var(--comark-accent,var(--ui-bg-elevated,var(--accent,#262626)));--_comark-ring:var(--comark-ring,var(--ui-primary,var(--ring,#737373)))}:where(.cc){--cc-columns:1}.cc{position:relative;margin:1.5rem 0;container:cc/inline-size}.cc[data-carousel-columns='2']{--cc-columns:2}.cc[data-carousel-columns='3']{--cc-columns:3}.cc-run{--_cc-column-ratio:tan(atan2(100cqi,10000px));container-type:inline-size;margin-inline-end:calc(-1 * max(0px,var(--cc-bleed,0px)))}.cc-track{position:relative;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;scroll-padding-inline-end:calc((tan(atan2(100cqi,10000px)) - var(--_cc-column-ratio)) * 10000px)}.cc-grid{margin-inline-end:calc((tan(atan2(100cqi,10000px)) - var(--_cc-column-ratio)) * 10000px);display:grid;grid-auto-flow:column;grid-auto-columns:calc((100% - (var(--cc-columns) - 1) * var(--cc-gap,1rem)) / var(--cc-columns));gap:var(--cc-gap,1rem)}.cc-grid>.cc-slide{min-width:0;scroll-snap-align:start;align-content:start;padding:var(--cc-padding,1rem);border-radius:var(--_comark-radius);background:var(--cc-surface,color-mix(in srgb,var(--_comark-foreground) 4%,transparent))}.cc-grid>.cc-slide:last-child{position:relative}.cc-grid>.cc-slide:last-child::after{content:"";position:absolute;top:0;inset-inline-start:100%;width:calc((tan(atan2(100cqi,10000px)) - var(--_cc-column-ratio)) * 10000px);height:1px;pointer-events:none}.cc-slide>:nth-child(1 of :not(style,script)),.cc-slide>.ck:nth-child(1 of :not(style,script))>pre{margin-top:0!important}.cc-slide>:nth-last-child(1 of :not(style,script)),.cc-slide>.ck:nth-last-child(1 of :not(style,script))>pre{margin-bottom:0!important}.cc-grid>.cc-slide:has(>:is(pre,.ck):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))){padding:0;background:none}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child){padding:0;background:none}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>a{display:block}.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>img,.cc-grid>.cc-slide:has(>:is(img,a):nth-child(1 of :not(style,script)):nth-last-child(1 of :not(style,script))):has(>img,>a>img:only-child)>a>img{width:100%;aspect-ratio:var(--cc-ratio,4/3);object-fit:cover;border-radius:var(--_comark-radius)}.cc-slide img{max-width:100%;height:auto}.cc-slide>img,.cc-slide>a>img{display:block;margin-inline:auto}.cc-track [data-zoom]:focus-visible{outline-offset:-2px}@container cc (max-width:36rem){.cc-grid{grid-auto-columns:100%}.cc-grid:has(>.cc-slide+.cc-slide){grid-auto-columns:calc(100% - var(--cc-peek,3rem))}.cc-grid>.cc-slide{padding:calc(var(--cc-padding,1rem) / 2)}.cc-grid>.cc-slide:last-child{scroll-snap-align:end}}.cc-controls{display:none;align-items:center;justify-content:space-between;gap:.5rem;margin-top:.75rem}[data-carousel-ready] .cc .cc-track{scrollbar-width:none}[data-carousel-ready] .cc .cc-track::-webkit-scrollbar{display:none}[data-carousel-ready] .cc .cc-controls{display:flex}@media (scripting:enabled){.cc[data-comark-mounts] .cc-track{scrollbar-width:none}.cc[data-comark-mounts] .cc-track::-webkit-scrollbar{display:none}.cc[data-comark-mounts] .cc-controls{display:flex}}@container cc (min-width:36.01rem){.cc[data-carousel-fits] .cc-controls{display:none!important}}.cc-count{color:var(--_comark-muted);font-size:.875rem;line-height:1.25rem;font-variant-numeric:tabular-nums}.cc-steps{display:flex;gap:.5rem}.cc-step{display:inline-grid;place-items:center;width:var(--cc-button-size,2rem);height:var(--cc-button-size,2rem);padding:0;border:1px solid var(--_comark-border);border-radius:9999px;background:var(--_comark-background);color:var(--_comark-foreground);cursor:pointer;touch-action:manipulation;transition:background .15s,opacity .15s}.cc-step:hover:not([aria-disabled='true']){background:var(--_comark-accent)}.cc-step:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--_comark-ring) 50%,transparent)}.cc-step[aria-disabled='true']{opacity:.5;cursor:default}.cc-step svg{width:1rem;height:1rem}.cc:dir(rtl) .cc-step svg{scale:-1 1}@media (pointer:coarse){.cc-step{width:max(var(--cc-button-size,2rem),2.5rem);height:max(var(--cc-button-size,2rem),2.5rem)}}}
 \ No newline at end of file
 diff --git a/dist/svelte/Carousel.svelte b/dist/svelte/Carousel.svelte
 index 485b3f02b23d49b17267b3954be37cedd791b8e3..e9ab221653275d86b04a1934b4a0f6f336f91a0e 100644
@@ -161,13 +183,13 @@ index 485b3f02b23d49b17267b3954be37cedd791b8e3..e9ab221653275d86b04a1934b4a0f6f3
      <div class="cc-controls">
        <span class="cc-count" aria-live="polite">1 / {total}</span>
 diff --git a/dist/vue.mjs b/dist/vue.mjs
-index bf25177f4ef3533a5b9914a82a0d5dc4a999319d..968e441a2c39cb4c86c2620df58ca1e838c72ce2 100644
+index bf25177f4ef3533a5b9914a82a0d5dc4a999319d..b76ab5bfbd5d64be8f633a80f5825f74c7bac997 100644
 --- a/dist/vue.mjs
 +++ b/dist/vue.mjs
 @@ -1,5 +1,5 @@
  import { t as src_default } from "./src-CP4zQ4YX.mjs";
 -import { n as css$1, t as start$1 } from "./client-LnAaCQm_.mjs";
-+import { n as css$1, t as start$1 } from "./client-I-TJCh4n.mjs";
++import { n as css$1, t as start$1 } from "./client-CBA3gLzU.mjs";
  import { css, start } from "comark-zoom/client";
  import { defineComponent, h, onBeforeUnmount, onMounted } from "vue";
  //#region src/vue.ts

@@ -61,7 +61,22 @@ async function open(browser, width, height = 900) {
   const frame = page.frames()[1]
   await frame.waitForFunction(() => window.__comarkOutline, null, { polling: 100 })
   await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-  return frame.evaluate(() => {
+  return frame.evaluate(async () => {
+    // Scrolled to its end, the first carousel's last page should line up with its column.
+    const cc = document.querySelector(".typeset > .cc")
+    const track = cc.querySelector(".cc-track")
+    track.scrollTo({ left: track.scrollWidth - track.clientWidth, behavior: "instant" })
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const column = cc.getBoundingClientRect()
+    const shown = [...track.querySelectorAll(".cc-slide")].map((slide) => slide.getBoundingClientRect())
+    const end = {
+      start: shown.at(-3).left - column.left,
+      end: column.right - shown.at(-1).right,
+      before: shown.at(-4).right - column.left,
+      count: cc.querySelector(".cc-count")?.textContent,
+    }
+    track.scrollTo({ left: 0, behavior: "instant" })
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     const box = (selector) => document.querySelector(selector).getBoundingClientRect()
     const outline = document.querySelector(".cto-rail")
     return {
@@ -86,8 +101,16 @@ async function open(browser, width, height = 900) {
       viewport: document.documentElement.clientWidth,
       frame: window.innerWidth,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      end,
     }
   })
+}
+
+// At the end, the last three slides fill the text column, with nothing of the slide before them showing at its start.
+function lastPageLinesUp({ end }) {
+  assert.ok(Math.abs(end.start) < 1 && Math.abs(end.end) < 1, JSON.stringify(end))
+  assert.ok(end.before < 1, `the slide before the last page shows ${end.before}px`)
+  assert.equal(end.count, "4–6 / 6")
 }
 
 test(
@@ -108,6 +131,7 @@ test(
         `outline at ${desktop.outline.left}, slides end at ${desktop.track.right}`,
       )
       assert.equal(desktop.overflow, 0)
+      lastPageLinesUp(desktop)
       // A slide that is one photo is the photo itself: no panel around it, filling the slide at 4:3.
       assert.equal(desktop.photo.backgroundColor, "rgba(0, 0, 0, 0)")
       assert.equal(desktop.photo.paddingTop, "0px")
@@ -123,6 +147,7 @@ test(
       assert.ok(narrow.viewport < narrow.frame, "the frame scrolls, so its scrollbar takes room")
       assert.ok(narrow.track.right > narrow.viewport, `slides end at ${narrow.track.right}, short of the scrollbar`)
       assert.equal(narrow.overflow, 0)
+      lastPageLinesUp(narrow)
 
       const phone = await open(browser, 390)
       assert.equal(Math.round(phone.track.right), phone.frame, "the slides run to the screen's edge")
