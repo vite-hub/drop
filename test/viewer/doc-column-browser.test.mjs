@@ -46,7 +46,23 @@ Some text above the cards, long enough to wrap onto a second line in the column 
 ![Sized wide](${picture(1600, 800)}){.wide width="1000"}
 
 ![Inline wide](${picture(1600, 800)}){.wide} in a sentence stays in the column.
+
+[![Linked wide](${picture(1600, 800)}){.wide}](https://example.com)
+
+[![Small linked wide](${picture(320, 200)}){.wide}](https://example.com)
+
+[Read this ![Linked with text](${picture(1600, 800)}){.wide}](https://example.com)
+
+[![Linked with another image](${picture(1600, 800)}){.wide} ![Other](${picture(320, 200)})](https://example.com)
 `
+
+test("only paragraphs containing a single wide image are marked wide, including image-only links", async () => {
+  const { html } = await renderMarkdownCached("doc-column", async () => markdown)
+  const wideParagraphs = [...html.matchAll(/<p\b[^>]*\bdata-wide(?:=|\s|>)[^<]*[\s\S]*?<\/p>/g)].map(
+    ([paragraph]) => paragraph.match(/\balt="([^"]+)"/)?.[1],
+  )
+  assert.deepEqual(wideParagraphs, ["Wide", "Sized wide", "Linked wide", "Small linked wide"])
+})
 
 async function measure(page, frame) {
   const sizes = await frame.evaluate(async () => {
@@ -55,6 +71,13 @@ async function measure(page, frame) {
     const style = getComputedStyle(article)
     const column = article.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
     const width = (alt) => document.querySelector(`img[alt="${alt}"]`).getBoundingClientRect().width
+    const linked = document.querySelector('img[alt="Small linked wide"]')
+    const link = linked.closest("a")
+    const paragraph = link.closest("p")
+    const center = (element) => {
+      const { left, width } = element.getBoundingClientRect()
+      return left + width / 2
+    }
     return {
       rem: parseFloat(getComputedStyle(document.documentElement).fontSize),
       column,
@@ -63,6 +86,11 @@ async function measure(page, frame) {
       wide: width("Wide"),
       sized: width("Sized wide"),
       inline: width("Inline wide"),
+      linkedWide: width("Linked wide"),
+      linkedWithText: width("Linked with text"),
+      linkedWithOther: width("Linked with another image"),
+      smallLink: link.getBoundingClientRect().width,
+      smallLinkOffset: center(linked) - center(paragraph),
     }
   })
   await page.close()
@@ -117,6 +145,11 @@ test(
         )
         assert.equal(wide.sized, 1000, `${open.name}: {.wide} with a width grows to it`)
         near(wide.inline, wide.column, `${open.name}: {.wide} inside a sentence stays in the column`)
+        near(wide.linkedWide, wide.wide, `${open.name}: an image-only link can go wide`)
+        near(wide.linkedWithText, wide.column, `${open.name}: a link with text stays in the column`)
+        near(wide.linkedWithOther, wide.column, `${open.name}: a link with two images stays in the column`)
+        near(wide.smallLink, 320, `${open.name}: the link only covers the visible image`)
+        near(wide.smallLinkOffset, 0, `${open.name}: the small linked image is centered`)
 
         const phone = await open(browser, 390)
         assert.ok(phone.column < 390 && phone.column > 300, `${open.name}: ${phone.column}px on a phone`)
@@ -132,3 +165,34 @@ test(
     }
   },
 )
+
+test("a tall prose image and its heading print together on one A4 sheet", { timeout: 30_000 }, async () => {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs")
+  const source = `# Printed card\n\n![Card](${picture(1100, 2200)})`
+  const { html } = await renderMarkdownCached("print-card", async () => source)
+  const standalone = await renderMarkdownDocument(async () => source, "/f/card.md", "card.md")
+  const browser = await chromium.launch()
+  try {
+    for (const [name, document] of [
+      ["viewer export", planDocument("markdown", source, false, html, 0, "readable")],
+      ["standalone", standalone],
+    ]) {
+      const page = await browser.newPage()
+      await images(page, document.replace("</head>", `<style>${styles}</style></head>`))
+      await page.locator('img[alt="Card"]').evaluate((image) => image.decode())
+      const bytes = await page.pdf({ format: "A4" })
+      await page.close()
+      const loading = getDocument({ data: new Uint8Array(bytes) })
+      try {
+        const pdf = await loading.promise
+        assert.equal(pdf.numPages, 1, name)
+        const content = await (await pdf.getPage(1)).getTextContent()
+        assert.match(content.items.map((item) => item.str ?? "").join(" "), /Printed card/, name)
+      } finally {
+        await loading.destroy()
+      }
+    }
+  } finally {
+    await browser.close()
+  }
+})

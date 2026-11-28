@@ -45,7 +45,7 @@
   margin-bottom: 0;
 }
 
-/* An image at least as wide as the column fills it, and a smaller one keeps its own size. No height cap: comark-ui's
+/* On screen, an image at least as wide as the column fills it, and a smaller one keeps its own size. comark-ui's
    typeset caps an image at 70svh, which shrinks a tall one, such as a card of a whole conversation, to a strip a third
    of the column wide whose text can't be read; a reader scrolls past it, and a click zooms it whole. Both axes
    auto-size, so zoom uses a proportional box. */
@@ -58,6 +58,11 @@
     height: auto;
     max-width: min(100%, var(--drop-image-width, 100%));
     max-height: none;
+
+    @media print {
+      max-height: min(70svh, 40rem);
+      break-inside: avoid;
+    }
   }
 }
 
@@ -68,8 +73,14 @@
   margin-inline: auto;
 }
 
+:is(.typeset, .typeset > .cr) > p[data-wide] > a:has(> img) {
+  width: fit-content;
+  max-width: 100%;
+}
+
 :is(.typeset, .typeset > .cr) > p[data-wide] > a > img {
   display: block;
+  margin-inline: auto;
 }
 
 .typeset img:not(a img):focus-visible {

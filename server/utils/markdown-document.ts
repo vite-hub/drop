@@ -143,18 +143,20 @@ const isWideImage = (node: unknown): boolean =>
   typeof node[1]?.class === "string" &&
   node[1].class.split(/\s+/).includes("wide")
 
+const hasContent = (node: MarkdownNode): boolean => typeof node !== "string" || node.trim().length > 0
+
 function widenImages(nodes: MarkdownNode[]): void {
   for (const node of nodes) {
     if (!Array.isArray(node) || node[0] === null) continue
     const [tag, attrs, ...children] = node
     if (tag === "comments" || tag === "comments-render") widenImages(children)
     if (tag !== "p") continue
-    const content = children.filter((child) => typeof child !== "string" || child.trim())
+    const content = children.filter(hasContent)
     if (content.length !== 1) continue
     const [only] = content
-    const linked = Array.isArray(only) && only[0] === "a" ? only.slice(2) : []
-    const image = isWideImage(only) ? only : linked.find(isWideImage)
-    if (!Array.isArray(image)) continue
+    const linked = Array.isArray(only) && only[0] === "a" ? only.slice(2).filter(hasContent) : []
+    const image = linked.length === 1 ? linked[0] : only
+    if (!Array.isArray(image) || !isWideImage(image)) continue
     attrs["data-wide"] = ""
     const width = Number(image[1].width)
     if (Number.isSafeInteger(width) && width > 0)
