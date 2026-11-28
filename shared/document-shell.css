@@ -59,7 +59,7 @@ body {
 }
 
 main {
-  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
+  width: min(100% - 2rem, 52rem + var(--drop-rail, 0rem));
   margin: 0 auto;
   padding: 2.5rem 0 1.25rem;
 }
@@ -179,7 +179,7 @@ p.render-error {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-  width: min(100% - 2rem, 48rem + var(--drop-rail, 0rem));
+  width: min(100% - 2rem, 52rem + var(--drop-rail, 0rem));
   margin: 1.25rem auto 0;
   padding: 1rem 0 2rem;
   border-top: 1px solid var(--border);
@@ -198,12 +198,12 @@ p.render-error {
 
 @media (max-width: 36rem) {
   main {
-    width: min(100% - 1.25rem, 48rem);
+    width: min(100% - 1.25rem, 52rem);
     padding-top: 1.25rem;
   }
 
   .document-footer {
-    width: min(100% - 1.25rem, 48rem);
+    width: min(100% - 1.25rem, 52rem);
   }
 }
 

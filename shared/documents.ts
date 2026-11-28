@@ -4,7 +4,7 @@ import { DOC_HEADER_SCRIPT } from "./doc-header"
 import { injectRuntime, THEME_CSS } from "./plan-runtime"
 import { TYPESET_CSS } from "./typeset"
 
-export const DOC_WIDTHS = { readable: "46rem", wide: "64rem", full: "80rem" } as const
+export const DOC_WIDTHS = { readable: "52rem", wide: "64rem", full: "80rem" } as const
 export type DocWidth = keyof typeof DOC_WIDTHS
 
 const DOCUMENT_EXTRA_CSS = `
@@ -17,13 +17,13 @@ html:root.drop-zen { --comark-rail-width: 0px; }
 :root.drop-zen .cto-rail { display: none !important; }
 body { margin: 0; background: var(--background); color: var(--foreground); transition: padding-right .2s ease-out;
   --drop-right: var(--drop-inset, 0px);
-  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 46rem) + var(--drop-rail, 0px) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
+  --drop-shift: clamp(0px, calc(2 * var(--drop-inset, 0px) + var(--drop-column, 52rem) + var(--drop-rail, 0px) - 100vw), max(0px, calc(var(--drop-inset, 0px) - 1.5rem)));
   padding-right: var(--drop-shift); }
 /* The app's grain (shared/theme.css) on the doc too, so the frame doesn't read as a flat sheet inside the page. The
    root carries it where a short doc's body ends. */
 html, body { background-image: var(--surface-grain); background-size: var(--surface-grain-size); }
-main { width: min(100% - 2rem, var(--drop-column, 46rem) + var(--drop-rail, 0px)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
-@media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 46rem)); } }
+main { width: min(100% - 2rem, var(--drop-column, 52rem) + var(--drop-rail, 0px)); margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+@media (max-width: 36rem) { main { width: min(100% - 1.25rem, var(--drop-column, 52rem)); } }
 .typeset :is(h2, h3) { scroll-margin-top: 1.5rem; }
 /* \`::drop\` (EMBEDS_SCRIPT): another drop's box, a link until the viewer fills it with the drop in a frame. */
 .drop-embed { display: grid; place-items: center; height: var(--drop-embed-height, 480px); margin: 1.5rem 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--muted); overflow: hidden; }
