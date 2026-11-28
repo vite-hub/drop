@@ -2248,11 +2248,11 @@ watch(
       v-if="floatShown"
       ref="floatRef"
       aria-label="New comment"
-      class="fixed z-40 flex max-h-[min(24rem,60dvh)] origin-top-left flex-col overflow-y-auto overscroll-contain bg-default motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
+      class="fixed z-40 flex origin-top-left flex-col bg-default motion-safe:[animation:pop-in_150ms_var(--ease-out)]"
       :class="
         compactFloat
-          ? 'rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)] has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(0_0_0/22%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(255_255_255/22%)]'
-          : 'rounded-lg border border-default shadow-lg'
+          ? 'overflow-visible rounded-[6px_18px_18px_18px] shadow-[0_0_0_1px_rgb(0_0_0/6%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:shadow-[0_0_0_1px_rgb(255_255_255/10%)] has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(0_0_0/22%),0_2px_4px_rgb(0_0_0/6%),0_10px_24px_-6px_rgb(0_0_0/18%)] dark:has-[textarea:focus-visible]:shadow-[0_0_0_1px_rgb(255_255_255/22%)]'
+          : 'max-h-[min(24rem,60dvh)] overflow-y-auto overscroll-contain rounded-lg border border-default shadow-lg'
       "
       :style="floatStyle"
     >
@@ -2269,13 +2269,15 @@ watch(
         v-if="pinShown"
         ref="pinRef"
         :aria-label="pinDraft ? 'Comment on selected text' : 'Comment thread'"
-        class="fixed z-40 flex max-h-[min(28rem,60dvh)] flex-col overscroll-contain border border-default bg-default shadow-lg"
+        class="fixed z-40 flex flex-col overscroll-contain border border-default bg-default shadow-lg"
         :class="
-          pinDraft
-            ? 'overflow-y-auto rounded-[6px_18px_18px_18px] has-[textarea:focus-visible]:border-accented'
-            : threadSpot?.rail
-              ? 'overflow-hidden rounded-xl'
-              : 'overflow-hidden rounded-[6px_16px_16px_16px]'
+          pinDraft && compactFloat
+            ? 'overflow-visible rounded-[6px_18px_18px_18px] has-[textarea:focus-visible]:border-accented'
+            : pinDraft
+              ? 'max-h-[min(28rem,60dvh)] overflow-y-auto rounded-[6px_18px_18px_18px] has-[textarea:focus-visible]:border-accented'
+              : threadSpot?.rail
+                ? 'max-h-[min(28rem,60dvh)] overflow-hidden rounded-xl'
+                : 'max-h-[min(28rem,60dvh)] overflow-hidden rounded-[6px_16px_16px_16px]'
         "
         role="dialog"
         :style="pinBubbleStyle"

@@ -46,7 +46,8 @@ defineExpose({
 </template>
 
 <style>
-/* Keep lookup results in the measured card so both floating scroll containers grow to expose them. */
+/* Keep lookup results in the measured card so both floating cards grow to show them. The cards don't clip: the text
+   field scrolls itself, and the attached pictures fan out above the card with their Remove buttons. */
 [data-pin-composer] [data-slot="comment-composer-mentions"] {
   position: static;
   margin-top: 0.25rem;

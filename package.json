@@ -5,7 +5,7 @@
   "license": "BUSL-1.1",
   "type": "module",
   "scripts": {
-    "build": "nuxt build && node scripts/migrate-workers-builds.mjs",
+    "build": "nuxt build && node scripts/check-built-fonts.mjs && node scripts/migrate-workers-builds.mjs",
     "lint": "vp lint",
     "lint:fix": "vp lint --fix",
     "knip": "knip",
