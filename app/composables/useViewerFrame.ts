@@ -1,7 +1,7 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
-import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
+import { appLocation, appPageFor, appStaticPageFor, buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
@@ -69,7 +69,11 @@ export function useViewerFrame(options: {
   const dark = computed(() => colorMode.value === "dark")
   const isApp = computed(() => drop.value.kind === "app")
   const mediaPath = computed(() => (isApp.value ? location.value.replace(/[?#].*$/s, "") : null))
-  const mediaScope = computed(() => JSON.stringify([drop.value.id, drop.value.version, mediaPath.value]))
+  const mediaScope = computed(() => {
+    const path = mediaPath.value
+    const pageKey = path === null ? null : (appStaticPageFor(pages.value, path) ?? path)
+    return JSON.stringify([drop.value.id, drop.value.version, pageKey])
+  })
   const trashed = computed(() => drop.value.trashedAt !== null)
 
   const imageBlob = shallowRef<Blob>()

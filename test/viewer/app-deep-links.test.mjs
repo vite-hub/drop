@@ -154,6 +154,43 @@ test("a hand-written link's hash after the query belongs to the app's address, a
   }
 })
 
+test.each([
+  ["guide.html", "/guide.html", "/guide"],
+  ["product/index.html", "/product", "/product/"],
+])("playback saved for %s restores through another URL", (file, from, to) => {
+  const files = { "index.html": page("Home"), [file]: page("Clip") }
+  const storage = new Map()
+  const clip = { source: `${ORIGIN}/clip.webm`, at: 12, duration: 20 }
+  const save = openApp({ path: from }, { files })
+  try {
+    vi.stubGlobal("localStorage", {
+      getItem: (key) => storage.get(key),
+      setItem: (key, value) => storage.set(key, value),
+    })
+    assert.equal(save.app.page.value, file)
+    save.receive({ type: "media-time", index: 0, ...clip })
+  } finally {
+    save.stop()
+  }
+
+  const reopen = openApp({ path: to }, { files })
+  try {
+    vi.stubGlobal("localStorage", { getItem: (key) => storage.get(key) })
+    assert.equal(reopen.app.page.value, file)
+    reopen.receive({ type: "ready" })
+    assert.deepEqual(
+      reopen.sent.find(({ type }) => type === "media-times"),
+      {
+        type: "media-times",
+        path: to,
+        times: { 0: clip },
+      },
+    )
+  } finally {
+    reopen.stop()
+  }
+})
+
 test("a mounted app frame gets the destination's saved playback on same-document navigation", async () => {
   const { app, viewer, sent, receive, settle, stop } = openApp({}, { files: { "index.html": page("App") } })
   const storage = new Map()
