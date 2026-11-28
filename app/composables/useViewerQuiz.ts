@@ -9,6 +9,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   const results = new Map<string, QuizResult>()
   const sequences = new Map<string, number>()
   const confirmed = new Map<string, { sequence: number; saved: QuizSaved }>()
+  const pendingNotes = new Map<string, Promise<void>>()
   const failedPolls = new Set<string>()
   let issuedAt = 0
   let session = crypto.randomUUID()
@@ -20,6 +21,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
       results.clear()
       sequences.clear()
       confirmed.clear()
+      pendingNotes.clear()
       failedPolls.clear()
       session = crypto.randomUUID()
     },
@@ -35,7 +37,9 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
         answers: Object.fromEntries(
           shown.flatMap((id) => {
             const value = answer(id)
-            return value ? [[id, { choice: [...value.choice], correct: value.correct }]] : []
+            if (!value) return []
+            const { choice, correct, note } = value
+            return [[id, { choice: [...choice], correct, ...(note === undefined ? {} : { note }) }]]
           }),
         ),
         results: Object.fromEntries(
@@ -55,6 +59,7 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
   }
 
   async function save(answer: Extract<QuizMessage, { type: "comark-quiz:answer" }>["detail"]) {
+    const { id: dropId, version } = drop.value
     const before = drop.value.quiz?.answers[answer.id]
     const sequence = (sequences.get(answer.id) ?? 0) + 1
     sequences.set(answer.id, sequence)
@@ -62,11 +67,14 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
     const order = { session, sequence, issuedAt }
     const current = () => session === order.session && sequences.get(answer.id) === sequence
     failedPolls.delete(answer.id)
-    answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
+    answers.set(answer.id, shownAnswer(answer))
     try {
-      const saved = await $fetch<QuizSaved>(`/api/drops/${drop.value.id}/answers`, {
+      const pendingNote = pendingNotes.get(answer.id)
+      if (pendingNote) await pendingNote
+      if (session !== order.session) return
+      const saved = await $fetch<QuizSaved>(`/api/drops/${dropId}/answers`, {
         method: "POST",
-        query: { v: drop.value.version },
+        query: { v: version },
         body: { ...answer, order },
       })
       if (session !== order.session) return
@@ -81,7 +89,10 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
       if (answer.kind === "poll") {
         failedPolls.add(answer.id)
         const saved = confirmed.get(answer.id)?.saved
-        answers.set(answer.id, saved?.answer ?? before ?? { choice: [], correct: null })
+        answers.set(
+          answer.id,
+          saved?.answer ?? before ?? { choice: [], correct: null, ...(answer.note === undefined ? {} : { note: "" }) },
+        )
         if (saved?.results) results.set(answer.id, saved.results)
         else results.delete(answer.id)
       }
@@ -96,10 +107,25 @@ export function useViewerQuiz(drop: Ref<DropDetail>, send: (message: Record<stri
       return push()
     }
     const answer = message.detail
-    if (drop.value.quiz) return void save(answer)
+    if (drop.value.quiz) {
+      const saving = save(answer)
+      if (answer.kind === "poll" && answer.note !== undefined) {
+        pendingNotes.set(answer.id, saving)
+        void saving.finally(() => {
+          if (pendingNotes.get(answer.id) === saving) pendingNotes.delete(answer.id)
+        })
+      }
+      return
+    }
     if (answer.kind !== "poll") answers.set(answer.id, { choice: answer.choice, correct: answer.correct })
     push()
   }
 
   return { receive }
 }
+
+const shownAnswer = (answer: Extract<QuizMessage, { type: "comark-quiz:answer" }>["detail"]): QuizAnswer => ({
+  choice: answer.choice,
+  correct: answer.correct,
+  ...(answer.kind === "poll" && answer.note !== undefined ? { note: answer.note } : {}),
+})

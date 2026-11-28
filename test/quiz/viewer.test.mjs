@@ -168,3 +168,70 @@ for (const earlierCompletesFirst of [false, true]) {
     }
   })
 }
+
+test("a voter's note goes with their vote, and the saved note comes back to the page", async () => {
+  const scope = effectScope()
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce({ answer: { choice: ["tacos"], correct: null, note: "Spicy" } })
+    .mockRejectedValueOnce(new Error("Failed vote"))
+  vi.stubGlobal("watch", watch)
+  vi.stubGlobal("useNotify", () => ({ fail: vi.fn() }))
+  vi.stubGlobal("$fetch", fetch)
+  try {
+    const saved = { choice: ["pizza"], correct: null, note: "Thin crust" }
+    const drop = ref({ id: "quiz", link: "quiz", version: 1, quiz: { answers: { lunch: saved }, results: {} } })
+    const send = vi.fn()
+    const viewer = scope.run(() => useViewerQuiz(drop, send))
+    viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
+    assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, saved, "the field restores from the saved note")
+    const vote = (note) => ({
+      type: "comark-quiz:answer",
+      detail: { id: "lunch", kind: "poll", choice: ["tacos"], correct: null, note },
+    })
+    viewer.receive(vote("Spicy"))
+    assert.deepEqual(fetch.mock.calls[0][1].body.note, "Spicy")
+    await vi.waitFor(() =>
+      assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, { choice: ["tacos"], correct: null, note: "Spicy" }),
+    )
+    const sent = send.mock.calls.length
+    viewer.receive(vote("Mild"))
+    await vi.waitFor(() => assert.equal(send.mock.calls.length, sent + 1))
+    assert.deepEqual(
+      send.mock.lastCall[0].detail.answers.lunch,
+      { choice: ["tacos"], correct: null, note: "Spicy" },
+      "a failed edit puts the saved note back",
+    )
+  } finally {
+    scope.stop()
+    vi.unstubAllGlobals()
+  }
+})
+
+test("a vote after a pending note edit gets the updated note back", async () => {
+  const scope = effectScope()
+  const edit = Promise.withResolvers()
+  const updated = { choice: ["tacos"], correct: null, note: "" }
+  const fetch = vi.fn().mockReturnValueOnce(edit.promise).mockResolvedValueOnce({ answer: updated })
+  vi.stubGlobal("watch", watch)
+  vi.stubGlobal("useNotify", () => ({ fail: vi.fn() }))
+  vi.stubGlobal("$fetch", fetch)
+  try {
+    const before = { choice: ["pizza"], correct: null, note: "Old note" }
+    const drop = ref({ id: "quiz", link: "quiz", version: 1, quiz: { answers: { lunch: before }, results: {} } })
+    const send = vi.fn()
+    const viewer = scope.run(() => useViewerQuiz(drop, send))
+    viewer.receive({ type: "comark-quiz:ready", detail: { ids: ["lunch"] } })
+    const poll = { id: "lunch", kind: "poll", correct: null }
+    viewer.receive({ type: "comark-quiz:answer", detail: { ...poll, choice: ["pizza"], note: "" } })
+    viewer.receive({ type: "comark-quiz:answer", detail: { ...poll, choice: ["tacos"] } })
+    assert.equal(fetch.mock.calls.length, 1)
+    edit.resolve({ answer: { ...before, note: "" } })
+    await vi.waitFor(() => assert.deepEqual(send.mock.lastCall[0].detail.answers.lunch, updated))
+    assert.equal(fetch.mock.calls[1][1].body.order.sequence, 2)
+    assert.equal(Object.hasOwn(fetch.mock.calls[1][1].body, "note"), false)
+  } finally {
+    scope.stop()
+    vi.unstubAllGlobals()
+  }
+})

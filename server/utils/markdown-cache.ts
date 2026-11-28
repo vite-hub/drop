@@ -30,7 +30,7 @@ const cached = defineCachedFunction(
     name: "markdown",
     maxAge: MARKDOWN_CACHE_TTL,
     swr: false,
-    integrity: `${comarkUiVersion}+drop.38`,
+    integrity: `${comarkUiVersion}+drop.40`,
     validate: (entry: { value?: MarkdownRender }) => entry.value !== undefined && !entry.value.retry,
     getMaxAge: (entry: { value?: MarkdownRender }) => (entry.value?.failed ? FAILED_RENDER_TTL : MARKDOWN_CACHE_TTL),
     getKey: (_event: H3Event | undefined, key: string) => key,

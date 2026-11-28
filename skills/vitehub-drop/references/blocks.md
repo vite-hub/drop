@@ -34,6 +34,7 @@ Drop reads no files, so a block that points at one (`src` on `::table`, `::tests
 | A link for a phone | [a QR code](#qr-codes) |
 | A recording | [a video or audio file](#video-and-audio) |
 | A YouTube, Vimeo, Loom, Spotify, CodePen, or Figma link | [an embed](#embeds) |
+| A post from X, Bluesky, Mastodon, Threads, or LinkedIn | [a social post](#social-posts) |
 | Several screenshots in one place | [a carousel](#carousels) |
 | A table or block to see larger | [a zoom](#zoom) |
 | A PlantUML, Graphviz, D2, DBML, or ASCII diagram | [a diagram](#diagrams) |
@@ -425,6 +426,20 @@ An image link to an `.mp4`, `.webm`, `.mov`, `.mp3`, `.ogg`, or `.wav` file play
 
 [comark-embed](https://comark-ui.onmax.me/embed/)
 
+## Social posts
+
+```md
+::post{url="https://bsky.app/profile/tlin.bsky.social/post/3lxyz" author="Theo Lin" handle="tlin.bsky.social" time="2026-11-21T14:05:00Z" replies="6" reposts="21" likes="140"}
+The bug report every maintainer wants: a repro, the version, and what they expected.
+
+:::post{author="Mira Okafor" handle="miraokafor.bsky.social" time="2026-11-21"}
+Links with a trailing slash 404 on 0.14.2.
+:::
+::
+```
+
+Copy the post's text and counts into the card: Drop draws it without loading anything from the platform, so it stays as it was. `url` picks the platform's logo, and a nested `:::post` is the quoted post. [comark-social](https://comark-ui.onmax.me/social/)
+
 ## Carousels
 
 ```md
@@ -465,7 +480,7 @@ Which callback runs first once the current script ends?
 After every task, the event loop empties the microtask queue.
 ::
 
-::poll{#next-lesson}
+::poll{#next-lesson note}
 What should the next lesson cover?
 
 - [ ] Web Workers
@@ -480,7 +495,7 @@ Promise callbacks are microtasks, and a timer's callback is a task.
 ::
 ```
 
-Give each block an `#id` and keep it across versions. Mark the right options with `[x]` and put a `>` reason under every option. `#hint` adds a hint to a question. Options are shuffled, so don't write "All of the above". [comark-quiz](https://comark-ui.onmax.me/quiz/)
+Give each block an `#id` and keep it across versions. Mark the right options with `[x]` and put a `>` reason under every option. `#hint` adds a hint to a question. `note` on a poll lets each voter add a note to their vote; `read_drop` gives the doc's owner every note with the voter's name, and each other reader only their own. Options are shuffled, so don't write "All of the above". [comark-quiz](https://comark-ui.onmax.me/quiz/)
 
 ## Diagrams
 

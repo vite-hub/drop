@@ -43,24 +43,20 @@ overrides:
   "@vite-hub/workflow": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workflow@bb58bb98620e86aa315dc43404d188b652ca17b5
   "@vite-hub/workspace": https://pkg.pr.new/vite-hub/vitehub/@vite-hub/workspace@bb58bb98620e86aa315dc43404d188b652ca17b5
   # ViteHub Content renders the docs with Drop's comark-ui, so the app holds one copy.
-  "@vite-hub/content>comark-ui": 0.14.3
+  "@vite-hub/content>comark-ui": https://pkg.pr.new/onmax/comark-ui/comark-ui@ff46bb306dae773c41001472af8a9316599f020a
   # Keep ViteHub auth and the app on one Better Auth type surface.
   better-auth: 1.7.28
   "@better-auth/oauth-provider": 1.7.28
   vite@*: "catalog:"
 
 patchedDependencies:
-  # A standalone screenshot's note off to one side of its point (side=top|bottom with `to`) ran up to 14rem past the
-  # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
-  # screenshot the same fit check (onmax/comark-ui#491). Delete with the next comark-ui bump that includes it.
-  comark-annotate@0.14.3: patches/comark-annotate@0.14.3.patch
-  # Lets a top-level carousel's slides run past the text column into the room on its right (--cc-bleed), with the next
-  # photos peeking in, and makes the side outline keep clear of them, as it does of wide blocks (onmax/comark-ui#495). A
-  # slide that is one image shows the photo filling the slide at 4:3, with no panel (onmax/comark-ui#503), and scrolled
-  # to the end, the last page lines up with the text column, and with --cc-bleed-start the slides scroll out to the
-  # frame's left edge (onmax/comark-ui#503). Delete both with the next comark-ui bump that includes #503.
+  # A slide that is one image shows the photo filling the slide at 4:3, with no panel, scrolled to the end, a bleeding
+  # carousel's last page lines up with the text column, and with --cc-bleed-start the slides scroll out to the frame's
+  # left edge (onmax/comark-ui#503, which took in #502). The pkg.pr.new build Drop pins keeps comark-ui's version, 0.14.3.
+  # Delete with the next comark-ui bump that includes #503.
   comark-carousel@0.14.3: patches/comark-carousel@0.14.3.patch
-  comark-outline@0.14.3: patches/comark-outline@0.14.3.patch
+  # Keep a vote-only event from writing the note cached in its tab. Drop this patch once the pin emits only note edits.
+  comark-quiz@0.14.3: patches/comark-quiz@0.14.3.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.

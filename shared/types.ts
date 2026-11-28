@@ -157,6 +157,7 @@ export interface SkillInstall {
 export interface QuizAnswer {
   choice: string[]
   correct: boolean | null
+  note?: string
 }
 
 export interface QuizResult {

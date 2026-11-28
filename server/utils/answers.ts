@@ -15,20 +15,25 @@ const TABLE = [
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_drop_delete` AFTER DELETE ON `drops` BEGIN DELETE FROM `drop_answers` WHERE `link` = OLD.id; END",
   "CREATE TRIGGER IF NOT EXISTS `drop_answers_user_delete` AFTER DELETE ON `user` BEGIN DELETE FROM `drop_answers` WHERE `user_id` = OLD.id; END",
 ]
-const ORDER_COLUMNS = {
+const ADDED_COLUMNS = {
   first_session: "text",
   first_sequence: "integer",
   session: "text",
   sequence: "integer",
   first_issued_at: "integer",
   issued_at: "integer",
+  note: "text",
+  note_at: "integer",
+  note_session: "text",
+  note_sequence: "integer",
+  note_issued_at: "integer",
 }
 let table: Promise<void> | undefined
 function ensureTable() {
   table ??= (async () => {
     for (const statement of TABLE) await db.run(sql.raw(statement))
     const columns = await db.all<{ name: string }>(sql`PRAGMA table_info(drop_answers)`)
-    for (const [name, type] of Object.entries(ORDER_COLUMNS)) {
+    for (const [name, type] of Object.entries(ADDED_COLUMNS)) {
       if (columns.some((column) => column.name === name)) continue
       try {
         await db.run(sql.raw(`ALTER TABLE drop_answers ADD COLUMN ${name} ${type}`))
@@ -46,13 +51,28 @@ function ensureTable() {
 
 const reading = <T>(read: () => Promise<T>) =>
   read().catch(async (error: unknown) => {
-    if (!/no such table/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`)) throw error
+    if (!/no such (?:table|column)/i.test(`${String(error)} ${error instanceof Error ? String(error.cause) : ""}`))
+      throw error
+    table = undefined
     await ensureTable()
     return read()
   })
 
 export const answerable = (row: Pick<DropRow, "kind" | "expired">, who: Identity | null) =>
   who?.actorKind === "browser" && row.kind === "markdown" && !row.expired
+
+function newerOrder(session: string, sequence: string, issuedAt: string, savedAt: string) {
+  const page = sql.raw(session)
+  const number = sql.raw(sequence)
+  const issued = sql.raw(issuedAt)
+  const previousIssuedAt = sql`min(${issued}, (${sql.raw(savedAt)} + 1) * 1000 - 1)`
+  return sql`CASE
+    WHEN excluded.${page} = ${page} THEN excluded.${number} > ${number}
+    WHEN excluded.${issued} IS NOT NULL THEN ${issued} IS NULL OR excluded.${issued} > ${previousIssuedAt}
+      OR (excluded.${issued} = ${previousIssuedAt} AND excluded.${page} > ${page})
+    WHEN excluded.${page} IS NOT NULL THEN ${issued} IS NULL
+    ELSE ${page} IS NULL END`
+}
 
 export async function recordAnswer(link: string, userId: string, answer: QuizAnswerRequest, now = Date.now()) {
   await ensureTable()
@@ -61,22 +81,25 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
   const session = answer.order?.session ?? null
   const sequence = answer.order?.sequence ?? null
   const issuedAt = answer.order?.issuedAt === undefined ? null : Math.min(answer.order.issuedAt, (now + 1) * 1000 - 1)
+  const note = answer.kind === "poll" ? answer.note : undefined
   const previousFirstIssuedAt = sql`min(first_issued_at, (created_at + 1) * 1000 - 1)`
-  const previousIssuedAt = sql`min(issued_at, (updated_at + 1) * 1000 - 1)`
   const first = sql`(excluded.first_session = first_session AND excluded.first_sequence < first_sequence)
     OR (excluded.first_session <> first_session AND (excluded.first_issued_at < ${previousFirstIssuedAt}
       OR (excluded.first_issued_at = ${previousFirstIssuedAt} AND excluded.first_session < first_session)))`
-  const latest = sql`CASE
-    WHEN excluded.session = session THEN excluded.sequence > sequence
-    WHEN excluded.issued_at IS NOT NULL THEN issued_at IS NULL OR excluded.issued_at > ${previousIssuedAt}
-      OR (excluded.issued_at = ${previousIssuedAt} AND excluded.session > session)
-    WHEN excluded.session IS NOT NULL THEN issued_at IS NULL
-    ELSE session IS NULL END`
-  const kept = await db.all<{ choice: string; correct: number | null }>(sql`INSERT INTO drop_answers
+  const latest = newerOrder("session", "sequence", "issued_at", "updated_at")
+  const latestNote = sql`excluded.note_at IS NOT NULL AND ${newerOrder("note_session", "note_sequence", "note_issued_at", "note_at")}`
+  const kept = await db.all<{
+    choice: string
+    correct: number | null
+    note: string | null
+  }>(sql`INSERT INTO drop_answers
       (link, question, user_id, kind, first_choice, first_correct, choice, correct, attempts, created_at, updated_at,
-       first_session, first_sequence, session, sequence, first_issued_at, issued_at)
+       first_session, first_sequence, session, sequence, first_issued_at, issued_at, note, note_at,
+       note_session, note_sequence, note_issued_at)
     SELECT ${link}, ${answer.id}, ${userId}, ${answer.kind}, ${choice}, ${correct}, ${choice}, ${correct}, 1, ${now}, ${now},
-      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}
+      ${session}, ${sequence}, ${session}, ${sequence}, ${issuedAt}, ${issuedAt}, ${note || null},
+      ${note === undefined ? null : now}, ${note === undefined ? null : session},
+      ${note === undefined ? null : sequence}, ${note === undefined ? null : issuedAt}
     WHERE EXISTS (SELECT 1 FROM drop_answers WHERE link = ${link} AND question = ${answer.id})
       OR (SELECT count(DISTINCT question) FROM drop_answers WHERE link = ${link}) < ${MAX_QUIZ_BLOCKS}
     ON CONFLICT (link, question, user_id) DO UPDATE SET
@@ -92,24 +115,41 @@ export async function recordAnswer(link: string, userId: string, answer: QuizAns
       session = CASE WHEN ${latest} THEN excluded.session ELSE session END,
       sequence = CASE WHEN ${latest} THEN excluded.sequence ELSE sequence END,
       issued_at = CASE WHEN ${latest} THEN COALESCE(excluded.issued_at, issued_at) ELSE issued_at END,
+      note = CASE WHEN ${latestNote} THEN excluded.note ELSE note END,
+      note_at = CASE WHEN ${latestNote} THEN excluded.note_at
+        WHEN note IS NOT NULL THEN COALESCE(note_at, updated_at) ELSE note_at END,
+      note_session = CASE WHEN ${latestNote} THEN excluded.note_session ELSE note_session END,
+      note_sequence = CASE WHEN ${latestNote} THEN excluded.note_sequence ELSE note_sequence END,
+      note_issued_at = CASE WHEN ${latestNote} THEN COALESCE(excluded.note_issued_at, note_issued_at) ELSE note_issued_at END,
       attempts = attempts + 1
-    RETURNING choice, correct`)
+    RETURNING choice, correct, note`)
   const row = kept[0]
-  return row ? { choice: v.parse(Keys, row.choice), correct: v.parse(Correct, row.correct) } : false
+  return row ? latestAnswer(answer.kind, row) : false
 }
+
+const latestAnswer = (kind: QuizKind, row: { choice: string; correct: number | null; note: unknown }): QuizAnswer => ({
+  choice: v.parse(Keys, row.choice),
+  correct: v.parse(Correct, row.correct),
+  ...(kind === "poll" ? { note: v.parse(Note, row.note) } : {}),
+})
 
 const Keys = v.pipe(v.string(), v.parseJson(), v.array(v.string()))
 const Correct = v.pipe(
   v.nullable(v.number()),
   v.transform((value) => (value === null ? null : value === 1)),
 )
+const Note = v.pipe(
+  v.nullable(v.string()),
+  v.transform((value) => value ?? ""),
+)
 const AnswerRow = v.object({
   question: v.string(),
   kind: v.picklist(QUIZ_KINDS),
   first_choice: Keys,
   first_correct: Correct,
-  choice: Keys,
-  correct: Correct,
+  choice: v.string(),
+  correct: v.nullable(v.number()),
+  note: v.nullable(v.string()),
   attempts: v.number(),
   updated_at: v.number(),
 })
@@ -125,7 +165,7 @@ export interface StoredAnswer {
 
 export async function answersOf(link: string, userId: string): Promise<StoredAnswer[]> {
   const rows = await reading(() =>
-    db.all(sql`SELECT question, kind, first_choice, first_correct, choice, correct, attempts, updated_at
+    db.all(sql`SELECT question, kind, first_choice, first_correct, choice, correct, note, attempts, updated_at
       FROM drop_answers WHERE link = ${link} AND user_id = ${userId} ORDER BY created_at, question`),
   )
   return rows.map((row) => {
@@ -134,11 +174,35 @@ export async function answersOf(link: string, userId: string): Promise<StoredAns
       id: answer.question,
       kind: answer.kind,
       first: { choice: answer.first_choice, correct: answer.first_correct },
-      latest: { choice: answer.choice, correct: answer.correct },
+      latest: latestAnswer(answer.kind, answer),
       attempts: answer.attempts,
       answeredAt: answer.updated_at,
     }
   })
+}
+
+export interface PollNote {
+  voter: string
+  choice: string[]
+  note: string
+  at: number
+}
+
+export async function pollNotes(link: string): Promise<Map<string, PollNote[]>> {
+  const rows = await reading(() =>
+    db.all<{ question: string; voter: string | null; choice: string; note: string; at: number }>(sql`
+      SELECT a.question, u.name AS voter, a.choice, a.note, COALESCE(a.note_at, a.updated_at) AS at FROM drop_answers a
+      LEFT JOIN user u ON u.id = a.user_id
+      WHERE a.link = ${link} AND a.kind = 'poll' AND a.note IS NOT NULL
+      ORDER BY at, a.user_id`),
+  )
+  const notes = new Map<string, PollNote[]>()
+  for (const row of rows) {
+    const list = notes.get(row.question) ?? []
+    list.push({ voter: row.voter ?? "Someone", choice: v.parse(Keys, row.choice), note: row.note, at: row.at })
+    notes.set(row.question, list)
+  }
+  return notes
 }
 
 export type QuizTally = QuizResult & { kind: Exclude<QuizKind, "recall"> }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { H3Event } from "h3"
 import { beforeEach, test, vi } from "vite-plus/test"
 import { insertDrop, insertVersion, migrate, reset, sql, state, who } from "../cost/harness.mjs"
-const { answersOf, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
+const { answersOf, pollNotes, quizBlocks, quizResults, recordAnswer } = await import("../../server/utils/answers.ts")
 const { cachedMarkdown } = await import("../../server/utils/markdown-cache.ts")
 const { MAX_QUIZ_BLOCKS } = await import("../../shared/quiz.ts")
 const { default: answersPost } = await import("../../server/api/drops/[id]/answers.post.ts")
@@ -73,9 +73,21 @@ test("a database without the answers table gets it on the first read, index and 
     sql
       .prepare("PRAGMA table_info(drop_answers)")
       .all()
-      .slice(-6)
+      .slice(-11)
       .map((column) => column.name),
-    ["first_session", "first_sequence", "session", "sequence", "first_issued_at", "issued_at"],
+    [
+      "first_session",
+      "first_sequence",
+      "session",
+      "sequence",
+      "first_issued_at",
+      "issued_at",
+      "note",
+      "note_at",
+      "note_session",
+      "note_sequence",
+      "note_issued_at",
+    ],
   )
 })
 
@@ -110,7 +122,7 @@ test("a reader's first answer stays beside their latest; results count first tri
       id: "lunch",
       kind: "poll",
       first: { choice: ["pizza"], correct: null },
-      latest: { choice: ["tacos", "pizza"], correct: null },
+      latest: { choice: ["tacos", "pizza"], correct: null, note: "" },
       attempts: 2,
       answeredAt: 5,
     },
@@ -189,7 +201,7 @@ test("a signed-in reader's answer is checked against the doc, kept, and comes ba
   })
   state.who = bob
   assert.deepEqual(await post("quiz", { id: "lunch", kind: "poll", choice: ["tacos", "tacos"] }), {
-    answer: { choice: ["tacos"], correct: null },
+    answer: { choice: ["tacos"], correct: null, note: "" },
     results: { counts: { tacos: 1 }, total: 1 },
   })
   assert.deepEqual(await post("quiz", { id: "photosynthesis", kind: "recall", choice: ["missed"], correct: null }), {
@@ -260,11 +272,9 @@ test("authoritative rendered options determine correctness, including exact mult
     ["photosynthesis", "recall", ["knew"], true, null],
     ["photosynthesis", "recall", ["missed"], false, null],
   ]) {
-    assert.deepEqual((await post("grading", { id, kind, choice, correct })).answer, { choice, correct: expected })
-    assert.deepEqual((await answersOf("grading", "ada")).find((answer) => answer.id === id).latest, {
-      choice,
-      correct: expected,
-    })
+    const saved = { choice, correct: expected, ...(kind === "poll" ? { note: "" } : {}) }
+    assert.deepEqual((await post("grading", { id, kind, choice, correct })).answer, saved)
+    assert.deepEqual((await answersOf("grading", "ada")).find((answer) => answer.id === id).latest, saved)
   }
   assert.deepEqual((await answersOf("grading", "ada")).find((answer) => answer.id === "capital").first, {
     choice: ["lyon"],
@@ -278,17 +288,17 @@ test("reversed requests keep the first action and latest vote, including concurr
   const session = "00000000-0000-4000-8000-000000000001"
   const vote = (sequence, choice) => ({ id: "lunch", kind: "poll", choice, order: { session, sequence } })
   await post("ordered", vote(2, ["tacos"]))
-  assert.deepEqual((await post("ordered", vote(1, ["pizza"]))).answer, { choice: ["tacos"], correct: null })
+  assert.deepEqual((await post("ordered", vote(1, ["pizza"]))).answer, { choice: ["tacos"], correct: null, note: "" })
   let stored = (await answersOf("ordered", "ada"))[0]
   assert.deepEqual(stored.first, { choice: ["pizza"], correct: null })
-  assert.deepEqual(stored.latest, { choice: ["tacos"], correct: null })
+  assert.deepEqual(stored.latest, { choice: ["tacos"], correct: null, note: "" })
   await Promise.all([post("ordered", vote(4, [])), post("ordered", vote(3, ["pizza"]))])
   stored = (await answersOf("ordered", "ada"))[0]
-  assert.deepEqual(stored.latest, { choice: [], correct: null })
+  assert.deepEqual(stored.latest, { choice: [], correct: null, note: "" })
   assert.equal(stored.attempts, 4)
   assert.deepEqual(Object.fromEntries(await quizResults("ordered")), {})
   await post("ordered", { ...vote(1, ["pizza"]), order: { session: crypto.randomUUID(), sequence: 1 } })
-  assert.deepEqual((await answersOf("ordered", "ada"))[0].latest, { choice: ["pizza"], correct: null })
+  assert.deepEqual((await answersOf("ordered", "ada"))[0].latest, { choice: ["pizza"], correct: null, note: "" })
   // Questions count the first action, even if it arrived last.
   const question = (sequence, choice) => ({ id: "capital", kind: "question", choice, order: { session, sequence } })
   await post("ordered", question(2, ["paris"]))
@@ -324,24 +334,16 @@ test("delayed actions from another page and unordered callers cannot overwrite a
     order: { session, sequence, issuedAt: issuedAt === undefined ? undefined : now * 1000 + issuedAt },
   })
   await post("tabs", vote(newer, 1, 200, ["tacos"]))
-  assert.deepEqual((await post("tabs", vote(older, 1, 100, ["pizza"]))).answer, {
-    choice: ["tacos"],
-    correct: null,
-  })
-  assert.deepEqual((await post("tabs", { id: "lunch", kind: "poll", choice: ["pizza"] })).answer, {
-    choice: ["tacos"],
-    correct: null,
-  })
-  assert.deepEqual((await post("tabs", vote(older, 2, undefined, ["pizza"]))).answer, {
-    choice: ["tacos"],
-    correct: null,
-  })
+  const tacos = { choice: ["tacos"], correct: null, note: "" }
+  assert.deepEqual((await post("tabs", vote(older, 1, 100, ["pizza"]))).answer, tacos)
+  assert.deepEqual((await post("tabs", { id: "lunch", kind: "poll", choice: ["pizza"] })).answer, tacos)
+  assert.deepEqual((await post("tabs", vote(older, 2, undefined, ["pizza"]))).answer, tacos)
   // An older page can still make a genuinely later action.
   await post("tabs", vote(older, 3, 300, ["pizza"]))
   await post("tabs", vote(newer, 2, 250, []))
   const stored = (await answersOf("tabs", "ada"))[0]
   assert.deepEqual(stored.first, { choice: ["pizza"], correct: null })
-  assert.deepEqual(stored.latest, { choice: ["pizza"], correct: null })
+  assert.deepEqual(stored.latest, { choice: ["pizza"], correct: null, note: "" })
   assert.equal(stored.attempts, 6)
   assert.deepEqual((await quizResults("tabs")).get("lunch"), { kind: "poll", counts: { pizza: 1 }, total: 1 })
 })
@@ -379,7 +381,11 @@ for (const kind of ["question", "poll"]) {
         choice,
         order: { session: crypto.randomUUID(), sequence: 1, issuedAt: (now + 10) * 1000 },
       })
-      assert.deepEqual(saved.answer, { choice, correct: kind === "question" ? true : null })
+      assert.deepEqual(saved.answer, {
+        choice,
+        correct: kind === "question" ? true : null,
+        ...(kind === "poll" ? { note: "" } : {}),
+      })
       const storedAnswer = (await answersOf("clock", "ada"))[0]
       assert.deepEqual(storedAnswer.latest, saved.answer)
       assert.deepEqual(storedAnswer.first.choice, before)
@@ -424,4 +430,118 @@ test("the drop's page carries the reader's answers and the results of only the b
   assert.equal((await detail("quiz")).quiz, undefined, "a guest's answers don't count")
   state.who = { ...ada, actorKind: "agent", actorName: "Claude Code" }
   assert.equal((await detail("quiz")).quiz, undefined, "agents read answers through read_drop")
+})
+
+const NOTE_HTML =
+  '<div data-quiz-kind="poll" data-quiz-id="next"><i data-key="streams"></i><i data-key="workers"></i></div>'
+
+test("a table from before notes gets the column on the first read, and its votes read as having none", async () => {
+  sql.exec("DROP TABLE IF EXISTS drop_answers")
+  sql.exec(
+    "CREATE TABLE drop_answers (link text NOT NULL, question text NOT NULL, user_id text NOT NULL, kind text NOT NULL, first_choice text NOT NULL, first_correct integer, choice text NOT NULL, correct integer, attempts integer NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL, first_session text, first_sequence integer, session text, sequence integer, first_issued_at integer, issued_at integer, PRIMARY KEY(link, question, user_id))",
+  )
+  sql.exec(`INSERT INTO drop_answers (link, question, user_id, kind, first_choice, choice, attempts, created_at, updated_at)
+    VALUES ('doc', 'next', 'ada', 'poll', '["streams"]', '["streams"]', 1, 1, 1)`)
+  try {
+    assert.deepEqual((await answersOf("doc", "ada"))[0].latest, { choice: ["streams"], correct: null, note: "" })
+    assert.ok(sql.prepare("SELECT 1 FROM pragma_table_info('drop_answers') WHERE name = 'note'").get())
+  } finally {
+    sql.exec("DROP TABLE drop_answers")
+    await answersOf("doc", "ada")
+  }
+})
+
+test("a legacy note keeps its best known timestamp when the vote changes", async () => {
+  const vote = { id: "next", kind: "poll", correct: null }
+  await recordAnswer("doc", "ada", { ...vote, choice: ["streams"], note: "Legacy" }, 1000)
+  sql.exec("ALTER TABLE drop_answers DROP COLUMN note_at")
+  try {
+    assert.equal((await pollNotes("doc")).get("next")[0].at, 1000)
+    await recordAnswer("doc", "ada", { ...vote, choice: ["workers"] }, 2000)
+    const [note] = (await pollNotes("doc")).get("next")
+    assert.deepEqual(note, { voter: "Someone", choice: ["workers"], note: "Legacy", at: 1000 })
+  } finally {
+    sql.exec("DROP TABLE drop_answers")
+    await answersOf("doc", "ada")
+  }
+})
+
+test("poll choice and note take the latest action independently", async () => {
+  const session = crypto.randomUUID()
+  const otherSession = crypto.randomUUID()
+  const save = (sequence, choice, note, page = session) =>
+    recordAnswer(
+      "doc",
+      "ada",
+      {
+        id: "next",
+        kind: "poll",
+        choice: [choice],
+        correct: null,
+        note,
+        order: { session: page, sequence, issuedAt: 1000 + sequence },
+      },
+      20_000 + sequence,
+    )
+
+  await save(2, "workers")
+  assert.deepEqual(await save(1, "streams", "New note"), { choice: ["workers"], correct: null, note: "New note" })
+  await save(4, "streams", undefined, otherSession)
+  assert.deepEqual(await save(3, "workers", ""), { choice: ["streams"], correct: null, note: "" })
+  assert.equal((await save(1, "workers", "Delayed", otherSession)).note, "")
+  assert.equal((await save(6, "workers", "Newest", otherSession)).note, "Newest")
+  assert.equal((await save(5, "streams", "Delayed")).note, "Newest")
+  assert.deepEqual((await pollNotes("doc")).get("next"), [
+    { voter: "Someone", choice: ["workers"], note: "Newest", at: 20_006 },
+  ])
+})
+
+test("a voter's note is kept with their vote, comes back only to them, and an edit or an empty note replaces it", async () => {
+  await quizDoc("notes", { visibility: "public", access: "view" }, NOTE_HTML)
+  const session = crypto.randomUUID()
+  let sequence = 0
+  const vote = (choice, note) => ({
+    id: "next",
+    kind: "poll",
+    choice,
+    ...(note === undefined ? {} : { note }),
+    order: { session, sequence: ++sequence },
+  })
+  state.who = ada
+  assert.deepEqual(await post("notes", vote(["streams"], "  Streams would fix my uploads\nand my imports\n")), {
+    answer: { choice: ["streams"], correct: null, note: "Streams would fix my uploads\nand my imports" },
+    results: { counts: { streams: 1 }, total: 1 },
+  })
+  assert.deepEqual((await detail("notes")).quiz.answers, {
+    next: { choice: ["streams"], correct: null, note: "Streams would fix my uploads\nand my imports" },
+  })
+
+  state.who = bob
+  await post("notes", vote(["workers"], "Workers"))
+  assert.deepEqual((await detail("notes")).quiz, {
+    answers: { next: { choice: ["workers"], correct: null, note: "Workers" } },
+    results: { next: { counts: { streams: 1, workers: 1 }, total: 2 } },
+  })
+  assert.doesNotMatch(JSON.stringify(await detail("notes")), /uploads/, "nobody else gets Ada's note")
+
+  state.who = ada
+  assert.equal((await post("notes", vote(["streams"], "Only uploads"))).answer.note, "Only uploads", "an edit replaces")
+  assert.equal((await post("notes", vote(["workers"]))).answer.note, "Only uploads", "a vote without one keeps it")
+  assert.deepEqual((await post("notes", { ...vote(["streams"], "Late"), order: { session, sequence: 1 } })).answer, {
+    choice: ["workers"],
+    correct: null,
+    note: "Only uploads",
+  })
+  assert.equal((await post("notes", vote(["workers"], "   "))).answer.note, "", "an empty note takes it back")
+  assert.equal(sql.prepare("SELECT note FROM drop_answers WHERE user_id = 'ada'").get().note, null)
+
+  await post("notes", vote(["workers"], "x".repeat(2000)))
+  await assert.rejects(post("notes", vote(["workers"], "x".repeat(2001))), status(400), "longer than the cap")
+  assert.equal((await answersOf("notes", "ada"))[0].latest.note.length, 2000)
+  await quizDoc("notes-q", { visibility: "public", access: "view" })
+  assert.deepEqual((await post("notes-q", { id: "capital", kind: "question", choice: ["paris"], note: "Hi" })).answer, {
+    choice: ["paris"],
+    correct: true,
+  })
+  assert.equal(sql.prepare("SELECT note FROM drop_answers WHERE link = 'notes-q'").get().note, null)
 })
