@@ -13,6 +13,9 @@ const generated = [
   "public/vendor/**",
   "skills/**/assets/**",
   "skills/**/scripts/**",
+  "packages/extension/.output/**",
+  "packages/extension/.wxt/**",
+  "packages/extension/harness/results/**",
 ]
 
 export default defineConfig({

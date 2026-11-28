@@ -9,6 +9,16 @@ const props = defineProps<{ drop: DropDetail; publicView?: boolean }>()
 const { createBoard, createDoc, createFolder, newSite, rename, remove } = useDropActions()
 const folderDialog = useFolderDialog()
 const children = computed(() => props.drop.children ?? [])
+const groups = computed(() => {
+  if (props.drop.role !== "notes-folder") return [{ domain: "", items: children.value }]
+  const byDomain = new Map<string, DropSummary[]>()
+  for (const child of children.value) {
+    const domain = child.domain ?? ""
+    byDomain.set(domain, [...(byDomain.get(domain) ?? []), child])
+  }
+  return [...byDomain].map(([domain, items]) => ({ domain, items }))
+})
+const ordered = computed(() => groups.value.flatMap((group) => group.items))
 const to = (child: DropSummary) => child.href ?? (props.publicView ? dropPath(child) : `/drops/${child.id}`)
 const open = (child: DropSummary) =>
   child.href ? void window.open(child.href, "_blank", "noopener,noreferrer") : void navigateTo(to(child))
@@ -172,12 +182,12 @@ function walk(event: KeyboardEvent) {
   }
   if (event.key === "Escape" && selected.value) return void (selected.value = null)
   const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0
-  if (!step || !children.value.length) return
+  if (!step || !ordered.value.length) return
   event.preventDefault()
-  const at = children.value.findIndex((child) => child.id === selected.value)
-  const next = Math.min(children.value.length - 1, Math.max(0, at === -1 ? 0 : at + step))
-  if (wide.value) selected.value = children.value[next]!.id
-  rowOf(children.value[next]!.id)?.focus()
+  const at = ordered.value.findIndex((child) => child.id === selected.value)
+  const next = Math.min(ordered.value.length - 1, Math.max(0, at === -1 ? 0 : at + step))
+  if (wide.value) selected.value = ordered.value[next]!.id
+  rowOf(ordered.value[next]!.id)?.focus()
 }
 
 const { pending, uploading, uploadFiles, openPicker, isOverDropZone } = useUploads(useTemplateRef("root"), {
@@ -329,41 +339,51 @@ async function newBoard() {
               @keydown="walk"
             >
               <DropUpload v-for="item in pending" :key="item.key" class="px-2 py-1.5" layout="row" :upload="item" />
-              <li v-for="child in children" :key="child.id">
-                <div
-                  v-if="renaming === child.id"
-                  class="flex items-center gap-3 rounded-md bg-accented/70 px-2 py-1.5"
-                  :data-id="child.id"
+              <template v-for="group in groups" :key="group.domain">
+                <li
+                  v-if="group.domain"
+                  class="px-2 pt-4 pb-1 text-xs font-medium text-muted first:pt-1"
+                  data-domain
+                  role="presentation"
                 >
-                  <ReuseRowParts :child part="icon" />
-                  <div class="min-w-0 flex-1">
-                    <ViewerRename
-                      :label="`Rename ${child.title}`"
-                      :title="child.title"
-                      @done="renamed(child, $event)"
-                    />
+                  {{ group.domain }}
+                </li>
+                <li v-for="child in group.items" :key="child.id">
+                  <div
+                    v-if="renaming === child.id"
+                    class="flex items-center gap-3 rounded-md bg-accented/70 px-2 py-1.5"
+                    :data-id="child.id"
+                  >
+                    <ReuseRowParts :child part="icon" />
+                    <div class="min-w-0 flex-1">
+                      <ViewerRename
+                        :label="`Rename ${child.title}`"
+                        :title="child.title"
+                        @done="renamed(child, $event)"
+                      />
+                    </div>
+                    <ReuseRowParts :child part="meta" />
                   </div>
-                  <ReuseRowParts :child part="meta" />
-                </div>
-                <NuxtLink
-                  v-else
-                  :aria-current="picked?.id === child.id ? 'true' : undefined"
-                  class="flex items-center gap-3 rounded-md px-2 py-1.5 outline-none select-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset"
-                  :class="picked?.id === child.id ? 'bg-accented/70' : 'hover:bg-elevated'"
-                  :data-id="child.id"
-                  draggable="false"
-                  :rel="child.href ? 'noopener noreferrer' : undefined"
-                  :target="child.href ? '_blank' : undefined"
-                  :to="to(child)"
-                  @click.capture="pick($event, child)"
-                >
-                  <ReuseRowParts :child part="icon" />
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium text-highlighted">
-                    <span data-name>{{ nameOf(child) }}</span>
-                  </span>
-                  <ReuseRowParts :child part="meta" />
-                </NuxtLink>
-              </li>
+                  <NuxtLink
+                    v-else
+                    :aria-current="picked?.id === child.id ? 'true' : undefined"
+                    class="flex items-center gap-3 rounded-md px-2 py-1.5 outline-none select-none focus-visible:ring-2 focus-visible:ring-(--ui-border-inverted) focus-visible:ring-inset"
+                    :class="picked?.id === child.id ? 'bg-accented/70' : 'hover:bg-elevated'"
+                    :data-id="child.id"
+                    draggable="false"
+                    :rel="child.href ? 'noopener noreferrer' : undefined"
+                    :target="child.href ? '_blank' : undefined"
+                    :to="to(child)"
+                    @click.capture="pick($event, child)"
+                  >
+                    <ReuseRowParts :child part="icon" />
+                    <span class="min-w-0 flex-1 truncate text-sm font-medium text-highlighted">
+                      <span data-name>{{ nameOf(child) }}</span>
+                    </span>
+                    <ReuseRowParts :child part="meta" />
+                  </NuxtLink>
+                </li>
+              </template>
             </ul>
           </UContextMenu>
         </template>

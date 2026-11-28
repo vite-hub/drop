@@ -1,3 +1,4 @@
+import { parse } from "tldts"
 import type { drops } from "../../databases/default/index"
 import { slugify } from "#shared/links"
 import type { DropCrumb, DropSummary } from "#shared/types"
@@ -81,6 +82,11 @@ export const waitingForReview = (drop: DropRow | null, who: Identity | null) =>
     !permissions(drop, who).view,
   )
 
+export function siteDomain(url: string) {
+  const { domain, hostname } = parse(url, { allowPrivateDomains: true })
+  return domain ?? hostname ?? url
+}
+
 export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().days): DropSummary {
   const expires = expiresAt(row, days)
   return {
@@ -110,6 +116,8 @@ export function toSummary(row: DropRow, paths?: string[], days = expiryPolicy().
     trashReason: row.trashReason ?? (row.expired ? "expired" : null),
     ...(row.kind === "folder" && row.teamFolder ? { teamFolder: true } : {}),
     ...(row.kind === "link" && row.siteUrl ? { href: row.siteUrl } : {}),
+    ...(row.role ? { role: row.role } : {}),
+    ...(row.role === "notes" && row.siteUrl ? { domain: siteDomain(row.siteUrl) } : {}),
     ...(teamOf(row) ? { team: teamOf(row)! } : {}),
     ...(row.sharedFrom && row.raw ? { sharedFrom: row.sharedFrom, ownShare: row.raw.share } : {}),
   }

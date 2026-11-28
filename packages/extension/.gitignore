@@ -1,0 +1,9 @@
+.browsers/
+.output/
+.output-e2e/
+.wxt/
+*.log
+*.pid
+auto-imports.d.ts
+components.d.ts
+harness/results/

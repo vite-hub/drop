@@ -1,0 +1,229 @@
+name: extension
+
+# The browser extension in packages/extension (docs: content/docs/extension.md) ships on three channels:
+#   pull requests  a Chrome zip and an unsigned Firefox XPI as the run's artifacts
+#   beta           nightly when the extension's files changed since the last beta, or by hand from main: the rolling
+#                  extension-beta prerelease, a signed self-updating "Drop Beta" for Firefox, the "Drop Beta" Chrome item
+#   stable         a tag extension-vX.Y.Z naming packages/extension/package.json's version: both stores and a release
+# Store steps skip, with a line in the run's summary, until their secrets and variables exist:
+#   secrets    AMO_JWT_ISSUER, AMO_JWT_SECRET, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
+#   variables  CWS_PUBLISHER_ID, CWS_ITEM_ID (Drop), CWS_BETA_ITEM_ID (Drop Beta)
+# The paths below are the extension's sources, the same list as SOURCES in packages/extension/scripts/release.ts.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - packages/extension/**
+      - shared/**
+      - app/components/DropMark.vue
+      - skills/prototype/assets/picker.js
+      - LICENSE
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - .npmrc
+      - .pnpmfile.cjs
+      - patches/**
+      - .github/workflows/extension.yml
+  push:
+    tags: ["extension-v*"]
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pull-request:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - working-directory: packages/extension
+        run: |
+          pnpm build:firefox
+          pnpm build
+          pnpm lint:firefox
+          node scripts/release.ts pack "$(node -p 'require("./package.json").version')" stable
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drop-extension-pr-${{ github.event.pull_request.number }}
+          path: packages/extension/.output/release/
+          if-no-files-found: error
+          retention-days: 14
+
+  beta:
+    if: >-
+      github.repository == 'vite-hub/drop' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: plan
+        working-directory: packages/extension
+        run: |
+          last=""
+          if git rev-parse -q --verify refs/tags/extension-beta >/dev/null; then
+            last=$(gh release view extension-beta --json name --jq '.name | split(" ") | last' 2>/dev/null || true)
+            if [ "$EVENT" = schedule ] && [ "$(node scripts/release.ts changed extension-beta)" = false ]; then
+              echo "The extension hasn't changed since beta $last." >> "$GITHUB_STEP_SUMMARY"
+              echo "build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            node scripts/release.ts notes extension-beta > "$RUNNER_TEMP/notes.md"
+          else
+            node scripts/release.ts notes > "$RUNNER_TEMP/notes.md"
+          fi
+          version=$(node scripts/release.ts version beta "$last")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=true" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+      - id: stores
+        if: steps.plan.outputs.build == 'true'
+        run: |
+          echo "amo=${{ secrets.AMO_JWT_ISSUER != '' && secrets.AMO_JWT_SECRET != '' }}" >> "$GITHUB_OUTPUT"
+          echo "cws=${{ secrets.CWS_CLIENT_ID != '' && secrets.CWS_CLIENT_SECRET != '' && secrets.CWS_REFRESH_TOKEN != '' && vars.CWS_PUBLISHER_ID != '' && vars.CWS_BETA_ITEM_ID != '' }}" >> "$GITHUB_OUTPUT"
+      - if: steps.plan.outputs.build == 'true'
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - if: steps.plan.outputs.build == 'true'
+        working-directory: packages/extension
+        run: |
+          pnpm build:firefox
+          pnpm build
+          pnpm lint:firefox --self-hosted
+          node scripts/release.ts pack "$DROP_BETA" beta
+        env:
+          DROP_BETA: ${{ steps.plan.outputs.version }}
+      - if: steps.plan.outputs.build == 'true'
+        working-directory: packages/extension/.output/release
+        run: |
+          if gh release view extension-beta >/dev/null 2>&1; then gh release delete extension-beta --cleanup-tag --yes; fi
+          gh release create extension-beta --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "Drop Beta $VERSION" --notes-file "$RUNNER_TEMP/notes.md" \
+            "drop-beta-$VERSION-chrome.zip" "drop-beta-$VERSION-sources.zip"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+      - if: steps.plan.outputs.build == 'true' && steps.stores.outputs.amo != 'true'
+        run: echo "Skipped signing the Firefox beta until the AMO_JWT_ISSUER and AMO_JWT_SECRET secrets exist." >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.plan.outputs.build == 'true' && steps.stores.outputs.amo == 'true'
+        working-directory: packages/extension
+        run: |
+          pnpm exec web-ext sign --channel unlisted --source-dir .output/firefox-mv3 --artifacts-dir .output/signed \
+            --upload-source-code ".output/release/drop-beta-$VERSION-sources.zip"
+          mv .output/signed/*.xpi ".output/release/drop-beta-$VERSION-firefox.xpi"
+          node scripts/release.ts updates ".output/release/drop-beta-$VERSION-firefox.xpi"
+          gh release upload extension-beta ".output/release/drop-beta-$VERSION-firefox.xpi" .output/release/updates.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      - if: steps.plan.outputs.build == 'true' && steps.stores.outputs.cws != 'true'
+        run: echo "Skipped the Chrome beta until the CWS_* secrets and the CWS_PUBLISHER_ID and CWS_BETA_ITEM_ID variables exist." >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.plan.outputs.build == 'true' && steps.stores.outputs.cws == 'true'
+        working-directory: packages/extension
+        run: node scripts/release.ts cws ".output/release/drop-beta-$VERSION-chrome.zip" "$CWS_BETA_ITEM_ID"
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_BETA_ITEM_ID: ${{ vars.CWS_BETA_ITEM_ID }}
+
+  stable:
+    if: github.repository == 'vite-hub/drop' && startsWith(github.ref, 'refs/tags/extension-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: plan
+        working-directory: packages/extension
+        run: |
+          echo "version=$(node scripts/release.ts version stable "$GITHUB_REF_NAME")" >> "$GITHUB_OUTPUT"
+          previous=$(git describe --tags --abbrev=0 --match 'extension-v*' "$GITHUB_SHA^" 2>/dev/null || true)
+          node scripts/release.ts notes "$previous" > "$RUNNER_TEMP/notes.md"
+          echo "amo=${{ secrets.AMO_JWT_ISSUER != '' && secrets.AMO_JWT_SECRET != '' }}" >> "$GITHUB_OUTPUT"
+          echo "cws=${{ secrets.CWS_CLIENT_ID != '' && secrets.CWS_CLIENT_SECRET != '' && secrets.CWS_REFRESH_TOKEN != '' && vars.CWS_PUBLISHER_ID != '' && vars.CWS_ITEM_ID != '' }}" >> "$GITHUB_OUTPUT"
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - working-directory: packages/extension
+        run: |
+          pnpm build:firefox
+          pnpm build
+          pnpm lint:firefox
+          node scripts/release.ts pack "$VERSION" stable
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+      - working-directory: packages/extension/.output/release
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --latest=false --title "Drop extension $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" "drop-$VERSION-chrome.zip" "drop-$VERSION-sources.zip"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+      - if: steps.plan.outputs.amo != 'true'
+        run: echo "Skipped Firefox Add-ons until the AMO_JWT_ISSUER and AMO_JWT_SECRET secrets exist." >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.plan.outputs.amo == 'true'
+        working-directory: packages/extension
+        run: |
+          pnpm exec web-ext sign --channel listed --approval-timeout 0 --source-dir .output/firefox-mv3 \
+            --artifacts-dir .output/signed --upload-source-code ".output/release/drop-$VERSION-sources.zip"
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      - if: steps.plan.outputs.cws != 'true'
+        run: echo "Skipped the Chrome Web Store until the CWS_* secrets and the CWS_PUBLISHER_ID and CWS_ITEM_ID variables exist." >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.plan.outputs.cws == 'true'
+        working-directory: packages/extension
+        run: node scripts/release.ts cws ".output/release/drop-$VERSION-chrome.zip" "$CWS_ITEM_ID"
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_ITEM_ID: ${{ vars.CWS_ITEM_ID }}

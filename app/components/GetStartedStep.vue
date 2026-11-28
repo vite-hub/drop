@@ -77,8 +77,8 @@ const tabsUi = {
 
     <template v-else>
       <p>
-        Comment on any live website, such as a preview build, with a bookmarklet. Each note arrives with a screenshot
-        your agent can read.
+        Comment on any live website, such as a preview build, with the Drop browser extension or a script tag. Each note
+        arrives with a screenshot your agent can read.
       </p>
       <UButton
         color="neutral"

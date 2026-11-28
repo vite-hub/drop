@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+/* Geist from node_modules, bundled into the extension: pages load no remote fonts. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+/* The app's design system, shared rather than copied (app/assets/css/main.css imports the same files). */
+@import "../../../shared/theme.css";
+@import "../../../shared/ui.css";
+
+body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}

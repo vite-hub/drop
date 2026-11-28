@@ -27,13 +27,16 @@ publish({
 
 `share: "team"` lets everyone signed in to a team Drop comment. `share: "public_comment"` also lets guests comment, on any Drop.
 
-Reviewers comment in one of three ways:
+Reviewers comment in one of four ways:
 
-| Way                         | Use it when                                       | Setup                          |
-| --------------------------- | ------------------------------------------------- | ------------------------------ |
-| [Inside Drop](#here)        | The site can be shown in a frame.                 | None.                          |
-| [Script tag](#install)      | You build the site's previews.                    | One tag in preview builds.     |
-| [Bookmarklet](#bookmarklet) | You can't change the site and it can't be framed. | Each reviewer adds a bookmark. |
+| Way                                  | Use it when                                              | Setup                           |
+| ------------------------------------ | -------------------------------------------------------- | ------------------------------- |
+| [Browser extension](/docs/extension) | You review sites often, or can't change the site.        | Each reviewer installs it once. |
+| [Script tag](#install)               | You build the site's previews. Works for everyone.       | One tag in preview builds.      |
+| [Inside Drop](#here)                 | The site can be shown in a frame.                        | None.                           |
+| [Bookmarklet](#bookmarklet)          | You can't install anything and the site can't be framed. | Each reviewer adds a bookmark.  |
+
+The **Drop extension** for Chrome and Firefox puts the review pill on any page you press it on. Your comments go to the site review that covers the page, or to your private **Browser notes** folder when none does, grouped by site. Once it's installed, Drop pages stop suggesting it. [Browser extension](/docs/extension) shows how to install it and link it to your Drop.
 
 ## Review it in Drop {#here}
 
@@ -41,7 +44,7 @@ On the site review's page, type a page address and press **Review here**. Open *
 
 When you mark an area, Drop takes its screenshot with your browser's screen sharing, which asks once per visit. Opening Comments alone does not ask for screen sharing. Chrome, Edge, and Brave share **This tab**, so the screenshot matches the page. Firefox, Zen, and Safari share a window or a screen, so the crop can be slightly off. You see the screenshot before you send it.
 
-These comments carry the screenshot, your box, your note, and the address in the row above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the bookmarklet there.
+These comments carry the screenshot, your box, your note, and the address in the row above the page, but not the element under the box. Clicks inside the page don't change that address, so type the page you're on. A site that refuses to be framed stays blank; use the [extension](/docs/extension) or the bookmarklet there.
 
 ## Add the script to preview builds {#install}
 

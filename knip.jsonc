@@ -72,5 +72,26 @@
       // `nuxt` is an alias of nuxt-nightly for the types of `#app`; `vitest` comes with vite-plus.
       "ignoreDependencies": ["nuxt", "nuxt-nightly", "vitest"],
     },
+    // @vite-hub/drop-extension, the browser extension. WXT finds entrypoints/ by convention.
+    "packages/extension": {
+      "entry": ["entrypoints/**/*.{ts,vue}", "harness/*.mjs", "scripts/*.ts", "test/**/*.ts"],
+      "project": [
+        "entrypoints/**/*.{ts,vue}",
+        "components/**/*.vue",
+        "lib/**/*.ts",
+        "assets/**/*.ts",
+        "harness/*.mjs",
+        "scripts/*.ts",
+        "test/**/*.ts",
+      ],
+      "ignoreDependencies": [
+        // assets/main.css imports these stylesheets, and @nuxt/ui/vite reads the icon collection by name.
+        "@fontsource-variable/geist",
+        "@fontsource-variable/geist-mono",
+        "@iconify-json/mingcute",
+      ],
+      // harness/drop-fixture.mjs signs a throwaway certificate for the HTTPS fixture.
+      "ignoreBinaries": ["openssl"],
+    },
   },
 }

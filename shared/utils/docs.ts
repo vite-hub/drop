@@ -92,6 +92,7 @@ export const DOCS_NAV: Array<{ title: string; links: DocsLink[] }> = [
       { label: "Connect an agent", to: "/docs/agents" },
       { label: "Review and share", to: "/docs/review" },
       { label: "Review a live site", to: "/docs/sites" },
+      { label: "Browser extension", to: "/docs/extension" },
       { label: "Troubleshooting", to: "/docs/troubleshooting" },
     ],
   },
