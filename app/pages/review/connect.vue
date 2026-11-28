@@ -83,6 +83,7 @@ onMounted(async () => {
   else state.value = "choose"
 })
 
+const extension = useExtension()
 const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.fullPath } }))
 </script>
 
@@ -211,6 +212,12 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
           <p class="mt-2 text-sm leading-relaxed text-muted" role="alert">{{ error }}</p>
         </template>
       </div>
+      <p v-if="extension.prompt.value" class="mt-4 text-center text-sm text-pretty text-muted" data-extension-prompt>
+        Skip this window next time:
+        <ULink class="text-highlighted underline underline-offset-2" :to="extension.link.value" target="_blank"
+          >install the Drop extension</ULink
+        >.
+      </p>
     </div>
   </main>
 </template>

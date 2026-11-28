@@ -60,6 +60,11 @@ function pageUrl(comment: DropComment) {
   return url && siteCovers(props.drop.siteUrl, url) ? url : undefined
 }
 const setupOpen = ref(props.comments.length === 0)
+const extension = useExtension()
+const setupParts = computed(() =>
+  [extension.prompt.value && "extension", props.drop.isOwner && "script tag", "bookmarklet"].filter(Boolean).join(", "),
+)
+const firstWays = computed(() => extension.prompt.value || props.drop.isOwner)
 function openHere(event: SubmitEvent) {
   if (addressCovered.value) {
     framed.value = new URL(address.value).href
@@ -179,17 +184,48 @@ function openHere(event: SubmitEvent) {
             name="i-mingcute-right-line"
             class="size-4 text-muted transition-transform duration-150 ease-(--ease-out) group-open/setup:rotate-90 motion-reduce:transition-none"
           />
-          Other ways to comment
-          <span class="ml-auto text-xs font-normal text-muted"
-            >Bookmarklet{{ drop.isOwner ? ", preview tag" : "" }}</span
-          >
+          Comment on the site itself
+          <span class="ml-auto text-xs font-normal text-muted first-letter:uppercase">{{ setupParts }}</span>
         </summary>
         <ul class="divide-y divide-default border-t border-default px-4">
+          <li
+            v-if="extension.prompt.value"
+            class="flex flex-wrap items-center gap-x-6 gap-y-3 py-4"
+            data-extension-prompt
+          >
+            <div class="min-w-0 flex-1 space-y-1">
+              <h3 class="text-sm font-medium text-highlighted">Install the extension</h3>
+              <p class="text-sm text-pretty text-muted">
+                Comment on {{ host }} itself: press Drop in your browser's toolbar on any of its pages. Nothing changes
+                on the site, and it works where this page stays blank.
+              </p>
+            </div>
+            <UButton
+              class="shrink-0"
+              color="neutral"
+              icon="i-mingcute-download-2-line"
+              label="Install"
+              size="sm"
+              :to="extension.link.value"
+              variant="outline"
+            />
+          </li>
+          <li v-if="drop.isOwner" class="space-y-3 py-4">
+            <div class="space-y-1">
+              <h3 class="text-sm font-medium text-highlighted">Add a script tag (works for everyone)</h3>
+              <p class="text-sm text-pretty text-muted">
+                Add this tag to preview builds, never production. Each preview gets a Comment button, and only people
+                this review is shared with can use it. A strict Content Security Policy needs to allow {{ origin }}.
+              </p>
+            </div>
+            <AgentsCodeBlock :code="snippet" />
+          </li>
           <li class="flex flex-wrap items-center gap-x-6 gap-y-3 py-4">
             <div class="min-w-0 flex-1 space-y-1">
+              <p v-if="firstWays" class="text-xs text-muted">Other ways</p>
               <h3 class="text-sm font-medium text-highlighted">Bookmarklet</h3>
               <p class="text-sm text-pretty text-muted">
-                For sites that stay blank here. Drag the button to your {{ bar }}
+                Nothing to install; it lasts until you reload. Drag the button to your {{ bar }}
                 <span class="inline-flex gap-0.5 align-middle"
                   ><UKbd v-for="key in BAR_KEYS" :key="key" :value="key" /></span
                 >{{ afterBar }}
@@ -204,16 +240,6 @@ function openHere(event: SubmitEvent) {
                 <UIcon name="i-mingcute-chat-1-line" class="size-4 text-muted" />Review with Drop
               </a>
             </UTooltip>
-          </li>
-          <li v-if="drop.isOwner" class="space-y-3 py-4">
-            <div class="space-y-1">
-              <h3 class="text-sm font-medium text-highlighted">Comment button on previews</h3>
-              <p class="text-sm text-pretty text-muted">
-                Add this tag to preview builds, never production. Each preview gets a Comment button, and only people
-                this review is shared with can use it. A strict Content Security Policy needs to allow {{ origin }}.
-              </p>
-            </div>
-            <AgentsCodeBlock :code="snippet" />
           </li>
         </ul>
       </details>
