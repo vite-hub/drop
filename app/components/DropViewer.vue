@@ -1852,6 +1852,7 @@ watch(
             :comments="frameComments"
             :link="link"
             :src="drop.url"
+            :resume="drop.id"
             :start="startTime(textValue(route.query.t))"
             :title="drop.title"
             :type="video"

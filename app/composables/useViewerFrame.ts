@@ -6,6 +6,7 @@ import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { Presence } from "~/composables/usePresence"
+import { readMediaSpots, saveMediaSpot } from "../lib/media-resume.client"
 
 type RuntimeReport = {
   kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
@@ -305,6 +306,8 @@ export function useViewerFrame(options: {
         return options.presence?.point(message.at)
       case "activity":
         return options.presence?.activity()
+      case "media-time":
+        return saveMediaSpot(drop.value.id, message.index, message.at, message.duration)
       case "files":
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
@@ -334,6 +337,7 @@ export function useViewerFrame(options: {
       case "ready":
         variants.value = null
         frameTool.value = "browse"
+        send({ type: "media-times", times: readMediaSpots(drop.value.id) })
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":

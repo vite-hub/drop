@@ -2104,6 +2104,35 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   document.addEventListener("transitionend", reshow, true);
   document.documentElement.appendChild(host);
   document.head.appendChild(pageStyle);
+
+  // Each video and audio starts where this reader stopped it last time. Drop keeps the spots (the frame's own storage
+  // is gone on reload) and sends them as media-times; the frame reports a player's spot as it plays, pauses or seeks.
+  let mediaSpots = {};
+  const mediaReported = new WeakMap();
+  const mediaIndex = (el) => Array.prototype.indexOf.call(document.querySelectorAll("video, audio"), el);
+  const resumeMedia = (el) => {
+    const spot = mediaSpots[mediaIndex(el)];
+    if (el.dataset.dropResumed || !spot || el.readyState < 1 || !(el.duration > 0)) return;
+    el.dataset.dropResumed = "";
+    if (Math.abs(spot.duration - el.duration) < 1 && el.currentTime < 1) el.currentTime = spot.at;
+  };
+  const reportMedia = (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLMediaElement) || !(el.duration > 0) || !Number.isFinite(el.duration)) return;
+    if (e.type === "loadedmetadata") return resumeMedia(el);
+    // While it plays, every few seconds is close enough.
+    const now = performance.now();
+    if (e.type === "timeupdate" && now - (mediaReported.get(el) || 0) < 2000) return;
+    mediaReported.set(el, now);
+    const index = mediaIndex(el);
+    if (index >= 0 && index < 100) post({ type: "media-time", index, at: e.type === "ended" ? 0 : el.currentTime, duration: el.duration });
+  };
+  for (const type of ["loadedmetadata", "timeupdate", "pause", "seeked", "ended"]) document.addEventListener(type, reportMedia, true);
+  window.addEventListener("message", (e) => {
+    if (e.source !== parent || !e.data || !e.data.__drop || e.data.type !== "media-times") return;
+    mediaSpots = e.data.times && typeof e.data.times === "object" ? e.data.times : {};
+    document.querySelectorAll("video, audio").forEach(resumeMedia);
+  });
   post({ type: "ready" });
 })();`
 

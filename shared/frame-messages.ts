@@ -25,6 +25,12 @@ export const FrameMessage = v.variant("type", [
   v.object({ type: v.literal("doc-folder") }),
   v.object({ type: v.literal("activity") }),
   v.object({
+    type: v.literal("media-time"),
+    index: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(99)),
+    at: v.pipe(v.number(), v.minValue(0)),
+    duration: v.pipe(v.number(), v.minValue(0)),
+  }),
+  v.object({
     type: v.literal("pointer"),
     at: v.nullable(
       v.object({
