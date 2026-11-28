@@ -4,6 +4,7 @@ import { blocked, inject, markClosed, onTabLoaded, openTabs, probe, type Policy 
 import type { Hand, LinkProblem, LinkResult, SiteState, State } from "./messages"
 import { host, start } from "./host"
 import { indexed, siteIndex } from "./notes"
+import { syncMarker } from "./marker"
 import { link, linked, unlink } from "./oauth"
 import { listen, type ContentHandlers, type PageHandlers } from "./router"
 import { local, trustedOnly } from "./storage"
@@ -113,6 +114,7 @@ async function connect(): Promise<LinkResult> {
     if (checked.ok) await remember(checked)
   }
   void refreshIndex()
+  await syncMarker()
   return { ok: true, state: await state() }
 }
 
@@ -125,16 +127,19 @@ const pageHandlers: PageHandlers = {
     if (checked.drop !== (await currentDrop())) await unlink()
     await local.set("drop", checked.drop)
     await remember(checked)
+    await syncMarker()
     return state()
   },
   async "deployment.reset"() {
     if ((await currentDrop()) !== DEFAULT_DROP) await unlink()
     await local.remove("drop")
+    await syncMarker()
     return state()
   },
   "link.start": connect,
   async "link.remove"() {
     await unlink()
+    await syncMarker()
     return state()
   },
   async "hand.set"({ hand }) {
@@ -201,7 +206,10 @@ export function startBackground() {
   void trustedOnly()
   listen({ page: pageHandlers, content: contentHandlers })
 
+  browser.runtime.onStartup.addListener(() => void syncMarker())
+
   browser.runtime.onInstalled.addListener(async ({ reason }) => {
+    void syncMarker()
     await browser.contextMenus.removeAll()
     browser.contextMenus.create({
       id: MENU_ID,
