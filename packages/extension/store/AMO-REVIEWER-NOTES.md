@@ -13,11 +13,14 @@ The build bundles everything it runs: no remote code, no CDN fonts (Geist ships 
 
 ## `web-ext lint` warnings
 
-`web-ext lint --source-dir .output/firefox-mv3` reports 0 errors and 7 warnings.
+`web-ext lint --source-dir .output/firefox-mv3` reports 0 errors and 10 warnings.
 
-**`UNSAFE_VAR_ASSIGNMENT` (5, all in `chunks/AccountLink-*.js`).** That chunk is the shared vendor chunk of the
-extension's own pages (popup, options, welcome). No content script contains any of them; `content-scripts/review.js`
-builds its DOM with `createElement` and `textContent`. The five assignments are library code:
+**`UNSAFE_VAR_ASSIGNMENT` in `content-scripts/review.js` (3).** The review pill's shadow root, its resolve button and
+its link icons are filled from string constants built into the script: the pill's own CSS, markup and SVG icons. Text
+from the page or from Drop (comments, names, titles, links) is set with `textContent` or `setAttribute` only.
+
+**`UNSAFE_VAR_ASSIGNMENT` in `chunks/ConnectProblem-*.js` (5).** That chunk is the shared vendor chunk of the
+extension's own pages (popup, options, welcome). The five assignments are library code:
 
 | Library | Assignment | What it is given |
 | --- | --- | --- |
