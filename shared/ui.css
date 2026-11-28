@@ -1,0 +1,88 @@
+/*
+ * Drop's design system on Nuxt UI, for the app (app/assets/css/main.css) and the browser extension's pages
+ * (packages/extension/assets/main.css). Import it after Tailwind, Nuxt UI and shared/theme.css.
+ *
+ * shadcn/ui's tokens and radii (new-york v4) with Executor's restraint: grayscale surfaces, hairlines over shadows,
+ * Geist + Geist Mono, one filled button per view, destructive red as the only hue. Nuxt UI reads --ui-*, so each one
+ * points at a shadcn token; the few steps shadcn has no name for sit on the same gray ramp.
+ */
+/* The classes in the components' theme (shared/ui-config.ts), which Tailwind's own scan doesn't reach. */
+@source "./ui-config.ts";
+@theme static {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/*
+ * The review tools (ViewerToolbar, and what the frame draws in shared/plan-runtime.ts) take Mesurer's look: one blue for
+ * the tool that's on, at the lightness where a white icon or label on it reads (4.7:1), and a borderless toolbar raised by
+ * layered shadows. Areas drawn for a comment take the same blue, so they show on dark pages and white images alike. The
+ * rest of Drop stays grayscale.
+ */
+@theme inline {
+  --color-tool: oklch(0.56 0.18 255);
+  --shadow-toolbar: var(--toolbar-shadow);
+}
+
+/* shadcn's radius scale, from --radius: md 8px for controls, lg 10px for containers, xl 14px for cards. */
+@theme inline {
+  --radius-xs: calc(var(--radius) * 0.4);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+:root {
+  --ui-primary: var(--primary);
+  --ui-bg: var(--background);
+  --ui-bg-muted: oklch(0.985 0 0);
+  --ui-bg-elevated: var(--muted);
+  --ui-bg-accented: oklch(0.94 0 0);
+  --ui-bg-inverted: var(--foreground);
+  --ui-text: var(--foreground);
+  --ui-text-highlighted: var(--foreground);
+  --ui-text-muted: var(--muted-foreground);
+  --ui-text-dimmed: oklch(0.65 0 0);
+  --ui-text-toned: oklch(0.37 0 0);
+  --ui-text-inverted: var(--background);
+  --ui-border: var(--border);
+  --ui-border-muted: oklch(0.95 0 0);
+  --ui-border-accented: oklch(0.87 0 0);
+  --ui-border-inverted: var(--foreground);
+  --ui-error: var(--destructive);
+  --ui-radius: calc(var(--radius) * 0.6);
+  --toolbar-shadow:
+    0 0 0 0.5px oklch(0 0 0 / 18%), 0 1px 1px oklch(0 0 0 / 6%), 0 3px 9px oklch(0 0 0 / 6%),
+    0 6px 18px oklch(0 0 0 / 3%);
+}
+
+.dark {
+  --ui-bg-muted: oklch(0.175 0 0);
+  --ui-bg-accented: oklch(0.32 0 0);
+  --ui-text-dimmed: oklch(0.556 0 0);
+  --ui-text-toned: oklch(0.85 0 0);
+  --ui-border-muted: oklch(1 0 0 / 6%);
+  --ui-border-accented: oklch(1 0 0 / 18%);
+  --toolbar-shadow:
+    0 0 0 0.5px oklch(1 0 0 / 16%), 0 1px 1px oklch(0 0 0 / 12.5%), 0 2px 5px oklch(0 0 0 / 12.5%),
+    0 3px 8px oklch(0 0 0 / 12.5%);
+}
+
+/* T3 Code's glass: --ui-bg at 80% over a blur, slightly saturated, so what scrolls under a floating bar stays readable
+   instead of ending at its edge. */
+:root {
+  --glass-blur: 12px;
+  --glass-opacity: 80%;
+  --glass-saturation: 1.14;
+}
+
+.dark {
+  --glass-blur: 16px;
+  --glass-saturation: 1.08;
+}
