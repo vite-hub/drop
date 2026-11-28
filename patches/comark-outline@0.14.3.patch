@@ -1,0 +1,19 @@
+diff --git a/dist/styles-Ds-0K0Ou.mjs b/dist/styles-Ds-0K0Ou.mjs
+index 72e3086757cdb9932cff3cba5a436569e88daa34..a7d8f75cc384c7ef39b17ec3cf3851ef28383139 100644
+--- a/dist/styles-Ds-0K0Ou.mjs
++++ b/dist/styles-Ds-0K0Ou.mjs
+@@ -74,8 +74,12 @@ function start() {
+ 			} : null;
+ 		};
+ 		reserve(false);
+-		const column = text().width;
+-		const wide = [...parent.children].filter((child) => child.hasAttribute("data-wide") && width(child) > column + 1);
++		const { end, width: column } = text();
++		const wide = [...parent.children].flatMap((child) => {
++			if (child === nav) return [];
++			if (child.hasAttribute("data-wide")) return width(child) > column + 1 ? [child] : [];
++			return [...child.children].filter((part) => part.getBoundingClientRect().right > end + 1);
++		});
+ 		let spot = beside(wide, WIDTH);
+ 		if (!spot && wide.length) {
+ 			const own = wide.filter((block) => getComputedStyle(block).getPropertyValue("--comark-wide-width").trim());

@@ -238,8 +238,15 @@ p.render-error {
   --comark-grain: none;
 }
 
+/* A carousel's slides run past the text column into the same room on its right, so the next photos peek in there,
+   while its counter and arrows stay under the column. The side outline keeps clear of them as it does of wide blocks.
+   A carousel inside a compare stays inside it. */
+.typeset > .cc {
+  --cc-bleed: max(0px, var(--comark-wide-end, 0px));
+}
+
 /* In a doc with threads, or review comments in the margin, the room beside the text is the cards', so a compare, its
-   heading, and a wide diagram stay in the column. */
+   heading, a wide diagram, and a carousel's slides stay in the column. */
 :is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) {
   --comark-wide-start: 0px;
   --comark-wide-end: 0px;

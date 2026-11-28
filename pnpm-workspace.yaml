@@ -54,6 +54,11 @@ patchedDependencies:
   # image and widened the page; 0.14.3 limits and fits such notes only inside ::compare. This gives a standalone
   # screenshot the same fit check (onmax/comark-ui#491). Delete with the next comark-ui bump that includes it.
   comark-annotate@0.14.3: patches/comark-annotate@0.14.3.patch
+  # Lets a top-level carousel's slides run past the text column into the room on its right (--cc-bleed), with the next
+  # photos peeking in, and makes the side outline keep clear of them, as it does of wide blocks. Delete both with the
+  # next comark-ui bump that includes onmax/comark-ui#495.
+  comark-carousel@0.14.3: patches/comark-carousel@0.14.3.patch
+  comark-outline@0.14.3: patches/comark-outline@0.14.3.patch
   # Logs the error behind a JSON-RPC "Internal error"; upstream returns it without a trace.
   # Preserves the full server identity in both protocol eras.
   # Names a refused token `invalid_token` on the 401 challenge (RFC 6750 §3.1), as h3js/mcp@998d52a does; unreleased.
