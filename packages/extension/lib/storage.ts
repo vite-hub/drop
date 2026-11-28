@@ -9,11 +9,22 @@ export interface Client {
 export interface Link {
   drop: string
   clientId: string
-  accessToken: string
   refreshToken: string
-  expiresAt: number
   name?: string
   email?: string
+}
+
+export interface Access {
+  drop: string
+  token: string
+  expiresAt: number
+}
+
+export interface SiteIndex {
+  drop: string
+  etag?: string
+  origins: string[]
+  at: number
 }
 
 interface Local {
@@ -24,10 +35,13 @@ interface Local {
   hand: Hand
   kept: string[]
   welcomed: boolean
+  picked: Record<string, string>
 }
 
 interface Session {
   open: Record<string, string>
+  access: Access
+  index: SiteIndex
 }
 
 async function get<T extends object, K extends keyof T & string>(
@@ -48,4 +62,14 @@ export const local = {
 export const session = {
   get: <K extends keyof Session>(key: K) => get<Session, K>("session", key),
   set: <K extends keyof Session>(key: K, value: Session[K]) => browser.storage.session.set({ [key]: value }),
+  remove: (key: keyof Session) => browser.storage.session.remove(key),
+}
+
+export async function trustedOnly() {
+  for (const area of [browser.storage.local, browser.storage.session]) {
+    if (typeof area.setAccessLevel === "function")
+      await Promise.resolve()
+        .then(() => area.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }))
+        .catch(() => undefined)
+  }
 }

@@ -1,5 +1,6 @@
 .browsers/
 .output/
+.output-e2e/
 .wxt/
 *.log
 *.pid

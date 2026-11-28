@@ -1540,7 +1540,7 @@ test("review.js is one cacheable script with no key, inert until someone presses
   assert.equal(source, REVIEW_SCRIPT)
   assert.match(source, /esm\.sh\/modern-screenshot@\d+\.\d+\.\d+/)
   assert.match(source, /credentials: "omit"/)
-  assert.match(source, /window\.__dropReview\) return/)
+  assert.match(source, /window\.__dropReview \|\| document\.querySelector\("drop-review"\)\) return/)
   assert.match(source, /onCloneEachNode/, "sticky and fixed elements are pinned in the screenshot")
   assert.match(source, /"\/review\/connect\?origin=" \+ encodeURIComponent\(location\.origin\)/)
 
