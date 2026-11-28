@@ -1,8 +1,58 @@
-diff --git a/dist/styles-Ds-0K0Ou.mjs b/dist/styles-Ds-0K0Ou.mjs
-index 72e3086757cdb9932cff3cba5a436569e88daa34..a7d8f75cc384c7ef39b17ec3cf3851ef28383139 100644
+diff --git a/dist/client-DH0j-tPK.mjs b/dist/client-Gomxd5hj.mjs
+similarity index 94%
+rename from dist/client-DH0j-tPK.mjs
+rename to dist/client-Gomxd5hj.mjs
+index 23b2bc3f8615df829ca7668a6dec129a77773773..208b978bc8ad02dd408bf85d11fba067479c262b 100644
+--- a/dist/client-DH0j-tPK.mjs
++++ b/dist/client-Gomxd5hj.mjs
+@@ -1,4 +1,4 @@
+-import { t as css } from "./styles-Ds-0K0Ou.mjs";
++import { t as css } from "./styles-DASQvWCX.mjs";
+ //#region ../../shared/styles.ts
+ /**
+ * Adds a package's styles to the page once, unless the page already carries them as a `style` or a `link` with
+diff --git a/dist/client.mjs b/dist/client.mjs
+index f58370580dc0e3cb6686e77fe910654af4cfa748..8a2a6aebdee2a6ff3fe2596e4994ba98b603055e 100644
+--- a/dist/client.mjs
++++ b/dist/client.mjs
+@@ -1,3 +1,3 @@
+-import { n as start, t as css } from "./styles-Ds-0K0Ou.mjs";
+-import { t as addStyles } from "./client-DH0j-tPK.mjs";
++import { n as start, t as css } from "./styles-DASQvWCX.mjs";
++import { t as addStyles } from "./client-Gomxd5hj.mjs";
+ export { addStyles, css, start };
+diff --git a/dist/html.mjs b/dist/html.mjs
+index 37d90cf8357d5aabb99acf765bb8b6b998ffc4a4..8c3174cd473d12c53ea2add78ce672fb6382cbda 100644
+--- a/dist/html.mjs
++++ b/dist/html.mjs
+@@ -1,5 +1,5 @@
+ import { n as src_default, r as rawText, t as RAIL_TAG } from "./src-DZw19bLx.mjs";
+-import { n as start, t as css } from "./styles-Ds-0K0Ou.mjs";
++import { n as start, t as css } from "./styles-DASQvWCX.mjs";
+ import { escapeHtml } from "comark/utils";
+ //#region ../../shared/html.ts
+ /** A value as the inside of a double-quoted HTML attribute. */
+diff --git a/dist/react.mjs b/dist/react.mjs
+index a001555ec9068f923b6e2794ce25f3d0769fef6e..145e97336ddb261084b89384cee72cbcae09b10d 100644
+--- a/dist/react.mjs
++++ b/dist/react.mjs
+@@ -1,6 +1,6 @@
+ import { n as src_default, t as RAIL_TAG } from "./src-DZw19bLx.mjs";
+-import { n as start } from "./styles-Ds-0K0Ou.mjs";
+-import { t as addStyles } from "./client-DH0j-tPK.mjs";
++import { n as start } from "./styles-DASQvWCX.mjs";
++import { t as addStyles } from "./client-Gomxd5hj.mjs";
+ import { Children, createElement, useEffect } from "react";
+ //#region src/react.ts
+ /** `::toc` for `@comark/react`. */
+diff --git a/dist/styles-Ds-0K0Ou.mjs b/dist/styles-DASQvWCX.mjs
+similarity index 97%
+rename from dist/styles-Ds-0K0Ou.mjs
+rename to dist/styles-DASQvWCX.mjs
+index 72e3086757cdb9932cff3cba5a436569e88daa34..4ab3080b30a3d63a748a228e8d94df4a54fa9bd5 100644
 --- a/dist/styles-Ds-0K0Ou.mjs
-+++ b/dist/styles-Ds-0K0Ou.mjs
-@@ -74,8 +74,12 @@ function start() {
++++ b/dist/styles-DASQvWCX.mjs
+@@ -74,8 +74,13 @@ function start() {
  			} : null;
  		};
  		reserve(false);
@@ -12,8 +62,22 @@ index 72e3086757cdb9932cff3cba5a436569e88daa34..a7d8f75cc384c7ef39b17ec3cf3851ef
 +		const wide = [...parent.children].flatMap((child) => {
 +			if (child === nav) return [];
 +			if (child.hasAttribute("data-wide")) return width(child) > column + 1 ? [child] : [];
++			if (getComputedStyle(child).overflowX !== "visible") return [];
 +			return [...child.children].filter((part) => part.getBoundingClientRect().right > end + 1);
 +		});
  		let spot = beside(wide, WIDTH);
  		if (!spot && wide.length) {
  			const own = wide.filter((block) => getComputedStyle(block).getPropertyValue("--comark-wide-width").trim());
+diff --git a/dist/vue.mjs b/dist/vue.mjs
+index 1541c8fe96793e0e618de225c8fe9124d284fa3f..f5bfffe05ca80b194abc3f01cd2f83f4061f552f 100644
+--- a/dist/vue.mjs
++++ b/dist/vue.mjs
+@@ -1,6 +1,6 @@
+ import { n as src_default, t as RAIL_TAG } from "./src-DZw19bLx.mjs";
+-import { n as start } from "./styles-Ds-0K0Ou.mjs";
+-import { t as addStyles } from "./client-DH0j-tPK.mjs";
++import { n as start } from "./styles-DASQvWCX.mjs";
++import { t as addStyles } from "./client-Gomxd5hj.mjs";
+ import { defineComponent, h, onBeforeUnmount, onMounted } from "vue";
+ //#region src/vue.ts
+ /** `::toc` for `@comark/vue`. */
