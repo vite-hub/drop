@@ -78,7 +78,6 @@ export async function onTabLoaded(
   tab: Pick<Browser.tabs.Tab, "url">,
   policy: Policy,
   settings: Settings,
-  listed: (origin: string) => Promise<boolean>,
 ) {
   const wasOpen = String(tabId) in (await openTabs())
   const origin = originOf(tab.url)
@@ -86,8 +85,7 @@ export async function onTabLoaded(
   const everywhere = async () =>
     settings.hand === "everywhere" &&
     origin !== undefined &&
-    (await browser.permissions.contains({ origins: ["<all_urls>"] })) &&
-    (await listed(origin))
+    (await browser.permissions.contains({ origins: ["<all_urls>"] }))
   if (!wasOpen && !kept && !(await everywhere())) return undefined
   const result = await inject(tabId, policy)
   if (!result.ok) await markClosed(tabId)

@@ -160,7 +160,7 @@ try {
   })
 
   out.checks.handIndexGate = await step(
-    "with the hand on, five note-less sites ask nothing, and a site with a review gets the pill",
+    "with the hand on, five note-less sites show the hand and ask Drop nothing, and a site with a review gets the pill",
     async () => {
       await background("hand.set", { hand: "everywhere" })
       await until(() => fake.counts.index > 0, "the index")
@@ -175,7 +175,7 @@ try {
         await page.close()
       }
       const asked = fake.requests.slice(before).map((r) => `${r.method} ${new URL(r.url).pathname}`)
-      if (found.some((h) => h.hosts !== 0) || asked.length)
+      if (found.some((h) => h.hosts !== 1) || asked.length)
         throw new Error(`injected ${JSON.stringify(found)}, asked ${JSON.stringify(asked)}`)
       const acme = await context.newPage()
       await acme.goto(`${ACME}/hand`)

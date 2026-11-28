@@ -64,7 +64,7 @@ By default, Drop only shows up when you press it. Two switches in the toolbar bu
 | Switch | What it does | Your browser asks for |
 | --- | --- | --- |
 | **On this site** | The hand comes back every time you open this site. | This one site. |
-| **On every page** | The hand shows by itself on every site where you have notes or a review you can comment on. Elsewhere, press Drop as usual. | Every site. |
+| **On every page** | The hand waits in the corner of every site. Drop loads comments only where you have notes or a review; elsewhere it asks your Drop nothing until you press **Comment** or **Highlight**. | Every site. |
 
 Turn a switch off and the extension gives that permission back. Settings lists the sites where Drop stays, and you can remove any of them.
 
@@ -94,7 +94,7 @@ Every permission that reaches websites is optional. The extension asks for no si
 | **Context menus** (`contextMenus`) | Add **Comment with Drop** when you right-click a page. |
 | **Your Drop's address** (optional) | Talk to your Drop. Asked for when you pick or connect a Drop. |
 | **One site** (optional) | Show the hand on that site every time. Asked for when you turn on **On this site**. |
-| **Every site** (optional) | Show the hand by itself where you have notes or a review. Asked for when you turn on **On every page**. |
+| **Every site** (optional) | Show the hand on every page. Asked for when you turn on **On every page**. |
 
 When you turn on **On every page**, your browser warns that Drop can "read and change all your data on all websites". Browsers say that about every extension that shows something on pages. Drop only draws the hand and your comments.
 

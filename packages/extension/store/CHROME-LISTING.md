@@ -69,7 +69,7 @@ Drop lets a person comment on web pages: it puts a review toolbar on the page th
 | `storage` | Keeps the address of the person's Drop, their sign-in to it, and their settings (where the hand shows, kept sites, where comments go per site) in the browser. |
 | `identity` | Opens the sign-in window of the person's Drop (OAuth with PKCE) when they connect the extension. |
 | `contextMenus` | Adds "Comment with Drop" to the page's right-click menu. |
-| Host permissions (optional, `<all_urls>`) | None at install. The browser asks for one site when the person turns on "On this site", for the person's Drop address when they connect it, and for all sites only when they turn on "On every page"; then the toolbar shows by itself on sites where they have notes or a review. Turning a switch off gives the permission back. |
+| Host permissions (optional, `<all_urls>`) | None at install. The browser asks for one site when the person turns on "On this site", for the person's Drop address when they connect it, and for all sites only when they turn on "On every page"; then the hand shows on every page, and comments load only on sites where they have notes or a review. Turning a switch off gives the permission back. |
 | Remote code | No. Every script the extension runs is in the package. |
 
 ### Data usage

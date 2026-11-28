@@ -62,47 +62,45 @@ describe("inject", () => {
   })
 })
 
-const listed = async (origin: string) => origin === "https://example.com"
-
 describe("after a load", () => {
   const press = { hand: "press" as const, kept: [] }
 
   test("a tab nobody pressed gets nothing, not even a probe", async () => {
     const { onTabLoaded } = await import("../lib/injection")
-    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, press, listed)).toBeUndefined()
-    expect(await onTabLoaded(1, {}, policy, press, listed)).toBeUndefined()
+    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, press)).toBeUndefined()
+    expect(await onTabLoaded(1, {}, policy, press)).toBeUndefined()
     expect(fakeBrowser.scripting.executeScript).not.toHaveBeenCalled()
   })
 
   test("an open pill comes back while the grant holds, and closes when it's gone", async () => {
     const { inject, onTabLoaded, openTabs } = await import("../lib/injection")
     await inject(1, policy)
-    expect(await onTabLoaded(1, {}, policy, press, listed)).toMatchObject({ ok: true })
+    expect(await onTabLoaded(1, {}, policy, press)).toMatchObject({ ok: true })
     granted.delete(1)
-    expect(await onTabLoaded(1, {}, policy, press, listed)).toMatchObject({ ok: false, reason: "no-grant" })
+    expect(await onTabLoaded(1, {}, policy, press)).toMatchObject({ ok: false, reason: "no-grant" })
     expect(await openTabs()).toEqual({})
   })
 
   test("a kept site matches its exact origin", async () => {
     const { onTabLoaded } = await import("../lib/injection")
     const kept = { hand: "press" as const, kept: ["https://example.com"] }
-    expect(await onTabLoaded(1, { url: "http://example.com/a" }, policy, kept, listed)).toBeUndefined()
-    expect(await onTabLoaded(1, { url: "https://example.com:8443/a" }, policy, kept, listed)).toBeUndefined()
-    expect(await onTabLoaded(1, { url: "https://example.com/b" }, policy, kept, listed)).toMatchObject({ ok: true })
+    expect(await onTabLoaded(1, { url: "http://example.com/a" }, policy, kept)).toBeUndefined()
+    expect(await onTabLoaded(1, { url: "https://example.com:8443/a" }, policy, kept)).toBeUndefined()
+    expect(await onTabLoaded(1, { url: "https://example.com/b" }, policy, kept)).toMatchObject({ ok: true })
   })
 
-  test("on every page only while the permission is held, and only where there are notes or a review", async () => {
+  test("on every page only while the permission is held, with or without notes", async () => {
     const { onTabLoaded } = await import("../lib/injection")
     const everywhere = { hand: "everywhere" as const, kept: [] }
-    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, everywhere, listed)).toBeUndefined()
+    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, everywhere)).toBeUndefined()
     allSites = true
-    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, everywhere, listed)).toMatchObject({
+    expect(await onTabLoaded(1, { url: "https://example.com/a" }, policy, everywhere)).toMatchObject({
       ok: true,
     })
     pages[4] = "https://example.org/a"
     granted.add(4)
-    expect(await onTabLoaded(4, { url: pages[4] }, policy, everywhere, listed)).toBeUndefined()
-    expect(injected).toEqual([1])
+    expect(await onTabLoaded(4, { url: pages[4] }, policy, everywhere)).toMatchObject({ ok: true })
+    expect(injected).toEqual([1, 4])
   })
 })
 

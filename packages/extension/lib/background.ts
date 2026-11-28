@@ -3,7 +3,7 @@ import { checkDrop, currentDrop, DEFAULT_DROP, originPattern, type DropCheck } f
 import { blocked, inject, markClosed, onTabLoaded, openTabs, probe, type Policy } from "./injection"
 import type { Hand, LinkProblem, LinkResult, SiteState, State } from "./messages"
 import { host, start } from "./host"
-import { indexed, siteIndex } from "./notes"
+import { siteIndex } from "./notes"
 import { syncMarker } from "./marker"
 import { link, linked, unlink } from "./oauth"
 import { listen, type ContentHandlers, type PageHandlers } from "./router"
@@ -183,12 +183,6 @@ const contentHandlers: ContentHandlers = {
   "review.host": ({ request }, from) => host(request, from),
 }
 
-async function indexedSite(origin: string) {
-  const current = await linked()
-  if (current?.drop !== (await currentDrop())) return false
-  return indexed(await siteIndex().catch(() => undefined), origin)
-}
-
 function refreshIndex() {
   return siteIndex({ fresh: true }).catch(() => undefined)
 }
@@ -233,7 +227,7 @@ export function startBackground() {
 
   browser.tabs.onUpdated.addListener((tabId, change, tab) => {
     if (change.status !== "complete") return
-    void (async () => onTabLoaded(tabId, tab, await policy(), await settings(), indexedSite))()
+    void (async () => onTabLoaded(tabId, tab, await policy(), await settings()))()
   })
 
   browser.tabs.onRemoved.addListener((tabId) => void markClosed(tabId))
