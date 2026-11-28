@@ -39,11 +39,19 @@ export async function signUpload(event: H3Event, who: Identity, input: PublishIn
 export async function readUpload(event: H3Event, sealed: string, now = Date.now()) {
   const ticket = await unseal(event, "upload", UploadTicket, sealed, MAX_TICKET)
   if (!ticket || ticket.e <= now || (!ticket.i.file && !ticket.i.archive)) return null
+  const who = await ticketIdentity(event, ticket)
+  return who && { who, input: ticket.i, id: ticket.j, expiresAt: ticket.e }
+}
+
+export async function ticketIdentity(
+  event: H3Event,
+  ticket: Pick<UploadTicket, "u" | "k" | "a">,
+): Promise<Identity | null> {
   const [row] = await db.select().from(users).where(eq(users.id, ticket.u)).limit(1)
   if (!row || row.banned) return null
   if (!(await isMember(row.id, event))) return null
   const role = row.role ?? ""
-  const who: Identity = {
+  return {
     userId: row.id,
     name: row.name,
     email: row.email,
@@ -52,7 +60,6 @@ export async function readUpload(event: H3Event, sealed: string, now = Date.now(
     actorKind: ticket.k,
     actorName: ticket.a,
   }
-  return { who, input: ticket.i, id: ticket.j, expiresAt: ticket.e }
 }
 
 export function invalidUpload() {

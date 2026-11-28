@@ -9,7 +9,7 @@ A **doc** is Markdown, a self-contained HTML page, or any single file up to 4 Mi
 
 Markdown renders with tables, task lists, callouts, footnotes, Mermaid diagrams, and every [comark-ui](https://comark-ui.onmax.me) block, such as tabs, steps, diffs, metrics, and charts. HTML runs as-is, scripts included, in a sandbox with no access to your session. If the Drop serves apps from a separate domain, each page gets its own origin, so storage and history work.
 
-Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it.
+Images a doc embeds from Drop belong to it. Whoever can open the doc sees them, and they go to the Trash with it. An agent can publish a doc with up to 30 images in one call: it writes each as `./A.png` and passes `images`, and Drop replaces each with the image's address.
 
 In a Markdown doc, the **#** beside a heading copies a link to that section, which opens the doc there. The address bar follows the section you open from the outline. An image's button in its corner copies the image's own address, and a video's settings copy its address at the second it's at (`#t=`) or the frame on screen.
 

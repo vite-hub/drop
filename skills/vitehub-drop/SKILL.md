@@ -72,7 +72,11 @@ If the call fails with `DROP_LIMIT_REACHED` and `retryable: true`, you hit the p
 
 ## Images and recordings in a doc
 
-Publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change. An embedded file belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
+For images on disk, publish the doc with them in one call. Write each image as `./<name>` in the Markdown, as in `![alt](./A.png)` or `::screenshot{src="./A.png"}`, and pass `images: [{ name: "A.png" }, …]`, up to 30, with `markdown` or a `.md` `file`. Drop stores the doc with each `./<name>` replaced by that image's `fileUrl`, and the reply lists an `uploadUrl` for each image (in the upload's JSON for a `.md` file). Run `curl -T <path> '<uploadUrl>'` for each, within 15 minutes; until then the doc shows that image as missing. A link to a `./<name>.png` that isn't in `images` stops the publish. With `previous`, `./<name>` also finds the images the doc already has, the latest of each name, so pass only new or changed ones in `images`.
+
+Otherwise publish each image or screen recording with `file` first, then embed its `fileUrl` in the doc: `![alt](fileUrl)` or `::screenshot{src="fileUrl"}` for an image, and `![what it shows](fileUrl)` for an `.mp4` or `.webm`, which plays as a video. A recording must fit in 4 MiB, so keep it to the seconds that show the change.
+
+An image in a doc, either way, belongs to the doc: anyone who can open the doc sees it, and it lives and goes to the Trash with the doc, whatever lifetime you gave the file. When people comment on it inside the doc, the comment lands on the doc.
 
 A doc runs no scripts. For something interactive in it, such as a demo or an animated figure, publish that as its own `html` drop, then show it in the doc with `::embed{url=…}` ([interactive drops](references/markdown.md#interactive-drops)). For an HTTP Drop, such as `http://localhost:3000`, use `::drop{link=…}` instead; the reference includes its local lint configuration. Share it at least as widely as the doc: each reader sees it only if they can open it.
 

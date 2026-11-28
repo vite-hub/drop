@@ -32,6 +32,9 @@ import { perDropOrigins } from "./content-origin"
 import { addedResources, frontmatterResources, resourceList, ResourcesInput, saveResources } from "./resources"
 import { MAX_RESOURCE_URL } from "#shared/resources"
 import { signUpload } from "./uploads"
+import { attachedImages, type DocImage, DocImagesInput, linkImages, planImages, signImageUpload } from "./doc-images"
+
+const MARKDOWN_FILE = /\.(?:md|markdown)$/i
 
 export const PublishInput = v.object({
   agent: v.optional(
@@ -100,6 +103,7 @@ export const PublishInput = v.object({
       ),
     ),
   ),
+  images: v.optional(DocImagesInput),
   site: v.optional(
     v.pipe(
       v.object({
@@ -223,6 +227,12 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       status: 400,
       message: "Pass exactly one of markdown, html, files, archive, file, site, board, or link.",
     })
+  if (input.images && !(input.markdown !== undefined || (input.file && MARKDOWN_FILE.test(input.file.name))))
+    throw new HTTPError({
+      status: 400,
+      message:
+        "images go with a Markdown doc: pass markdown, or file with a .md name, and write each image as ./<name>.",
+    })
   if (input.base !== undefined && !input.previous)
     throw new HTTPError({ status: 400, message: "base is the version you read of previous: pass previous with it." })
   if (!input.previous && !input.folder && !input.lifetime)
@@ -316,6 +326,7 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   const life = { lifetime: input.lifetime, keepReason: input.keepReason, note: input.note, agent, base: input.base }
 
   let row
+  let planned: DocImage[] = []
   let warnings: string[] = []
   let appPaths: string[] | undefined
   if (input.files || input.archive) {
@@ -395,7 +406,19 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
       filename = input.html ? "doc.html" : "doc.md"
       bytes = new TextEncoder().encode(source)
     }
-    const listed = /\.(?:md|markdown)$/i.test(filename) ? frontmatterResources(new TextDecoder().decode(bytes)) : []
+    if (MARKDOWN_FILE.test(filename) && (input.images?.length || previous)) {
+      planned = planImages(input.images ?? [], event.url.origin)
+      const files = previous ? await attachedImages(previous, event.url.origin) : new Map<string, string>()
+      for (const image of planned) files.set(image.name, image.fileUrl)
+      const linked = linkImages(new TextDecoder().decode(bytes), files)
+      if (input.images?.length && linked.missing.length)
+        throw new HTTPError({
+          status: 400,
+          message: `The doc links to ${linked.missing.map((name) => `./${name}`).join(", ")}, which ${linked.missing.length === 1 ? "isn't" : "aren't"} in images${previous ? " or on the doc already" : ""}. Add ${linked.missing.length === 1 ? "it" : "them"} to images, or fix the link.`,
+        })
+      bytes = new TextEncoder().encode(linked.markdown)
+    }
+    const listed = MARKDOWN_FILE.test(filename) ? frontmatterResources(new TextDecoder().decode(bytes)) : []
     if (listed.length) resources = addedResources(previous, [...(links ?? []), ...listed])
     row = await createDocDrop(
       who,
@@ -435,8 +458,10 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
   if (resources) await saveResources(fresh, resources)
   const drop = mcpDrop(toSummary(fresh), event.url.origin, fresh)
   const pages = appPaths ? appPageLinks(drop.url, appPaths) : []
+  const images = await Promise.all(planned.map((image) => signImageUpload(event, who, fresh, image)))
   const result = {
     ...drop,
+    ...(images.length ? { images } : {}),
     ...(pages.length ? { pages: pages.slice(0, MAX_LISTED_PAGES) } : {}),
     ...(resolved.length ? { resolved } : {}),
     ...(warnings.length ? { warnings } : {}),
@@ -449,7 +474,11 @@ export async function publishInput(who: Identity, input: PublishInput, event: H3
     ? `\n\n${lead} Fix them and publish again with previous:\n${warnings.map((warning) => `- ${warning}`).join("\n")}`
     : ""
   return {
-    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${pages.length > 1 ? `\n\n${pagesSection(pages)}` : ""}${check}`,
+    text: `Published${drop.version > 1 ? ` v${drop.version}` : ""}${resolved.length ? `, resolved ${resolved.map((n) => `#${n}`).join(", ")}` : ""}:\n${dropLine(drop)}${folderLife(drop, input.lifetime)}${pages.length > 1 ? `\n\n${pagesSection(pages)}` : ""}${images.length ? `\n\n${imagesSection(images)}` : ""}${check}`,
     result,
   }
+}
+
+function imagesSection(images: { name: string; uploadUrl: string }[]) {
+  return `Upload each image within 15 minutes, once. Until then the doc shows it as missing:\n${images.map((image) => `curl -T <path to ${image.name}> '${image.uploadUrl}'`).join("\n")}`
 }
