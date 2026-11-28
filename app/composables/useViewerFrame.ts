@@ -1,11 +1,12 @@
 import { DOC_WIDTHS, type DocWidth, planDocument } from "#shared/documents"
 import type { FrameMessage } from "#shared/frame-messages"
 import { embedDocument, injectRuntime, withVariantBar } from "#shared/plan-runtime"
-import { appLocation, appPageFor, buildProjectDocument } from "#shared/project-bundle"
+import { appLocation, appPageFor, appStaticPageFor, buildProjectDocument } from "#shared/project-bundle"
 import type { DropComment, DropDetail, DropRuntimeError } from "#shared/types"
 import type { ViewerTool } from "~/composables/useViewerAnnotations"
 import type { CommentStyle } from "~/composables/usePreferences"
 import type { Presence } from "~/composables/usePresence"
+import { readMediaSpots, saveMediaSpot } from "../lib/media-resume.client"
 
 type RuntimeReport = {
   kind: Extract<FrameMessage, { type: "runtime-error" }>["kind"]
@@ -67,6 +68,12 @@ export function useViewerFrame(options: {
   const mounted = useMounted()
   const dark = computed(() => colorMode.value === "dark")
   const isApp = computed(() => drop.value.kind === "app")
+  const mediaPath = computed(() => (isApp.value ? location.value.replace(/[?#].*$/s, "") : null))
+  const mediaScope = computed(() => {
+    const path = mediaPath.value
+    const pageKey = path === null ? null : (appStaticPageFor(pages.value, path) ?? path)
+    return JSON.stringify([drop.value.id, drop.value.version, pageKey])
+  })
   const trashed = computed(() => drop.value.trashedAt !== null)
 
   const imageBlob = shallowRef<Blob>()
@@ -224,6 +231,12 @@ export function useViewerFrame(options: {
   const reading = new Map<string, string[]>()
 
   const quiz = useViewerQuiz(drop, (message) => send(message))
+  const restoreMedia = () =>
+    send({
+      type: "media-times",
+      path: contentOrigin.value ? mediaPath.value : null,
+      times: readMediaSpots(mediaScope.value),
+    })
   const { ready, send } = useDropFrame(options.frame, contentOrigin, (message, box) => {
     switch (message.type) {
       case "comark-quiz:ready":
@@ -274,10 +287,13 @@ export function useViewerFrame(options: {
         reading.set(target, [...(reading.get(target) ?? []), message.id])
         return send({ type: "read", page: target })
       }
-      case "location":
+      case "location": {
+        const before = mediaPath.value
         followFrame(message.path)
         frameDocument = srcdoc.value
+        if (ready.value && before !== mediaPath.value) restoreMedia()
         return
+      }
       case "navigate":
         if (isApp.value) page.value = message.path
         return
@@ -305,6 +321,8 @@ export function useViewerFrame(options: {
         return options.presence?.point(message.at)
       case "activity":
         return options.presence?.activity()
+      case "media-time":
+        return saveMediaSpot(mediaScope.value, message.index, message.source, message.at, message.duration)
       case "files":
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
@@ -334,6 +352,7 @@ export function useViewerFrame(options: {
       case "ready":
         variants.value = null
         frameTool.value = "browse"
+        restoreMedia()
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":

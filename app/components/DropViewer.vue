@@ -1847,11 +1847,13 @@ watch(
           <LazyViewerLink v-else-if="drop.kind === 'link'" :drop="drop" />
           <LazyViewerVideo
             v-else-if="video && drop.url"
+            :key="`${drop.id}@${drop.version}:${drop.url}`"
             ref="videoRef"
             :can-comment="drop.canComment && annotationsEnabled && !trashed"
             :comments="frameComments"
             :link="link"
             :src="drop.url"
+            :resume="`${drop.id}@${drop.version}`"
             :start="startTime(textValue(route.query.t))"
             :title="drop.title"
             :type="video"

@@ -10,7 +10,8 @@ test("a video's link starts at the second its ?t= names, written as seconds, a c
   assert.equal(startTime("1:02:07"), 3727)
   assert.equal(startTime("1m15s"), 75)
   assert.equal(startTime("1h"), 3600)
-  for (const nothing of [undefined, "", "soon", "-4", "1:2:3:4"]) assert.equal(startTime(nothing), 0)
+  for (const zero of ["0", "0:00", "0s"]) assert.equal(startTime(zero), 0)
+  for (const nothing of [undefined, "", "soon", "-4", "1:2:3:4"]) assert.equal(startTime(nothing), undefined)
 })
 
 test("a second shows as the player shows it", () => {

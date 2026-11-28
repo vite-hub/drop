@@ -56,7 +56,9 @@ const DEFERRED_FILES_SCRIPT = String.raw`(() => {
       let url;
       for (const media of document.querySelectorAll("[data-drop-media]")) {
         if (media.dataset.dropMedia !== m.path) continue;
-        media.src = url ||= URL.createObjectURL(m.data);
+        media.dataset.dropMediaObject = url ||= URL.createObjectURL(m.data);
+        media.dataset.dropMediaSource = m.path;
+        media.src = url;
         media.removeAttribute("data-drop-media");
       }
       return;
