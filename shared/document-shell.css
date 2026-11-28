@@ -240,10 +240,14 @@ p.render-error {
 
 /* A carousel's slides run past the text column into the room on its right, so the next photos peek in there, while its
    counter and arrows stay under the column. With no outline column beside them they run to the frame's edge, where a
-   photo cut off reads as more to come; with one they stop 1.5rem short of it, as wide blocks do. A carousel inside a
-   compare stays inside it. */
+   photo cut off reads as more to come; with one they stop 1.5rem short of it, as wide blocks do. They also scroll out
+   to the frame's left edge, so the slides you pass slide off the page instead of being cut at the column, and they
+   come to rest lined up with the text. comark-ui reads --cc-bleed-start as a number, where a percentage means nothing,
+   so it takes the column's width as 100cqi (the carousel is its own container). A carousel inside a compare stays
+   inside it. */
 .typeset > .cc {
   --cc-bleed: max(0px, calc(var(--comark-wide-end, 0px) + 1.5rem - min(1.5rem, var(--comark-rail-width, 0px))));
+  --cc-bleed-start: max(0px, calc((100vw - var(--drop-shift, 0px) - 100cqi) / 2));
 }
 
 /* A classic scrollbar sits inside 100vw, so slides that reach the frame's edge pass under it. The page clips them there
@@ -261,6 +265,7 @@ p.render-error {
 }
 :is(.typeset:has(.cr), [data-drop-rail="open"] .typeset) > .cc {
   --cc-bleed: 0px;
+  --cc-bleed-start: 0px;
 }
 
 :is(.typeset, .typeset > .cr) > div:is([data-width], [data-fit])[data-fold][data-cols] > table > * > tr > [data-row] {

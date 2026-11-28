@@ -57,7 +57,7 @@ pnpmfileChecksum: sha256-8nGb6beLH6d2nsxD8QO9rz+ZxKMtdjGwf9yIYJVcy0c=
 
 patchedDependencies:
   comark-annotate@0.14.3: 2db368163928545df4dfb543b3cdfb56f277b36349e6f9791649897b27c99fa4
-  comark-carousel@0.14.3: 9bfcf95f2e9f96ae01ab1dbbea099f028256e931d2cb3cba7ca2e143b180f609
+  comark-carousel@0.14.3: c373b3e971f78a235f742e6376aac4748a7adabae094b002f38dcd47ffc162e9
   comark-outline@0.14.3: fe2fe7f9a23a501a8d39efad0cbc5c50ac586377b61d7211378f98a6ecd2d3ef
   h3-mcp@0.2.0: c7af7bbf89a2ae2c216bb3d465add17ecbad531f0636a92538f12d8de6832259
   nuxt-security@2.7.0: d1112d15a1d8f4227f55eeacac6e28d4e2e2c918aa4679be7a30fd0cf620da6b

@@ -73,6 +73,8 @@ async function open(browser, width, height = 900) {
       start: shown.at(-3).left - column.left,
       end: column.right - shown.at(-1).right,
       before: shown.at(-4).right - column.left,
+      // Where the slide before the last page ends on the screen: in the room left of the column, not cut at it.
+      passed: shown.at(-4).right,
       count: cc.querySelector(".cc-count")?.textContent,
     }
     track.scrollTo({ left: 0, behavior: "instant" })
@@ -106,10 +108,11 @@ async function open(browser, width, height = 900) {
   })
 }
 
-// At the end, the last three slides fill the text column, with nothing of the slide before them showing at its start.
+// At the end, the last three slides fill the text column, and the slide before them sits whole in the room on its left.
 function lastPageLinesUp({ end }) {
   assert.ok(Math.abs(end.start) < 1 && Math.abs(end.end) < 1, JSON.stringify(end))
-  assert.ok(end.before < 1, `the slide before the last page shows ${end.before}px`)
+  assert.ok(end.before < 1, `the slide before the last page reaches ${end.before}px into the column`)
+  assert.ok(end.passed > 40, `the slide before the last page ends at ${end.passed}px, cut at the column`)
   assert.equal(end.count, "4–6 / 6")
 }
 
@@ -120,7 +123,9 @@ test(
     const browser = await chromium.launch()
     try {
       const desktop = await open(browser, 1440)
-      assert.equal(Math.round(desktop.track.left), Math.round(desktop.text.left))
+      // The slides scroll out to the frame's left edge, and rest lined up with the text.
+      assert.ok(Math.abs(desktop.track.left) < 1, `the slides stop at ${desktop.track.left}`)
+      assert.equal(Math.round(desktop.slide.left), Math.round(desktop.text.left))
       assert.ok(desktop.track.right > desktop.text.right + 40, JSON.stringify(desktop))
       // Three slides still fill the column; the fourth is the one that peeks in.
       assert.ok(Math.abs(desktop.slide.width * 3 - (desktop.carousel.width - 2 * 16)) < 4)
@@ -151,6 +156,8 @@ test(
 
       const phone = await open(browser, 390)
       assert.equal(Math.round(phone.track.right), phone.frame, "the slides run to the screen's edge")
+      assert.ok(Math.abs(phone.track.left) < 1, "and out to its left edge")
+      assert.equal(Math.round(phone.slide.left), Math.round(phone.text.left))
       assert.equal(phone.overflow, 0)
     } finally {
       await browser.close()
