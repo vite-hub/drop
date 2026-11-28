@@ -28,6 +28,14 @@ beforeEach(() => {
 
 const notDrop = async () => new Response("<html>", { status: 200 })
 const down = async () => new Response("", { status: 502 })
+const missing = async () => new Response("", { status: 404 })
+const outdated = async (url: string | URL | Request) =>
+  (url instanceof Request ? url.url : url.toString()).endsWith("/.well-known/oauth-authorization-server")
+    ? Response.json({ authorization_endpoint: "https://example.com/authorize" })
+    : new Response("", { status: 404 })
+const moved = async () => new Response(null, { status: 302, headers: { location: "https://drop.example.com/" } })
+const elsewhere = async () =>
+  Response.json({ drop: "https://drop.example.com", name: "Example Drop", version: "0.1.0" })
 
 describe("inject", () => {
   test("mounts the review script on a site and remembers the tab", async () => {
@@ -126,5 +134,14 @@ describe("deployment", () => {
     expect(await checkDrop("https://elsewhere.example.com", fake.fetch)).toEqual({ ok: false, error: "unreachable" })
     expect(await checkDrop("https://example.com", notDrop)).toEqual({ ok: false, error: "not-a-drop" })
     expect(await checkDrop("https://example.com", down)).toEqual({ ok: false, error: "server-error", status: 502 })
+    expect(await checkDrop("https://example.com", missing)).toEqual({ ok: false, error: "not-a-drop", status: 404 })
+    expect(await checkDrop("https://example.com", outdated)).toEqual({ ok: false, error: "outdated" })
+    expect(await checkDrop("https://example.com", moved)).toEqual({ ok: false, error: "redirects" })
+    expect(await checkDrop("https://acme.example.com", fake.fetch)).toEqual({ ok: false, error: "unreachable" })
+    expect(await checkDrop("https://acme.example.com", elsewhere)).toEqual({
+      ok: false,
+      error: "elsewhere",
+      drop: "https://drop.example.com",
+    })
   })
 })

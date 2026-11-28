@@ -82,6 +82,8 @@
         "@fontsource-variable/geist-mono",
         "@iconify-json/mingcute",
       ],
+      // harness/drop-fixture.mjs signs a throwaway certificate for the HTTPS fixture.
+      "ignoreBinaries": ["openssl"],
     },
   },
 }

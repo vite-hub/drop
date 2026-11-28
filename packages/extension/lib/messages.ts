@@ -29,11 +29,16 @@ export type InjectResult =
   | { ok: true; origin: string }
   | { ok: false; reason: "no-grant" | "blocked" | "unsupported" | "failed"; error?: string }
 
+export type LinkProblem = "closed" | "denied" | "failed"
+
+export type LinkResult = { ok: true; state: State } | { ok: false; problem: LinkProblem; detail: string; state: State }
+
 export interface PageRequests {
   "state.get": [{ tabId?: number }, State]
   "deployment.check": [{ drop: string }, DropCheck]
   "deployment.set": [{ drop: string }, State]
-  "link.start": [Record<string, never>, State]
+  "deployment.reset": [Record<string, never>, State]
+  "link.start": [Record<string, never>, LinkResult]
   "link.remove": [Record<string, never>, State]
   "hand.set": [{ hand: Hand }, State]
   "site.keep": [{ origin: string; keep: boolean }, State]

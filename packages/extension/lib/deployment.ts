@@ -1,12 +1,15 @@
 import { local } from "./storage"
 
-const DEFAULT_DROP = "https://drop.vitehub.dev"
+export const DEFAULT_DROP = "https://drop.vitehub.dev"
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"])
 
+export type DropProblem = "invalid-address" | "unreachable" | "not-a-drop" | "outdated" | "redirects" | "server-error"
+
 export type DropCheck =
   | { ok: true; drop: string; name: string; version: string; content?: string }
-  | { ok: false; error: "invalid-address" | "unreachable" | "not-a-drop" | "server-error"; status?: number }
+  | { ok: false; error: DropProblem; status?: number }
+  | { ok: false; error: "elsewhere"; drop: string }
 
 export function normalizeDrop(input: string): string | undefined {
   const text = input.trim()
@@ -46,14 +49,22 @@ export async function checkDrop(input: string, fetcher: typeof fetch = fetch): P
   if (!drop) return { ok: false, error: "invalid-address" }
   let response: Response
   try {
-    response = await fetcher(`${drop}/api/review/notes/hello`, { headers: { accept: "application/json" } })
+    response = await fetcher(`${drop}/api/review/notes/hello`, {
+      headers: { accept: "application/json" },
+      redirect: "manual",
+    })
   } catch {
     return { ok: false, error: "unreachable" }
   }
+  if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400))
+    return { ok: false, error: "redirects" }
   if (response.status >= 500) return { ok: false, error: "server-error", status: response.status }
+  if (response.status === 404 && (await offersSignIn(drop, fetcher))) return { ok: false, error: "outdated" }
   if (!response.ok) return { ok: false, error: "not-a-drop", status: response.status }
   const hello: unknown = await response.json().catch(() => undefined)
   if (!isHello(hello)) return { ok: false, error: "not-a-drop" }
+  const home = normalizeDrop(hello.drop)
+  if (home && home !== drop) return { ok: false, error: "elsewhere", drop: home }
   return {
     ok: true,
     drop,
@@ -61,6 +72,16 @@ export async function checkDrop(input: string, fetcher: typeof fetch = fetch): P
     version: hello.version,
     ...(typeof hello.content === "string" ? { content: hello.content } : {}),
   }
+}
+
+async function offersSignIn(drop: string, fetcher: typeof fetch) {
+  const response = await fetcher(`${drop}/.well-known/oauth-authorization-server`, {
+    headers: { accept: "application/json" },
+    redirect: "manual",
+  }).catch(() => undefined)
+  if (!response?.ok) return false
+  const metadata: unknown = await response.json().catch(() => undefined)
+  return !!metadata && typeof metadata === "object" && "authorization_endpoint" in metadata
 }
 
 function isHello(value: unknown): value is { drop: string; name: string; version: string; content?: unknown } {
