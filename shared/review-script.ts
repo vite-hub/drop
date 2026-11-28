@@ -3,7 +3,8 @@ import DROP_MARK from "./drop-mark.svg?raw"
 import { ELEMENT_NAMING, INK, KEY_SCROLL, PALETTE_KEY } from "./plan-runtime"
 import { MEASURE, MEASURE_CSS, measureColors } from "./measure"
 import { MARK_COLORS, MARK_TIPS } from "./utils/marker"
-import { CAPTURE } from "./viewport-capture"
+import { REVIEW_HOST_VERSION } from "./review-host"
+import { CAPTURE, DESCRIBE_PINNED } from "./viewport-capture"
 import { PRESENCE_CURSOR_STYLE, PRESENCE_CURSORS } from "./presence-cursors"
 
 const STYLE =
@@ -65,6 +66,8 @@ textarea { display: block; width: 100%; min-height: 64px; max-height: 200px; res
 .file svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 28; stroke-linecap: round; }
 .row { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
 .row .icon { margin-left: -2px; }
+.target { display: block; width: fit-content; max-width: 100%; margin: 0 0 8px; padding: 2px 8px; overflow: hidden; border-radius: 10px; background: var(--soft); color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.head select { max-width: 160px; height: 26px; padding: 0 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 12px; }
 .who { flex: 1; min-width: 0; padding-left: 2px; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .msg { margin: 6px 0 0; color: var(--error); font-size: 13px; }
 .empty { padding: 16px 12px; color: var(--muted); }
@@ -150,6 +153,9 @@ const ICONS = {
   measure: svg(
     `<rect x="24" y="84" width="208" height="88" rx="8"/><path d="M64 84v32M104 84v20M144 84v32M184 84v20"/>`,
   ),
+  prompt: svg(
+    `<path d="M96 40h64v40H96z"/><path d="M160 60h24a16 16 0 0 1 16 16v132a16 16 0 0 1-16 16H72a16 16 0 0 1-16-16V76a16 16 0 0 1 16-16h24"/><path d="M96 136h64M96 176h40"/>`,
+  ),
   link: svg(
     `<path d="M107 139a53 53 0 0 0 80 6l32-32a53 53 0 0 0-75-75l-18 18"/><path d="M149 117a53 53 0 0 0-80-6l-32 32a53 53 0 0 0 75 75l18-18"/>`,
   ),
@@ -190,15 +196,15 @@ const MARKUP = `<div class="ui">
 <div class="gauge" hidden></div>
 <div class="mark" hidden></div>
 <div class="inked" hidden><svg class="ink"></svg></div>
-<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows, or label it">${ICONS.marker}Highlight</button><button type="button" data-act="measure" aria-pressed="false" aria-keyshortcuts="S" title="Measure an element, and the space from it to another (S)">${ICONS.measure}Measure</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
+<div class="seg bar" slot="review"><button type="button" data-act="comment">${ICONS.comment}Comment</button><button type="button" data-act="mark" title="Draw on the page with a marker, a pen, or arrows, or label it">${ICONS.marker}Highlight</button><button type="button" data-act="measure" aria-pressed="false" aria-keyshortcuts="S" title="Measure an element, and the space from it to another (S)">${ICONS.measure}Measure</button><button type="button" data-act="list" hidden>${ICONS.list}<span class="count"></span></button><button type="button" data-act="copy" hidden title="Copy the review's link" aria-label="Copy the review's link">${ICONS.link}</button><button type="button" data-act="prompt" hidden title="Copy a prompt for your agent to answer the open comments" aria-label="Copy a prompt for your agent">${ICONS.prompt}</button><button type="button" data-act="pins" hidden aria-pressed="false" title="Hide comments" aria-label="Hide comments">${ICONS.eye}</button><button type="button" class="people" data-act="people" hidden aria-pressed="true"></button></div>
 <div class="seg related" slot="related" hidden><button type="button" data-act="related" aria-haspopup="true" aria-expanded="false" aria-controls="related-links">${ICONS.link}Related links</button></div>
 <div class="draw" hidden><div class="hint">Click a spot or drag over an area. Esc cancels.</div></div>
 <div class="box" hidden></div>
 <div class="paint" hidden><div class="hint">Draw on what should change. Shift draws straight, Enter when done, Esc cancels.</div></div>
 ${TOOLS}
-<form class="card pop" hidden>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
+<form class="card pop" hidden><p class="target" hidden></p>${COMPOSE("Comment", "What should change here?", "Send", true)}</form>
 <div class="card thread" role="dialog" hidden><div class="head"><span class="title"></span><button class="icon" type="button" data-act="resolve"></button><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div><form class="reply">${COMPOSE("Reply", "Reply", "Reply", false)}</form></div>
-<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><label class="away-toggle" hidden><input type="checkbox" data-act="outdated"><span></span></label><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
+<div class="card list" role="dialog" aria-label="Comments on this page" hidden><div class="head"><span class="title">Comments</span><select data-act="target" aria-label="Where comments go" hidden></select><label class="away-toggle" hidden><input type="checkbox" data-act="outdated"><span></span></label><label><input type="checkbox" data-act="resolved">Resolved</label><a target="_blank" rel="noopener">Open in Drop</a><button class="icon" type="button" data-act="close" aria-label="Close">${ICONS.close}</button></div><div class="items"></div></div>
 <nav class="links" id="related-links" aria-label="Related links" hidden></nav>
 <div class="toast" role="status" hidden></div>
 </div>`
@@ -208,20 +214,215 @@ const GAUGE_STYLE =
 @media (prefers-color-scheme: dark) { :host { ${measureColors(true)} } }
 ` + MEASURE_CSS
 
-export const REVIEW_SCRIPT = String.raw`(() => {
-  // A bookmarklet adds this script with a plain script element, where currentScript works too.
+const PAGE_HEADER = String.raw`// A bookmarklet adds this script with a plain script element, where currentScript works too.
   const script = document.currentScript || Array.from(document.scripts).find((s) => /\/review\.js(?:[?#]|$)/.test(s.src));
   if (!script || window.__dropReview) return;
   window.__dropReview = true;
   const drop = new URL(script.src).origin;
-  const api = drop + "/api/review/comments";
   const stored = "drop-review:" + drop;
-  const MAX_IMAGES = 4, MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-  let token = null;
+  let session = null, targetId = "";
   try {
     const saved = JSON.parse(sessionStorage.getItem(stored) || "null");
-    if (saved && saved.expiresAt > Date.now()) token = saved.token;
+    if (saved && saved.token && saved.expiresAt > Date.now()) session = saved;
   } catch (e) {}
+  const startDock = { edge: script.dataset.edge || "bottom", at: Number(script.dataset.at || 50) }, startCollapsed = script.hasAttribute("data-collapsed");
+  const trustedOnly = false;`
+
+const PAGE_TRANSPORT = String.raw`// Every request to Drop: the token, never cookies.
+  const fromDrop = (path, init) => fetch(drop + path, Object.assign({ credentials: "omit", signal }, init, { headers: Object.assign({ authorization: "Bearer " + (session && session.token) }, (init && init.headers) || {}) }));
+  const hostList = (page, fresh) => fromDrop(api + (fresh ? "/refresh" : "") + "?page=" + encodeURIComponent(page), fresh ? { method: "POST" } : undefined);
+  const hostCall = (path, method, json) => fromDrop(path, json === undefined ? { method } : { method, headers: { "content-type": "application/json" }, body: JSON.stringify(json) });
+  function hostUpload(path, data, files) {
+    const form = new FormData();
+    form.append("data", JSON.stringify(data));
+    files.forEach((file) => form.append(file.field, file.blob, file.name));
+    return fromDrop(path, { method: "POST", body: form });
+  }
+  // Without the token, Drop only says whether any drop links here.
+  const hostRelated = (probe) => (probe ? fetch(drop + relatedApi, { credentials: "omit", signal }) : fromDrop(relatedApi));
+  const hostPresence = () => fromDrop("/api/review/presence", { method: "POST" });
+  const presenceClient = () => import(drop + "/review-presence.js?v=3");
+  function store(value) {
+    try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
+  }
+  const resume = async () => session;
+  const targets = () => [];
+  const targetName = () => (session && session.title) || "";
+
+  // Drop's popup runs on Drop's origin, with Drop's session, and posts the token to this origin only.
+  function connect() {
+    return new Promise((resolve, reject) => {
+      const url = drop + "/review/connect?origin=" + encodeURIComponent(location.origin);
+      const popup = window.open(url, "drop-review", "popup,width=480,height=640");
+      if (!popup) return reject(new Error("Allow pop-ups from this page to sign in to Drop."));
+      let settled = false;
+      const done = (error, value) => {
+        if (settled) return;
+        settled = true;
+        removeEventListener("message", onMessage);
+        clearInterval(timer);
+        error ? reject(error) : resolve(value);
+      };
+      const onMessage = (e) => {
+        if (e.origin !== drop || e.source !== popup || !e.data || e.data.__dropReview !== true) return;
+        if (typeof e.data.token !== "string") return done(new Error(String(e.data.error || "Drop didn't connect.")));
+        save({ token: e.data.token, expiresAt: Number(e.data.expiresAt) || 0, name: String(e.data.name || ""), title: String(e.data.title || "") });
+        done(null, e.data.token);
+      };
+      addEventListener("message", onMessage);
+      // Closing the popup without connecting cancels quietly. The wait lets a token posted just before closing arrive.
+      const timer = setInterval(() => { if (popup.closed) setTimeout(() => done(new Error("")), 300); }, 500);
+    });
+  }
+
+  // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
+  const reviewUrl = () => drop + "/review/open#" + encodeURIComponent((session && session.token) || "");
+  const linkReview = (a) => { a.href = reviewUrl(); };
+  // Copy link and Copy prompt go through Drop the same way: a small Drop window copies there and closes. Each request
+  // gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
+  function dropWindow(query, blocked) {
+    const url = drop + "/review/open?" + query + "#" + encodeURIComponent((session && session.token) || "");
+    if (!window.open(url, "_blank", "popup,width=420,height=360")) say(blocked);
+  }
+  const copyReviewLink = () => dropWindow("copy", "Allow pop-ups from this page to copy the review's link.");
+  const copyPrompt = () => dropWindow("prompt", "Allow pop-ups from this page to copy the prompt.");`
+
+const PAGE_CAPTURE = String.raw`${CAPTURE}
+  // Loaded when someone presses Comment, so the box's screenshot can start the moment it's drawn.
+  const warmCapture = () => { loadScreenshot().catch(() => { screenshotModule = null; }); };`
+
+const EXTENSION_HEADER = String.raw`// The extension's content script sets the host before it runs this (review-host.ts). A pill already on the page,
+  // the page's own or this one, keeps it: the content script asks it to yield first.
+  const bridge = globalThis.__dropReviewHost;
+  if (!bridge || bridge.version !== ${REVIEW_HOST_VERSION} || window.__dropReview || document.querySelector("drop-review")) return;
+  window.__dropReview = true;
+  const drop = new URL(bridge.drop).origin;
+  const targets = () => (Array.isArray(bridge.targets) ? bridge.targets : []);
+  let session = null, targetId = bridge.target || (targets()[0] && targets()[0].id) || "";
+  const startDock = { edge: "bottom", at: 50 }, startCollapsed = false;
+  const trustedOnly = true;`
+
+const EXTENSION_TRANSPORT = String.raw`// One message to the extension's background for the current target. Nothing goes once the toolbar is gone.
+  async function hostSend(type, fields) {
+    if (signal.aborted) throw new Error("");
+    const answer = await bridge.send(Object.assign({ v: ${REVIEW_HOST_VERSION}, type, target: targetId }, fields));
+    if (signal.aborted) throw new Error("");
+    return answer;
+  }
+  const bytesOf = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  async function base64Of(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let text = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(text);
+  }
+  // The background's answer, as the Response a fetch would give.
+  async function answered(pending) {
+    const answer = await pending;
+    if (!answer || !(answer.status >= 200 && answer.status <= 599)) throw new Error("Couldn't reach Drop.");
+    const empty = answer.status === 204 || answer.status === 205 || answer.status === 304;
+    const body = empty ? null : typeof answer.base64 === "string" ? bytesOf(answer.base64) : answer.text || "";
+    return new Response(body, { status: answer.status, headers: answer.type ? { "content-type": answer.type } : {} });
+  }
+  const hostList = (page, fresh) => answered(hostSend("list", fresh ? { page, refresh: true } : { page }));
+  const hostCall = (path, method, json) => answered(hostSend("call", json === undefined ? { path, method } : { path, method, json }));
+  async function hostUpload(path, data, files) {
+    const sent = await Promise.all(files.map(async (file) => ({ field: file.field, name: file.name, type: file.blob.type, base64: await base64Of(file.blob) })));
+    return answered(hostSend("upload", { path, data, files: sent }));
+  }
+  const hostRelated = (probe) => answered(hostSend("related", probe ? { probe: true } : {}));
+  const hostPresence = () => answered(hostSend("presence", {}));
+  // The extension bundles the Realtime client; without it there are no faces or cursors.
+  async function presenceClient() {
+    if (!bridge.realtime) throw new Error("No Realtime client");
+    return bridge.realtime;
+  }
+  // The background keeps the token. A session that ended is forgotten there too.
+  function store(value) {
+    if (!value) hostSend("session", { clear: true }).catch(() => {});
+  }
+  async function resume() {
+    try {
+      const found = await hostSend("session", {});
+      if (found && found.expiresAt > Date.now()) session = found;
+    } catch (e) {}
+    return session;
+  }
+  async function connect() {
+    const found = await hostSend("connect", { origin: location.origin });
+    if (!found) throw new Error("Drop didn't connect.");
+    save(found);
+  }
+  const targetName = () => {
+    const found = targets().find((target) => target.id === targetId);
+    return found ? found.name + " · " + found.access : "";
+  };
+  // Drop's windows open from the background, which holds the review's link.
+  const openInDrop = (what) => hostSend("open", { what }).catch((error) => { if (error.message) say(error.message); });
+  const linkReview = (a) => {
+    a.href = drop + "/";
+    a.onclick = (e) => { e.preventDefault(); void openInDrop("review"); };
+  };
+  const copyReviewLink = () => openInDrop("copy-link");
+  const copyPrompt = () => openInDrop("copy-prompt");`
+
+const EXTENSION_CAPTURE = String.raw`${DESCRIBE_PINNED}
+  const MAX_BYTES = 4 * 1024 * 1024;
+  const painted = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  const warmCapture = () => {};
+  // The background takes the visible tab while the toolbar hides, and the shot is cut to the viewport and scaled here
+  // as a page's is: at most two pixels per CSS pixel as WebP, or one as JPEG when that's too big.
+  let hiding = 0, shownOpacity = "";
+  async function captureViewport(skip, stale) {
+    const width = innerWidth, height = innerHeight;
+    if (!hiding++) shownOpacity = skip.style.opacity;
+    skip.style.setProperty("opacity", "0", "important");
+    let taken;
+    try {
+      await painted();
+      await painted();
+      taken = (await hostSend("capture", {})).dataUrl;
+    } finally {
+      if (!--hiding) skip.style.setProperty("opacity", shownOpacity);
+    }
+    if (stale && stale()) return null;
+    const type = (/^data:([^;,]+)/.exec(taken) || [])[1] || "image/png";
+    const image = await createImageBitmap(new Blob([bytesOf(taken.slice(taken.indexOf(",") + 1))], { type }));
+    const encode = (canvas, type, quality) => new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    const draw = (scale) => {
+      const canvas = document.createElement("canvas"), k = image.width / width;
+      canvas.width = Math.round(width * scale); canvas.height = Math.round(height * scale);
+      canvas.getContext("2d").drawImage(image, 0, 0, image.width, Math.min(image.height, height * k), 0, 0, canvas.width, canvas.height);
+      return canvas;
+    };
+    let canvas = draw(Math.min(window.devicePixelRatio || 1, 2));
+    try {
+      let shot = await encode(canvas, "image/webp", 0.85);
+      if (!shot || shot.size > MAX_BYTES) {
+        canvas.width = canvas.height = 0;
+        canvas = draw(1);
+        shot = await encode(canvas, "image/jpeg", 0.75);
+      }
+      return shot && shot.size <= MAX_BYTES ? shot : null;
+    } finally {
+      canvas.width = canvas.height = 0;
+      image.close();
+    }
+  }`
+
+export function reviewScript({ host }: { host: "page" | "extension" }) {
+  const page = host === "page"
+  return String.raw`(() => {
+  ${page ? PAGE_HEADER : EXTENSION_HEADER}
+  // The toolbar's listeners, timers and requests stop with this signal: drop-review:yield (below) takes it off the page.
+  const life = new AbortController(), signal = life.signal;
+  const addEventListener = (type, listener, options) =>
+    window.addEventListener(type, listener, Object.assign(typeof options === "object" ? {} : { capture: Boolean(options) }, options, { signal }));
+  const every = (run, ms) => { const id = setInterval(run, ms); signal.addEventListener("abort", () => clearInterval(id)); };
+  const api = "/api/review/comments", relatedApi = "/api/review/related";
+  const MAX_IMAGES = 4, MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+  ${page ? PAGE_TRANSPORT : EXTENSION_TRANSPORT}
 
   ${ELEMENT_NAMING}
 
@@ -269,12 +470,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     slots: ["review", "related", "highlight"],
     storage: { collapsed: "drop-review-collapsed", dock: "drop-review-dock" },
     initial: {
-      dock: ViteHubPagePill.readViteHubPageDock({ edge: script.dataset.edge || "bottom", at: Number(script.dataset.at || 50) }),
-      collapsed: script.hasAttribute("data-collapsed"),
+      dock: ViteHubPagePill.readViteHubPageDock(startDock),
+      collapsed: startCollapsed,
     },
     onPlace: dockCards,
     parent: $(".ui"),
-    signal: new AbortController().signal,
+    signal,
   });
   pill.append(bar, related, tools);
   let area = null, start = null, busy = false, toastTimer = 0;
@@ -286,16 +487,17 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const pinFor = new Map(), elementFor = new Map(), imageUrls = new Map(), shownImages = new Set();
 
   function save(value) {
-    token = value ? value.token : null;
-    try { value ? sessionStorage.setItem(stored, JSON.stringify(value)) : sessionStorage.removeItem(stored); } catch (e) {}
-    if (!token) { threads = []; forgetRelated(); leavePresence(); render(); }
+    session = value || null;
+    store(session);
+    if (!session) { threads = []; forgetRelated(); leavePresence(); render(); }
   }
 
   function say(text, link) {
     toast.textContent = text;
     if (link) {
       const a = document.createElement("a");
-      a.href = link; a.target = "_blank"; a.rel = "noopener"; a.textContent = "Open in Drop";
+      a.target = "_blank"; a.rel = "noopener"; a.textContent = "Open in Drop";
+      linkReview(a);
       toast.appendChild(a);
     }
     toast.hidden = false;
@@ -303,61 +505,49 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     toastTimer = setTimeout(() => { toast.hidden = true; }, 5000);
   }
 
-  // Drop's popup runs on Drop's origin, with Drop's session, and posts the token to this origin only.
-  function connect() {
-    return new Promise((resolve, reject) => {
-      const url = drop + "/review/connect?origin=" + encodeURIComponent(location.origin);
-      const popup = window.open(url, "drop-review", "popup,width=480,height=640");
-      if (!popup) return reject(new Error("Allow pop-ups from this page to sign in to Drop."));
-      let settled = false;
-      const done = (error, value) => {
-        if (settled) return;
-        settled = true;
-        removeEventListener("message", onMessage);
-        clearInterval(timer);
-        error ? reject(error) : resolve(value);
-      };
-      const onMessage = (e) => {
-        if (e.origin !== drop || e.source !== popup || !e.data || e.data.__dropReview !== true) return;
-        if (typeof e.data.token !== "string") return done(new Error(String(e.data.error || "Drop didn't connect.")));
-        save({ token: e.data.token, expiresAt: Number(e.data.expiresAt) || 0, name: String(e.data.name || "") });
-        done(null, e.data.token);
-      };
-      addEventListener("message", onMessage);
-      // Closing the popup without connecting cancels quietly. The wait lets a token posted just before closing arrive.
-      const timer = setInterval(() => { if (popup.closed) setTimeout(() => done(new Error("")), 300); }, 500);
-    });
-  }
+  const authorName = () => (session && session.name) || "";
 
-  // Drop opens the review from the token, for people it's shared with. The page never learns the review's link.
-  const reviewUrl = () => drop + "/review/open#" + encodeURIComponent(token || "");
-  // Copy link goes through Drop the same way: a small Drop window copies the link there and closes.
-  // Each request gets a fresh document: an earlier window may still be waiting for a manual copy of another review.
-  function copyReviewLink() {
-    const url = drop + "/review/open?copy#" + encodeURIComponent(token || "");
-    if (!window.open(url, "_blank", "popup,width=420,height=360")) say("Allow pop-ups from this page to copy the review's link.");
-  }
-
-  function authorName() {
-    try { return (JSON.parse(sessionStorage.getItem(stored) || "null") || {}).name || ""; } catch (e) { return ""; }
-  }
-
-  // Every request to Drop: the token, never cookies. A 401 means the session ended.
-  async function call(path, init) {
-    const response = await fetch(path, Object.assign({ credentials: "omit" }, init, { headers: Object.assign({ authorization: "Bearer " + token }, (init && init.headers) || {}) }));
+  // Every answer from Drop: a 401 means the session ended.
+  async function checked(pending) {
+    const response = await pending;
     if (response.status === 401) { save(null); throw new Error("Your review session ended. Connect again to comment."); }
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || "Drop didn't take that.");
     return response;
   }
+  const imageFile = (file) => ({ field: "image", blob: file, name: file.name || "image" });
 
-  // The words and images a box sends: JSON alone, or multipart when there are images.
-  function bodyOf(data, files) {
-    if (!files.length) return { body: JSON.stringify(data), headers: { "content-type": "application/json" } };
-    const form = new FormData();
-    form.append("data", JSON.stringify(data));
-    files.forEach((file) => form.append("image", file, file.name || "image"));
-    return { body: form };
+  // Where comments go: the review this session is for, or in the extension, the target picked in the list.
+  const targetChip = $(".target", pop), targetSwitch = $("[data-act=target]", list), promptButton = $("[data-act=prompt]", bar);
+  function paintTarget() {
+    const name = targetName();
+    targetChip.textContent = name;
+    targetChip.title = name ? "Your comment goes to " + name : "";
+    targetChip.hidden = !name;
+    const all = targets();
+    targetSwitch.hidden = all.length < 2;
+    if (targetSwitch.hidden) return;
+    targetSwitch.replaceChildren(...all.map((target) => {
+      const option = document.createElement("option");
+      option.value = target.id;
+      option.textContent = target.name + " · " + target.access;
+      return option;
+    }));
+    targetSwitch.value = targetId;
   }
+  // Another target has its own session, threads and people. A comment on its way finishes first.
+  async function switchTarget(id) {
+    if (id === targetId) return;
+    if (busy || sending) { targetSwitch.value = targetId; return say("Sending your comment…"); }
+    targetId = id;
+    session = null; reads++;
+    closeThread(); forgetRelated(); leavePresence(); paintTarget();
+    await resume();
+    if (targetId !== id) return;
+    if (session) await refresh();
+    else { threads = []; render(); }
+    paintTarget();
+  }
+  targetSwitch.addEventListener("change", () => void switchTarget(targetSwitch.value));
 
   // ---- Threads on the page ----
 
@@ -368,12 +558,11 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   let reads = 0;
   let primaryComments = false;
   async function refresh() {
-    if (!token) return;
+    if (!session) return;
     here = pageKey();
     const read = ++reads;
     try {
-      const path = api + (primaryComments ? "/refresh" : "") + "?page=" + encodeURIComponent(here);
-      const response = await call(path, primaryComments ? { method: "POST" } : undefined);
+      const response = await checked(hostList(here, primaryComments));
       const answer = await response.json();
       if (read !== reads || here !== pageKey()) return;
       threads = Array.isArray(answer.threads) ? answer.threads : [];
@@ -487,9 +676,10 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
 
   function render() {
-    const shown = token ? visible() : [];
+    const shown = session ? visible() : [];
     // The list shows once the page has threads: before someone connects there is nothing to count.
     copyButton.hidden = pinsButton.hidden = listButton.hidden = !threads.length;
+    promptButton.hidden = !threads.some((item) => !item.resolved);
     if (listButton.hidden) list.hidden = true;
     for (const [n, pin] of pinFor) if (!shown.some((item) => item.n === n && item.element)) { pin.remove(); pinFor.delete(n); }
     for (const item of shown) {
@@ -601,7 +791,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const show = (url) => { img.src = url; a.href = url; };
     if (known) known.then(show, () => {});
     else {
-      const loading = call(drop + "/api/review/images/" + encodeURIComponent(id)).then((r) => r.blob()).then((b) => URL.createObjectURL(b));
+      const loading = checked(hostCall("/api/review/images/" + encodeURIComponent(id), "GET")).then((r) => r.blob()).then((b) => URL.createObjectURL(b));
       loading.catch(() => imageUrls.delete(id));
       imageUrls.set(id, loading);
       loading.then(show, () => { a.textContent = name || "Image"; });
@@ -703,7 +893,8 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     renderList();
   }
   function renderList() {
-    $("a", list).href = reviewUrl();
+    linkReview($("a", list));
+    paintTarget();
     $(".title", list).textContent = listOnly ? listOnly.length + " comments here" : "Comments";
     listItems.textContent = "";
     const shown = visible()
@@ -738,19 +929,18 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // Before someone connects, Drop only says whether any drop links here, which shows the button. The first press
   // connects, as Comment does, then lists the drops this person would find in Drop anyway (server/utils/related.ts),
   // each with a handle that /review/open takes in place of its link, and their links, like the pull request.
-  const relatedApi = drop + "/api/review/related";
   let relatedLinks = null, relatedAsk = null, relatedOpening = false, relatedIntent = 0;
   async function probeRelated() {
     try {
-      const response = await fetch(relatedApi, { credentials: "omit" });
+      const response = await hostRelated(true);
       related.hidden = !(response.ok && (await response.json()).linked === true);
     } catch (e) {}
   }
   async function findRelated() {
     await ensureToken();
     let answer;
-    try { answer = await (await call(relatedApi)).json(); }
-    catch (error) { throw new Error(token ? "Couldn't reach Drop." : error.message); }
+    try { answer = await (await checked(hostRelated(false))).json(); }
+    catch (error) { throw new Error(session ? "Couldn't reach Drop." : error.message); }
     // One list: each drop, then the links of its not listed yet.
     return (answer.groups || []).flatMap((group) => [
       { url: drop + "/review/open#doc=" + encodeURIComponent(group.open), label: group.title, detail: "Drop", icons: [drop + "/favicon.svg", drop + "/favicon.ico"] },
@@ -868,6 +1058,9 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
     const submit = $("[type=submit]", form);
     submit.title = submit.textContent + " (" + (isMac ? "⌘" : "Ctrl+") + "Enter)";
+    // In the extension only the reviewer's own press or ⌘Enter sends: a click a script makes does nothing.
+    let armed = false;
+    if (trustedOnly) submit.addEventListener("click", (e) => { if (e.isTrusted) armed = true; else e.preventDefault(); });
     const picked = [];
     const show = (text) => { msg.textContent = text; msg.hidden = !text; };
     function add(incoming) {
@@ -901,12 +1094,18 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     form.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault(); });
     form.addEventListener("drop", (e) => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); add(Array.from(e.dataTransfer.files)); } });
     form.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); }
+      if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.isComposing) return;
+      e.preventDefault(); e.stopPropagation();
+      if (trustedOnly && !e.isTrusted) return;
+      armed = true;
+      form.requestSubmit();
     });
     return {
       note, show,
       files: () => picked.map((item) => item.file),
       reset() { picked.splice(0).forEach((item) => URL.revokeObjectURL(item.url)); paint(); note.value = ""; show(""); },
+      // Whether this submit may send; each press counts once.
+      sendable() { const ok = armed || !trustedOnly; armed = false; return ok; },
     };
   }
   const newBox = composer(pop), replyBox = composer($(".reply", thread));
@@ -924,7 +1123,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     closeThread();
     list.hidden = true;
     closeRelated();
-    loadScreenshot().catch(() => { screenshotModule = null; });
+    warmCapture();
     pill.hidden = true;
     draw.hidden = false;
     layout();
@@ -986,6 +1185,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     area = { rect: r, viewport: { width: innerWidth, height: innerHeight }, selector: pathOf(target), label: describe(target), spot, shot };
     const width = Math.min(320, innerWidth - 16);
     pop.style.width = width + "px";
+    paintTarget();
     pop.hidden = false;
     const anchor = point ? { left: point.x, top: point.y, bottom: point.y } : r;
     const below = anchor.bottom + 8 + pop.offsetHeight <= innerHeight;
@@ -1209,7 +1409,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     topLayerNotice();
   }
   for (const type of ["toggle", "fullscreenchange"])
-    document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, true);
+    document.addEventListener(type, () => { if (!gauge.hidden && siteInTopLayer()) stopForTopLayer(); }, { capture: true, signal });
   const releaseSitePointer = (event) => { if (event.isTrusted) sitePointers.delete(event.pointerId); };
   addEventListener("pointercancel", releaseSitePointer, true);
   for (const type of ["pointermove", "lostpointercapture"]) {
@@ -1260,13 +1460,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   }
   addEventListener("keydown", measureKey);
 
-  ${CAPTURE}
+  ${page ? PAGE_CAPTURE : EXTENSION_CAPTURE}
   // Each comment's screenshot; cancel() stops the one still being drawn for a comment that's gone.
   let captureRun = 0;
   const capture = () => { const run = ++captureRun; return captureViewport(host, () => run !== captureRun); };
 
   async function ensureToken() {
-    if (token) return;
+    if (session) return;
     await connect();
     void refresh();
   }
@@ -1296,6 +1496,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   showOutdated.addEventListener("change", renderList);
   $("[data-act=close]", list).addEventListener("click", () => { list.hidden = true; });
   copyButton.addEventListener("click", copyReviewLink);
+  promptButton.addEventListener("click", copyPrompt);
   $("[data-act=close]", thread).addEventListener("click", closeThread);
   $("[data-act=cancel]", pop).addEventListener("click", cancel);
 
@@ -1304,7 +1505,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (!item || busy) return;
     busy = true;
     try {
-      await call(api + "/" + item.n, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ resolved: !item.resolved }) });
+      await checked(hostCall(api + "/" + item.n, "PATCH", { resolved: !item.resolved }));
       item.resolved = !item.resolved;
       commented();
       if (item.resolved && !showResolved.checked) { closeThread(); say("Resolved #" + item.n + "."); }
@@ -1316,13 +1517,15 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   $(".reply", thread).addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!replyBox.sendable()) return;
     const item = threads.find((t) => t.n === openN);
     const body = replyBox.note.value.trim();
     if (!item || !body || busy) return;
     busy = true; replySend.disabled = true; replyBox.show("");
     try {
       await ensureToken();
-      await call(api + "/" + item.n + "/replies", Object.assign({ method: "POST" }, bodyOf({ body: body.slice(0, 4000) }, replyBox.files())));
+      const path = api + "/" + item.n + "/replies", data = { body: body.slice(0, 4000) }, files = replyBox.files().map(imageFile);
+      await checked(files.length ? hostUpload(path, data, files) : hostCall(path, "POST", data));
       replyBox.reset();
       commented();
       await refresh();
@@ -1344,11 +1547,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const unreachable = (response) => !response || response.status === 502 || response.status === 503 || response.status === 504;
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  async function postComment(form, data) {
+  async function postComment(data, files) {
     const until = Date.now() + RETRY_FOR;
-    const attempt = () => fetch(api, { method: "POST", body: form, headers: { authorization: "Bearer " + token }, credentials: "omit" }).catch(() => null);
+    const attempt = () => hostUpload(api, data, files).catch(() => null);
     let response = await attempt();
     for (let wait = 2000; unreachable(response); wait = Math.min(wait * 2, 15000)) {
+      if (signal.aborted) throw new Error("");
       if (Date.now() + wait > until) throw new Error("Couldn't reach Drop. Your comment is still here: press Send to try again.");
       unsend();
       newBox.show("Can't reach Drop. Trying again…");
@@ -1366,7 +1570,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   async function landed(page, requestId) {
     try {
-      const response = await fetch(api + "?page=" + encodeURIComponent(page), { headers: { authorization: "Bearer " + token }, credentials: "omit" });
+      const response = await hostList(page, false);
       // A session that ended goes to the resend, whose 401 says so.
       if (response.status === 401) return null;
       if (!response.ok) return undefined;
@@ -1410,6 +1614,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
 
   pop.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (!newBox.sendable()) return;
     const body = newBox.note.value.trim();
     if (!body || busy || !area) return;
     busy = true; send.disabled = true; send.textContent = "Sending…"; newBox.show("");
@@ -1429,19 +1634,16 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       // The screenshot may still be drawing; the pin doesn't wait for it, or for Drop.
       const from = pageKey();
       showSending(data);
-      const form = new FormData();
-      form.append("data", JSON.stringify(data));
       const shot = await area.shot;
-      if (shot) form.append("screenshot", shot, "screenshot");
-      newBox.files().forEach((file) => form.append("image", file, file.name || "image"));
-      const answer = await postComment(form, data);
+      const files = (shot ? [{ field: "screenshot", blob: shot, name: "screenshot" }] : []).concat(newBox.files().map(imageFile));
+      const answer = await postComment(data, files);
       const saved = answer.thread && answer.thread.n === answer.n ? answer.thread : null;
       forgetSending();
       if (saved && from === pageKey()) { reads++; threads = [saved].concat(threads.filter((item) => item.n !== saved.n)); }
       commented();
       newBox.reset();
       cancel();
-      say("Sent as #" + answer.n + ". ", reviewUrl());
+      say("Sent as #" + answer.n + ". ", true);
       // A resend that found the earlier submission answers its number only.
       if (saved) render(); else void refresh();
     } catch (error) {
@@ -1465,12 +1667,12 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   const herePage = () => location.origin + pageKey();
 
   async function joinPresence() {
-    if (!token || presence || joining) return;
+    if (!session || presence || joining) return;
     joining = true;
     try {
-      const answer = await (await call(drop + "/api/review/presence", { method: "POST" })).json();
-      const client = await import(drop + "/review-presence.js?v=3");
-      if (!token || presence) return;
+      const answer = await (await checked(hostPresence())).json();
+      const client = await presenceClient();
+      if (!session || presence || signal.aborted) return;
       const room = client.connectRealtimeRoom("presence", answer.room, { origin: drop, params: { ticket: answer.ticket }, identity: answer.you });
       room.setLocal("active", active);
       room.setLocal("at", herePage());
@@ -1578,7 +1780,7 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     if (presence) presence.room.setLocal("cursor", null);
   }
   addEventListener("pointermove", pointerMoved, { capture: true, passive: true });
-  document.documentElement.addEventListener("pointerleave", pointerLeft);
+  document.documentElement.addEventListener("pointerleave", pointerLeft, { signal });
   addEventListener("blur", pointerLeft);
   for (const type of ["keydown", "scroll", "pointerdown"]) addEventListener(type, () => { lastInput = Date.now(); }, { capture: true, passive: true });
   // Gone from the others' faces after a minute without input, or while the tab is hidden.
@@ -1588,13 +1790,13 @@ export const REVIEW_SCRIPT = String.raw`(() => {
     active = now;
     if (presence) presence.room.setLocal("active", active);
   }
-  setInterval(checkActive, 5000);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") lastInput = Date.now(); checkActive(); });
+  every(checkActive, 5000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") lastInput = Date.now(); checkActive(); }, { signal });
 
   // Pins follow their elements: on scroll anywhere, on resize, and when the page changes under them.
   addEventListener("scroll", schedule, { capture: true, passive: true });
   addEventListener("resize", schedule, { passive: true });
-  new MutationObserver((records) => {
+  const observer = new MutationObserver((records) => {
     const changes = records.filter((record) => host !== record.target && !host.contains(record.target));
     if (!changes.length) return;
     const labels = changes.filter((record) => record.type !== "attributes" || record.attributeName === "alt");
@@ -1602,18 +1804,19 @@ export const REVIEW_SCRIPT = String.raw`(() => {
       if (known.el && labels.some((record) => known.el.contains(record.target))) elementFor.delete(n);
     changedAt = performance.now();
     schedule();
-  }).observe(document.documentElement, { childList: true, characterData: true, attributes: true, subtree: true });
+  });
+  observer.observe(document.documentElement, { childList: true, characterData: true, attributes: true, subtree: true });
   // A single-page app changes the address without a load: each new page has its own threads.
-  setInterval(() => {
-    if (token && pageKey() !== here) {
+  every(() => {
+    if (session && pageKey() !== here) {
       closeThread(); elementFor.clear(); void refresh();
       if (presence) { presence.room.setLocal("at", herePage()); presence.room.setLocal("cursor", null); onPresence(); }
     }
     else schedule();
   }, 1000);
   // Other reviewers' new threads and replies show up while someone looks.
-  setInterval(() => { if (token && document.visibilityState === "visible" && !busy) void refresh(); }, 30000);
-  addEventListener("focus", () => { if (token) void refresh(); });
+  every(() => { if (session && document.visibilityState === "visible" && !busy) void refresh(); }, 30000);
+  addEventListener("focus", () => { if (session) void refresh(); });
 
   // In Drop's site review frame, Drop's window keeps focus under Comments and passes the scroll keys on, as it does for
   // a drop's own frame. Highlight holds the page still.
@@ -1652,7 +1855,26 @@ export const REVIEW_SCRIPT = String.raw`(() => {
   // element, not here, so it's stopped on its way down when focus is moving into the toolbar. Otherwise the note's box
   // loses focus as it opens and the words go into the slideover (drop#164).
   addEventListener("focusout", (e) => { if (e.relatedTarget === host) e.stopPropagation(); }, true);
+  // drop-review:yield takes the toolbar off the page, as the browser extension asks before it puts its own on. The
+  // listeners above go with the signal; the rest goes here, and a new copy of the script can start after.
+  signal.addEventListener("abort", () => {
+    observer.disconnect();
+    leavePresence();
+    cursors.set([]);
+    captureRun++;
+    clearTimeout(toastTimer); clearTimeout(pointerTimer);
+    cancelAnimationFrame(frame); cancelAnimationFrame(gaugeFrame);
+    imageUrls.forEach((loading) => loading.then((url) => URL.revokeObjectURL(url), () => {}));
+    imageUrls.clear();
+    host.remove();
+    window.__dropReview = false;
+  });
+  addEventListener("drop-review:yield", () => life.abort());
   document.documentElement.appendChild(host);
-  void refresh();
+  paintTarget();
+  ${page ? "void refresh();" : "void resume().then(refresh);"}
   void probeRelated();
 })();`
+}
+
+export const REVIEW_SCRIPT = reviewScript({ host: "page" })

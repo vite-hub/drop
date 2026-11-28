@@ -7,7 +7,9 @@ useSeoMeta({ title: `Open the ${thing}`, robots: "noindex, nofollow" })
 const { data: me } = await useMe()
 const ready = useMounted()
 const error = ref("")
-const copying = doc === null && "copy" in route.query
+const prompting = doc === null && "prompt" in route.query
+const copying = prompting || (doc === null && "copy" in route.query)
+const what = prompting ? "prompt" : "review's link"
 const link = ref("")
 const copied = ref(false)
 function closeWindow() {
@@ -30,14 +32,20 @@ onMounted(async () => {
   if (!doc && !token)
     return (error.value = `Press Comment on the site first, then ${copying ? "copy" : "open"} the review from there.`)
   if (!me.value) return
+  const reader = me.value.id
   try {
     const found = await openReview(doc === null ? { token } : { doc })
     if (!copying || !("link" in found) || !found.link) return await navigateTo(found.to, { replace: true })
-    link.value = found.link
+    if (!prompting) link.value = found.link
+    else {
+      const text = await reviewPrompt(found.to.replace(/^\/drops\//, ""), reader)
+      if (!text) return (error.value = "No comment on this review is waiting for an answer.")
+      link.value = text
+    }
     await copyLink()
   } catch (cause) {
     reportClientError("review-open", cause)
-    error.value = errorText(cause, copying ? "Couldn't copy this review's link." : `Couldn't open this ${thing}.`)
+    error.value = errorText(cause, copying ? `Couldn't copy this ${what}.` : `Couldn't open this ${thing}.`)
   }
 })
 
@@ -56,13 +64,13 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
       <div class="rounded-xl border border-default bg-default p-6">
         <template v-if="ready && error">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">
-            {{ copying ? "Can't copy the review's link" : `Can't open the ${thing}` }}
+            {{ copying ? `Can't copy the ${what}` : `Can't open the ${thing}` }}
           </h1>
           <p class="mt-2 text-sm leading-relaxed text-muted" role="alert">{{ error }}</p>
         </template>
         <template v-else-if="ready && !me">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted">
-            {{ copying ? "Sign in to copy the review's link" : `Sign in to open the ${thing}` }}
+            {{ copying ? `Sign in to copy the ${what}` : `Sign in to open the ${thing}` }}
           </h1>
           <p class="mt-2 text-sm leading-relaxed text-muted">
             {{
@@ -82,7 +90,7 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
         </template>
         <template v-else-if="ready && link">
           <h1 class="text-lg font-semibold tracking-tight text-highlighted" role="status">
-            {{ copied ? "Link copied" : "The review's link" }}
+            {{ copied ? (prompting ? "Prompt copied" : "Link copied") : `The ${what}` }}
           </h1>
           <p class="mt-2 truncate text-sm text-muted">{{ link }}</p>
           <UButton
@@ -91,7 +99,7 @@ const signInTo = computed(() => ({ path: "/signin", query: { redirect: route.ful
             class="mt-6"
             color="neutral"
             icon="i-mingcute-link-line"
-            label="Copy link"
+            :label="prompting ? 'Copy prompt' : 'Copy link'"
             @click="copyLink"
           />
         </template>

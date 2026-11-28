@@ -1,5 +1,24 @@
 const SCREENSHOT_MODULE = "https://esm.sh/modern-screenshot@4.7.0"
 
+export const DESCRIBE_PINNED = String.raw`const PINNED_NAMES = { header: "header", nav: "navigation", footer: "footer", aside: "sidebar", button: "button", a: "link", dialog: "dialog" };
+  // The element under a box, and the sticky or fixed one it's on with the CSS that pins it, so whoever fixes the page
+  // finds the rule: like div "Combo 12,400 On hand" in a sticky element (its parent: top: 48px; z-index: 20; height: 0).
+  function describe(el) {
+    const label = labelOf(el), node = pinnedOf(el);
+    if (!node) return label;
+    const style = getComputedStyle(node), role = node.getAttribute("role"), r = node.getBoundingClientRect();
+    const what = style.position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
+    // A sticky element's insets as set in CSS; a fixed one's come back in pixels even where they're auto, so they're left out.
+    const sides = style.position === "sticky" ? ["top", "right", "bottom", "left"] : [];
+    const css = sides.filter((side) => style[side] !== "auto").map((side) => side + ": " + style[side]);
+    if (style.zIndex !== "auto") css.push("z-index: " + style.zIndex);
+    if (r.height < 1) css.push("height: 0");
+    let up = 0;
+    for (let n = el; n !== node; n = n.parentElement) up++;
+    if (!up) return label + " (" + what + (css.length ? ": " + css.join("; ") : "") + ")";
+    return label + " in a " + what + " (" + (up === 1 ? "its parent" : up + " levels up") + (css.length ? ": " + css.join("; ") : "") + ")";
+  }`
+
 export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_MS = 300, MAX_REDRAWS = 2, SLICE_MS = 30;
   let screenshotModule = null;
   // Loaded when someone presses Comment, so the box's screenshot can start the moment it's drawn.
@@ -242,21 +261,4 @@ export const CAPTURE = String.raw`const MAX_BYTES = 4 * 1024 * 1024, LOAD_WAIT_M
     };
   }
 
-  const PINNED_NAMES = { header: "header", nav: "navigation", footer: "footer", aside: "sidebar", button: "button", a: "link", dialog: "dialog" };
-  // The element under a box, and the sticky or fixed one it's on with the CSS that pins it, so whoever fixes the page
-  // finds the rule: like div "Combo 12,400 On hand" in a sticky element (its parent: top: 48px; z-index: 20; height: 0).
-  function describe(el) {
-    const label = labelOf(el), node = pinnedOf(el);
-    if (!node) return label;
-    const style = getComputedStyle(node), role = node.getAttribute("role"), r = node.getBoundingClientRect();
-    const what = style.position + " " + (PINNED_NAMES[node.localName] || (role && /^[a-z]{3,20}$/.test(role) ? role : "element"));
-    // A sticky element's insets as set in CSS; a fixed one's come back in pixels even where they're auto, so they're left out.
-    const sides = style.position === "sticky" ? ["top", "right", "bottom", "left"] : [];
-    const css = sides.filter((side) => style[side] !== "auto").map((side) => side + ": " + style[side]);
-    if (style.zIndex !== "auto") css.push("z-index: " + style.zIndex);
-    if (r.height < 1) css.push("height: 0");
-    let up = 0;
-    for (let n = el; n !== node; n = n.parentElement) up++;
-    if (!up) return label + " (" + what + (css.length ? ": " + css.join("; ") : "") + ")";
-    return label + " in a " + what + " (" + (up === 1 ? "its parent" : up + " levels up") + (css.length ? ": " + css.join("; ") : "") + ")";
-  }`
+  ${DESCRIBE_PINNED}`

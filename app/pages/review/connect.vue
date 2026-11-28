@@ -22,7 +22,7 @@ function handOver(answer: ReviewToken) {
   issued.value = answer
   if (!window.opener) return (state.value = "lost")
   window.opener.postMessage(
-    { __dropReview: true, token: answer.token, expiresAt: answer.expiresAt, name: answer.name },
+    { __dropReview: true, token: answer.token, expiresAt: answer.expiresAt, name: answer.name, title: answer.title },
     answer.origin,
   )
   state.value = "done"
