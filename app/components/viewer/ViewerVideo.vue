@@ -49,10 +49,14 @@ onMounted(measure)
 onMounted(() => {
   const element = video.value
   now.value = element?.currentTime ?? 0
-  if (!element || (!props.start && !props.resume)) return
+  if (!element || (props.start === undefined && !props.resume)) return
   const go = () => {
-    const at = props.start || (props.resume && mediaSpotFor(readMediaSpots(props.resume), 0, element.duration))
-    if (at) element.currentTime = Math.min(at, element.duration || at)
+    const at =
+      props.start ??
+      (props.resume ? mediaSpotFor(readMediaSpots(props.resume), 0, props.src, element.duration) : undefined)
+    if (at === undefined) return
+    const target = Math.min(at, element.duration || at)
+    if (element.currentTime !== target) element.currentTime = target
   }
   if (element.readyState >= HTMLMediaElement.HAVE_METADATA) go()
   else element.addEventListener("loadedmetadata", go, { once: true })
@@ -63,7 +67,7 @@ function saveSpot(event: Event) {
   if (!props.resume || !element) return
   if (event.type === "timeupdate" && performance.now() - savedAt < 2000) return
   savedAt = performance.now()
-  saveMediaSpot(props.resume, 0, event.type === "ended" ? 0 : element.currentTime, element.duration)
+  saveMediaSpot(props.resume, 0, props.src, event.type === "ended" ? 0 : element.currentTime, element.duration)
 }
 useEventListener(video, ["timeupdate", "pause", "seeked", "ended"], saveSpot)
 

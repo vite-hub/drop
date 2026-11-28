@@ -68,6 +68,9 @@ export function useViewerFrame(options: {
   const mounted = useMounted()
   const dark = computed(() => colorMode.value === "dark")
   const isApp = computed(() => drop.value.kind === "app")
+  const mediaScope = computed(() =>
+    JSON.stringify([drop.value.id, drop.value.version, isApp.value ? page.value : null]),
+  )
   const trashed = computed(() => drop.value.trashedAt !== null)
 
   const imageBlob = shallowRef<Blob>()
@@ -307,7 +310,7 @@ export function useViewerFrame(options: {
       case "activity":
         return options.presence?.activity()
       case "media-time":
-        return saveMediaSpot(drop.value.id, message.index, message.at, message.duration)
+        return saveMediaSpot(mediaScope.value, message.index, message.source, message.at, message.duration)
       case "files":
         for (const path of message.paths)
           void attached.load(path).then((data) => data && send({ type: "file-data", path, data }))
@@ -337,7 +340,7 @@ export function useViewerFrame(options: {
       case "ready":
         variants.value = null
         frameTool.value = "browse"
-        send({ type: "media-times", times: readMediaSpots(drop.value.id) })
+        send({ type: "media-times", times: readMediaSpots(mediaScope.value) })
         if (options.variantBar) send({ type: "picker", do: "sync" })
         return
       case "variants":

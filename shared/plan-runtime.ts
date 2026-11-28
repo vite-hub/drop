@@ -2109,12 +2109,20 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
   // is gone on reload) and sends them as media-times; the frame reports a player's spot as it plays, pauses or seeks.
   let mediaSpots = {};
   const mediaReported = new WeakMap();
+  const mediaResumed = new WeakMap();
   const mediaIndex = (el) => Array.prototype.indexOf.call(document.querySelectorAll("video, audio"), el);
+  const mediaSource = (el) => {
+    const url = el.currentSrc;
+    if (!url || el.srcObject) return;
+    if (url === el.dataset.dropMediaObject) return el.dataset.dropMediaSource;
+    if (/^https?:/.test(url) && url.length <= 2048) return url;
+  };
   const resumeMedia = (el) => {
     const spot = mediaSpots[mediaIndex(el)];
-    if (el.dataset.dropResumed || !spot || el.readyState < 1 || !(el.duration > 0)) return;
-    el.dataset.dropResumed = "";
-    if (Math.abs(spot.duration - el.duration) < 1 && el.currentTime < 1) el.currentTime = spot.at;
+    const source = mediaSource(el);
+    if (!source || mediaResumed.get(el) === source || spot?.source !== source || el.readyState < 1 || !(el.duration > 0)) return;
+    mediaResumed.set(el, source);
+    if (Math.abs(spot.duration - el.duration) <= 1 && el.currentTime < 1) el.currentTime = spot.at;
   };
   const reportMedia = (e) => {
     const el = e.target;
@@ -2125,7 +2133,8 @@ const ANNOTATOR_SCRIPT = String.raw`(() => {
     if (e.type === "timeupdate" && now - (mediaReported.get(el) || 0) < 2000) return;
     mediaReported.set(el, now);
     const index = mediaIndex(el);
-    if (index >= 0 && index < 100) post({ type: "media-time", index, at: e.type === "ended" ? 0 : el.currentTime, duration: el.duration });
+    const source = mediaSource(el);
+    if (source && index >= 0 && index < 100) post({ type: "media-time", index, source, at: e.type === "ended" ? 0 : el.currentTime, duration: el.duration });
   };
   for (const type of ["loadedmetadata", "timeupdate", "pause", "seeked", "ended"]) document.addEventListener(type, reportMedia, true);
   window.addEventListener("message", (e) => {
